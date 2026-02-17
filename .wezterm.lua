@@ -63,7 +63,7 @@ end
 config.font = make_font("DemiBold")
 
 config.use_cap_height_to_scale_fallback_fonts = false
-config.line_height = 1.15
+config.line_height = 1.2
 
 -- =========================================================
 -- Bold settings (allow bold on non-Retina, keep brightening off)
