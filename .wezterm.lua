@@ -35,50 +35,62 @@ config.custom_block_glyphs = false
 -- =========================================================
 local USE_NERD_PRIMARY = false -- set true if you want ALL text to use Nerd Font
 
-local EN_FONT_NORMAL = "Rec Mono Baker"
-local EN_FONT_NERD = "RecMono Nerd Font" -- brew install --cask font-recursive-mono-nerd-font
+local EN_FONT_NORMAL = "RecMonoBaker Nerd Font"
+local EN_FONT_NERD = "RecMonoBaker Nerd Font"
 
 config.font_size = 14.0
-local CN_SCALE = 16.0 / 14.0
+local CN_SCALE = 17.0 / 14.0
 
 local function main_font_family()
   return USE_NERD_PRIMARY and EN_FONT_NERD or EN_FONT_NORMAL
 end
 
-config.font = wezterm.font_with_fallback({
-  { family = main_font_family() },
-
-  -- CJK monospace fallback
-  { family = "LXGW WenKai Mono", scale = CN_SCALE },
-
-  -- Prefer Nerd Font for powerline glyphs
-  EN_FONT_NERD,
-  "Symbols Nerd Font Mono",
-  "Noto Color Emoji",
-})
-
-config.use_cap_height_to_scale_fallback_fonts = false
-config.line_height = 1.12
-
--- =========================================================
--- Disable Bold (no bold weight + no brightening)
--- =========================================================
-config.bold_brightens_ansi_colors = "No"
-
-local function build_font(style)
+local function make_font(weight)
   return wezterm.font_with_fallback({
-    { family = main_font_family(), weight = "Regular", style = style },
-    { family = "LXGW WenKai Mono", weight = "Regular", style = style, scale = CN_SCALE },
+    { family = main_font_family(), weight = weight },
+
+    -- CJK monospace fallback
+    { family = "LXGW WenKai Mono", scale = CN_SCALE },
+
+    -- Prefer Nerd Font for powerline glyphs
     EN_FONT_NERD,
     "Symbols Nerd Font Mono",
     "Noto Color Emoji",
   })
 end
 
-config.font_rules = {
-  { intensity = "Bold", font = build_font(nil) },
-  { intensity = "Bold", italic = true, font = build_font("Italic") },
-}
+-- Default to DemiBold (overridden to Regular on Retina via event below)
+config.font = make_font("DemiBold")
+
+config.use_cap_height_to_scale_fallback_fonts = false
+config.line_height = 1.15
+
+-- =========================================================
+-- Bold settings (allow bold on non-Retina, keep brightening off)
+-- =========================================================
+config.bold_brightens_ansi_colors = "No"
+
+-- Remove font_rules to allow native bold rendering
+-- (Bold text will use Bold weight instead of Regular)
+
+-- =========================================================
+-- Auto-detect Retina: use DemiBold on non-Retina, Regular on Retina
+-- =========================================================
+wezterm.on("window-config-reloaded", function(window, _pane)
+  local dpi = window:get_dimensions().dpi
+  local is_retina = dpi > 100
+  local overrides = window:get_config_overrides() or {}
+
+  local desired_weight = is_retina and "Regular" or "DemiBold"
+  local new_font = make_font(desired_weight)
+
+  -- Only apply override if it changed, to avoid infinite reload loop
+  if overrides._font_weight ~= desired_weight then
+    overrides.font = new_font
+    overrides._font_weight = desired_weight
+    window:set_config_overrides(overrides)
+  end
+end)
 
 -- =========================================================
 -- Retro tab bar (NO fancy)
