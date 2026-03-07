@@ -301,4 +301,12 @@ config.audible_bell = "Disabled"
 config.window_background_opacity = 1.0
 config.text_background_opacity = 1.0
 
+-- =========================================================
+-- Dim inactive panes for clear active/inactive distinction
+-- =========================================================
+config.inactive_pane_hsb = {
+  saturation = 0.7,
+  brightness = 0.4,
+}
+
 return config
