@@ -21,7 +21,7 @@ local config = wezterm.config_builder and wezterm.config_builder() or {}
 -- =========================================================
 -- Theme
 -- =========================================================
-config.color_scheme = "GruvboxDarkHard"
+config.color_scheme = "Solarized Dark - Patched"
 
 -- =========================================================
 -- Make Powerline/NERD glyphs render correctly
@@ -110,13 +110,13 @@ config.window_frame = {
 -- =========================================================
 -- Colors
 -- =========================================================
-local BAR_BG      = "#1d2021"
-local INACTIVE_BG = "#282828"
-local HOVER_BG    = "#504945"
-local ACTIVE_BG   = "#3c3836"
+local BAR_BG      = "#002b36"
+local INACTIVE_BG = "#073642"
+local HOVER_BG    = "#586e75"
+local ACTIVE_BG   = "#073642"
 
-local FG_DIM      = "#a89984"
-local FG          = "#ebdbb2"
+local FG_DIM      = "#839496"
+local FG          = "#eee8d5"
 
 config.colors = config.colors or {}
 config.colors.tab_bar = {
