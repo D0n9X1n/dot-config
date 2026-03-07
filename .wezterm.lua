@@ -63,7 +63,7 @@ end
 config.font = make_font("DemiBold")
 
 config.use_cap_height_to_scale_fallback_fonts = false
-config.line_height = 1.2
+config.line_height = 1.1
 
 -- =========================================================
 -- Bold settings (allow bold on non-Retina, keep brightening off)
@@ -286,6 +286,9 @@ config.keys = {
 
   -- Zoom current pane: Cmd+Ctrl+Alt+Enter
   { key = "Enter", mods = "CMD|CTRL|ALT", action = act.TogglePaneZoomState },
+
+  -- Cmd+w: close current pane (closes tab only if it's the last pane)
+  { key = "w", mods = "CMD", action = act.CloseCurrentPane({ confirm = true }) },
 }
 
 -- =========================================================
