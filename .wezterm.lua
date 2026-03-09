@@ -30,16 +30,13 @@ config.custom_block_glyphs = false
 
 -- =========================================================
 -- Fonts
--- EN=14, CN=16 (scaled)
--- Use Nerd Font as much as possible (icons/powerline glyphs)
 -- =========================================================
 local USE_NERD_PRIMARY = false -- set true if you want ALL text to use Nerd Font
 
-local EN_FONT_NORMAL = "RecMonoBaker Nerd Font"
-local EN_FONT_NERD = "RecMonoBaker Nerd Font"
+local EN_FONT_NORMAL = "Rec Mono St.Helens"
+local EN_FONT_NERD = "Rec Mono St.Helens"
 
 config.font_size = 14.0
-local CN_SCALE = 17.0 / 14.0
 
 local function main_font_family()
   return USE_NERD_PRIMARY and EN_FONT_NERD or EN_FONT_NORMAL
@@ -49,48 +46,25 @@ local function make_font(weight)
   return wezterm.font_with_fallback({
     { family = main_font_family(), weight = weight },
 
-    -- CJK monospace fallback
-    { family = "LXGW WenKai Mono", scale = CN_SCALE },
-
-    -- Prefer Nerd Font for powerline glyphs
-    EN_FONT_NERD,
     "Symbols Nerd Font Mono",
     "Noto Color Emoji",
   })
 end
 
--- Default to DemiBold (overridden to Regular on Retina via event below)
 config.font = make_font("DemiBold")
 
 config.use_cap_height_to_scale_fallback_fonts = false
-config.line_height = 1.1
+config.line_height = 1.0
+config.cell_width = 1.0
+
+-- Antialiasing defaults (overridden per-display below)
+config.freetype_load_target = "Light"
+config.freetype_render_target = "HorizontalLcd"
 
 -- =========================================================
--- Bold settings (allow bold on non-Retina, keep brightening off)
+-- Bold settings (keep brightening off)
 -- =========================================================
 config.bold_brightens_ansi_colors = "No"
-
--- Remove font_rules to allow native bold rendering
--- (Bold text will use Bold weight instead of Regular)
-
--- =========================================================
--- Auto-detect Retina: use DemiBold on non-Retina, Regular on Retina
--- =========================================================
-wezterm.on("window-config-reloaded", function(window, _pane)
-  local dpi = window:get_dimensions().dpi
-  local is_retina = dpi > 100
-  local overrides = window:get_config_overrides() or {}
-
-  local desired_weight = is_retina and "Regular" or "DemiBold"
-  local new_font = make_font(desired_weight)
-
-  -- Only apply override if it changed, to avoid infinite reload loop
-  if overrides._font_weight ~= desired_weight then
-    overrides.font = new_font
-    overrides._font_weight = desired_weight
-    window:set_config_overrides(overrides)
-  end
-end)
 
 -- =========================================================
 -- Retro tab bar (NO fancy)
@@ -308,5 +282,23 @@ config.inactive_pane_hsb = {
   saturation = 0.7,
   brightness = 0.4,
 }
+
+-- =========================================================
+-- Retina / non-retina adaptive antialiasing
+-- =========================================================
+-- Retina (scale >= 2): greyscale AA — no subpixel fringing, cleaner on HiDPI
+-- Non-retina (scale 1): subpixel AA — sharper text on low-DPI panels
+wezterm.on("window-resized", function(window, _pane)
+  local overrides = window:get_config_overrides() or {}
+  local dpi = window:get_dimensions().dpi or 96
+  local is_retina = dpi > 140
+
+  local want_render = is_retina and "Normal" or "HorizontalLcd"
+  if overrides.freetype_render_target ~= want_render then
+    overrides.freetype_render_target = want_render
+    overrides.freetype_load_target = "Light"
+    window:set_config_overrides(overrides)
+  end
+end)
 
 return config
