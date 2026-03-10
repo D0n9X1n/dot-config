@@ -24,62 +24,50 @@ local config = wezterm.config_builder and wezterm.config_builder() or {}
 config.color_scheme = "Solarized Dark - Patched"
 
 -- =========================================================
--- Make Powerline/NERD glyphs render correctly
+-- Fonts
 -- =========================================================
 config.custom_block_glyphs = false
 
--- =========================================================
--- Fonts
--- =========================================================
-local USE_NERD_PRIMARY = false -- set true if you want ALL text to use Nerd Font
-
-local EN_FONT_NORMAL = "Rec Mono St.Helens"
-local EN_FONT_NERD = "Rec Mono St.Helens"
-
-config.font_size = 14.0
-
-local function main_font_family()
-  return USE_NERD_PRIMARY and EN_FONT_NERD or EN_FONT_NORMAL
-end
+local EN_FONT = "Rec Mono St.Helens"
 
 local function make_font(weight)
   return wezterm.font_with_fallback({
-    { family = main_font_family(), weight = weight },
-
+    { family = EN_FONT, weight = weight },
     "Symbols Nerd Font Mono",
     "Noto Color Emoji",
   })
 end
 
-config.font = make_font("DemiBold")
-
+config.font = make_font("Regular")
+config.font_size = 14.0
 config.use_cap_height_to_scale_fallback_fonts = false
-config.line_height = 1.0
-config.cell_width = 1.0
 
--- Antialiasing defaults (overridden per-display below)
-config.freetype_load_target = "Light"
+-- Disable hinting to preserve natural stroke width
+config.freetype_load_target = "Normal"
 config.freetype_render_target = "HorizontalLcd"
+config.freetype_load_flags = "NO_HINTING"
 
--- =========================================================
--- Bold settings (keep brightening off)
--- =========================================================
 config.bold_brightens_ansi_colors = "No"
 
+-- Disable bold (font only has Regular and Bold)
+config.font_rules = {
+  {
+    intensity = "Bold",
+    italic = false,
+    font = make_font("Regular"),
+  },
+}
+
 -- =========================================================
--- Retro tab bar (NO fancy)
+-- Tab bar
 -- =========================================================
 config.use_fancy_tab_bar = false
 config.enable_tab_bar = true
 config.tab_bar_at_bottom = true
 config.hide_tab_bar_if_only_one_tab = false
-
 config.tab_max_width = 40
 config.show_new_tab_button_in_tab_bar = false
-config.show_tab_index_in_tab_bar = false -- no index
-config.window_frame = {
-  font_size = 18.0,
-}
+config.show_tab_index_in_tab_bar = false
 
 -- =========================================================
 -- Colors
@@ -92,19 +80,16 @@ local ACTIVE_BG   = "#073642"
 local FG_DIM      = "#839496"
 local FG          = "#eee8d5"
 
-config.colors = config.colors or {}
-config.colors.tab_bar = {
-  background = BAR_BG,
-
-  -- Hide the default '|' divider by painting edge as background
-  inactive_tab_edge = BAR_BG,
-
-  active_tab = { bg_color = ACTIVE_BG, fg_color = FG },
-  inactive_tab = { bg_color = INACTIVE_BG, fg_color = FG_DIM },
-  inactive_tab_hover = { bg_color = HOVER_BG, fg_color = FG },
-
-  new_tab = { bg_color = BAR_BG, fg_color = FG_DIM },
-  new_tab_hover = { bg_color = HOVER_BG, fg_color = FG },
+config.colors = {
+  tab_bar = {
+    background = BAR_BG,
+    inactive_tab_edge = BAR_BG,
+    active_tab = { bg_color = ACTIVE_BG, fg_color = FG },
+    inactive_tab = { bg_color = INACTIVE_BG, fg_color = FG_DIM },
+    inactive_tab_hover = { bg_color = HOVER_BG, fg_color = FG },
+    new_tab = { bg_color = BAR_BG, fg_color = FG_DIM },
+    new_tab_hover = { bg_color = HOVER_BG, fg_color = FG },
+  },
 }
 
 -- =========================================================
@@ -230,9 +215,14 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, cfg, hover, max_width)
 end)
 
 -- =========================================================
--- Window padding
+-- Window
 -- =========================================================
 config.window_padding = { left = 8, right = 8, top = 8, bottom = 8 }
+
+config.inactive_pane_hsb = {
+  saturation = 0.7,
+  brightness = 0.4,
+}
 
 -- =========================================================
 -- Keybindings
@@ -266,39 +256,35 @@ config.keys = {
 }
 
 -- =========================================================
--- QoL / stability
+-- QoL
 -- =========================================================
 config.term = "xterm-256color"
 config.scrollback_lines = 20000
 config.audible_bell = "Disabled"
 
-config.window_background_opacity = 1.0
-config.text_background_opacity = 1.0
-
 -- =========================================================
--- Dim inactive panes for clear active/inactive distinction
+-- Adaptive rendering per display DPI
 -- =========================================================
-config.inactive_pane_hsb = {
-  saturation = 0.7,
-  brightness = 0.4,
-}
-
--- =========================================================
--- Retina / non-retina adaptive antialiasing
--- =========================================================
--- Retina (scale >= 2): greyscale AA — no subpixel fringing, cleaner on HiDPI
--- Non-retina (scale 1): subpixel AA — sharper text on low-DPI panels
-wezterm.on("window-resized", function(window, _pane)
+local function apply_display_overrides(window)
   local overrides = window:get_config_overrides() or {}
   local dpi = window:get_dimensions().dpi or 96
   local is_retina = dpi > 140
 
   local want_render = is_retina and "Normal" or "HorizontalLcd"
-  if overrides.freetype_render_target ~= want_render then
+  local want_load   = is_retina and "Normal" or "HorizontalLcd"
+  local want_flags  = is_retina and "NO_HINTING" or "DEFAULT"
+
+  if overrides.freetype_render_target ~= want_render
+    or overrides.freetype_load_target ~= want_load
+    or overrides.freetype_load_flags  ~= want_flags then
     overrides.freetype_render_target = want_render
-    overrides.freetype_load_target = "Light"
+    overrides.freetype_load_target   = want_load
+    overrides.freetype_load_flags    = want_flags
     window:set_config_overrides(overrides)
   end
-end)
+end
+
+wezterm.on("window-config-reloaded", function(window, _pane) apply_display_overrides(window) end)
+wezterm.on("window-resized", function(window, _pane) apply_display_overrides(window) end)
 
 return config
