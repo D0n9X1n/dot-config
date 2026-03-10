@@ -266,22 +266,21 @@ config.audible_bell = "Disabled"
 -- Adaptive rendering per display DPI
 -- =========================================================
 local function apply_display_overrides(window)
-  local overrides = window:get_config_overrides() or {}
   local dpi = window:get_dimensions().dpi or 96
   local is_retina = dpi > 140
 
-  local want_render = is_retina and "Normal" or "HorizontalLcd"
-  local want_load   = is_retina and "Normal" or "HorizontalLcd"
-  local want_flags  = is_retina and "NO_HINTING" or "DEFAULT"
+  local weight = is_retina and "Regular"     or "Medium"
+  local render = is_retina and "Normal"      or "HorizontalLcd"
+  local load   = is_retina and "Normal"      or "Normal"
+  local flags  = is_retina and "NO_HINTING"  or "DEFAULT"
 
-  if overrides.freetype_render_target ~= want_render
-    or overrides.freetype_load_target ~= want_load
-    or overrides.freetype_load_flags  ~= want_flags then
-    overrides.freetype_render_target = want_render
-    overrides.freetype_load_target   = want_load
-    overrides.freetype_load_flags    = want_flags
-    window:set_config_overrides(overrides)
-  end
+  window:set_config_overrides({
+    font                   = make_font(weight),
+    font_rules             = { { intensity = "Bold", italic = false, font = make_font(weight) } },
+    freetype_render_target = render,
+    freetype_load_target   = load,
+    freetype_load_flags    = flags,
+  })
 end
 
 wezterm.on("window-config-reloaded", function(window, _pane) apply_display_overrides(window) end)
