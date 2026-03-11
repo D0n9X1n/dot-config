@@ -21,12 +21,12 @@ local config = wezterm.config_builder and wezterm.config_builder() or {}
 -- =========================================================
 -- Theme
 -- =========================================================
-config.color_scheme = "Solarized Dark - Patched"
+config.color_scheme = "GruvboxDarkHard"
 
 -- =========================================================
 -- Fonts
 -- =========================================================
-config.custom_block_glyphs = false
+config.custom_block_glyphs = true
 
 local EN_FONT = "Rec Mono St.Helens"
 
@@ -40,6 +40,7 @@ end
 
 config.font = make_font("Regular")
 config.font_size = 14.0
+config.line_height = 1.1
 config.use_cap_height_to_scale_fallback_fonts = false
 
 -- Disable hinting to preserve natural stroke width
@@ -72,13 +73,13 @@ config.show_tab_index_in_tab_bar = false
 -- =========================================================
 -- Colors
 -- =========================================================
-local BAR_BG      = "#002b36"
-local INACTIVE_BG = "#073642"
-local HOVER_BG    = "#586e75"
-local ACTIVE_BG   = "#073642"
+local BAR_BG      = "#282828"
+local INACTIVE_BG = "#3c3836"
+local HOVER_BG    = "#504945"
+local ACTIVE_BG   = "#3c3836"
 
-local FG_DIM      = "#839496"
-local FG          = "#eee8d5"
+local FG_DIM      = "#a89984"
+local FG          = "#ebdbb2"
 
 config.colors = {
   tab_bar = {
