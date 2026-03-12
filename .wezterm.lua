@@ -43,10 +43,13 @@ config.font_size = 14.0
 config.line_height = 1.1
 config.use_cap_height_to_scale_fallback_fonts = false
 
--- Disable hinting to preserve natural stroke width
-config.freetype_load_target = "Normal"
+-- Light vertical hinting + LCD subpixel rendering + FreeType auto-hinter
+-- (better than CFF2 built-in hints for screen rendering of variable fonts).
+-- Subpixel rendering gives 3× horizontal resolution — crispness without
+-- needing heavier weight.  Retina overrides via apply_display_overrides().
+config.freetype_load_target = "Light"
 config.freetype_render_target = "HorizontalLcd"
-config.freetype_load_flags = "NO_HINTING"
+config.freetype_load_flags = "FORCE_AUTOHINT"
 
 config.bold_brightens_ansi_colors = "No"
 
@@ -267,13 +270,13 @@ config.audible_bell = "Disabled"
 -- Adaptive rendering per display DPI
 -- =========================================================
 local function apply_display_overrides(window)
-  local dpi = window:get_dimensions().dpi or 96
+  local dpi = window:get_dimensions().dpi or 72
   local is_retina = dpi > 140
 
   local weight = is_retina and "Regular"     or "Medium"
   local render = is_retina and "Normal"      or "HorizontalLcd"
-  local load   = is_retina and "Normal"      or "Normal"
-  local flags  = is_retina and "NO_HINTING"  or "DEFAULT"
+  local load   = is_retina and "Normal"      or "Light"
+  local flags  = is_retina and "NO_HINTING"  or "FORCE_AUTOHINT"
 
   window:set_config_overrides({
     font                   = make_font(weight),
