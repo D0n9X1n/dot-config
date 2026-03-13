@@ -2,12 +2,12 @@
 -- =========================================================
 -- Keymap quick reference
 -- Splits:
---   Cmd+Ctrl+Alt+v  -> split right (horizontal)
---   Cmd+Ctrl+Alt+h  -> split down (vertical)
+--   Cmd+d            -> split down (vertical)
+--   Cmd+Shift+d      -> split right (horizontal)
 -- Tabs:
 --   Cmd+Left/Right  -> previous/next tab
 -- Panes:
---   Cmd+Ctrl+Alt+Arrows -> focus pane in direction
+--   Ctrl+hjkl        -> focus pane in direction
 -- Resize panes:
 --   Cmd+Ctrl+Alt+Shift+Arrows -> resize by small steps
 -- Zoom:
@@ -233,18 +233,18 @@ config.inactive_pane_hsb = {
 -- =========================================================
 config.keys = {
   -- Splits
-  { key = "v", mods = "CMD|CTRL|ALT", action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }) },
-  { key = "h", mods = "CMD|CTRL|ALT", action = act.SplitVertical({ domain = "CurrentPaneDomain" }) },
+  { key = "d", mods = "CMD",       action = act.SplitVertical({ domain = "CurrentPaneDomain" }) },
+  { key = "d", mods = "CMD|SHIFT", action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }) },
 
   -- Cmd + Left/Right: switch tabs
   { key = "LeftArrow",  mods = "CMD", action = act.ActivateTabRelative(-1) },
   { key = "RightArrow", mods = "CMD", action = act.ActivateTabRelative(1) },
 
   -- Pane navigation
-  { key = "LeftArrow",  mods = "CMD|CTRL|ALT", action = act.ActivatePaneDirection("Left") },
-  { key = "RightArrow", mods = "CMD|CTRL|ALT", action = act.ActivatePaneDirection("Right") },
-  { key = "UpArrow",    mods = "CMD|CTRL|ALT", action = act.ActivatePaneDirection("Up") },
-  { key = "DownArrow",  mods = "CMD|CTRL|ALT", action = act.ActivatePaneDirection("Down") },
+  { key = "h", mods = "CTRL", action = act.ActivatePaneDirection("Left") },
+  { key = "l", mods = "CTRL", action = act.ActivatePaneDirection("Right") },
+  { key = "k", mods = "CTRL", action = act.ActivatePaneDirection("Up") },
+  { key = "j", mods = "CTRL", action = act.ActivatePaneDirection("Down") },
 
   -- Resize pane: Cmd+Ctrl+Alt+Shift + arrows
   { key = "LeftArrow",  mods = "CMD|CTRL|ALT|SHIFT", action = act.AdjustPaneSize({ "Left", 5 }) },
