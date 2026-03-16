@@ -7,7 +7,7 @@
 -- Tabs:
 --   Cmd+Left/Right  -> previous/next tab
 -- Panes:
---   Ctrl+hjkl        -> focus pane in direction
+--   Ctrl+Shift+Arrows -> focus pane in direction
 -- Resize panes:
 --   Cmd+Ctrl+Alt+Shift+Arrows -> resize by small steps
 -- Zoom:
@@ -38,27 +38,25 @@ local function make_font(weight)
   })
 end
 
-config.font = make_font("Regular")
+config.font = make_font(500)
 config.font_size = 14.0
 config.line_height = 1.1
 config.use_cap_height_to_scale_fallback_fonts = false
 
--- Light vertical hinting + LCD subpixel rendering + FreeType auto-hinter
--- (better than CFF2 built-in hints for screen rendering of variable fonts).
--- Subpixel rendering gives 3× horizontal resolution — crispness without
--- needing heavier weight.  Retina overrides via apply_display_overrides().
+-- No hinting + grayscale anti-aliasing = thinnest possible strokes.
+-- Display-specific overrides via apply_display_overrides().
 config.freetype_load_target = "Light"
-config.freetype_render_target = "HorizontalLcd"
-config.freetype_load_flags = "FORCE_AUTOHINT"
+config.freetype_render_target = "Normal"
+config.freetype_load_flags = "NO_HINTING"
 
 config.bold_brightens_ansi_colors = "No"
 
--- Disable bold (font only has Regular and Bold)
+-- Map bold to same weight (font only has Regular and Bold)
 config.font_rules = {
   {
     intensity = "Bold",
     italic = false,
-    font = make_font("Regular"),
+    font = make_font(500),
   },
 }
 
@@ -232,6 +230,16 @@ config.inactive_pane_hsb = {
 -- Keybindings
 -- =========================================================
 config.keys = {
+  -- Only copy when there is a selection; otherwise send Ctrl+C (SIGINT)
+  { key = "c", mods = "CMD", action = wezterm.action_callback(function(window, pane)
+    local sel = window:get_selection_text_for_pane(pane)
+    if sel and sel ~= "" then
+      window:perform_action(act.CopyTo("Clipboard"), pane)
+    else
+      window:perform_action(act.SendKey({ key = "c", mods = "CTRL" }), pane)
+    end
+  end) },
+
   -- Splits
   { key = "d", mods = "CMD",       action = act.SplitVertical({ domain = "CurrentPaneDomain" }) },
   { key = "d", mods = "CMD|SHIFT", action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }) },
@@ -241,10 +249,10 @@ config.keys = {
   { key = "RightArrow", mods = "CMD", action = act.ActivateTabRelative(1) },
 
   -- Pane navigation
-  { key = "h", mods = "CTRL", action = act.ActivatePaneDirection("Left") },
-  { key = "l", mods = "CTRL", action = act.ActivatePaneDirection("Right") },
-  { key = "k", mods = "CTRL", action = act.ActivatePaneDirection("Up") },
-  { key = "j", mods = "CTRL", action = act.ActivatePaneDirection("Down") },
+  { key = "LeftArrow",  mods = "CTRL|SHIFT", action = act.ActivatePaneDirection("Left") },
+  { key = "RightArrow", mods = "CTRL|SHIFT", action = act.ActivatePaneDirection("Right") },
+  { key = "UpArrow",    mods = "CTRL|SHIFT", action = act.ActivatePaneDirection("Up") },
+  { key = "DownArrow",  mods = "CTRL|SHIFT", action = act.ActivatePaneDirection("Down") },
 
   -- Resize pane: Cmd+Ctrl+Alt+Shift + arrows
   { key = "LeftArrow",  mods = "CMD|CTRL|ALT|SHIFT", action = act.AdjustPaneSize({ "Left", 5 }) },
@@ -273,10 +281,10 @@ local function apply_display_overrides(window)
   local dpi = window:get_dimensions().dpi or 72
   local is_retina = dpi > 140
 
-  local weight = is_retina and "Regular"     or "Medium"
-  local render = is_retina and "Normal"      or "HorizontalLcd"
-  local load   = is_retina and "Normal"      or "Light"
-  local flags  = is_retina and "NO_HINTING"  or "FORCE_AUTOHINT"
+  local weight = is_retina and "Medium"       or "DemiBold"
+  local render = is_retina and "Normal"       or "HorizontalLcd"
+  local load   = is_retina and "Normal"       or "Light"
+  local flags  = is_retina and "NO_HINTING"   or "DEFAULT"
 
   window:set_config_overrides({
     font                   = make_font(weight),
