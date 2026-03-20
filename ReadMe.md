@@ -69,7 +69,7 @@ Example: `.wezterm.lua` → `$HOME/.wezterm.lua`
 | Split down (vertical) | `Cmd+Ctrl+Alt+H` |
 | Previous tab | `Cmd+←` |
 | Next tab | `Cmd+→` |
-| Focus pane (direction) | `Cmd+Ctrl+Alt+Arrows` |
+| Focus pane (direction) | `Ctrl+Shift+Arrows` |
 | Resize pane (small steps) | `Cmd+Ctrl+Alt+Shift+Arrows` |
 | Toggle pane zoom | `Cmd+Ctrl+Alt+Enter` |
 
