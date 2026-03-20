@@ -18,6 +18,9 @@ local act = wezterm.action
 
 local config = wezterm.config_builder and wezterm.config_builder() or {}
 
+-- Use Metal via WebGpu instead of deprecated OpenGL (fixes sleep/wake crashes)
+config.front_end = "WebGpu"
+
 -- =========================================================
 -- Theme
 -- =========================================================

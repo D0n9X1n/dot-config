@@ -77,6 +77,7 @@ Example: `.wezterm.lua` → `$HOME/.wezterm.lua`
 
 | Setting | Value |
 |---|---|
+| Rendering | WebGpu (Metal) — avoids deprecated OpenGL sleep/wake crashes |
 | TERM | `xterm-256color` |
 | Scrollback lines | 20,000 |
 | Audible bell | Disabled |
