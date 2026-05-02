@@ -19,7 +19,9 @@ install_macos_deps() {
     exit 1
   fi
 
-  brew tap homebrew/cask-fonts >/dev/null
+  # homebrew/cask-fonts was deprecated in 2024 and merged into homebrew/cask;
+  # ignore failures so older clones don't error here.
+  brew tap homebrew/cask-fonts >/dev/null 2>&1 || true
 
   local app_casks=(
     wezterm
@@ -37,7 +39,7 @@ install_macos_deps() {
     if brew list --cask "$cask" >/dev/null 2>&1; then
       continue
     fi
-    brew install --cask "$cask"
+    brew install --cask "$cask" || echo "Warning: failed to install cask '$cask' (skipping)"
   done
 }
 
@@ -70,5 +72,20 @@ while IFS= read -r -d '' entry; do
   base="$(basename "$entry")"
   link_file "$entry" "${dest_dir}/${base}"
 done < <(find "$src_dir" -maxdepth 1 -mindepth 1 -name ".*" -type f -print0)
+
+# Link oh-my-zsh custom files (oh-my-zsh-custom/* -> ~/.oh-my-zsh/custom/*)
+omz_custom_src="${src_dir}/oh-my-zsh-custom"
+omz_custom_dest="${HOME}/.oh-my-zsh/custom"
+if [ -d "$omz_custom_src" ]; then
+  if [ -d "$omz_custom_dest" ]; then
+    while IFS= read -r -d '' entry; do
+      base="$(basename "$entry")"
+      link_file "$entry" "${omz_custom_dest}/${base}"
+    done < <(find "$omz_custom_src" -maxdepth 1 -mindepth 1 -type f -print0)
+    echo "Linked oh-my-zsh custom files to $omz_custom_dest"
+  else
+    echo "Skipping oh-my-zsh custom files: $omz_custom_dest does not exist (oh-my-zsh not installed?)"
+  fi
+fi
 
 echo "Linked dotfiles from $src_dir to $dest_dir"
