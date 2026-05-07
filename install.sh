@@ -88,4 +88,24 @@ if [ -d "$omz_custom_src" ]; then
   fi
 fi
 
+# Link Copilot CLI config files (copilot/* -> ~/.copilot/*)
+copilot_src="${src_dir}/copilot"
+copilot_dest="${HOME}/.copilot"
+if [ -d "$copilot_src" ]; then
+  if [ -d "$copilot_dest" ]; then
+    while IFS= read -r -d '' entry; do
+      base="$(basename "$entry")"
+      link_file "$entry" "${copilot_dest}/${base}"
+      # Preserve executable bit on shell scripts (e.g., statusline.sh) so
+      # Copilot CLI can run them directly without chmod each time.
+      case "$base" in
+        *.sh) chmod +x "$entry" ;;
+      esac
+    done < <(find "$copilot_src" -maxdepth 1 -mindepth 1 -type f -print0)
+    echo "Linked Copilot CLI config files to $copilot_dest"
+  else
+    echo "Skipping Copilot config files: $copilot_dest does not exist (copilot CLI not installed?)"
+  fi
+fi
+
 echo "Linked dotfiles from $src_dir to $dest_dir"

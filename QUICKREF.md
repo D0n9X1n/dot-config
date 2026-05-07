@@ -12,14 +12,23 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
 - `install.sh` — single entry point; idempotent; safe to re-run.
 - `<repo>/.<name>` — root dotfiles linked to `$HOME/.<name>`. Currently:
   - `.wezterm.lua` → `$HOME/.wezterm.lua`
+- `<repo>/copilot/<file>` — files linked to `$HOME/.copilot/<file>`. Currently:
+  - `settings.json` — Copilot CLI settings (model: `claude-opus-4.7-1m-internal`,
+    theme `dark`, `keepAlive: busy`, `continueOnAutoMode: true`, full footer
+    UX, custom status line, experimental features).
+  - `statusline.sh` — executable script printing the custom status line:
+    time, git clean/dirty indicator, active Python venv. Uses Nerd Font glyphs.
+    `install.sh` ensures the executable bit is set.
+  - `copilot-instructions.md` — global agent instructions (autonomous mode).
 - `<repo>/oh-my-zsh-custom/<file>` — files linked to
   `$HOME/.oh-my-zsh/custom/<file>`. Currently:
   - `custom.zsh` — aliases, proxy helpers (`enable_proxy`/`disable_proxy`),
     brew completions, `PATH` extras (`.NET`, Android SDK).
   - `gg.zsh` — defines `gg <title>` which sets the WezTerm tab + window title
     (via OSC 1/2 escapes and `wezterm cli`) and runs `command copilot
-    --allow-all-tools --allow-all-paths`. Also sets `DISABLE_AUTO_TITLE=true`
-    so oh-my-zsh hooks don't overwrite the title during the session.
+    --allow-all-tools --allow-all-paths --effort xhigh`. Also sets
+    `DISABLE_AUTO_TITLE=true` so oh-my-zsh hooks don't overwrite the title
+    during the session.
 
 ## How install.sh works
 1. macOS only (auto-installs Homebrew apps and fonts; failures are warnings,
@@ -27,14 +36,18 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
 2. Symlinks every top-level `.<name>` file in the repo to `$HOME/.<name>`.
 3. Symlinks every file in `oh-my-zsh-custom/` to `~/.oh-my-zsh/custom/`.
    Skipped (with a warning) if `~/.oh-my-zsh/custom/` does not exist.
-4. Existing destination files/links that don't match are renamed to
+4. Symlinks every file in `copilot/` to `~/.copilot/`.
+   Skipped (with a warning) if `~/.copilot/` does not exist.
+5. Existing destination files/links that don't match are renamed to
    `<name>.bak.YYYYMMDDHHMMSS` before linking.
-5. Correct symlinks are left alone (no-op).
+6. Correct symlinks are left alone (no-op).
 
 ## Adding a new config
 - New `~/.something` dotfile: drop `.something` at repo root, run `install.sh`.
 - New oh-my-zsh customization: add a `*.zsh` file to `oh-my-zsh-custom/`,
   run `install.sh`. oh-my-zsh auto-loads files in alphabetical order.
+- New Copilot CLI config: add a file to `copilot/`, run `install.sh`.
+  Note: `mcp-config.json` is excluded (contains secrets) — manage it manually.
 - Editing existing config: edit in this repo. Symlinks make changes live
   immediately on every machine.
 

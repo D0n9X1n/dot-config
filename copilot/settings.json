@@ -1,0 +1,71 @@
+{
+  "model": "claude-opus-4.7-1m-internal",
+  "theme": "dark",
+  "renderMarkdown": true,
+  "logLevel": "all",
+  "experimental": true,
+  "banner": "always",
+  "beep": true,
+  "mouse": true,
+  "stream": true,
+  "keepAlive": "busy",
+  "continueOnAutoMode": true,
+  "updateTerminalTitle": true,
+  "compactPaste": true,
+  "respectGitignore": true,
+  "includeCoAuthoredBy": true,
+  "footer": {
+    "showModelEffort": true,
+    "showDirectory": true,
+    "showBranch": true,
+    "showContextWindow": true,
+    "showQuota": false,
+    "showAgent": true,
+    "showCodeChanges": true,
+    "showUsername": false,
+    "showCustom": true
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "~/.copilot/statusline.sh",
+    "padding": 1
+  },
+  "ide": {
+    "autoConnect": true,
+    "openDiffOnEdit": true
+  },
+  "effortLevel": "xhigh",
+  "trustedFolders": [
+    "/Users/d0n9x1n"
+  ],
+  "lastLoggedInUser": {
+    "host": "https://github.com",
+    "login": "D0n9X1n"
+  },
+  "loggedInUsers": [
+    {
+      "host": "https://github.com",
+      "login": "D0n9X1n"
+    }
+  ],
+  "firstLaunchAt": "2026-03-11T00:00:00.000Z",
+  "sessionSync": [
+    {
+      "origin": "D0n9X1n/nvim-config",
+      "level": "user"
+    },
+    {
+      "origin": "D0n9X1n/chatgpt-tag-highlighter",
+      "level": "user"
+    },
+    {
+      "origin": "D0n9X1n/dot-config",
+      "level": "user"
+    },
+    {
+      "origin": "*",
+      "level": "local"
+    }
+  ],
+  "staff": true
+}
