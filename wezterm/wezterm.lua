@@ -92,17 +92,14 @@ config.colors = {
 }
 
 -- =========================================================
--- Tab bar
+-- Tab bar — retro mode, multi-line for height
 -- =========================================================
--- use_fancy_tab_bar=true gives a taller, native-style tab bar (vs the
--- one-cell-tall retro mode). Still respects format-tab-title below, so
--- the pill icons + per-process Nerd Font glyphs keep working.
---
--- IMPORTANT: fancy mode is only supported at the TOP of the window. Setting
--- tab_bar_at_bottom=true while fancy is on silently downgrades the bar to
--- retro mode (one cell tall) and makes window_frame.font_size a no-op.
--- We deliberately put the bar at the top so the height bump below applies.
-config.use_fancy_tab_bar = true
+-- Why retro (not fancy):
+--   * Fancy mode shows a close × on hover that can't be hidden (controlled
+--     by WezTerm's chrome), and forces a single-line layout.
+--   * Retro lets format-tab-title return MULTI-LINE text — the bar grows
+--     to the tallest tab. That's how we get height + a loading bar row.
+config.use_fancy_tab_bar = false
 config.enable_tab_bar = true
 config.tab_bar_at_bottom = false
 config.hide_tab_bar_if_only_one_tab = false
@@ -110,36 +107,49 @@ config.tab_max_width = 40
 config.show_new_tab_button_in_tab_bar = false
 config.show_tab_index_in_tab_bar = false
 
--- Fancy tab bar height is driven by the window_frame font size. Default is
--- ~12pt; 13 keeps tabs comfortably readable without dwarfing terminal text.
--- Window frame chrome harmonised with the bar so everything looks like one
--- continuous Gruvbox surface.
-config.window_frame = {
-  font = wezterm.font({ family = "Rec Mono St.Helens", weight = "Medium" }),
-  font_size = 13.0,
-  active_titlebar_bg = BAR_BG,
-  inactive_titlebar_bg = BAR_BG,
-  active_titlebar_fg = FG,
-  inactive_titlebar_fg = FG_DIM,
-  active_titlebar_border_bottom = BAR_BG,
-  inactive_titlebar_border_bottom = BAR_BG,
-  button_fg = FG_DIM,
-  button_bg = BAR_BG,
-  button_hover_fg = FG,
-  button_hover_bg = HOVER_BG,
-}
+-- Drive the loading-bar animation. WezTerm fires update-status on this
+-- interval; we bump a global frame counter and nudge the bar to redraw.
+config.status_update_interval = 200  -- 5Hz
 
 -- =========================================================
--- Custom tab renderer (rounded pill style with Powerline-extra glyphs)
+-- Custom tab renderer
+--   * 3 lines tall (top accent / title / bottom row)
+--   * Vibe-coding tabs (manually titled via gg) get an animated
+--     Knight-Rider loading bar on the bottom row
+--   * No rounded pills, no close icon
 -- =========================================================
 local MIN_TAB_WIDTH = 22 -- minimum clickable width (columns)
 
 local nf = wezterm.nerdfonts or {}
--- Rounded pill edges (Powerline Extra glyphs from Nerd Fonts).
--- The fg-color of the pill char IS the tab body color, drawn against the
--- bar bg — this makes the rounded shape "carve out" of the bar seamlessly.
-local LEFT_PILL  = utf8.char(0xe0b6)  --   half-circle left
-local RIGHT_PILL = utf8.char(0xe0b4) --   half-circle right
+
+-- Animated loading-bar driver: bump the frame counter on every status tick.
+-- update-status also nudges the tab bar to redraw, so format-tab-title
+-- below re-runs with the latest frame.
+wezterm.GLOBAL.tab_frame = wezterm.GLOBAL.tab_frame or 0
+wezterm.on("update-status", function(window, _pane)
+  wezterm.GLOBAL.tab_frame = (wezterm.GLOBAL.tab_frame + 1) % 1000
+  -- An empty right-status keeps the bar repainting without showing extra UI.
+  window:set_right_status("")
+end)
+
+-- Knight-Rider bar across a fixed-width track. A 3-block highlight bounces
+-- left↔right; the rest of the row uses ▁ for a faint base line.
+local function loading_bar(width, frame)
+  if width < 4 then width = 4 end
+  local span = width - 2  -- positions the 3-block highlight can occupy
+  local cycle = span * 2
+  local pos = frame % cycle
+  if pos >= span then pos = cycle - pos - 1 end
+  local out = {}
+  for i = 1, width do
+    if i >= pos + 1 and i <= pos + 3 then
+      out[i] = "█"
+    else
+      out[i] = "▁"
+    end
+  end
+  return table.concat(out)
+end
 
 local function tab_title(tab_info)
   local has_folder = false
@@ -227,37 +237,51 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, cfg, hover, max_width)
   local index = tostring(tab.tab_index + 1)
   title = index .. " " .. title
 
-  -- Width math: pill(1) + pad(1) + title + pad(1) + pill(1) = title + 4
+  -- Width math: outer pad(1) + title + outer pad(1) = title + 2
   local mw = max_width or 999
-  local FIXED = 1 + 1 + 1 + 1
+  local FIXED = 2
   local title_max = mw - FIXED
   if title_max < 1 then title_max = 1 end
 
   title = wezterm.truncate_right(title, title_max)
 
   -- Enforce minimum width for the title area
-  local min_title = MIN_TAB_WIDTH - 2 -- exclude the two pads around title
+  local min_title = MIN_TAB_WIDTH - FIXED
   if min_title < 1 then min_title = 1 end
   if min_title > title_max then min_title = title_max end
   title = wezterm.pad_right(title, min_title)
 
-  return {
-    -- Left rounded pill: pill fg = tab body color, drawn on bar bg.
-    { Background = { Color = BAR_BG } },
-    { Foreground = { Color = bg } },
-    { Text = LEFT_PILL },
+  -- Vibe-coding detection: tab.tab_title is set manually by the gg() shell
+  -- function (via OSC 1/2). Any tab with a non-empty manual title is treated
+  -- as a vibe-coding session and gets the animated loading bar.
+  local manual_title = tab_info.tab_title
+  local is_vibe = manual_title ~= nil and manual_title ~= ""
 
-    -- Tab body: title with single-space pads on each side.
+  local tab_width = #title + 2  -- includes the two outer pads
+  local top_row = string.rep(" ", tab_width)  -- breathing room
+
+  local bottom_row
+  if is_vibe then
+    local frame = wezterm.GLOBAL.tab_frame or 0
+    bottom_row = " " .. loading_bar(tab_width - 2, frame) .. " "
+  else
+    bottom_row = string.rep(" ", tab_width)
+  end
+
+  local body_row = " " .. title .. " "
+
+  return {
+    -- Tab background spans all 3 rows; the embedded \n forces wrap.
     { Background = { Color = bg } },
     { Foreground = { Color = fg } },
     { Attribute = { Intensity = is_active and "Bold" or "Normal" } },
-    { Text = " " .. title .. " " },
+    { Text = top_row .. "\n" .. body_row .. "\n" .. bottom_row },
     { Attribute = { Intensity = "Normal" } },
 
-    -- Right rounded pill: same trick, mirrored.
+    -- One-cell gap of bar bg between tabs (visual separator).
     { Background = { Color = BAR_BG } },
-    { Foreground = { Color = bg } },
-    { Text = RIGHT_PILL },
+    { Foreground = { Color = BAR_BG } },
+    { Text = " " },
   }
 end)
 
