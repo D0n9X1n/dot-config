@@ -220,21 +220,22 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, cfg, hover, max_width)
   -- Tab number prefix (#1, #2, ...) — easier to scan than a bare digit.
   title = "#" .. tostring(tab.tab_index + 1) .. " " .. title
 
-  -- Width math: 2 chars left pad + title + 2 chars right pad = title + 4.
-  -- Truncate to fit (max_width is the cell budget), but DON'T pad to a
-  -- min width — let each tab size to its actual content. Snugger tabs.
+  -- Width math: 2 chars left pad + title + 6 chars right pad (room before
+  -- the close × rendered by fancy-mode chrome) = title + 8.
   local mw = max_width or 999
-  local FIXED = 4
+  local FIXED = 8
   local title_max = mw - FIXED
   if title_max < 1 then title_max = 1 end
   title = wezterm.truncate_right(title, title_max)
 
   return {
     -- Single-line tab body. Padding around title; bold + accent on active.
+    -- Right pad is wider than left so the close × on hover doesn't crowd
+    -- the title text.
     { Background = { Color = bg } },
     { Foreground = { Color = fg } },
     { Attribute = { Intensity = is_active and "Bold" or "Normal" } },
-    { Text = "  " .. title .. "  " },
+    { Text = "  " .. title .. "      " },
     { Attribute = { Intensity = "Normal" } },
   }
 end)
