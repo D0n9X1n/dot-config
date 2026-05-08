@@ -77,6 +77,23 @@ config.tab_max_width = 40
 config.show_new_tab_button_in_tab_bar = false
 config.show_tab_index_in_tab_bar = false
 
+-- Fancy tab bar height is driven by the window_frame font size + the
+-- gruvbox tab bar bg (so the bar visually merges with the chrome).
+config.window_frame = {
+  font = wezterm.font({ family = "Rec Mono St.Helens", weight = "Regular" }),
+  font_size = 18.0,
+  active_titlebar_bg = "#282828",
+  inactive_titlebar_bg = "#282828",
+  active_titlebar_fg = "#ebdbb2",
+  inactive_titlebar_fg = "#a89984",
+  active_titlebar_border_bottom = "#282828",
+  inactive_titlebar_border_bottom = "#282828",
+  button_fg = "#a89984",
+  button_bg = "#282828",
+  button_hover_fg = "#ebdbb2",
+  button_hover_bg = "#3c3836",
+}
+
 -- =========================================================
 -- Colors
 -- =========================================================
