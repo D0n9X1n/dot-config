@@ -30,7 +30,9 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     `ghostty +validate-config --config-file=ghostty/config.ghostty`.
 - `<repo>/wezterm/<file>` — **archived previous terminal config; NOT
   auto-linked**. Kept so users mid-migration can manually run
-  `ln -s "$(pwd)/wezterm/wezterm.lua" ~/.wezterm.lua`. Slated for removal
+  `ln -sfn "$(pwd)/wezterm/wezterm.lua" ~/.wezterm.lua` (the `-fn` flags
+  safely overwrite the stale `~/.wezterm.lua` symlink left over from
+  `v0.3.0`, which now points at a deleted file). Slated for removal
   in `v0.5.0`.
 - `<repo>/copilot/<file>` — files linked to `$HOME/.copilot/<file>`. Currently:
   - `settings.json` — Copilot CLI settings (model: `claude-opus-4.7-1m-internal`,

@@ -47,7 +47,9 @@ dot-configs/
 
 > **`wezterm/` is intentionally not auto-linked.** It holds the previous
 > terminal config so users mid-migration can keep using WezTerm by manually
-> running `ln -s "$(pwd)/wezterm/wezterm.lua" ~/.wezterm.lua`. Slated for
+> running `ln -sfn "$(pwd)/wezterm/wezterm.lua" ~/.wezterm.lua` (the `-fn`
+> flags safely overwrite the stale `~/.wezterm.lua` symlink left over from
+> `v0.3.0`, which now points at a deleted file). Slated for
 > removal in `v0.5.0`.
 
 Safe to re-run at any time. Pulling new commits automatically takes effect on
@@ -165,7 +167,7 @@ The previous daily-driver terminal. **Not auto-linked** by `install.sh`
 users mid-migration can manually opt in:
 
 ```bash
-ln -s "$(pwd)/wezterm/wezterm.lua" ~/.wezterm.lua
+ln -sfn "$(pwd)/wezterm/wezterm.lua" ~/.wezterm.lua
 ```
 
 Slated for removal in `v0.5.0`. The previous WezTerm setup highlights
