@@ -28,7 +28,7 @@
   "statusLine": {
     "type": "command",
     "command": "~/.copilot/statusline.sh",
-    "paddingTop": 2,
+    "paddingTop": 5,
     "paddingBottom": 1
   },
   "ide": {
