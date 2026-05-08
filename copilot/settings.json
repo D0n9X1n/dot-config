@@ -27,8 +27,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "~/.copilot/statusline.sh",
-    "padding": 0
+    "command": "~/.copilot/statusline.sh"
   },
   "ide": {
     "autoConnect": true,
