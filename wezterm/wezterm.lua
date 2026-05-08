@@ -107,11 +107,6 @@ config.tab_max_width = 40
 config.show_new_tab_button_in_tab_bar = false
 config.show_tab_index_in_tab_bar = false
 
--- Drive the inline spinner animation. WezTerm fires update-status on this
--- interval; we bump a frame counter and nudge the bar to redraw so
--- format-tab-title sees the new frame.
-config.status_update_interval = 200  -- 5Hz
-
 -- Fancy tab-bar height comes from window_frame.font_size. 14pt matches
 -- terminal body for harmony; chrome harmonised with the Gruvbox bar.
 config.window_frame = {
@@ -131,28 +126,13 @@ config.window_frame = {
 
 -- =========================================================
 -- Custom tab renderer (single-line, fancy-mode compatible)
---   * Inline braille spinner ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ on vibe-coding tabs (titled via gg)
 --   * 2-space horizontal padding on each side
 --   * Active tab: bold + Gruvbox bright-yellow accent
+--   * Per-process Nerd Font icon prefix when detectable
+--   * "#N" tab-index prefix
+--   * Tabs auto-fit content (no min width padding); WezTerm caps at tab_max_width
 -- =========================================================
-local MIN_TAB_WIDTH = 24 -- minimum clickable width (columns)
-
 local nf = wezterm.nerdfonts or {}
-
--- Animated spinner driver: bump the frame counter on every status tick.
--- update-status also nudges the tab bar to redraw via set_right_status,
--- so format-tab-title runs again with the latest frame.
-wezterm.GLOBAL.tab_frame = wezterm.GLOBAL.tab_frame or 0
-wezterm.on("update-status", function(window, _pane)
-  wezterm.GLOBAL.tab_frame = (wezterm.GLOBAL.tab_frame + 1) % 1000
-  window:set_right_status("")
-end)
-
--- Braille spinner — 10 frames, classic CLI loading indicator.
-local SPINNER = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" }
-local function spinner_for(frame)
-  return SPINNER[(frame % #SPINNER) + 1]
-end
 
 local function tab_title(tab_info)
   local has_folder = false
@@ -237,47 +217,17 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, cfg, hover, max_width)
   elseif has_folder then
     title = folder_icon .. " " .. title
   end
-  local index = tostring(tab.tab_index + 1)
-  title = index .. " " .. title
+  -- Tab number prefix (#1, #2, ...) — easier to scan than a bare digit.
+  title = "#" .. tostring(tab.tab_index + 1) .. " " .. title
 
-  -- Width math: 3 chars left pad + title + 3 chars right pad = title + 6
-  local mw = max_width or 999
-  local FIXED = 6
-  local title_max = mw - FIXED
-  if title_max < 1 then title_max = 1 end
-
-  title = wezterm.truncate_right(title, title_max)
-
-  -- Enforce minimum width for the title area
-  local min_title = MIN_TAB_WIDTH - FIXED
-  if min_title < 1 then min_title = 1 end
-  if min_title > title_max then min_title = title_max end
-  title = wezterm.pad_right(title, min_title)
-
-  -- Vibe-coding detection: tab.tab_title is set by the gg() shell function
-  -- (via 'wezterm cli set-tab-title'). Vibe tabs prefix the title with an
-  -- animated braille spinner so the user can see "this session is alive".
-  local manual_title = tab.tab_title
-  local is_vibe = manual_title ~= nil and manual_title ~= ""
-
-  if is_vibe then
-    local frame = wezterm.GLOBAL.tab_frame or 0
-    title = spinner_for(frame) .. " " .. title
-  end
-
-  -- Width math: 2 chars left pad + title + 2 chars right pad = title + 4
+  -- Width math: 2 chars left pad + title + 2 chars right pad = title + 4.
+  -- Truncate to fit (max_width is the cell budget), but DON'T pad to a
+  -- min width — let each tab size to its actual content. Snugger tabs.
   local mw = max_width or 999
   local FIXED = 4
   local title_max = mw - FIXED
   if title_max < 1 then title_max = 1 end
-
   title = wezterm.truncate_right(title, title_max)
-
-  -- Enforce minimum width for the title area
-  local min_title = MIN_TAB_WIDTH - FIXED
-  if min_title < 1 then min_title = 1 end
-  if min_title > title_max then min_title = title_max end
-  title = wezterm.pad_right(title, min_title)
 
   return {
     -- Single-line tab body. Padding around title; bold + accent on active.
