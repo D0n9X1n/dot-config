@@ -16,9 +16,16 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
   - `settings.json` — Copilot CLI settings (model: `claude-opus-4.7-1m-internal`,
     theme `dark`, `keepAlive: busy`, `continueOnAutoMode: true`, full footer
     UX, custom status line, experimental features).
-  - `statusline.sh` — executable script printing the custom status line:
-    time, git clean/dirty indicator, active Python venv. Uses Nerd Font glyphs.
-    `install.sh` ensures the executable bit is set.
+  - `statusline.sh` — executable script printing the custom status line.
+    Renders 11 segments separated by `│` (each shown only when its data is
+    available): `<icon> <Label> <value>` — Time, Req, Run, API, Cache,
+    Last, Repo (clean/dirty + ↑↓), Stash, Venv, GH, MCP. Setting
+    `COPILOT_STATUSLINE_NO_ICONS=1` drops the Nerd Font icons but keeps the
+    text labels. Run `~/.copilot/statusline.sh --test` to verify each
+    codepoint renders in your terminal (uses `fc-list` if installed).
+    Parses Copilot's session JSON from stdin (single `jq` call) and caches
+    `gh auth status` for 5 min. Bash 3.2-compatible. `install.sh` ensures
+    the executable bit is set.
   - `copilot-instructions.md` — global agent instructions (autonomous mode).
 - `<repo>/oh-my-zsh-custom/<file>` — files linked to
   `$HOME/.oh-my-zsh/custom/<file>`. Currently:
