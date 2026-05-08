@@ -27,7 +27,7 @@ install_macos_deps() {
     wezterm
   )
   local font_casks=(
-    font-recursive # Provides Rec Mono Baker family
+    font-recursive # Provides the Recursive Mono variable family (St.Helens, Casual, Linear, Duotone)
     font-recursive-mono-nerd-font
     font-lxgw-wenkai
     font-symbols-only-nerd-font

@@ -82,8 +82,9 @@ cd ~/Public/dot-configs && git pull
 
 ## Requirements (from configs)
 - Apps: WezTerm. oh-my-zsh required only for the `oh-my-zsh-custom/` part.
-- Fonts (auto-installed): Recursive (Rec Mono Baker), Recursive Mono Nerd Font,
-  LXGW WenKai, Symbols Only Nerd Font, Noto Color Emoji.
+- Fonts (auto-installed): Recursive (Rec Mono St.Helens — part of the Rec Mono
+  variable family), Recursive Mono Nerd Font, LXGW WenKai, Symbols Only Nerd
+  Font, Noto Color Emoji.
 - Optional brew formulae sourced if present: `autojump`,
   `zsh-fast-syntax-highlighting`, `zsh-completions`.
 
