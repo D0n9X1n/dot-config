@@ -66,28 +66,30 @@ config.font_rules = {
 -- =========================================================
 -- Colors (declared first — referenced by Tab bar block + format-tab-title)
 -- =========================================================
--- Gruvbox layered backgrounds — clear active vs inactive separation.
--- Bar matches terminal bg so the chrome is seamless; tabs are progressively
--- brighter (inactive bg0 → hover bg1 → active bg2). Active also gets a
--- Gruvbox bright-yellow accent fg so it pops without being garish.
+-- Subtle tab states: same background everywhere, only foreground color
+-- distinguishes active / inactive / hover. Bar matches terminal bg so the
+-- chrome is seamless.
 local BAR_BG      = "#1d2021"  -- gruvbox dark hard bg (matches terminal)
-local INACTIVE_BG = "#282828"  -- gruvbox bg0
-local HOVER_BG    = "#3c3836"  -- gruvbox bg1
-local ACTIVE_BG   = "#504945"  -- gruvbox bg2
+local TAB_BG      = "#282828"  -- gruvbox bg0 — single tab bg for all states
 
-local FG_DIM      = "#d5c4a1"  -- gruvbox fg2 (bright cream gray — readable on any tab bg)
-local FG          = "#ebdbb2"  -- gruvbox fg (full bright)
-local FG_ACCENT   = "#fabd2f"  -- gruvbox bright yellow (active tab title)
+-- Backwards-compat aliases (still referenced by the format-tab-title body):
+local INACTIVE_BG = TAB_BG
+local HOVER_BG    = TAB_BG
+local ACTIVE_BG   = TAB_BG
+
+local FG_DIM      = "#928374"  -- gruvbox neutral gray (inactive — quieter)
+local FG          = "#d5c4a1"  -- gruvbox fg2 (hover — slightly brighter)
+local FG_ACCENT   = "#fabd2f"  -- gruvbox bright yellow (active title)
 
 config.colors = {
   tab_bar = {
     background = BAR_BG,
     inactive_tab_edge = BAR_BG,
-    active_tab = { bg_color = ACTIVE_BG, fg_color = FG_ACCENT, intensity = "Bold" },
-    inactive_tab = { bg_color = INACTIVE_BG, fg_color = FG_DIM },
-    inactive_tab_hover = { bg_color = HOVER_BG, fg_color = FG },
+    active_tab = { bg_color = TAB_BG, fg_color = FG_ACCENT },
+    inactive_tab = { bg_color = TAB_BG, fg_color = FG_DIM },
+    inactive_tab_hover = { bg_color = TAB_BG, fg_color = FG },
     new_tab = { bg_color = BAR_BG, fg_color = FG_DIM },
-    new_tab_hover = { bg_color = HOVER_BG, fg_color = FG },
+    new_tab_hover = { bg_color = BAR_BG, fg_color = FG },
   },
 }
 
@@ -229,19 +231,17 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, cfg, hover, max_width)
   title = wezterm.truncate_right(title, title_max)
 
   return {
-    -- Vertical separator before every tab except the first.
+    -- Vertical separator before every tab except the first. Heavy line
+    -- (┃ U+2503) for clear visual division.
     { Background = { Color = BAR_BG } },
     { Foreground = { Color = FG_DIM } },
-    { Text = tab.tab_index > 0 and "│" or " " },
+    { Text = tab.tab_index > 0 and "┃" or " " },
 
-    -- Single-line tab body. Padding around title; bold + accent on active.
-    -- Right pad is wider than left so the close × on hover doesn't crowd
-    -- the title text.
+    -- Single-line tab body. Same bg for active/inactive — only the fg
+    -- color distinguishes states. No bold (subtler).
     { Background = { Color = bg } },
     { Foreground = { Color = fg } },
-    { Attribute = { Intensity = is_active and "Bold" or "Normal" } },
     { Text = "  " .. title .. "      " },
-    { Attribute = { Intensity = "Normal" } },
   }
 end)
 
