@@ -51,6 +51,23 @@ if [ -n "${COPILOT_STATUSLINE_NO_DIM:-}" ]; then
   RESET=""
 fi
 
+# Per-side padding in the script. The Copilot CLI statusLine config only
+# honors a single `padding` key (paddingTop/Bottom/Left/Right are silently
+# ignored), so we emit our own spacing here for finer control.
+#   PAD_TOP   blank lines printed before the status line
+#   PAD_LEFT  spaces printed before the dimmed segments
+#   PAD_RIGHT spaces printed after the dimmed segments (rarely useful)
+PAD_TOP="${COPILOT_STATUSLINE_PAD_TOP:-8}"
+PAD_LEFT="${COPILOT_STATUSLINE_PAD_LEFT:-0}"
+PAD_RIGHT="${COPILOT_STATUSLINE_PAD_RIGHT:-0}"
+
+# repeat <char> <count> -> string of that char repeated count times
+repeat() {
+  local ch=$1 n=$2 out=""
+  while [ "$n" -gt 0 ]; do out="${out}${ch}"; n=$((n - 1)); done
+  printf '%s' "$out"
+}
+
 CACHE_DIR="${TMPDIR:-/tmp}/copilot-statusline-cache-$USER"
 mkdir -p "$CACHE_DIR" 2>/dev/null || true
 
@@ -313,4 +330,18 @@ for s in $SEGMENTS; do
   fi
 done
 
-printf '%s%s%s' "$DIM" "$out" "$RESET"
+# Emit top padding via a dedicated printf — $(...) command substitution
+# strips trailing newlines, which would silently drop PAD_TOP entirely.
+i=0
+while [ "$i" -lt "$PAD_TOP" ]; do
+  printf '\n'
+  i=$((i + 1))
+done
+
+printf '%s%s%s%s%s' \
+  "$DIM" \
+  "$(repeat ' ' "$PAD_LEFT")" \
+  "$out" \
+  "$(repeat ' ' "$PAD_RIGHT")" \
+  "$RESET"''
+
