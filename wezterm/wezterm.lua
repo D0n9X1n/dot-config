@@ -237,9 +237,9 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, cfg, hover, max_width)
   local index = tostring(tab.tab_index + 1)
   title = index .. " " .. title
 
-  -- Width math: outer pad(1) + title + outer pad(1) = title + 2
+  -- Width math: 3 chars left pad + title + 3 chars right pad = title + 6
   local mw = max_width or 999
-  local FIXED = 2
+  local FIXED = 6
   local title_max = mw - FIXED
   if title_max < 1 then title_max = 1 end
 
@@ -252,35 +252,58 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, cfg, hover, max_width)
   title = wezterm.pad_right(title, min_title)
 
   -- Vibe-coding detection: tab.tab_title is set manually by the gg() shell
-  -- function (via OSC 1/2). Any tab with a non-empty manual title is treated
-  -- as a vibe-coding session and gets the animated loading bar.
-  local manual_title = tab_info.tab_title
+  -- function (via 'wezterm cli set-tab-title'). Any tab with a non-empty
+  -- manual title is treated as a vibe-coding session and gets the animated
+  -- loading bar on its bottom row.
+  local manual_title = tab.tab_title
   local is_vibe = manual_title ~= nil and manual_title ~= ""
 
-  local tab_width = #title + 2  -- includes the two outer pads
-  local top_row = string.rep(" ", tab_width)  -- breathing room
+  -- 5-row layout for visible vertical padding ("floating tab" effect).
+  --   Row 1: BAR_BG  -- gap above the tab body, looks like extended bar
+  --   Row 2: tab bg, blank  -- inner top padding
+  --   Row 3: tab bg, title  -- the actual title text
+  --   Row 4: tab bg, loading bar (vibe) or blank (regular)  -- inner bottom
+  --   Row 5: BAR_BG  -- gap below the tab body
+  -- 3-space horizontal padding on each side keeps the title from kissing
+  -- the tab edge.
+  local PAD_X = "   "
+  local body_row = PAD_X .. title .. PAD_X
+  local bar_width = #body_row
+  local pad_row = string.rep(" ", bar_width)
 
-  local bottom_row
+  local row4
   if is_vibe then
     local frame = wezterm.GLOBAL.tab_frame or 0
-    bottom_row = " " .. loading_bar(tab_width - 2, frame) .. " "
+    row4 = PAD_X .. loading_bar(bar_width - #PAD_X * 2, frame) .. PAD_X
   else
-    bottom_row = string.rep(" ", tab_width)
+    row4 = pad_row
   end
 
-  local body_row = " " .. title .. " "
-
   return {
-    -- Tab background spans all 3 rows; the embedded \n forces wrap.
-    { Background = { Color = bg } },
-    { Foreground = { Color = fg } },
-    { Attribute = { Intensity = is_active and "Bold" or "Normal" } },
-    { Text = top_row .. "\n" .. body_row .. "\n" .. bottom_row },
-    { Attribute = { Intensity = "Normal" } },
-
-    -- One-cell gap of bar bg between tabs (visual separator).
+    -- Row 1: bar bg above tab (outer top padding)
     { Background = { Color = BAR_BG } },
     { Foreground = { Color = BAR_BG } },
+    { Text = pad_row .. "\n" },
+
+    -- Row 2: inner top padding (tab bg, no text)
+    { Background = { Color = bg } },
+    { Foreground = { Color = fg } },
+    { Text = pad_row .. "\n" },
+
+    -- Row 3: title — bold + accent fg on active tab
+    { Attribute = { Intensity = is_active and "Bold" or "Normal" } },
+    { Text = body_row .. "\n" },
+    { Attribute = { Intensity = "Normal" } },
+
+    -- Row 4: loading bar (vibe-coding only) or inner bottom padding
+    { Text = row4 .. "\n" },
+
+    -- Row 5: bar bg below tab (outer bottom padding)
+    { Background = { Color = BAR_BG } },
+    { Foreground = { Color = BAR_BG } },
+    { Text = pad_row },
+
+    -- One-cell horizontal gap of bar bg between adjacent tabs.
     { Text = " " },
   }
 end)
