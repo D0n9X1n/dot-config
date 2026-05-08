@@ -9,14 +9,17 @@ that creates symlinks into the home directory.
 ```
 dot-configs/
 ├── install.sh                   # idempotent linker; safe to re-run
-├── .wezterm.lua                 # root dotfile  -> ~/.wezterm.lua
+├── ghostty/                     # contents -> ~/.config/ghostty/
+│   └── config.ghostty           # Ghostty terminal config (Gruvbox + Rec Mono)
 ├── oh-my-zsh-custom/            # contents -> ~/.oh-my-zsh/custom/
 │   ├── custom.zsh               # aliases, proxy helpers, brew completions, env
-│   └── gg.zsh                   # gg() function (WezTerm title + copilot)
+│   └── gg.zsh                   # gg() function (terminal title + copilot)
 ├── copilot/                     # contents -> ~/.copilot/
 │   ├── settings.json            # Copilot CLI settings (model, footer, status line)
 │   ├── statusline.sh            # custom multi-segment status line
 │   └── copilot-instructions.md  # global agent instructions
+├── wezterm/                     # archived previous terminal config (NOT auto-linked)
+│   └── wezterm.lua              # legacy WezTerm config — link manually if needed
 ├── LICENSE
 ├── ReadMe.md                    # this file
 └── QUICKREF.md                  # condensed reference (agent-friendly)
@@ -25,17 +28,29 @@ dot-configs/
 `install.sh` is the only entry point. It:
 
 1. Installs required macOS apps and fonts via Homebrew (best-effort; failures
-   are logged but never abort the install).
+   are logged but never abort the install). Set `SKIP_BREW=1` to skip this
+   step entirely (useful for CI / fake-`HOME` testing).
 2. Symlinks every **top-level** dotfile in this repo (files starting with `.`)
-   into `$HOME`. Example: `.wezterm.lua` → `~/.wezterm.lua`.
+   into `$HOME`.
 3. Symlinks every file in `oh-my-zsh-custom/` into `~/.oh-my-zsh/custom/`.
    Skipped (with a warning) if `~/.oh-my-zsh/custom/` does not exist.
 4. Symlinks every file in `copilot/` into `~/.copilot/`. Skipped (with a
    warning) if `~/.copilot/` does not exist. Preserves the executable bit on
    `*.sh` files (so `statusline.sh` runs without re-chmod).
-5. Backs up any existing destination file or symlink that doesn't already point
+5. Symlinks every file in `ghostty/` into `~/.config/ghostty/`. **Creates the
+   destination directory if missing** (Ghostty only creates it on first
+   launch, but we want install.sh to wire things up on a fresh box without
+   requiring a Ghostty launch first).
+6. Backs up any existing destination file or symlink that doesn't already point
    at the repo as `<name>.bak.YYYYMMDDHHMMSS` before linking.
-6. Leaves correctly-pointing symlinks alone (no-op).
+7. Leaves correctly-pointing symlinks alone (no-op).
+
+> **`wezterm/` is intentionally not auto-linked.** It holds the previous
+> terminal config so users mid-migration can keep using WezTerm by manually
+> running `ln -sfn "$(pwd)/wezterm/wezterm.lua" ~/.wezterm.lua` (the `-fn`
+> flags safely overwrite the stale `~/.wezterm.lua` symlink left over from
+> `v0.3.0`, which now points at a deleted file). Slated for
+> removal in `v0.5.0`.
 
 Safe to re-run at any time. Pulling new commits automatically takes effect on
 all machines because every config file is a symlink into this repo.
@@ -61,6 +76,7 @@ cd ~/Public/dot-configs && git pull
 | New `~/.something` dotfile | Drop it at repo root as `.something`, then re-run `install.sh`. |
 | New oh-my-zsh customization (alias, function, env) | Create a new `*.zsh` file in `oh-my-zsh-custom/`, then re-run `install.sh`. Files there are auto-loaded by oh-my-zsh in alphabetical order. |
 | New Copilot CLI config | Drop the file under `copilot/`, then re-run `install.sh`. (`mcp-config.json` is gitignored because it contains secrets — manage that file manually.) |
+| New Ghostty config snippet | Drop the file under `ghostty/`, then re-run `install.sh`. The destination directory is created automatically. |
 | Editing an existing config | Edit it in this repo. Changes take effect immediately on every machine where it's symlinked. |
 
 After adding/editing, commit and push. Other machines pick up the change with
@@ -82,77 +98,82 @@ After adding/editing, commit and push. Other machines pick up the change with
 
 #### `gg.zsh` — `gg <title>`
 
-Sets the current WezTerm tab and window title to `<title>`, then launches
-`copilot --allow-all-tools --allow-all-paths` in the current shell. Useful for
-labeling Copilot CLI sessions so they're identifiable in the tab bar.
+Sets the current terminal tab and window title to `<title>` via OSC 1 / 2
+escape sequences (works in Ghostty, WezTerm, iTerm2, anything OSC-compliant)
+and then launches `copilot --allow-all-tools --allow-all-paths` in the
+current shell. Useful for labeling Copilot CLI sessions so they're
+identifiable in the tab bar.
 
 Implementation notes:
 
-- Sends OSC 1/2 escape sequences for the title (WezTerm's window title bar
-  reflects the active pane's OSC 2 title — IPC alone is not enough).
-- Also calls `wezterm cli set-tab-title` and `set-window-title` to update
-  WezTerm's internal state for completeness.
+- Sends OSC 1 (icon name / tab title) and OSC 2 (window title) — terminals
+  that pull the window title from the active pane's OSC 2 (Ghostty, WezTerm)
+  pick this up automatically.
+- For WezTerm specifically, also calls `wezterm cli set-tab-title` and
+  `set-window-title` to update WezTerm's internal state for completeness;
+  these commands are no-ops outside WezTerm.
 - Sets `DISABLE_AUTO_TITLE=true` while Copilot is running so oh-my-zsh's
-  `precmd`/`preexec` hooks don't keep overwriting the title.
+  `precmd` / `preexec` hooks don't keep overwriting the title.
 - Calls `command copilot ...` to bypass any shell alias of the same name.
 
-### WezTerm (`.wezterm.lua`)
+### Terminal — Ghostty (`ghostty/`)
 
-#### Theme & appearance
+The daily-driver terminal as of `v0.4.0`. Files in `ghostty/` are linked into
+`~/.config/ghostty/`. `install.sh` creates that directory if it doesn't
+already exist (Ghostty itself only creates the dir on first launch, but we
+want a fresh `install.sh` run to wire things up without requiring the user
+to launch Ghostty first).
+
+#### `config.ghostty`
 
 | Setting | Value |
 |---|---|
-| Color scheme | GruvboxDarkHard |
-| Background opacity | 1.0 |
-| Window padding | 8px all sides |
+| Theme | `Gruvbox Dark Hard` (built-in, verified via `ghostty +list-themes`) |
+| Primary font | `Rec Mono St.Helens` (Recursive Mono variable family) |
+| Font weight | 500 (Medium) via `font-variation = wght=500`, single weight always |
+| Font size | 14 pt |
+| Line height | `adjust-cell-height = 10%` (matches the WezTerm `line_height = 1.1`) |
+| Bold style | `font-style-bold = default` — no native bold variant; falls back to regular |
+| Window padding | 8 px on both axes |
+| Inactive split dim | `unfocused-split-opacity = 0.4` |
+| macOS title bar | `macos-titlebar-style = tabs` (native, tabs at top) |
+| Bell | Audio off (Ghostty default `bell-features` excludes audio) |
+| Scrollback | Default 10,000,000 lines |
+| Renderer | Metal (Ghostty native on macOS) |
+| `term` | `xterm-ghostty` (Ghostty default; ships its own terminfo) |
 
-#### Fonts
-
-| Role | Font | Size |
-|---|---|---|
-| Primary (EN) | Rec Mono St.Helens (Recursive Mono variable) | 14pt |
-| Icons / Powerline | Symbols Nerd Font Mono | — |
-| Emoji | Noto Color Emoji | — |
-
-- **Line height:** 1.1
-- **Weight:** Auto-detects display DPI — uses **Medium on Retina, Regular on non-Retina**. `apply_display_overrides()` swaps the weight and the FreeType flags on `window-config-reloaded` and `window-resized` events, so moving a window between displays re-tunes rendering live.
-- **Bold:** Bold mapped to the same weight as Regular — the font has no dedicated bold variant, so `font_rules` collapses Bold to the regular weight; `bold_brightens_ansi_colors` disabled.
-- **FreeType:** `freetype_render_target = "Normal"` (grayscale) on both displays. `freetype_load_target = "Normal"` at runtime — the static `"Light"` declared at the top of `.wezterm.lua` is overridden by `apply_display_overrides()` on every `window-config-reloaded` / `window-resized` event. The only DPI-conditional setting is `freetype_load_flags`: `"NO_HINTING"` on Retina (thinnest, smoothest strokes) and `"FORCE_AUTOHINT"` on non-Retina (crisper at 1×).
-- `custom_block_glyphs` enabled (true) — WezTerm draws block / box-drawing glyphs itself for pixel-perfect alignment.
-
-#### Tab bar
-
-- Retro style (non-fancy), positioned at bottom.
-- Pill-shaped tabs with Nerd Font process icons (shell, nvim, ssh, git, node, python, go, rust, docker, kubectl, etc.).
-- Folder icon shown for directory-based tab titles (`parent/leaf` format).
-- Tab index number prefixed to each tab title.
-- Max tab width: 40, minimum clickable width: 22.
-- No new-tab button, no tab index badge.
-
-#### Keybindings
+Keybindings (overrides on top of Ghostty defaults; later definitions win):
 
 | Action | Shortcut |
 |---|---|
-| Split right (horizontal) | `Cmd+Shift+D` |
-| Split down (vertical) | `Cmd+D` |
+| Split right (horizontal) | `Cmd+Shift+D` (Ghostty's `super+shift+d`) |
+| Split down (vertical) | `Cmd+D` (Ghostty's `super+d`) |
 | Previous tab | `Cmd+←` |
 | Next tab | `Cmd+→` |
 | Focus pane (direction) | `Ctrl+Shift+Arrows` |
-| Resize pane (small steps) | `Cmd+Ctrl+Alt+Shift+Arrows` |
+| Resize pane (small steps) | `Cmd+Ctrl+Alt+Shift+Arrows` (step 5) |
 | Toggle pane zoom | `Cmd+Ctrl+Alt+Enter` |
-| Smart copy / SIGINT | `Cmd+C` — copies if there is a selection, otherwise sends Ctrl+C |
-| Close pane (or tab if last pane) | `Cmd+W` |
+| Close pane (or tab if last pane) | `Cmd+W` (Ghostty default) |
+| Copy selection to clipboard | `Cmd+C` (Ghostty default `copy_to_clipboard:mixed`) |
+| Send `Ctrl+C` (SIGINT) | Plain `Ctrl+C` — Ghostty has no callback API, so the WezTerm "smart `Cmd+C`" (copy if selection, else SIGINT) is **not** portable |
 
-#### Other settings
+> **Validate locally** with `ghostty +validate-config --config-file=ghostty/config.ghostty` — exit 0 means clean; warnings or errors print otherwise. Use `ghostty +list-themes` to confirm the theme name and `ghostty +list-actions` for the full action vocabulary.
 
-| Setting | Value |
-|---|---|
-| Rendering | WebGpu (Metal) — avoids deprecated OpenGL sleep/wake crashes |
-| TERM | `xterm-256color` |
-| Scrollback lines | 20,000 |
-| Audible bell | Disabled |
-| Inactive pane dim | `inactive_pane_hsb`: saturation 0.7, brightness 0.4 |
-| Window padding | 8 px on all sides |
+### Legacy terminal — WezTerm (`wezterm/`, archived)
+
+The previous daily-driver terminal. **Not auto-linked** by `install.sh`
+(the linker only walks top-level `.<name>` files plus the `oh-my-zsh-custom/`,
+`copilot/`, and `ghostty/` mappings). Kept in-repo through `v0.4.x` so
+users mid-migration can manually opt in:
+
+```bash
+ln -sfn "$(pwd)/wezterm/wezterm.lua" ~/.wezterm.lua
+```
+
+Slated for removal in `v0.5.0`. The previous WezTerm setup highlights
+(GruvboxDarkHard, Rec Mono St.Helens, custom pill tabs with Nerd Font
+process icons, DPI-adaptive font weight, FreeType fine-tuning, smart
+`Cmd+C`) are documented in the file header.
 
 ### Copilot CLI (`copilot/`)
 
@@ -201,9 +222,12 @@ operate in plan / exec cycles and verify before claiming completion.
 
 ## Requirements
 
-### Apps
+### Apps (auto-installed via Homebrew on macOS)
 
-- [WezTerm](https://wezfurlong.org/wezterm/)
+- [Ghostty](https://ghostty.org/) — daily-driver terminal as of `v0.4.0`
+- [WezTerm](https://wezfurlong.org/wezterm/) — kept for users mid-migration
+  who still link `wezterm/wezterm.lua` manually (cask removal slated for
+  `v0.5.0`)
 - [oh-my-zsh](https://ohmyz.sh/) — required only if you want the
   `oh-my-zsh-custom/` files linked
 - [GitHub Copilot CLI](https://github.com/github/copilot) — required only if
@@ -216,9 +240,8 @@ operate in plan / exec cycles and verify before claiming completion.
 - Recursive (Rec Mono St.Helens — part of the Rec Mono variable family) —
   `font-recursive`
 - Recursive Mono Nerd Font — `font-recursive-mono-nerd-font`
-- LXGW WenKai — `font-lxgw-wenkai` (currently installed but not in
-  `.wezterm.lua`'s active fallback list — slated for re-evaluation in the
-  Ghostty migration)
+- LXGW WenKai — `font-lxgw-wenkai` (currently installed but not in any
+  active config's font-fallback list — slated for cleanup in `v0.5.0`)
 - Symbols Only Nerd Font — `font-symbols-only-nerd-font`
 - Noto Color Emoji — `font-noto-color-emoji`
 

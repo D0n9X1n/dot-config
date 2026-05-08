@@ -10,8 +10,30 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
 
 ## Layout
 - `install.sh` — single entry point; idempotent; safe to re-run.
-- `<repo>/.<name>` — root dotfiles linked to `$HOME/.<name>`. Currently:
-  - `.wezterm.lua` → `$HOME/.wezterm.lua`
+- `<repo>/.<name>` — root dotfiles linked to `$HOME/.<name>`. **Currently
+  none** (the previous `.wezterm.lua` was archived under `wezterm/` in
+  `v0.4.0`).
+- `<repo>/ghostty/<file>` — files linked to `$HOME/.config/ghostty/<file>`.
+  The destination directory is created by `install.sh` if missing (Ghostty
+  itself only creates it on first launch). Currently:
+  - `config.ghostty` — Ghostty terminal config. `theme = Gruvbox Dark Hard`
+    (note the spaces; verified built-in via `ghostty +list-themes`),
+    `font-family = Rec Mono St.Helens`, `font-variation = wght=500`,
+    `font-size = 14`, `adjust-cell-height = 10%` (line height 1.1 equiv),
+    `window-padding-x/y = 8`, `unfocused-split-opacity = 0.4`,
+    `macos-titlebar-style = tabs`. Keybinds override Ghostty defaults to
+    match the previous WezTerm muscle memory: `super+d=new_split:down`,
+    `super+shift+d=new_split:right`, `super+left/right=previous_tab/next_tab`,
+    `ctrl+shift+arrow_*=goto_split:*`,
+    `super+ctrl+alt+shift+arrow_*=resize_split:*,5`,
+    `super+ctrl+alt+enter=toggle_split_zoom`. Validate locally with
+    `ghostty +validate-config --config-file=ghostty/config.ghostty`.
+- `<repo>/wezterm/<file>` — **archived previous terminal config; NOT
+  auto-linked**. Kept so users mid-migration can manually run
+  `ln -sfn "$(pwd)/wezterm/wezterm.lua" ~/.wezterm.lua` (the `-fn` flags
+  safely overwrite the stale `~/.wezterm.lua` symlink left over from
+  `v0.3.0`, which now points at a deleted file). Slated for removal
+  in `v0.5.0`.
 - `<repo>/copilot/<file>` — files linked to `$HOME/.copilot/<file>`. Currently:
   - `settings.json` — Copilot CLI settings (model: `claude-opus-4.7-1m-internal`,
     theme `dark`, `keepAlive: busy`, `continueOnAutoMode: true`, custom
@@ -42,23 +64,29 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
   `$HOME/.oh-my-zsh/custom/<file>`. Currently:
   - `custom.zsh` — aliases, proxy helpers (`enable_proxy`/`disable_proxy`),
     brew completions, `PATH` extras (`.NET`, Android SDK).
-  - `gg.zsh` — defines `gg <title>` which sets the WezTerm tab + window title
-    (via OSC 1/2 escapes and `wezterm cli`) and runs `command copilot
-    --allow-all-tools --allow-all-paths --effort xhigh`. Also sets
-    `DISABLE_AUTO_TITLE=true` so oh-my-zsh hooks don't overwrite the title
-    during the session.
+  - `gg.zsh` — defines `gg <title>` which sets the terminal tab + window
+    title via OSC 1/2 escapes (works in Ghostty, WezTerm, iTerm2, …) and
+    runs `command copilot --allow-all-tools --allow-all-paths --effort xhigh`.
+    For WezTerm, also calls `wezterm cli set-tab-title` / `set-window-title`
+    (no-op outside WezTerm). Sets `DISABLE_AUTO_TITLE=true` so oh-my-zsh
+    hooks don't overwrite the title during the session.
 
 ## How install.sh works
 1. macOS only (auto-installs Homebrew apps and fonts; failures are warnings,
    never fatal — handles deprecated taps and conflicting casks gracefully).
+   Set `SKIP_BREW=1` to skip the Homebrew step entirely (useful for CI /
+   fake-`HOME` testing).
 2. Symlinks every top-level `.<name>` file in the repo to `$HOME/.<name>`.
 3. Symlinks every file in `oh-my-zsh-custom/` to `~/.oh-my-zsh/custom/`.
    Skipped (with a warning) if `~/.oh-my-zsh/custom/` does not exist.
 4. Symlinks every file in `copilot/` to `~/.copilot/`.
    Skipped (with a warning) if `~/.copilot/` does not exist.
-5. Existing destination files/links that don't match are renamed to
+5. Symlinks every file in `ghostty/` to `~/.config/ghostty/`. **Creates the
+   destination directory if missing** (Ghostty only creates it on first
+   launch).
+6. Existing destination files/links that don't match are renamed to
    `<name>.bak.YYYYMMDDHHMMSS` before linking.
-6. Correct symlinks are left alone (no-op).
+7. Correct symlinks are left alone (no-op).
 
 ## Adding a new config
 - New `~/.something` dotfile: drop `.something` at repo root, run `install.sh`.
@@ -66,6 +94,8 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
   run `install.sh`. oh-my-zsh auto-loads files in alphabetical order.
 - New Copilot CLI config: add a file to `copilot/`, run `install.sh`.
   Note: `mcp-config.json` is excluded (contains secrets) — manage it manually.
+- New Ghostty config snippet: add a file to `ghostty/`, run `install.sh`.
+  The destination directory is created automatically.
 - Editing existing config: edit in this repo. Symlinks make changes live
   immediately on every machine.
 
@@ -81,10 +111,12 @@ cd ~/Public/dot-configs && git pull
 ```
 
 ## Requirements (from configs)
-- Apps: WezTerm. oh-my-zsh required only for the `oh-my-zsh-custom/` part.
+- Apps: Ghostty (daily-driver as of `v0.4.0`); WezTerm (legacy, kept for
+  users mid-migration); oh-my-zsh required only for the `oh-my-zsh-custom/`
+  part.
 - Fonts (auto-installed): Recursive (Rec Mono St.Helens — part of the Rec Mono
-  variable family), Recursive Mono Nerd Font, LXGW WenKai, Symbols Only Nerd
-  Font, Noto Color Emoji.
+  variable family), Recursive Mono Nerd Font, LXGW WenKai (currently unused;
+  cleanup slated for `v0.5.0`), Symbols Only Nerd Font, Noto Color Emoji.
 - Optional brew formulae sourced if present: `autojump`,
   `zsh-fast-syntax-highlighting`, `zsh-completions`.
 
@@ -93,3 +125,8 @@ cd ~/Public/dot-configs && git pull
 - Backups are created only when a non-matching file/link exists.
 - `oh-my-zsh-custom/custom.zsh` shadows oh-my-zsh's default
   `custom/custom.zsh` (which is gitignored upstream and irrelevant here).
+- Validate the Ghostty config without launching the GUI:
+  `ghostty +validate-config --config-file=ghostty/config.ghostty`.
+- The `copilot/settings.json` working-tree may show a tiny diff
+  (`"padding": 0`) introduced by the Copilot CLI runtime — known noise; do
+  not commit it as a real change.
