@@ -92,63 +92,66 @@ config.colors = {
 }
 
 -- =========================================================
--- Tab bar — retro mode, multi-line for height
+-- Tab bar — fancy mode at top (chosen for guaranteed legibility)
 -- =========================================================
--- Why retro (not fancy):
---   * Fancy mode shows a close × on hover that can't be hidden (controlled
---     by WezTerm's chrome), and forces a single-line layout.
---   * Retro lets format-tab-title return MULTI-LINE text — the bar grows
---     to the tallest tab. That's how we get height + a loading bar row.
-config.use_fancy_tab_bar = false
+-- Multi-line in retro mode is supported per WezTerm docs but in practice
+-- doesn't render reliably with multi-line attribute changes — text becomes
+-- invisible. Fancy mode renders correctly and gives us native height via
+-- window_frame.font_size. Trade-off: a small × may appear on tab hover
+-- (no API to hide it), but tabs are always readable.
+config.use_fancy_tab_bar = true
 config.enable_tab_bar = true
-config.tab_bar_at_bottom = false
+config.tab_bar_at_bottom = false  -- fancy is top-only
 config.hide_tab_bar_if_only_one_tab = false
 config.tab_max_width = 40
 config.show_new_tab_button_in_tab_bar = false
 config.show_tab_index_in_tab_bar = false
 
--- Drive the loading-bar animation. WezTerm fires update-status on this
--- interval; we bump a global frame counter and nudge the bar to redraw.
+-- Drive the inline spinner animation. WezTerm fires update-status on this
+-- interval; we bump a frame counter and nudge the bar to redraw so
+-- format-tab-title sees the new frame.
 config.status_update_interval = 200  -- 5Hz
 
+-- Fancy tab-bar height comes from window_frame.font_size. 14pt matches
+-- terminal body for harmony; chrome harmonised with the Gruvbox bar.
+config.window_frame = {
+  font = wezterm.font({ family = "Rec Mono St.Helens", weight = "Medium" }),
+  font_size = 14.0,
+  active_titlebar_bg = BAR_BG,
+  inactive_titlebar_bg = BAR_BG,
+  active_titlebar_fg = FG,
+  inactive_titlebar_fg = FG_DIM,
+  active_titlebar_border_bottom = BAR_BG,
+  inactive_titlebar_border_bottom = BAR_BG,
+  button_fg = FG_DIM,
+  button_bg = BAR_BG,
+  button_hover_fg = FG,
+  button_hover_bg = HOVER_BG,
+}
+
 -- =========================================================
--- Custom tab renderer
---   * 3 lines tall (top accent / title / bottom row)
---   * Vibe-coding tabs (manually titled via gg) get an animated
---     Knight-Rider loading bar on the bottom row
---   * No rounded pills, no close icon
+-- Custom tab renderer (single-line, fancy-mode compatible)
+--   * Inline braille spinner ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ on vibe-coding tabs (titled via gg)
+--   * 2-space horizontal padding on each side
+--   * Active tab: bold + Gruvbox bright-yellow accent
 -- =========================================================
-local MIN_TAB_WIDTH = 22 -- minimum clickable width (columns)
+local MIN_TAB_WIDTH = 24 -- minimum clickable width (columns)
 
 local nf = wezterm.nerdfonts or {}
 
--- Animated loading-bar driver: bump the frame counter on every status tick.
--- update-status also nudges the tab bar to redraw, so format-tab-title
--- below re-runs with the latest frame.
+-- Animated spinner driver: bump the frame counter on every status tick.
+-- update-status also nudges the tab bar to redraw via set_right_status,
+-- so format-tab-title runs again with the latest frame.
 wezterm.GLOBAL.tab_frame = wezterm.GLOBAL.tab_frame or 0
 wezterm.on("update-status", function(window, _pane)
   wezterm.GLOBAL.tab_frame = (wezterm.GLOBAL.tab_frame + 1) % 1000
-  -- An empty right-status keeps the bar repainting without showing extra UI.
   window:set_right_status("")
 end)
 
--- Knight-Rider bar across a fixed-width track. A 3-block highlight bounces
--- left↔right; the rest of the row uses ▁ for a faint base line.
-local function loading_bar(width, frame)
-  if width < 4 then width = 4 end
-  local span = width - 2  -- positions the 3-block highlight can occupy
-  local cycle = span * 2
-  local pos = frame % cycle
-  if pos >= span then pos = cycle - pos - 1 end
-  local out = {}
-  for i = 1, width do
-    if i >= pos + 1 and i <= pos + 3 then
-      out[i] = "█"
-    else
-      out[i] = "▁"
-    end
-  end
-  return table.concat(out)
+-- Braille spinner — 10 frames, classic CLI loading indicator.
+local SPINNER = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" }
+local function spinner_for(frame)
+  return SPINNER[(frame % #SPINNER) + 1]
 end
 
 local function tab_title(tab_info)
@@ -251,65 +254,38 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, cfg, hover, max_width)
   if min_title > title_max then min_title = title_max end
   title = wezterm.pad_right(title, min_title)
 
-  -- Vibe-coding detection: tab.tab_title is set manually by the gg() shell
-  -- function (via 'wezterm cli set-tab-title'). Any tab with a non-empty
-  -- manual title is treated as a vibe-coding session and gets the animated
-  -- loading bar on its bottom row.
+  -- Vibe-coding detection: tab.tab_title is set by the gg() shell function
+  -- (via 'wezterm cli set-tab-title'). Vibe tabs prefix the title with an
+  -- animated braille spinner so the user can see "this session is alive".
   local manual_title = tab.tab_title
   local is_vibe = manual_title ~= nil and manual_title ~= ""
 
-  -- 5-row layout for visible vertical padding ("floating tab" effect).
-  --   Row 1: BAR_BG  -- gap above the tab body, looks like extended bar
-  --   Row 2: tab bg, blank  -- inner top padding
-  --   Row 3: tab bg, title  -- the actual title text
-  --   Row 4: tab bg, loading bar (vibe) or blank (regular)  -- inner bottom
-  --   Row 5: BAR_BG  -- gap below the tab body
-  -- 3-space horizontal padding on each side keeps the title from kissing
-  -- the tab edge.
-  local PAD_X = "   "
-  local body_row = PAD_X .. title .. PAD_X
-  local bar_width = #body_row
-  local pad_row = string.rep(" ", bar_width)
-
-  local row4
   if is_vibe then
     local frame = wezterm.GLOBAL.tab_frame or 0
-    row4 = PAD_X .. loading_bar(bar_width - #PAD_X * 2, frame) .. PAD_X
-  else
-    row4 = pad_row
+    title = spinner_for(frame) .. " " .. title
   end
 
+  -- Width math: 2 chars left pad + title + 2 chars right pad = title + 4
+  local mw = max_width or 999
+  local FIXED = 4
+  local title_max = mw - FIXED
+  if title_max < 1 then title_max = 1 end
+
+  title = wezterm.truncate_right(title, title_max)
+
+  -- Enforce minimum width for the title area
+  local min_title = MIN_TAB_WIDTH - FIXED
+  if min_title < 1 then min_title = 1 end
+  if min_title > title_max then min_title = title_max end
+  title = wezterm.pad_right(title, min_title)
+
   return {
-    -- Row 1: BAR_BG outer top padding (invisible text on bar bg)
-    { Background = { Color = BAR_BG } },
-    { Foreground = { Color = BAR_BG } },
-    { Text = pad_row .. "\n" },
-
-    -- Row 2: inner top padding (tab bg)
-    { Background = { Color = bg } },
-    { Foreground = { Color = fg } },
-    { Text = pad_row .. "\n" },
-
-    -- Row 3: TITLE — explicitly re-emit BG + FG so attributes don't bleed
-    -- across the \n above. Use Bold intensity for active tabs.
+    -- Single-line tab body. Padding around title; bold + accent on active.
     { Background = { Color = bg } },
     { Foreground = { Color = fg } },
     { Attribute = { Intensity = is_active and "Bold" or "Normal" } },
-    { Text = body_row .. "\n" },
+    { Text = "  " .. title .. "  " },
     { Attribute = { Intensity = "Normal" } },
-
-    -- Row 4: loading bar (vibe) or inner bottom padding — explicit BG+FG
-    { Background = { Color = bg } },
-    { Foreground = { Color = fg } },
-    { Text = row4 .. "\n" },
-
-    -- Row 5: BAR_BG outer bottom padding (invisible text on bar bg)
-    { Background = { Color = BAR_BG } },
-    { Foreground = { Color = BAR_BG } },
-    { Text = pad_row },
-
-    -- 1-cell horizontal gap of bar bg between adjacent tabs
-    { Text = " " },
   }
 end)
 
