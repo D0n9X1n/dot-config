@@ -1,14 +1,16 @@
 # gg <title>
 #
-# Set the current WezTerm tab + window title to <title>, then launch
+# Set the current terminal tab + window title to <title>, then launch
 # `copilot` in the current shell. Use `gg "Tab Title"` to start a Copilot
 # session with a meaningful name on the tab.
 #
 # Notes:
-# - Uses OSC escape sequences (which WezTerm honors for the window title bar)
-#   *and* the `wezterm cli` IPC for in-app state. Both are needed because
-#   WezTerm's window title bar reflects the active pane title (OSC 2), while
-#   `wezterm cli` updates the internal tab/window title attributes.
+# - Uses OSC 1/2 escape sequences for the title (works in Ghostty, WezTerm,
+#   iTerm2, and anything OSC-compliant — Ghostty and WezTerm both reflect
+#   the active pane's OSC 2 in the window title bar).
+# - For WezTerm specifically, also calls `wezterm cli set-tab-title` /
+#   `set-window-title` to keep WezTerm's internal state in sync. Guarded by
+#   `(( $+commands[wezterm] ))`, so it's a no-op outside WezTerm.
 # - Sets DISABLE_AUTO_TITLE during the Copilot session so oh-my-zsh's
 #   precmd/preexec hooks don't repeatedly overwrite the title.
 # - Uses `command copilot` to bypass any shell alias of the same name.

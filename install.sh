@@ -25,6 +25,7 @@ install_macos_deps() {
 
   local app_casks=(
     wezterm
+    ghostty
   )
   local font_casks=(
     font-recursive # Provides the Recursive Mono variable family (St.Helens, Casual, Linear, Duotone)
@@ -63,7 +64,11 @@ link_file() {
 }
 
 if is_macos; then
-  install_macos_deps
+  if [ "${SKIP_BREW:-0}" = "1" ]; then
+    echo "Skipping Homebrew step (SKIP_BREW=1)."
+  else
+    install_macos_deps
+  fi
 else
   echo "Auto-install only supports macOS + Homebrew. Install apps/fonts manually."
 fi
@@ -106,6 +111,22 @@ if [ -d "$copilot_src" ]; then
   else
     echo "Skipping Copilot config files: $copilot_dest does not exist (copilot CLI not installed?)"
   fi
+fi
+
+# Link Ghostty config files (ghostty/* -> ~/.config/ghostty/*).
+# Unlike copilot/, the destination is created if missing because
+# ~/.config/ghostty/ is the standard XDG location and Ghostty itself
+# only creates it on first launch — we want install.sh to wire things
+# up on a fresh box without requiring the user to launch Ghostty first.
+ghostty_src="${src_dir}/ghostty"
+ghostty_dest="${HOME}/.config/ghostty"
+if [ -d "$ghostty_src" ]; then
+  mkdir -p "$ghostty_dest"
+  while IFS= read -r -d '' entry; do
+    base="$(basename "$entry")"
+    link_file "$entry" "${ghostty_dest}/${base}"
+  done < <(find "$ghostty_src" -maxdepth 1 -mindepth 1 -type f -print0)
+  echo "Linked Ghostty config files to $ghostty_dest"
 fi
 
 echo "Linked dotfiles from $src_dir to $dest_dir"
