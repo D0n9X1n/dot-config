@@ -232,11 +232,11 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, cfg, hover, max_width)
   title = wezterm.truncate_right(title, title_max)
 
   return {
-    -- Vertical separator before every tab except the first. Heavy line
-    -- (┃ U+2503) for clear visual division.
+    -- Vertical separator before every tab except the first.
+    -- │ U+2502 BOX DRAWINGS LIGHT VERTICAL.
     { Background = { Color = BAR_BG } },
     { Foreground = { Color = FG_DIM } },
-    { Text = tab.tab_index > 0 and "┃" or " " },
+    { Text = tab.tab_index > 0 and "│" or " " },
 
     -- Single-line tab body. Same bg for active/inactive — only the fg
     -- color distinguishes states. No bold (subtler).
