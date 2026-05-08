@@ -24,15 +24,17 @@ install_macos_deps() {
   brew tap homebrew/cask-fonts >/dev/null 2>&1 || true
 
   local app_casks=(
+    alacritty
     wezterm
-    ghostty
   )
   local font_casks=(
     font-recursive # Provides the Recursive Mono variable family (St.Helens, Casual, Linear, Duotone)
     font-recursive-mono-nerd-font
-    font-lxgw-wenkai
     font-symbols-only-nerd-font
     font-noto-color-emoji
+  )
+  local formulae=(
+    tmux
   )
 
   local cask
@@ -41,6 +43,14 @@ install_macos_deps() {
       continue
     fi
     brew install --cask "$cask" || echo "Warning: failed to install cask '$cask' (skipping)"
+  done
+
+  local formula
+  for formula in "${formulae[@]}"; do
+    if brew list --formula "$formula" >/dev/null 2>&1; then
+      continue
+    fi
+    brew install "$formula" || echo "Warning: failed to install formula '$formula' (skipping)"
   done
 }
 
@@ -113,20 +123,39 @@ if [ -d "$copilot_src" ]; then
   fi
 fi
 
-# Link Ghostty config files (ghostty/* -> ~/.config/ghostty/*).
-# Unlike copilot/, the destination is created if missing because
-# ~/.config/ghostty/ is the standard XDG location and Ghostty itself
-# only creates it on first launch — we want install.sh to wire things
-# up on a fresh box without requiring the user to launch Ghostty first.
-ghostty_src="${src_dir}/ghostty"
-ghostty_dest="${HOME}/.config/ghostty"
-if [ -d "$ghostty_src" ]; then
-  mkdir -p "$ghostty_dest"
+# Link Alacritty config files (alacritty/* -> ~/.config/alacritty/*).
+# Like ghostty before it, the destination is created if missing because
+# Alacritty doesn't create ~/.config/alacritty/ until first launch — we
+# want install.sh to wire things up on a fresh box without requiring an
+# Alacritty launch first.
+alacritty_src="${src_dir}/alacritty"
+alacritty_dest="${HOME}/.config/alacritty"
+if [ -d "$alacritty_src" ]; then
+  mkdir -p "$alacritty_dest"
   while IFS= read -r -d '' entry; do
     base="$(basename "$entry")"
-    link_file "$entry" "${ghostty_dest}/${base}"
-  done < <(find "$ghostty_src" -maxdepth 1 -mindepth 1 -type f -print0)
-  echo "Linked Ghostty config files to $ghostty_dest"
+    link_file "$entry" "${alacritty_dest}/${base}"
+  done < <(find "$alacritty_src" -maxdepth 1 -mindepth 1 -type f -print0)
+  echo "Linked Alacritty config files to $alacritty_dest"
+fi
+
+# Bootstrap TPM (Tmux Plugin Manager) and install plugins listed in
+# .tmux.conf. Skipped if tmux isn't on PATH. Idempotent: re-running
+# install.sh is a no-op once everything is in place.
+if have_cmd tmux && [ -f "${HOME}/.tmux.conf" ]; then
+  tpm_dir="${HOME}/.tmux/plugins/tpm"
+  if [ ! -d "$tpm_dir" ]; then
+    git clone --depth=1 https://github.com/tmux-plugins/tpm "$tpm_dir" \
+      || echo "Warning: failed to clone TPM (run prefix+I in tmux to retry)"
+  fi
+  if [ -d "$tpm_dir" ]; then
+    # install_plugins uses `tmux start-server; show-environment` to discover
+    # TMUX_PLUGIN_MANAGER_PATH. That requires the default tmux socket to
+    # load .tmux.conf (which exports the var via the tpm init line). The
+    # script below handles the server start/stop transparently.
+    "$tpm_dir/bin/install_plugins" >/dev/null \
+      || echo "Warning: TPM plugin install reported errors (run prefix+I in tmux to retry)"
+  fi
 fi
 
 echo "Linked dotfiles from $src_dir to $dest_dir"

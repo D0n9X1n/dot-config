@@ -9,8 +9,9 @@ that creates symlinks into the home directory.
 ```
 dot-configs/
 ├── install.sh                   # idempotent linker; safe to re-run
-├── ghostty/                     # contents -> ~/.config/ghostty/
-│   └── config.ghostty           # Ghostty terminal config (Gruvbox + Rec Mono)
+├── .tmux.conf                   # -> ~/.tmux.conf  (tab/split/session manager)
+├── alacritty/                   # contents -> ~/.config/alacritty/
+│   └── alacritty.toml           # Alacritty terminal config (Gruvbox + Rec Mono)
 ├── oh-my-zsh-custom/            # contents -> ~/.oh-my-zsh/custom/
 │   ├── custom.zsh               # aliases, proxy helpers, brew completions, env
 │   └── gg.zsh                   # gg() function (terminal title + copilot)
@@ -18,8 +19,8 @@ dot-configs/
 │   ├── settings.json            # Copilot CLI settings (model, footer, status line)
 │   ├── statusline.sh            # custom multi-segment status line
 │   └── copilot-instructions.md  # global agent instructions
-├── wezterm/                     # archived previous terminal config (NOT auto-linked)
-│   └── wezterm.lua              # legacy WezTerm config — link manually if needed
+├── wezterm/                     # fallback terminal config (NOT auto-linked)
+│   └── wezterm.lua              # opt-in WezTerm config — link manually if used
 ├── LICENSE
 ├── ReadMe.md                    # this file
 └── QUICKREF.md                  # condensed reference (agent-friendly)
@@ -29,28 +30,37 @@ dot-configs/
 
 1. Installs required macOS apps and fonts via Homebrew (best-effort; failures
    are logged but never abort the install). Set `SKIP_BREW=1` to skip this
-   step entirely (useful for CI / fake-`HOME` testing).
+   step entirely (useful for CI / fake-`HOME` testing). Casks: `alacritty`,
+   `wezterm`, the Recursive font family, Symbols Only Nerd Font, Noto Color
+   Emoji. Formulae: `tmux`.
 2. Symlinks every **top-level** dotfile in this repo (files starting with `.`)
-   into `$HOME`.
+   into `$HOME` (currently `.tmux.conf`, plus the existing `.gitignore` /
+   `.DS_Store` pass-through which has been there since v0.1).
 3. Symlinks every file in `oh-my-zsh-custom/` into `~/.oh-my-zsh/custom/`.
    Skipped (with a warning) if `~/.oh-my-zsh/custom/` does not exist.
 4. Symlinks every file in `copilot/` into `~/.copilot/`. Skipped (with a
    warning) if `~/.copilot/` does not exist. Preserves the executable bit on
    `*.sh` files (so `statusline.sh` runs without re-chmod).
-5. Symlinks every file in `ghostty/` into `~/.config/ghostty/`. **Creates the
-   destination directory if missing** (Ghostty only creates it on first
+5. Symlinks every file in `alacritty/` into `~/.config/alacritty/`. **Creates
+   the destination directory if missing** (Alacritty only creates it on first
    launch, but we want install.sh to wire things up on a fresh box without
-   requiring a Ghostty launch first).
-6. Backs up any existing destination file or symlink that doesn't already point
+   requiring an Alacritty launch first).
+6. Bootstraps **TPM** (Tmux Plugin Manager): clones it under `~/.tmux/plugins/tpm`
+   if missing, then runs `tpm/bin/install_plugins` to clone every plugin
+   listed in `.tmux.conf`. Skipped if `tmux` isn't on PATH.
+7. Backs up any existing destination file or symlink that doesn't already point
    at the repo as `<name>.bak.YYYYMMDDHHMMSS` before linking.
-7. Leaves correctly-pointing symlinks alone (no-op).
+8. Leaves correctly-pointing symlinks alone (no-op).
 
-> **`wezterm/` is intentionally not auto-linked.** It holds the previous
-> terminal config so users mid-migration can keep using WezTerm by manually
-> running `ln -sfn "$(pwd)/wezterm/wezterm.lua" ~/.wezterm.lua` (the `-fn`
-> flags safely overwrite the stale `~/.wezterm.lua` symlink left over from
-> `v0.3.0`, which now points at a deleted file). Slated for
-> removal in `v0.5.0`.
+> **`wezterm/` is intentionally not auto-linked.** It's the supported fallback
+> terminal — kept in-repo (and the `wezterm` cask is still auto-installed) for
+> users who want native tabs/splits without involving tmux, or who need
+> WezTerm's variable-font weight axis (Alacritty has no equivalent). Manually
+> opt in with:
+>
+> ```bash
+> ln -sfn "$(pwd)/wezterm/wezterm.lua" ~/.wezterm.lua
+> ```
 
 Safe to re-run at any time. Pulling new commits automatically takes effect on
 all machines because every config file is a symlink into this repo.
@@ -76,8 +86,8 @@ cd ~/Public/dot-configs && git pull
 | New `~/.something` dotfile | Drop it at repo root as `.something`, then re-run `install.sh`. |
 | New oh-my-zsh customization (alias, function, env) | Create a new `*.zsh` file in `oh-my-zsh-custom/`, then re-run `install.sh`. Files there are auto-loaded by oh-my-zsh in alphabetical order. |
 | New Copilot CLI config | Drop the file under `copilot/`, then re-run `install.sh`. (`mcp-config.json` is gitignored because it contains secrets — manage that file manually.) |
-| New Ghostty config snippet | Drop the file under `ghostty/`, then re-run `install.sh`. The destination directory is created automatically. |
-| Editing an existing config | Edit it in this repo. Changes take effect immediately on every machine where it's symlinked. |
+| New Alacritty config snippet | Drop the file under `alacritty/`, then re-run `install.sh`. The destination directory is created automatically. |
+| Editing an existing config | Edit it in this repo. Symlinks make changes live immediately on every machine. Reload mechanisms: Alacritty `live_config_reload = true`; tmux `prefix + r`; wezterm auto-reloads. |
 
 After adding/editing, commit and push. Other machines pick up the change with
 `git pull` (and `install.sh` again only if new files were introduced).
@@ -99,81 +109,174 @@ After adding/editing, commit and push. Other machines pick up the change with
 #### `gg.zsh` — `gg <title>`
 
 Sets the current terminal tab and window title to `<title>` via OSC 1 / 2
-escape sequences (works in Ghostty, WezTerm, iTerm2, anything OSC-compliant)
-and then launches `copilot --allow-all-tools --allow-all-paths` in the
-current shell. Useful for labeling Copilot CLI sessions so they're
-identifiable in the tab bar.
+escape sequences (works in Alacritty, WezTerm, iTerm2, anything OSC-compliant).
+**Inside tmux** the OSC escape doesn't propagate to the outer terminal because
+`.tmux.conf` keeps `allow-rename off` and `automatic-rename off`, so `gg` also
+calls `tmux rename-window` directly — that updates tmux's status-bar window
+name, and `set-titles on` then bubbles `#S · #W` up to Alacritty's titlebar.
+After updating titles, `gg` launches
+`copilot --allow-all-tools --allow-all-paths --effort xhigh` in the current
+shell. Useful for labeling Copilot CLI sessions so they're identifiable in
+the tab bar.
 
 Implementation notes:
 
 - Sends OSC 1 (icon name / tab title) and OSC 2 (window title) — terminals
-  that pull the window title from the active pane's OSC 2 (Ghostty, WezTerm)
-  pick this up automatically.
-- For WezTerm specifically, also calls `wezterm cli set-tab-title` and
-  `set-window-title` to update WezTerm's internal state for completeness;
-  these commands are no-ops outside WezTerm.
+  that pull the window title from the active surface's OSC 2 (Alacritty,
+  WezTerm) pick this up automatically when not nested in tmux.
+- When `$TMUX` is set, also runs `tmux rename-window -- "$title"` so tmux's
+  own window-name machinery is in sync (it doesn't read OSC sequences once
+  `automatic-rename` is off).
+- For WezTerm specifically (gated by `$WEZTERM_PANE`), also calls
+  `wezterm cli set-tab-title` and `set-window-title` to update WezTerm's
+  internal state — no-op when wezterm is on PATH but not the active terminal.
 - Sets `DISABLE_AUTO_TITLE=true` while Copilot is running so oh-my-zsh's
   `precmd` / `preexec` hooks don't keep overwriting the title.
 - Calls `command copilot ...` to bypass any shell alias of the same name.
 
-### Terminal — Ghostty (`ghostty/`)
+### Terminal — Alacritty (`alacritty/`)
 
-The daily-driver terminal as of `v0.4.0`. Files in `ghostty/` are linked into
-`~/.config/ghostty/`. `install.sh` creates that directory if it doesn't
-already exist (Ghostty itself only creates the dir on first launch, but we
-want a fresh `install.sh` run to wire things up without requiring the user
-to launch Ghostty first).
+The daily-driver terminal as of `v0.5.0`. Files in `alacritty/` are linked
+into `~/.config/alacritty/`. `install.sh` creates that directory if it
+doesn't already exist (Alacritty itself only creates the dir on first
+launch, but we want a fresh `install.sh` run to wire things up without
+requiring the user to launch Alacritty first).
 
-#### `config.ghostty`
+Why Alacritty + tmux instead of a tabs-native terminal:
+
+- **Cross-platform muscle memory.** Alacritty runs natively on macOS,
+  Windows, and Linux/BSD with the same TOML config. Tabs/splits/sessions
+  live in tmux, so the experience is identical everywhere — including
+  remote SSH where local-terminal tabs would not exist.
+- **Session persistence.** tmux + tmux-resurrect + tmux-continuum survive
+  Alacritty crashes, OS reboots, and SSH disconnects. Native tabs cannot.
+- **Speed.** Alacritty is GPU-accelerated (OpenGL) and faster to start
+  than Electron-based terminals.
+
+#### `alacritty.toml`
 
 | Setting | Value |
 |---|---|
-| Theme | `Gruvbox Dark Hard` (built-in, verified via `ghostty +list-themes`) |
-| Primary font | `Rec Mono St.Helens` (Recursive Mono variable family) |
-| Font weight | 500 (Medium) via `font-variation = wght=500`, single weight always |
+| Theme | hand-rolled `[colors.*]` matching Gruvbox Dark Hard (mirrors `wezterm/wezterm.lua`'s `GruvboxDarkHard`) |
+| Primary font | `Rec Mono St.Helens`, style `Regular` (Alacritty has no variable-font weight axis support; the static `font-recursive` cask only ships Regular/Bold/Italic/Bold-Italic, so wght=500 from WezTerm is unreachable here — visual difference at 14pt is mild) |
 | Font size | 14 pt |
-| Line height | `adjust-cell-height = 10%` (matches the WezTerm `line_height = 1.1`) |
-| Bold style | `font-style-bold = default` — no native bold variant; falls back to regular |
-| Window padding | 8 px on both axes |
-| Inactive split dim | `unfocused-split-opacity = 0.4` |
-| macOS title bar | `macos-titlebar-style = tabs` (native, tabs at top) |
-| Bell | Audio off (Ghostty default `bell-features` excludes audio) |
-| Scrollback | Default 10,000,000 lines |
-| Renderer | Metal (Ghostty native on macOS) |
-| `term` | `xterm-ghostty` (Ghostty default; ships its own terminfo) |
+| Line height | `font.offset = { x=0, y=2 }` (vertical breathing room ≈ WezTerm `line_height = 1.1`) |
+| Window padding | `{x=8, y=8}`, `dynamic_padding = true` |
+| Window decorations | `Full` (Alacritty has no native tab strip; full chrome lets macOS render the titlebar normally) |
+| `option_as_alt` | `OnlyLeft` (left-Option as Alt for tmux/shell `M-…`; right-Option preserved for typing accents) |
+| `dynamic_title` | `true` (honour OSC 0/1/2 from `gg` and tmux) |
+| Bell | `duration = 0` (silent) |
+| Cursor | Block, no blink, hollow when unfocused |
+| Selection | `save_to_clipboard = false` (explicit Cmd+C only) |
+| Scrolling | `history = 100000` |
+| OSC 52 | `terminal.osc52 = "CopyPaste"` (cross-machine clipboard via SSH'd tmux/vim) |
+| Shell | `[terminal.shell] program = "/bin/zsh", args = ["-l"]` (login shell) |
+| `live_config_reload` | `true` |
 
-Keybindings (overrides on top of Ghostty defaults; later definitions win):
+Keybindings (additive on top of Alacritty defaults — defaults like Cmd+C/V,
+Cmd+=, Cmd+-, Cmd+N (new window), Cmd+W, Cmd+F (search), Cmd+H/M (hide/min)
+are kept):
 
 | Action | Shortcut |
 |---|---|
-| Split right (horizontal) | `Cmd+Shift+D` (Ghostty's `super+shift+d`) |
-| Split down (vertical) | `Cmd+D` (Ghostty's `super+d`) |
-| Previous tab | `Cmd+←` |
-| Next tab | `Cmd+→` |
-| Focus pane (direction) | `Ctrl+Shift+Arrows` |
-| Resize pane (small steps) | `Cmd+Ctrl+Alt+Shift+Arrows` (step 5) |
-| Toggle pane zoom | `Cmd+Ctrl+Alt+Enter` |
-| Close pane (or tab if last pane) | `Cmd+W` (Ghostty default) |
-| Copy selection to clipboard | `Cmd+C` (Ghostty default `copy_to_clipboard:mixed`) |
-| Send `Ctrl+C` (SIGINT) | Plain `Ctrl+C` — Ghostty has no callback API, so the WezTerm "smart `Cmd+C`" (copy if selection, else SIGINT) is **not** portable |
+| Open another window (no native tabs — use tmux) | `Cmd+T` (alias for `Cmd+N`) |
+| Reset font size | `Cmd+0` |
+| Word jump in shell | `Option+Left` / `Option+Right` (sends `ESC b` / `ESC f`) |
 
-> **Validate locally** with `ghostty +validate-config --config-file=ghostty/config.ghostty` — exit 0 means clean; warnings or errors print otherwise. Use `ghostty +list-themes` to confirm the theme name and `ghostty +list-actions` for the full action vocabulary.
+> **Tabs/splits/pane-nav are entirely tmux's responsibility.** See the tmux
+> section below for the keymap.
+>
+> **Validate locally** with
+> `alacritty migrate --dry-run --config-file alacritty/alacritty.toml` —
+> exit 0 with `Successfully migrated` means the schema is sound.
 
-### Legacy terminal — WezTerm (`wezterm/`, archived)
+##### Cross-platform notes
 
-The previous daily-driver terminal. **Not auto-linked** by `install.sh`
-(the linker only walks top-level `.<name>` files plus the `oh-my-zsh-custom/`,
-`copilot/`, and `ghostty/` mappings). Kept in-repo through `v0.4.x` so
-users mid-migration can manually opt in:
+The header comment in `alacritty.toml` documents how to use the file from
+Linux and Windows. In short:
+
+- **macOS**: `install.sh` symlinks the file to `~/.config/alacritty/alacritty.toml`.
+- **Linux**: `ln -sfn <repo>/alacritty/alacritty.toml ~/.config/alacritty/alacritty.toml`.
+- **Windows**: copy or symlink to `%APPDATA%\alacritty\alacritty.toml`.
+  Override the shell to `pwsh.exe` either inline or by placing a sibling
+  `local.toml` referenced from `[general] import` (the file ships with the
+  import line commented for that purpose). Recursive Mono St.Helens may not
+  be installed on Windows by default — fall back to `RecMonoCasual Nerd
+  Font` from `font-recursive-mono-nerd-font` or any monospace family.
+
+### Terminal — tmux (`.tmux.conf`)
+
+Primary tab/split/session manager. Linked to `~/.tmux.conf` by `install.sh`.
+
+| Setting | Value |
+|---|---|
+| Theme | hand-rolled Gruvbox Dark Hard palette (matches Alacritty + WezTerm) |
+| Prefix | `C-b` (default — kept for portability across shared machines) |
+| `default-terminal` | `tmux-256color` + `RGB` overrides for `alacritty`, `wezterm`, `xterm-256color`, `*-direct` |
+| Mouse | `on` (scroll, click-to-select, drag-to-resize) |
+| `escape-time` | `0` (vim-friendly) |
+| `history-limit` | `100000` |
+| Window/pane base index | `1` (1-indexed; `renumber-windows on`) |
+| Status position | top |
+| Set-clipboard | `on` (OSC 52 — works through SSH because Alacritty + WezTerm both honour OSC 52) |
+| Mode keys | `vi` |
+| Allow rename / Auto rename | `off` (so `gg` / Vim-buffer titles stick; `gg` calls `tmux rename-window` explicitly) |
+
+Keybinds (additive — tmux defaults like `prefix + n / p / 1..9 / Tab` for
+window nav, `prefix + z` for zoom, `prefix + Space` for layout cycle, `prefix
++ d` for detach, `prefix + s` for session list are all kept):
+
+| Action | Shortcut |
+|---|---|
+| Reload tmux.conf | `prefix + r` |
+| Split right (vertical separator) | `prefix + |` (cwd inherited) |
+| Split down (horizontal separator) | `prefix + -` (cwd inherited) |
+| New window (cwd inherited) | `prefix + c` (default rebound to inherit cwd) |
+| Pane focus (vim-style) | `prefix + h / j / k / l` |
+| Pane resize (repeatable, no re-prefix) | `prefix + H / J / K / L` |
+| Copy mode (vi keys) | `prefix + v`, then `v` start-selection, `y` copy |
+| Mouse drag selection | auto-copies on drag end (OSC 52) |
+
+Status bar segments:
+
+- **Left**: yellow pill with the current session name (`#S`).
+- **Window list**: inactive in dim grey on bg0; active in dark text on a
+  Gruvbox bright-blue pill, plus a magnifier when zoomed
+  (`#{?window_zoomed_flag, ,}`).
+- **Right**: prefix indicator (only while the prefix is held, in red),
+  `HH:MM`, vertical bar, and `YYYY-MM-DD`.
+
+Plugins (managed by **TPM** — bootstrap is automatic on first run, both via
+`.tmux.conf`'s `if "test ! -d ..."` guard and via `install.sh`):
+
+| Plugin | Why |
+|---|---|
+| `tmux-plugins/tpm` | Plugin manager |
+| `tmux-plugins/tmux-sensible` | Opinionated defaults that don't fight ours |
+| `tmux-plugins/tmux-yank` | Cross-platform clipboard helpers |
+| `tmux-plugins/tmux-resurrect` | Save/restore sessions (`prefix + Ctrl-s` / `Ctrl-r`); pane contents and Vim/NeoVim sessions captured |
+| `tmux-plugins/tmux-continuum` | Auto-save every 15 min, auto-restore on tmux start |
+
+> **Validate locally** with
+> `tmux -f .tmux.conf -L _v new-session -d -s _v ; tmux -L _v kill-server`
+> — silent exit means the config parsed cleanly. To force re-install of
+> plugins: `~/.tmux/plugins/tpm/bin/install_plugins`.
+
+### Fallback terminal — WezTerm (`wezterm/`, opt-in)
+
+Kept as the supported fallback for users who want native tabs/splits without
+tmux, or who need WezTerm's variable-font weight axis. **Not auto-linked**
+by `install.sh`; the `wezterm` cask is still installed so the fallback is
+one symlink away:
 
 ```bash
 ln -sfn "$(pwd)/wezterm/wezterm.lua" ~/.wezterm.lua
 ```
 
-Slated for removal in `v0.5.0`. The previous WezTerm setup highlights
-(GruvboxDarkHard, Rec Mono St.Helens, custom pill tabs with Nerd Font
-process icons, DPI-adaptive font weight, FreeType fine-tuning, smart
-`Cmd+C`) are documented in the file header.
+Highlights of the in-repo config: GruvboxDarkHard, Rec Mono St.Helens,
+custom 5-row "floating tabs" with Nerd Font process icons and a
+Knight-Rider loading bar for vibe-coding sessions, DPI-adaptive font
+weight, FreeType fine-tuning, smart `Cmd+C` (copy if selection else SIGINT).
 
 ### Copilot CLI (`copilot/`)
 
@@ -224,10 +327,9 @@ operate in plan / exec cycles and verify before claiming completion.
 
 ### Apps (auto-installed via Homebrew on macOS)
 
-- [Ghostty](https://ghostty.org/) — daily-driver terminal as of `v0.4.0`
-- [WezTerm](https://wezfurlong.org/wezterm/) — kept for users mid-migration
-  who still link `wezterm/wezterm.lua` manually (cask removal slated for
-  `v0.5.0`)
+- [Alacritty](https://alacritty.org/) — daily-driver terminal as of `v0.5.0`
+- [WezTerm](https://wezfurlong.org/wezterm/) — kept as the supported
+  fallback for users who want native tabs/splits without tmux
 - [oh-my-zsh](https://ohmyz.sh/) — required only if you want the
   `oh-my-zsh-custom/` files linked
 - [GitHub Copilot CLI](https://github.com/github/copilot) — required only if
@@ -235,13 +337,18 @@ operate in plan / exec cycles and verify before claiming completion.
 - [`gh`](https://cli.github.com/) — optional; `statusline.sh` calls
   `gh auth status` (cached 5 minutes) to render the GH segment
 
+### Tools (auto-installed via Homebrew on macOS)
+
+- [tmux](https://github.com/tmux/tmux) ≥ 3.3 (3.6a tested) — primary tab,
+  split, and session manager. TPM and listed plugins bootstrap automatically
+  on first launch.
+- `git` — required by TPM to clone the plugin manager and plugin repos.
+
 ### Fonts (installed automatically via Homebrew)
 
 - Recursive (Rec Mono St.Helens — part of the Rec Mono variable family) —
   `font-recursive`
 - Recursive Mono Nerd Font — `font-recursive-mono-nerd-font`
-- LXGW WenKai — `font-lxgw-wenkai` (currently installed but not in any
-  active config's font-fallback list — slated for cleanup in `v0.5.0`)
 - Symbols Only Nerd Font — `font-symbols-only-nerd-font`
 - Noto Color Emoji — `font-noto-color-emoji`
 

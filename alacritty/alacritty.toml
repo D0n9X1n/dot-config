@@ -1,0 +1,223 @@
+# ~/.config/alacritty/alacritty.toml
+# =========================================================
+# Primary terminal config (Alacritty 0.17+, TOML schema).
+# Daily-driver as of v0.5.0; WezTerm is the fallback (wezterm/wezterm.lua).
+#
+# Tabs / splits / sessions are intentionally NOT bound here — Alacritty has
+# no native tabs by design. tmux is the tab manager (.tmux.conf at repo root).
+#
+# Cross-platform usage
+#   macOS  : install.sh symlinks this file to ~/.config/alacritty/alacritty.toml
+#   Linux  : ln -sfn <repo>/alacritty/alacritty.toml ~/.config/alacritty/alacritty.toml
+#   Windows: copy/symlink to %APPDATA%\alacritty\alacritty.toml; then either
+#            (a) edit the [terminal.shell] block below, or
+#            (b) keep this file pristine and place a sibling
+#                %APPDATA%\alacritty\local.toml that overrides via:
+#                  [terminal.shell]
+#                  program = "pwsh.exe"
+#                  args    = ["-NoLogo"]
+#                  [font.normal]
+#                  family  = "RecMonoCasual Nerd Font"   # St.Helens isn't on Windows by default
+#                Reference it from this file by adding `local.toml` to
+#                [general] import below.
+#
+# Validate without launching the GUI:
+#   alacritty migrate --dry-run --config-file alacritty/alacritty.toml
+# =========================================================
+
+[general]
+live_config_reload = true
+# Per-machine local overrides go here (uncomment + create the file):
+# import = ["~/.config/alacritty/local.toml"]
+
+# =========================================================
+# Window
+# =========================================================
+[window]
+opacity = 1.0
+padding = { x = 8, y = 8 }
+dynamic_padding = true
+decorations = "Full"        # full titlebar — Alacritty has no native tab strip; macOS needs it for Cmd+W etc.
+startup_mode = "Windowed"
+title = "Alacritty"
+dynamic_title = true        # honour OSC 0/1/2 set by gg() and tmux
+
+# macOS-only: pass the LEFT Option key as Alt (so tmux/shell get M-…),
+# leave the right Option for typing dead keys / accents. Silently ignored
+# on other platforms.
+option_as_alt = "OnlyLeft"
+
+# =========================================================
+# Font
+# Alacritty doesn't expose variable-font weight axes (no equivalent of
+# WezTerm's weight=500 or Ghostty's font-variation = wght=500). The Rec Mono
+# St.Helens cask only ships static Regular/Bold/Italic/BoldItalic, so we
+# use Regular here. Visual difference vs. WezTerm's Medium is mild at 14pt.
+# =========================================================
+[font]
+size = 14.0
+builtin_box_drawing = true
+
+[font.normal]
+family = "Rec Mono St.Helens"
+style  = "Regular"
+
+[font.bold]
+family = "Rec Mono St.Helens"
+style  = "Bold"
+
+[font.italic]
+family = "Rec Mono St.Helens"
+style  = "Italic"
+
+[font.bold_italic]
+family = "Rec Mono St.Helens"
+style  = "Bold Italic"
+
+# Vertical breathing room — Alacritty has no line-height %; offset.y bumps
+# every cell by N px. ~2 px ≈ WezTerm's line_height = 1.1 at 14pt.
+[font.offset]
+x = 0
+y = 2
+
+# =========================================================
+# Cursor
+# =========================================================
+[cursor]
+style = { shape = "Block", blinking = "Off" }
+unfocused_hollow = true
+thickness = 0.15
+
+# =========================================================
+# Bell — disabled
+# =========================================================
+[bell]
+animation = "EaseOutExpo"
+duration = 0
+color = "#ffffff"
+
+# =========================================================
+# Mouse / selection
+# =========================================================
+[mouse]
+hide_when_typing = true
+
+[selection]
+save_to_clipboard = false   # explicit Cmd+C / mouse-then-Cmd+C only
+semantic_escape_chars = ",│`|:\"' ()[]{}<>\t"
+
+# =========================================================
+# Scrolling
+# =========================================================
+[scrolling]
+history = 100000
+multiplier = 3
+
+# =========================================================
+# Terminal
+# =========================================================
+[terminal]
+# OSC 52: let SSH'd tmux/vim copy to the LOCAL clipboard via escape sequences.
+osc52 = "CopyPaste"
+
+# Shell — macOS / Linux default. Override on Windows (see header comment).
+[terminal.shell]
+program = "/bin/zsh"
+args    = ["-l"]
+
+# =========================================================
+# Colors — Gruvbox Dark Hard (matches wezterm/wezterm.lua GruvboxDarkHard)
+# =========================================================
+[colors.primary]
+background        = "#1d2021"
+foreground        = "#ebdbb2"
+dim_foreground    = "#a89984"
+bright_foreground = "#fbf1c7"
+
+[colors.cursor]
+text   = "#1d2021"
+cursor = "#ebdbb2"
+
+[colors.vi_mode_cursor]
+text   = "#1d2021"
+cursor = "#83a598"
+
+[colors.selection]
+text       = "#1d2021"
+background = "#ebdbb2"
+
+[colors.search.matches]
+foreground = "#1d2021"
+background = "#fabd2f"
+
+[colors.search.focused_match]
+foreground = "#1d2021"
+background = "#fb4934"
+
+[colors.footer_bar]
+foreground = "#ebdbb2"
+background = "#3c3836"
+
+[colors.hints.start]
+foreground = "#1d2021"
+background = "#fabd2f"
+
+[colors.hints.end]
+foreground = "#1d2021"
+background = "#83a598"
+
+[colors.normal]
+black   = "#282828"
+red     = "#cc241d"
+green   = "#98971a"
+yellow  = "#d79921"
+blue    = "#458588"
+magenta = "#b16286"
+cyan    = "#689d6a"
+white   = "#a89984"
+
+[colors.bright]
+black   = "#928374"
+red     = "#fb4934"
+green   = "#b8bb26"
+yellow  = "#fabd2f"
+blue    = "#83a598"
+magenta = "#d3869b"
+cyan    = "#8ec07c"
+white   = "#ebdbb2"
+
+[colors.dim]
+black   = "#32302f"
+red     = "#9d0006"
+green   = "#79740e"
+yellow  = "#b57614"
+blue    = "#076678"
+magenta = "#8f3f71"
+cyan    = "#427b58"
+white   = "#928374"
+
+# =========================================================
+# Keybindings — minimal. tmux owns tabs/splits/pane nav.
+# Defaults you keep:
+#   Cmd+C / Cmd+V                       copy / paste
+#   Cmd+= / Cmd+- / Cmd+0               font size +/-/reset (we just add Cmd+0 below)
+#   Cmd+N                               new window
+#   Cmd+W                               close window
+#   Cmd+H / Cmd+M                       hide / minimise (macOS native)
+#   Cmd+F / Cmd+G / Shift+Cmd+G         search forward/next/prev
+# =========================================================
+[keyboard]
+bindings = [
+  # Cmd+T mirrors macOS muscle memory; we just open another window since
+  # Alacritty has no native tabs (tmux handles real tabs via prefix+c).
+  { key = "T", mods = "Command", action = "CreateNewWindow" },
+
+  # Reset font size — companion to default Cmd+= / Cmd+-
+  { key = "Key0", mods = "Command", action = "ResetFontSize" },
+
+  # macOS-style word jump on Option+Arrow → ESC b / ESC f (so readline
+  # and tmux copy-mode both behave). Only relevant when option_as_alt is
+  # not "OnlyLeft" or the right Option is used; harmless either way.
+  { key = "Left",  mods = "Alt", chars = "\u001Bb" },
+  { key = "Right", mods = "Alt", chars = "\u001Bf" },
+]
