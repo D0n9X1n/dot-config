@@ -28,7 +28,8 @@
   "statusLine": {
     "type": "command",
     "command": "~/.copilot/statusline.sh",
-    "padding": 1
+    "paddingTop": 2,
+    "paddingBottom": 1
   },
   "ide": {
     "autoConnect": true,
@@ -66,6 +67,5 @@
       "origin": "*",
       "level": "local"
     }
-  ],
-  "staff": true
+  ]
 }

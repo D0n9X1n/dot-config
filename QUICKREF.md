@@ -15,17 +15,22 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
 - `<repo>/copilot/<file>` — files linked to `$HOME/.copilot/<file>`. Currently:
   - `settings.json` — Copilot CLI settings (model: `claude-opus-4.7-1m-internal`,
     theme `dark`, `keepAlive: busy`, `continueOnAutoMode: true`, full footer
-    UX, custom status line, experimental features).
+    UX, custom status line with `paddingTop: 2` to separate it from the
+    input prompt, experimental features). Note: Copilot itself injects/strips
+    a `"staff": true` field at runtime based on org membership — keep that
+    field out of the committed file to avoid spurious diffs.
   - `statusline.sh` — executable script printing the custom status line.
     Renders 11 segments separated by `│` (each shown only when its data is
     available): `<icon> <Label> <value>` — Time, Req, Run, API, Cache,
-    Last, Repo (clean/dirty + ↑↓), Stash, Venv, GH, MCP. Setting
-    `COPILOT_STATUSLINE_NO_ICONS=1` drops the Nerd Font icons but keeps the
-    text labels. Run `~/.copilot/statusline.sh --test` to verify each
-    codepoint renders in your terminal (uses `fc-list` if installed).
-    Parses Copilot's session JSON from stdin (single `jq` call) and caches
-    `gh auth status` for 5 min. Bash 3.2-compatible. `install.sh` ensures
-    the executable bit is set.
+    Last, Repo (clean/dirty + ↑↓), Stash, Venv, GH, MCP. The whole line is
+    wrapped in ANSI dim (`\e[2m`…`\e[0m`) so it recedes from the prompt.
+    Env overrides: `COPILOT_STATUSLINE_NO_ICONS=1` drops icons (keeps text
+    labels); `COPILOT_STATUSLINE_NO_DIM=1` drops the dim wrap. Run
+    `~/.copilot/statusline.sh --test` to verify each codepoint renders in
+    your terminal (uses `fc-list` if installed). Parses Copilot's session
+    JSON from stdin (single `jq` call) and caches `gh auth status` for
+    5 min. Bash 3.2-compatible. `install.sh` ensures the executable bit
+    is set.
   - `copilot-instructions.md` — global agent instructions (autonomous mode).
 - `<repo>/oh-my-zsh-custom/<file>` — files linked to
   `$HOME/.oh-my-zsh/custom/<file>`. Currently:

@@ -2,9 +2,11 @@
 # Custom status line for Copilot CLI.
 #
 # Renders a single status line *below the input prompt*. Each segment is
-# `<NerdFont icon> <Label> <value>` separated by a Unicode bar. Setting
-# COPILOT_STATUSLINE_NO_ICONS=1 drops the icons but keeps the labels, so the
-# line stays readable in terminals/fonts without Nerd Font support.
+# `<NerdFont icon> <Label> <value>` separated by a Unicode bar. The whole
+# line is wrapped in ANSI dim (\033[2m...\033[0m) so it visually recedes
+# from the prompt above it. Environment overrides:
+#   COPILOT_STATUSLINE_NO_ICONS=1   drop icons, keep the text labels
+#   COPILOT_STATUSLINE_NO_DIM=1     drop the ANSI dim wrap
 #
 # Quick check that all icons render in your terminal:
 #     ~/.copilot/statusline.sh --test
@@ -40,6 +42,14 @@ SEP=' │ '
 
 ICONS_ON=1
 [ -n "${COPILOT_STATUSLINE_NO_ICONS:-}" ] && ICONS_ON=0
+
+# ANSI dim wrap. Set COPILOT_STATUSLINE_NO_DIM=1 to disable.
+DIM=$'\033[2m'
+RESET=$'\033[0m'
+if [ -n "${COPILOT_STATUSLINE_NO_DIM:-}" ]; then
+  DIM=""
+  RESET=""
+fi
 
 CACHE_DIR="${TMPDIR:-/tmp}/copilot-statusline-cache-$USER"
 mkdir -p "$CACHE_DIR" 2>/dev/null || true
@@ -303,4 +313,4 @@ for s in $SEGMENTS; do
   fi
 done
 
-printf ' %s' "$out"
+printf '%s %s%s' "$DIM" "$out" "$RESET"
