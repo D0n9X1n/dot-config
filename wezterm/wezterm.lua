@@ -229,6 +229,11 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, cfg, hover, max_width)
   title = wezterm.truncate_right(title, title_max)
 
   return {
+    -- Vertical separator before every tab except the first.
+    { Background = { Color = BAR_BG } },
+    { Foreground = { Color = FG_DIM } },
+    { Text = tab.tab_index > 0 and "│" or " " },
+
     -- Single-line tab body. Padding around title; bold + accent on active.
     -- Right pad is wider than left so the close × on hover doesn't crowd
     -- the title text.
