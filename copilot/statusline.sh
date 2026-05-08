@@ -57,7 +57,7 @@ fi
 #   PAD_TOP   blank lines printed before the status line
 #   PAD_LEFT  spaces printed before the dimmed segments
 #   PAD_RIGHT spaces printed after the dimmed segments (rarely useful)
-PAD_TOP="${COPILOT_STATUSLINE_PAD_TOP:-8}"
+PAD_TOP="${COPILOT_STATUSLINE_PAD_TOP:-4}"
 PAD_LEFT="${COPILOT_STATUSLINE_PAD_LEFT:-1}"
 PAD_RIGHT="${COPILOT_STATUSLINE_PAD_RIGHT:-0}"
 
