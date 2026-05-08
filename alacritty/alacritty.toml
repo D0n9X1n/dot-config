@@ -120,10 +120,26 @@ multiplier = 3
 # OSC 52: let SSH'd tmux/vim copy to the LOCAL clipboard via escape sequences.
 osc52 = "CopyPaste"
 
-# Shell — macOS / Linux default. Override on Windows (see header comment).
+# Shell — auto-attach to (or create) a tmux session named "main" on every
+# Alacritty launch. New windows share the same session, so detach + close +
+# reopen always lands you back where you were. The wrapper falls back to
+# plain zsh if tmux isn't installed.
+#
+# Opt-out: set `ALACRITTY_NO_TMUX=1` in your launchctl env (or temporarily
+# launch with `alacritty -o terminal.shell.args='["-l"]'`) and you'll get a
+# bare login zsh instead.
+#
+# Override on Windows: replace this whole block with
+#   program = "pwsh.exe"
+#   args    = ["-NoLogo"]
+# (or wire it through a sibling local.toml — see header comment).
 [terminal.shell]
 program = "/bin/zsh"
-args    = ["-l"]
+args    = [
+  "-l",
+  "-c",
+  "if [ \"${ALACRITTY_NO_TMUX:-0}\" = \"1\" ] || ! command -v tmux >/dev/null 2>&1; then exec /bin/zsh -l; else exec tmux new-session -A -s main; fi",
+]
 
 # =========================================================
 # Colors — Gruvbox Dark Hard (matches wezterm/wezterm.lua GruvboxDarkHard)

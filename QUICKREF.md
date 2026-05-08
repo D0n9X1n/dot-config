@@ -12,11 +12,13 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
 - `install.sh` — single entry point; idempotent; safe to re-run.
 - `<repo>/.<name>` — root dotfiles linked to `$HOME/.<name>`. Currently:
   - `.tmux.conf` — primary tab/split/session manager (Gruvbox Dark Hard
-    palette, prefix `C-b`, mouse on, top status bar, vim-style splits
-    (`prefix + |` / `prefix + -`), 1-indexed windows, OSC 52 clipboard,
-    TPM + tmux-sensible/yank/resurrect/continuum). Bootstrap of TPM and
-    plugins is automatic on first tmux start (cloned by the `if test
-    ! -d tpm` block, then plugin install runs after the `run
+    palette, prefix `C-q` (chosen over default C-b for ergonomics — far
+    from C-c/d/z, doesn't clash with readline, and modern macOS disables
+    the legacy C-q XON flow control), mouse on, top status bar, vim-style
+    splits (`prefix + |` / `prefix + -`), 1-indexed windows, OSC 52
+    clipboard, TPM + tmux-sensible/yank/resurrect/continuum). Bootstrap
+    of TPM and plugins is automatic on first tmux start (cloned by the
+    `if test ! -d tpm` block, then plugin install runs after the `run
     '~/.tmux/plugins/tpm/tpm'` init line because that line is what sets
     `TMUX_PLUGIN_MANAGER_PATH` in tmux's env). `install.sh` ALSO bootstraps
     TPM + plugins for the install-script path. Validate locally with

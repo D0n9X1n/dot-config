@@ -211,7 +211,7 @@ Primary tab/split/session manager. Linked to `~/.tmux.conf` by `install.sh`.
 | Setting | Value |
 |---|---|
 | Theme | hand-rolled Gruvbox Dark Hard palette (matches Alacritty + WezTerm) |
-| Prefix | `C-b` (default — kept for portability across shared machines) |
+| Prefix | `C-q` (chosen over default C-b for ergonomics — far from C-c/d/z, doesn't clash with readline, modern macOS disables the legacy C-q XON flow control so nothing reclaims the keystroke; press `prefix + C-q` to send a literal `C-q` to the active pane) |
 | `default-terminal` | `tmux-256color` + `RGB` overrides for `alacritty`, `wezterm`, `xterm-256color`, `*-direct` |
 | Mouse | `on` (scroll, click-to-select, drag-to-resize) |
 | `escape-time` | `0` (vim-friendly) |
