@@ -21,15 +21,14 @@
     "showContextWindow": true,
     "showQuota": false,
     "showAgent": true,
-    "showCodeChanges": true,
+    "showCodeChanges": false,
     "showUsername": false,
     "showCustom": true
   },
   "statusLine": {
     "type": "command",
     "command": "~/.copilot/statusline.sh",
-    "paddingTop": 5,
-    "paddingBottom": 1
+    "padding": 1
   },
   "ide": {
     "autoConnect": true,
@@ -67,5 +66,6 @@
       "origin": "*",
       "level": "local"
     }
-  ]
+  ],
+  "staff": true
 }

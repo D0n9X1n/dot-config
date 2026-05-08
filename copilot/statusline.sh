@@ -313,4 +313,4 @@ for s in $SEGMENTS; do
   fi
 done
 
-printf '%s %s%s' "$DIM" "$out" "$RESET"
+printf '%s%s%s' "$DIM" "$out" "$RESET"
