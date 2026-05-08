@@ -66,7 +66,10 @@ config.font_rules = {
 -- =========================================================
 -- Tab bar
 -- =========================================================
-config.use_fancy_tab_bar = false
+-- use_fancy_tab_bar=true gives a taller, native-style tab bar (vs the
+-- one-cell-tall retro mode). Still respects format-tab-title below, so
+-- the pill icons + per-process Nerd Font glyphs keep working.
+config.use_fancy_tab_bar = true
 config.enable_tab_bar = true
 config.tab_bar_at_bottom = true
 config.hide_tab_bar_if_only_one_tab = false
