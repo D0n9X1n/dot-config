@@ -105,7 +105,7 @@ config.use_fancy_tab_bar = true
 config.enable_tab_bar = true
 config.tab_bar_at_bottom = false  -- fancy is top-only
 config.hide_tab_bar_if_only_one_tab = false
-config.tab_max_width = 80
+config.tab_max_width = 999  -- effectively unbounded — tab width follows title length
 config.show_new_tab_button_in_tab_bar = false
 config.show_tab_index_in_tab_bar = false
 
@@ -114,7 +114,7 @@ config.show_tab_index_in_tab_bar = false
 -- with the bar so the whole title-bar area is one continuous Gruvbox surface.
 config.window_frame = {
   font = wezterm.font({ family = "Rec Mono St.Helens", weight = "Medium" }),
-  font_size = 16.0,
+  font_size = 15.0,
   active_titlebar_bg = BAR_BG,
   inactive_titlebar_bg = BAR_BG,
   active_titlebar_fg = FG,
