@@ -218,9 +218,12 @@ white   = "#928374"
 #   Cmd+C / Cmd+V                       copy / paste
 #   Cmd+= / Cmd+- / Cmd+0               font size +/-/reset (we just add Cmd+0 below)
 #   Cmd+N                               new window
-#   Cmd+W                               close window
 #   Cmd+H / Cmd+M                       hide / minimise (macOS native)
 #   Cmd+F / Cmd+G / Shift+Cmd+G         search forward/next/prev
+# Defaults we OVERRIDE:
+#   Cmd+W                               default = quit/close window — disabled
+#                                       so an accidental hit doesn't kill the
+#                                       tmux session running inside.
 # =========================================================
 [keyboard]
 bindings = [
@@ -230,6 +233,11 @@ bindings = [
 
   # Reset font size — companion to default Cmd+= / Cmd+-
   { key = "Key0", mods = "Command", action = "ResetFontSize" },
+
+  # Disable Cmd+W. ReceiveChar tells Alacritty to forward the key to the PTY
+  # instead of running its built-in Quit action; the shell/tmux ignores it,
+  # so the net effect is "key does nothing".
+  { key = "W", mods = "Command", action = "ReceiveChar" },
 
   # macOS-style word jump on Option+Arrow → ESC b / ESC f (so readline
   # and tmux copy-mode both behave). Only relevant when option_as_alt is
