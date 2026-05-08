@@ -66,11 +66,11 @@ config.font_rules = {
 -- =========================================================
 -- Colors (declared first — referenced by Tab bar block + format-tab-title)
 -- =========================================================
--- Subtle tab states: same background everywhere, only foreground color
--- distinguishes active / inactive / hover. Bar matches terminal bg so the
--- chrome is seamless.
+-- Subtle tab states: tab background MATCHES terminal background, so tabs
+-- look like floating text on the terminal canvas — only the heavy ┃
+-- separator divides them. Foreground color alone signals state.
 local BAR_BG      = "#1d2021"  -- gruvbox dark hard bg (matches terminal)
-local TAB_BG      = "#282828"  -- gruvbox bg0 — single tab bg for all states
+local TAB_BG      = "#1d2021"  -- same as bar — tabs blend into terminal bg
 
 -- Backwards-compat aliases (still referenced by the format-tab-title body):
 local INACTIVE_BG = TAB_BG
@@ -109,11 +109,12 @@ config.tab_max_width = 40
 config.show_new_tab_button_in_tab_bar = false
 config.show_tab_index_in_tab_bar = false
 
--- Fancy tab-bar height comes from window_frame.font_size. 14pt matches
--- terminal body for harmony; chrome harmonised with the Gruvbox bar.
+-- Fancy tab-bar height comes from window_frame.font_size. 16pt gives a
+-- comfortably tall bar without dwarfing terminal text. Chrome harmonised
+-- with the bar so the whole title-bar area is one continuous Gruvbox surface.
 config.window_frame = {
   font = wezterm.font({ family = "Rec Mono St.Helens", weight = "Medium" }),
-  font_size = 14.0,
+  font_size = 16.0,
   active_titlebar_bg = BAR_BG,
   inactive_titlebar_bg = BAR_BG,
   active_titlebar_fg = FG,
