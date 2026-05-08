@@ -223,10 +223,10 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, cfg, hover, max_width)
   -- Tab number prefix (#1, #2, ...) — easier to scan than a bare digit.
   title = "#" .. tostring(tab.tab_index + 1) .. " " .. title
 
-  -- Width math: 2 chars left pad + title + 6 chars right pad (room before
-  -- the close × rendered by fancy-mode chrome) = title + 8.
+  -- Width math: tab width = title length exactly, no padding chars added
+  -- by us (fancy-mode chrome still adds its own minimal edge padding).
   local mw = max_width or 999
-  local FIXED = 8
+  local FIXED = 0
   local title_max = mw - FIXED
   if title_max < 1 then title_max = 1 end
   title = wezterm.truncate_right(title, title_max)
@@ -238,11 +238,10 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, cfg, hover, max_width)
     { Foreground = { Color = FG_DIM } },
     { Text = tab.tab_index > 0 and "│" or " " },
 
-    -- Single-line tab body. Same bg for active/inactive — only the fg
-    -- color distinguishes states. No bold (subtler).
+    -- Tab body: title only, no padding chars (tab width = title length).
     { Background = { Color = bg } },
     { Foreground = { Color = fg } },
-    { Text = "  " .. title .. "      " },
+    { Text = title },
   }
 end)
 
