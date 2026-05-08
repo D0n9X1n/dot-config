@@ -21,15 +21,15 @@
     "showContextWindow": true,
     "showQuota": false,
     "showAgent": true,
-    "showCodeChanges": true,
+    "showCodeChanges": false,
     "showUsername": false,
     "showCustom": true
   },
   "statusLine": {
     "type": "command",
     "command": "~/.copilot/statusline.sh",
-    "paddingTop": 5,
-    "paddingBottom": 1,
+    "paddingTop": 8,
+    "paddingBottom": 0,
     "paddingLeft": 0,
     "paddingRight": 0
   },
