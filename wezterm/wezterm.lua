@@ -64,6 +64,34 @@ config.font_rules = {
 }
 
 -- =========================================================
+-- Colors (declared first — referenced by Tab bar block + format-tab-title)
+-- =========================================================
+-- Gruvbox layered backgrounds — clear active vs inactive separation.
+-- Bar matches terminal bg so the chrome is seamless; tabs are progressively
+-- brighter (inactive bg0 → hover bg1 → active bg2). Active also gets a
+-- Gruvbox bright-yellow accent fg so it pops without being garish.
+local BAR_BG      = "#1d2021"  -- gruvbox dark hard bg (matches terminal)
+local INACTIVE_BG = "#282828"  -- gruvbox bg0
+local HOVER_BG    = "#3c3836"  -- gruvbox bg1
+local ACTIVE_BG   = "#504945"  -- gruvbox bg2
+
+local FG_DIM      = "#928374"  -- gruvbox gray (dim for inactive)
+local FG          = "#ebdbb2"  -- gruvbox fg
+local FG_ACCENT   = "#fabd2f"  -- gruvbox bright yellow (active accent)
+
+config.colors = {
+  tab_bar = {
+    background = BAR_BG,
+    inactive_tab_edge = BAR_BG,
+    active_tab = { bg_color = ACTIVE_BG, fg_color = FG_ACCENT, intensity = "Bold" },
+    inactive_tab = { bg_color = INACTIVE_BG, fg_color = FG_DIM },
+    inactive_tab_hover = { bg_color = HOVER_BG, fg_color = FG },
+    new_tab = { bg_color = BAR_BG, fg_color = FG_DIM },
+    new_tab_hover = { bg_color = HOVER_BG, fg_color = FG },
+  },
+}
+
+-- =========================================================
 -- Tab bar
 -- =========================================================
 -- use_fancy_tab_bar=true gives a taller, native-style tab bar (vs the
@@ -82,53 +110,36 @@ config.tab_max_width = 40
 config.show_new_tab_button_in_tab_bar = false
 config.show_tab_index_in_tab_bar = false
 
--- Fancy tab bar height is driven by the window_frame font size + the
--- gruvbox tab bar bg (so the bar visually merges with the chrome).
+-- Fancy tab bar height is driven by the window_frame font size. Default is
+-- ~12pt; 13 keeps tabs comfortably readable without dwarfing terminal text.
+-- Window frame chrome harmonised with the bar so everything looks like one
+-- continuous Gruvbox surface.
 config.window_frame = {
-  font = wezterm.font({ family = "Rec Mono St.Helens", weight = "Regular" }),
-  font_size = 18.0,
-  active_titlebar_bg = "#282828",
-  inactive_titlebar_bg = "#282828",
-  active_titlebar_fg = "#ebdbb2",
-  inactive_titlebar_fg = "#a89984",
-  active_titlebar_border_bottom = "#282828",
-  inactive_titlebar_border_bottom = "#282828",
-  button_fg = "#a89984",
-  button_bg = "#282828",
-  button_hover_fg = "#ebdbb2",
-  button_hover_bg = "#3c3836",
+  font = wezterm.font({ family = "Rec Mono St.Helens", weight = "Medium" }),
+  font_size = 13.0,
+  active_titlebar_bg = BAR_BG,
+  inactive_titlebar_bg = BAR_BG,
+  active_titlebar_fg = FG,
+  inactive_titlebar_fg = FG_DIM,
+  active_titlebar_border_bottom = BAR_BG,
+  inactive_titlebar_border_bottom = BAR_BG,
+  button_fg = FG_DIM,
+  button_bg = BAR_BG,
+  button_hover_fg = FG,
+  button_hover_bg = HOVER_BG,
 }
 
 -- =========================================================
--- Colors
--- =========================================================
-local BAR_BG      = "#282828"
-local INACTIVE_BG = "#3c3836"
-local HOVER_BG    = "#504945"
-local ACTIVE_BG   = "#3c3836"
-
-local FG_DIM      = "#a89984"
-local FG          = "#ebdbb2"
-
-config.colors = {
-  tab_bar = {
-    background = BAR_BG,
-    inactive_tab_edge = BAR_BG,
-    active_tab = { bg_color = ACTIVE_BG, fg_color = FG },
-    inactive_tab = { bg_color = INACTIVE_BG, fg_color = FG_DIM },
-    inactive_tab_hover = { bg_color = HOVER_BG, fg_color = FG },
-    new_tab = { bg_color = BAR_BG, fg_color = FG_DIM },
-    new_tab_hover = { bg_color = HOVER_BG, fg_color = FG },
-  },
-}
-
--- =========================================================
--- Custom tab renderer (pill style, title only)
+-- Custom tab renderer (rounded pill style with Powerline-extra glyphs)
 -- =========================================================
 local MIN_TAB_WIDTH = 22 -- minimum clickable width (columns)
 
 local nf = wezterm.nerdfonts or {}
-local TAB_GAP = " "
+-- Rounded pill edges (Powerline Extra glyphs from Nerd Fonts).
+-- The fg-color of the pill char IS the tab body color, drawn against the
+-- bar bg — this makes the rounded shape "carve out" of the bar seamlessly.
+local LEFT_PILL  = utf8.char(0xe0b6)  --   half-circle left
+local RIGHT_PILL = utf8.char(0xe0b4) --   half-circle right
 
 local function tab_title(tab_info)
   local has_folder = false
@@ -170,7 +181,7 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, cfg, hover, max_width)
   local fg = FG_DIM
   if is_active then
     bg = ACTIVE_BG
-    fg = FG
+    fg = FG_ACCENT  -- gruvbox bright yellow on active tab body
   elseif hover then
     bg = HOVER_BG
     fg = FG
@@ -216,31 +227,37 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, cfg, hover, max_width)
   local index = tostring(tab.tab_index + 1)
   title = index .. " " .. title
 
-  -- Width math: keep pill edges symmetric and never cut off the right edge
+  -- Width math: pill(1) + pad(1) + title + pad(1) + pill(1) = title + 4
   local mw = max_width or 999
-  -- left pill(1) + space before title(1) + space after title(1) + right pill(1) + gap(1)
-  local FIXED = 1 + 1 + 1 + 1 + 1
+  local FIXED = 1 + 1 + 1 + 1
   local title_max = mw - FIXED
   if title_max < 1 then title_max = 1 end
 
   title = wezterm.truncate_right(title, title_max)
 
   -- Enforce minimum width for the title area
-  local min_title = MIN_TAB_WIDTH - 2 -- exclude the two spaces around title
+  local min_title = MIN_TAB_WIDTH - 2 -- exclude the two pads around title
   if min_title < 1 then min_title = 1 end
   if min_title > title_max then min_title = title_max end
   title = wezterm.pad_right(title, min_title)
 
   return {
-    -- Soft block with padding
+    -- Left rounded pill: pill fg = tab body color, drawn on bar bg.
+    { Background = { Color = BAR_BG } },
+    { Foreground = { Color = bg } },
+    { Text = LEFT_PILL },
+
+    -- Tab body: title with single-space pads on each side.
     { Background = { Color = bg } },
     { Foreground = { Color = fg } },
-    { Text = "  " .. title .. "  " },
+    { Attribute = { Intensity = is_active and "Bold" or "Normal" } },
+    { Text = " " .. title .. " " },
+    { Attribute = { Intensity = "Normal" } },
 
-    -- Breathing room between tabs
+    -- Right rounded pill: same trick, mirrored.
     { Background = { Color = BAR_BG } },
-    { Foreground = { Color = BAR_BG } },
-    { Text = TAB_GAP },
+    { Foreground = { Color = bg } },
+    { Text = RIGHT_PILL },
   }
 end)
 
