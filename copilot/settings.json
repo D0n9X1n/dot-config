@@ -30,7 +30,7 @@
     "command": "~/.copilot/statusline.sh",
     "paddingTop": 8,
     "paddingBottom": 0,
-    "paddingLeft": 0,
+    "paddingLeft": 2,
     "paddingRight": 0
   },
   "ide": {
