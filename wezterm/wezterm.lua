@@ -75,9 +75,9 @@ local INACTIVE_BG = "#282828"  -- gruvbox bg0
 local HOVER_BG    = "#3c3836"  -- gruvbox bg1
 local ACTIVE_BG   = "#504945"  -- gruvbox bg2
 
-local FG_DIM      = "#928374"  -- gruvbox gray (dim for inactive)
-local FG          = "#ebdbb2"  -- gruvbox fg
-local FG_ACCENT   = "#fabd2f"  -- gruvbox bright yellow (active accent)
+local FG_DIM      = "#d5c4a1"  -- gruvbox fg2 (bright cream gray — readable on any tab bg)
+local FG          = "#ebdbb2"  -- gruvbox fg (full bright)
+local FG_ACCENT   = "#fabd2f"  -- gruvbox bright yellow (active tab title)
 
 config.colors = {
   tab_bar = {
@@ -280,30 +280,35 @@ wezterm.on("format-tab-title", function(tab, tabs, panes, cfg, hover, max_width)
   end
 
   return {
-    -- Row 1: bar bg above tab (outer top padding)
+    -- Row 1: BAR_BG outer top padding (invisible text on bar bg)
     { Background = { Color = BAR_BG } },
     { Foreground = { Color = BAR_BG } },
     { Text = pad_row .. "\n" },
 
-    -- Row 2: inner top padding (tab bg, no text)
+    -- Row 2: inner top padding (tab bg)
     { Background = { Color = bg } },
     { Foreground = { Color = fg } },
     { Text = pad_row .. "\n" },
 
-    -- Row 3: title — bold + accent fg on active tab
+    -- Row 3: TITLE — explicitly re-emit BG + FG so attributes don't bleed
+    -- across the \n above. Use Bold intensity for active tabs.
+    { Background = { Color = bg } },
+    { Foreground = { Color = fg } },
     { Attribute = { Intensity = is_active and "Bold" or "Normal" } },
     { Text = body_row .. "\n" },
     { Attribute = { Intensity = "Normal" } },
 
-    -- Row 4: loading bar (vibe-coding only) or inner bottom padding
+    -- Row 4: loading bar (vibe) or inner bottom padding — explicit BG+FG
+    { Background = { Color = bg } },
+    { Foreground = { Color = fg } },
     { Text = row4 .. "\n" },
 
-    -- Row 5: bar bg below tab (outer bottom padding)
+    -- Row 5: BAR_BG outer bottom padding (invisible text on bar bg)
     { Background = { Color = BAR_BG } },
     { Foreground = { Color = BAR_BG } },
     { Text = pad_row },
 
-    -- One-cell horizontal gap of bar bg between adjacent tabs.
+    -- 1-cell horizontal gap of bar bg between adjacent tabs
     { Text = " " },
   }
 end)
