@@ -58,7 +58,7 @@ fi
 #   PAD_LEFT  spaces printed before the dimmed segments
 #   PAD_RIGHT spaces printed after the dimmed segments (rarely useful)
 PAD_TOP="${COPILOT_STATUSLINE_PAD_TOP:-8}"
-PAD_LEFT="${COPILOT_STATUSLINE_PAD_LEFT:-5}"
+PAD_LEFT="${COPILOT_STATUSLINE_PAD_LEFT:-1}"
 PAD_RIGHT="${COPILOT_STATUSLINE_PAD_RIGHT:-0}"
 
 # repeat <char> <count> -> string of that char repeated count times
