@@ -82,6 +82,168 @@ cd ~/Public/dot-configs && git pull
 # Re-run install.sh only if new files were added; existing symlinks need no action.
 ```
 
+## Fresh-devbox runbook (agent-friendly)
+
+Step-by-step setup on a brand-new macOS box. An agent (or human) can follow
+this top-to-bottom with no prior context. **Each step is verifiable** — run
+the check command before moving on. Stop at the first failure and report.
+
+### 0. Prerequisites
+
+```bash
+# macOS only. On Linux/Windows, see the "Cross-platform notes" section below.
+xcode-select --install            # Apple CLI tools (provides git, make, etc.)
+xcode-select -p                   # check: should print a path
+```
+
+If Homebrew isn't installed:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+brew --version                    # check: prints "Homebrew x.y.z"
+```
+
+If `git` isn't authenticated for github.com:
+
+```bash
+gh auth login                     # or: configure ssh keys per your standard
+ssh -T git@github.com 2>&1 | grep -q "successfully authenticated" \
+  && echo "ok" || echo "FAIL: github auth needed"
+```
+
+### 1. Clone the repo
+
+```bash
+mkdir -p ~/Public
+git clone git@github.com:D0n9X1n/dot-config.git ~/Public/dot-configs
+test -f ~/Public/dot-configs/install.sh && echo "ok" || echo "FAIL: clone failed"
+```
+
+### 2. Install oh-my-zsh (required before step 3 if you want zsh customizations)
+
+```bash
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+test -d ~/.oh-my-zsh/custom && echo "ok" || echo "FAIL: oh-my-zsh missing"
+```
+
+### 3. Run the installer
+
+```bash
+bash ~/Public/dot-configs/install.sh
+```
+
+Verify symlinks landed:
+
+```bash
+ls -l ~/.tmux.conf ~/.oh-my-zsh/custom/custom.zsh 2>&1 | grep -q "dot-configs" \
+  && echo "ok" || echo "FAIL: symlinks missing"
+```
+
+### 4. Install the CLIs and proxy (Claude Code + GitHub Copilot)
+
+```bash
+# Node + npm via Homebrew (skip if already present)
+command -v node >/dev/null || brew install node
+node --version                    # check: v20+ recommended
+
+# CLIs themselves
+npm install -g @anthropic-ai/claude-code copilot-api @github/copilot
+claude --version                  # check: prints version
+copilot --version                 # check: prints version
+copilot-api --version             # check: prints version
+```
+
+### 5. Authenticate the proxy (one-time, browser device-code flow)
+
+```bash
+copilot-api auth                  # opens browser; enter the device code
+# Verify token landed:
+test -f ~/.local/share/copilot-api/github_token && echo "ok" || echo "FAIL: auth incomplete"
+```
+
+### 6. Start the proxy daemon (must stay running for Claude Code)
+
+```bash
+# Foreground for first run so you can confirm it's listening.
+copilot-api start --claude-code &
+sleep 2
+curl -s http://localhost:4141/v1/models | head -c 100 \
+  && echo "" || echo "FAIL: proxy not responding on :4141"
+```
+
+For long-running setup, daemonize via launchd / tmux / nohup — the simplest:
+
+```bash
+# In a dedicated tmux window:
+tmux new-window -n proxy 'copilot-api start --claude-code'
+```
+
+### 7. Wire up MCP servers (optional but recommended)
+
+If you use Copilot CLI's MCP servers, install.sh's settings-merge step
+imports them into Claude Code automatically. Confirm:
+
+```bash
+test -f ~/.config/github-copilot/mcp.json && echo "Copilot MCP file present"
+jq '.mcpServers | keys' ~/.claude/settings.json   # should list servers
+```
+
+If there are none yet, add them via Copilot CLI as usual; re-run
+`install.sh` to re-merge into Claude Code.
+
+### 8. Optional: WezTerm (terminal)
+
+`install.sh` installs the wezterm cask but does **not** symlink the config
+(opt-in). To enable:
+
+```bash
+ln -sfn ~/Public/dot-configs/wezterm/wezterm.lua ~/.wezterm.lua
+# Open WezTerm; verify Gruvbox dark hard scheme is active.
+```
+
+### 9. Optional: tmux plugins
+
+`install.sh` runs TPM bootstrap automatically. Verify:
+
+```bash
+ls ~/.tmux/plugins/ | head        # should list tpm + a handful of plugins
+tmux source-file ~/.tmux.conf 2>&1 || echo "FAIL: tmux config error"
+```
+
+### 10. Smoke test — end to end
+
+```bash
+# Fresh shell so .zshrc/oh-my-zsh-custom are loaded.
+zsh -l -c 'echo $SHELL; alias ls; type enable_proxy' \
+  | grep -q "enable_proxy is a shell function" \
+  && echo "shell ok" || echo "FAIL: oh-my-zsh-custom not loaded"
+
+# Claude Code → proxy round-trip
+claude --print "say 'hello from devbox'" 2>&1 | head -5
+# Should print a model response. If it errors with connection refused,
+# the proxy (step 6) isn't running.
+```
+
+If all 10 steps print `ok` (or the equivalent positive signal), the box is
+fully set up. The `gg <title>` function, the statusline (`Vim` mode badge,
+git/branch/cost/ctx segments), the dark-ansi Claude Code theme, and the
+Gruvbox-aligned tmux/wezterm chrome are all live.
+
+### Cross-platform notes
+
+- **Linux**: skip the `brew` casks (wezterm, fonts) — install equivalents
+  via your distro package manager. Everything else (steps 1–10) works
+  unchanged.
+- **Windows / Git Bash / MSYS2**: `install.sh`'s `ln -s` requires
+  Developer Mode + `MSYS=winsymlinks:nativestrict` — without these,
+  symlinks silently degrade to copies and repo edits won't propagate.
+  The pure-bash statusline parser, `cksum`, `stat -f/-c`, and
+  `BASH_REMATCH` all work in Git Bash. tmux/wezterm setup is identical
+  via WSL2.
+- **The proxy must keep running** for Claude Code to function. Quitting
+  the `copilot-api start --claude-code` process breaks every Claude Code
+  session immediately.
+
 ## How to add a new config
 
 | Goal | Where to add the file |
