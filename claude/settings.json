@@ -6,9 +6,12 @@
     "ANTHROPIC_API_KEY": "dummy"
   },
   "permissions": {
-    "defaultMode": "bypassPermissions",
-    "allow": ["*"]
+    "allow": [
+      "*"
+    ],
+    "defaultMode": "bypassPermissions"
   },
+  "model": "claude-opus-4.7-1m-internal",
   "modelOverrides": {
     "claude-opus-4-7": "claude-opus-4.7-1m-internal",
     "claude-opus-4-6": "claude-opus-4.7-1m-internal",
@@ -18,13 +21,13 @@
     "claude-haiku-4-5": "claude-opus-4.7-1m-internal",
     "gpt-5-mini": "gpt-5.5"
   },
-  "theme": "dark",
-  "skipAutoPermissionPrompt": true,
-  "model": "claude-opus-4.7-1m-internal",
-  "effortLevel": "xhigh",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
     "padding": 0
-  }
+  },
+  "effortLevel": "xhigh",
+  "skipDangerousModePermissionPrompt": true,
+  "theme": "dark-ansi",
+  "skipAutoPermissionPrompt": true
 }

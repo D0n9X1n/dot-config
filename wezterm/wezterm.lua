@@ -24,7 +24,42 @@ config.front_end = "WebGpu"
 -- =========================================================
 -- Theme
 -- =========================================================
-config.color_scheme = "GruvboxDarkHard"
+-- Custom scheme: GruvboxDarkHard base + Material's warm-beige slot 7
+-- (#d4be98). Claude Code's `dark-ansi` theme paints the prompt-input
+-- background with ANSI 7; Hard's stock #a89984 reads as gray, Material's
+-- #d4be98 reads as warm cream. Keep everything else from Hard.
+config.color_schemes = {
+  ["GruvboxDarkHardWarm"] = {
+    foreground       = "#ebdbb2",
+    background       = "#1d2021",
+    cursor_bg        = "#ebdbb2",
+    cursor_fg        = "#1d2021",
+    cursor_border    = "#ebdbb2",
+    selection_fg     = "#ebdbb2",
+    selection_bg     = "#3c3836",
+    ansi = {
+      "#1d2021", -- 0  black
+      "#cc241d", -- 1  red
+      "#98971a", -- 2  green
+      "#d79921", -- 3  yellow
+      "#458588", -- 4  blue
+      "#b16286", -- 5  magenta
+      "#689d6a", -- 6  cyan
+      "#d4be98", -- 7  white  ← Material's warm beige (was #a89984)
+    },
+    brights = {
+      "#928374", -- 8  bright black
+      "#fb4934", -- 9  bright red
+      "#b8bb26", -- 10 bright green
+      "#fabd2f", -- 11 bright yellow
+      "#83a598", -- 12 bright blue
+      "#d3869b", -- 13 bright magenta
+      "#8ec07c", -- 14 bright cyan
+      "#ebdbb2", -- 15 bright white (soft fg)
+    },
+  },
+}
+config.color_scheme = "Gruvbox dark, hard (base16)"
 
 -- =========================================================
 -- Fonts
@@ -54,6 +89,12 @@ config.freetype_load_flags = "NO_HINTING"
 
 config.bold_brightens_ansi_colors = "No"
 
+-- Don't dim unfocused panes/windows. Default wezterm desaturates them
+-- (hue=1, saturation=0.9, brightness=0.8), which makes side-by-side
+-- comparisons look like the colors don't match — they do, one side is
+-- just being dimmed because it isn't focused.
+config.inactive_pane_hsb = { hue = 1.0, saturation = 1.0, brightness = 1.0 }
+
 -- Map bold to same weight (font only has Regular and Bold)
 config.font_rules = {
   {
@@ -69,8 +110,13 @@ config.font_rules = {
 -- Subtle tab states: tab background MATCHES terminal background, so tabs
 -- look like floating text on the terminal canvas — only the heavy ┃
 -- separator divides them. Foreground color alone signals state.
-local BAR_BG      = "#1d2021"  -- gruvbox dark hard bg (matches terminal)
-local TAB_BG      = "#1d2021"  -- same as bar — tabs blend into terminal bg
+--
+-- Pull the actual bg/fg from the active color scheme so swapping between
+-- Gruvbox variants (dark hard / medium / Material) keeps the chrome
+-- aligned automatically — no hex hunt required.
+local SCHEME      = wezterm.color.get_builtin_schemes()[config.color_scheme] or {}
+local BAR_BG      = (config.colors and config.colors.background) or SCHEME.background or "#1d2021"
+local TAB_BG      = BAR_BG
 
 -- Backwards-compat aliases (still referenced by the format-tab-title body):
 local INACTIVE_BG = TAB_BG
