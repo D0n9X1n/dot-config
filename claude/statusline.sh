@@ -501,12 +501,12 @@ seg_skills() {
   printf '%s%s%d%s' "$(label "$C_AQUA" "$ICON_SKILLS" 'Skills')" "$C_FG" "$total" "$C_RESET"
 }
 
-# MCP — number of servers in ~/.claude/settings.json's .mcpServers map.
-# Mirrors the copilot statusline's MCP segment but reads Claude's own
-# config (which install.sh now jq-merges from the copilot mcp.json so
-# the count matches what `copilot` shows).
+# MCP — number of servers in ~/.claude.json's .mcpServers map. Claude
+# Code reads MCP servers from ~/.claude.json (top-level), NOT from
+# settings.json. install.sh seeds this map from copilot's mcp.json so
+# the count matches what `copilot` shows.
 seg_mcp() {
-  local f="$HOME/.claude/settings.json"
+  local f="$HOME/.claude.json"
   [ -f "$f" ] || return 0
   command -v jq >/dev/null 2>&1 || return 0
   local count

@@ -137,10 +137,6 @@ if [ -d "$claude_src" ]; then
     # repo but shouldn't pollute ~/.claude/ where Claude Code keeps state.
     case "$base" in
       README*) continue ;;
-      # settings.json is GENERATED below (jq-merged with copilot's MCP
-      # config so the WAKATIME_API_KEY secret stays out of the repo).
-      # Skip the bare symlink here so the merge step doesn't fight it.
-      settings.json) continue ;;
     esac
     link_file "$entry" "${claude_dest}/${base}"
     # Preserve executable bit on shell scripts (e.g., statusline.sh) so
@@ -151,41 +147,46 @@ if [ -d "$claude_src" ]; then
   done < <(find "$claude_src" -maxdepth 1 -mindepth 1 -type f -print0)
   echo "Linked Claude Code config files to $claude_dest"
 
-  # ~/.claude/settings.json — generated, NOT symlinked. We merge the
-  # committed claude/settings.json with the user's local copilot MCP
-  # config (~/.config/github-copilot/mcp.json) so Claude Code sees the
-  # same MCP servers Copilot CLI does, without committing the secret-
-  # bearing mcp.json to this public repo. Same reason copilot/'s
-  # mcp-config.json is gitignored upstream.
+  # Import Copilot CLI's MCP servers into Claude Code's user-scope config.
+  # Claude Code reads MCP servers from ~/.claude.json (top-level
+  # `mcpServers` key) — NOT from ~/.claude/settings.json — so we have to
+  # merge them into that file. The copilot list lives at
+  # ~/.config/github-copilot/mcp.json (symlinked at ~/.copilot/mcp-config.json
+  # on disk; never in this repo because it carries WAKATIME_API_KEY etc.).
   #
-  # Idempotent: rewrites the file every time, but only when the source
-  # files actually exist. If jq isn't installed, falls back to a plain
-  # symlink (no MCP merge) so a fresh box can still get the rest of the
-  # config wired up.
-  claude_settings_src="${claude_src}/settings.json"
-  claude_settings_dest="${claude_dest}/settings.json"
+  # Idempotent: re-running install.sh just rewrites the same merged
+  # mcpServers map. If jq isn't installed, or the copilot MCP file is
+  # missing, this step is a silent no-op and Claude Code's existing
+  # mcpServers (or absence thereof) is left untouched.
   copilot_mcp="${HOME}/.config/github-copilot/mcp.json"
-  if [ -f "$claude_settings_src" ]; then
-    if have_cmd jq && [ -f "$copilot_mcp" ]; then
-      backup_path "$claude_settings_dest"
-      tmp_settings="$(mktemp -t claude-settings.XXXXXX)"
-      # `* { mcpServers: ... }` recursively merges, but mcpServers gets
-      # FULLY replaced by the right-hand value (no per-server merge),
-      # which is what we want: the copilot file is authoritative.
-      if jq -s '.[0] * { mcpServers: (.[1].mcpServers // {}) }' \
-          "$claude_settings_src" "$copilot_mcp" >"$tmp_settings"; then
-        mv "$tmp_settings" "$claude_settings_dest"
-        chmod 600 "$claude_settings_dest"
-        echo "Generated ${claude_settings_dest} (claude/settings.json + copilot mcp.json)"
+  claude_user_json="${HOME}/.claude.json"
+  if have_cmd jq && [ -f "$copilot_mcp" ]; then
+    # Read the source servers map (defaults to {} if the file is malformed).
+    src_mcp_json="$(jq -c '.mcpServers // {}' "$copilot_mcp" 2>/dev/null || echo '{}')"
+    if [ "$src_mcp_json" != '{}' ] && [ "$src_mcp_json" != "null" ]; then
+      tmp_user="$(mktemp -t claude-user-json.XXXXXX)"
+      if [ -f "$claude_user_json" ]; then
+        # Replace .mcpServers (no per-server merge — copilot's file is
+        # authoritative); preserve every other key (telemetry IDs, project
+        # state, settings cache, etc.).
+        if jq --argjson src "$src_mcp_json" '.mcpServers = $src' \
+            "$claude_user_json" >"$tmp_user"; then
+          backup_path "$claude_user_json"
+          mv "$tmp_user" "$claude_user_json"
+          chmod 600 "$claude_user_json"
+          echo "Imported $(echo "$src_mcp_json" | jq 'length') MCP servers into $claude_user_json (from $copilot_mcp)"
+        else
+          rm -f "$tmp_user"
+          echo "Warning: jq merge into $claude_user_json failed; MCP import skipped"
+        fi
       else
-        rm -f "$tmp_settings"
-        echo "Warning: jq merge failed for $claude_settings_dest — falling back to plain link"
-        link_file "$claude_settings_src" "$claude_settings_dest"
+        # Fresh box — Claude Code hasn't run yet. Seed the file with just
+        # the mcpServers map; Claude Code will fill in the rest on launch.
+        printf '{"mcpServers":%s}\n' "$src_mcp_json" >"$tmp_user"
+        mv "$tmp_user" "$claude_user_json"
+        chmod 600 "$claude_user_json"
+        echo "Created $claude_user_json with $(echo "$src_mcp_json" | jq 'length') MCP servers (from $copilot_mcp)"
       fi
-    else
-      # No jq, or no copilot MCP config — link the bare settings file so
-      # the rest of the Claude Code wiring still works.
-      link_file "$claude_settings_src" "$claude_settings_dest"
     fi
   fi
 fi
