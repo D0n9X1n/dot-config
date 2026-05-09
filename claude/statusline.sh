@@ -61,7 +61,7 @@
 set -u
 
 # --- Configuration ---------------------------------------------------------
-SEGMENTS="time model effort timer cost ctx vim agent worktree style git branch stash venv gh_account skills mcp"
+SEGMENTS="time timer cost git branch model effort mcp skills ctx vim agent worktree style stash venv"
 SEP=' │ '
 
 ICONS_ON=1
@@ -80,12 +80,12 @@ ICONS_ON=1
 #   U+F233 server           = EF 88 B3   API
 #   U+F155 dollar           = EF 85 95   Cost
 #   U+F12A asterisk         = EF 84 AA   Diff (stand-in for "changes")
-#   U+F0C2 cloud            = EF 83 82   Context
+#   U+F1C0 database         = EF 87 80   Context
 #   U+F121 code             = EF 84 A1   Vim
 #   U+F135 rocket           = EF 84 B5   Agent / Run (also)
 #   U+F1BB tree             = EF 86 BB   Worktree
 #   U+F0AD wrench           = EF 82 AD   Style
-#   U+F1D3 git              = EF 87 93   Repo
+#   U+F0E8 sitemap          = EF 83 A8   Repo
 #   U+F126 code-fork        = EF 84 A6   Branch
 #   U+F187 archive          = EF 86 87   Stash
 #   U+F1AE flask            = EF 86 AE   Venv
@@ -100,12 +100,12 @@ ICON_WALL=$'\xef\x89\x94'
 ICON_API=$'\xef\x88\xb3'
 ICON_COST=$'\xef\x85\x95'
 ICON_DIFF=$'\xef\x84\xaa'
-ICON_CTX=$'\xef\x83\x82'
+ICON_CTX=$'\xef\x87\x80'
 ICON_VIM=$'\xef\x84\xa1'
 ICON_AGENT=$'\xef\x84\xb5'
 ICON_WORKTREE=$'\xef\x86\xbb'
 ICON_STYLE=$'\xef\x82\xad'
-ICON_REPO=$'\xef\x87\x93'
+ICON_REPO=$'\xef\x83\xa8'
 ICON_BRANCH=$'\xef\x84\xa6'
 ICON_STASH=$'\xef\x86\x87'
 ICON_VENV=$'\xef\x86\xae'
@@ -172,12 +172,12 @@ f254|${ICON_WALL}|Wall
 f233|${ICON_API}|API
 f155|${ICON_COST}|Cost
 f12a|${ICON_DIFF}|Diff
-f0c2|${ICON_CTX}|Ctx
+f1c0|${ICON_CTX}|Context
 f121|${ICON_VIM}|Vim
 f135|${ICON_AGENT}|Agent
 f1bb|${ICON_WORKTREE}|Worktree
 f0ad|${ICON_STYLE}|Style
-f1d3|${ICON_REPO}|Repo
+f0e8|${ICON_REPO}|Repo
 f126|${ICON_BRANCH}|Branch
 f187|${ICON_STASH}|Stash
 f1ae|${ICON_VENV}|Venv
