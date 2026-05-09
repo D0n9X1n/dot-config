@@ -137,6 +137,10 @@ if [ -d "$claude_src" ]; then
     # repo but shouldn't pollute ~/.claude/ where Claude Code keeps state.
     case "$base" in
       README*) continue ;;
+      # settings.json is GENERATED below (jq-merged with copilot's MCP
+      # config so the WAKATIME_API_KEY secret stays out of the repo).
+      # Skip the bare symlink here so the merge step doesn't fight it.
+      settings.json) continue ;;
     esac
     link_file "$entry" "${claude_dest}/${base}"
     # Preserve executable bit on shell scripts (e.g., statusline.sh) so
@@ -146,6 +150,44 @@ if [ -d "$claude_src" ]; then
     esac
   done < <(find "$claude_src" -maxdepth 1 -mindepth 1 -type f -print0)
   echo "Linked Claude Code config files to $claude_dest"
+
+  # ~/.claude/settings.json — generated, NOT symlinked. We merge the
+  # committed claude/settings.json with the user's local copilot MCP
+  # config (~/.config/github-copilot/mcp.json) so Claude Code sees the
+  # same MCP servers Copilot CLI does, without committing the secret-
+  # bearing mcp.json to this public repo. Same reason copilot/'s
+  # mcp-config.json is gitignored upstream.
+  #
+  # Idempotent: rewrites the file every time, but only when the source
+  # files actually exist. If jq isn't installed, falls back to a plain
+  # symlink (no MCP merge) so a fresh box can still get the rest of the
+  # config wired up.
+  claude_settings_src="${claude_src}/settings.json"
+  claude_settings_dest="${claude_dest}/settings.json"
+  copilot_mcp="${HOME}/.config/github-copilot/mcp.json"
+  if [ -f "$claude_settings_src" ]; then
+    if have_cmd jq && [ -f "$copilot_mcp" ]; then
+      backup_path "$claude_settings_dest"
+      tmp_settings="$(mktemp -t claude-settings.XXXXXX)"
+      # `* { mcpServers: ... }` recursively merges, but mcpServers gets
+      # FULLY replaced by the right-hand value (no per-server merge),
+      # which is what we want: the copilot file is authoritative.
+      if jq -s '.[0] * { mcpServers: (.[1].mcpServers // {}) }' \
+          "$claude_settings_src" "$copilot_mcp" >"$tmp_settings"; then
+        mv "$tmp_settings" "$claude_settings_dest"
+        chmod 600 "$claude_settings_dest"
+        echo "Generated ${claude_settings_dest} (claude/settings.json + copilot mcp.json)"
+      else
+        rm -f "$tmp_settings"
+        echo "Warning: jq merge failed for $claude_settings_dest — falling back to plain link"
+        link_file "$claude_settings_src" "$claude_settings_dest"
+      fi
+    else
+      # No jq, or no copilot MCP config — link the bare settings file so
+      # the rest of the Claude Code wiring still works.
+      link_file "$claude_settings_src" "$claude_settings_dest"
+    fi
+  fi
 fi
 
 # Bootstrap TPM (Tmux Plugin Manager) and install plugins listed in

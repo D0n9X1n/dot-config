@@ -44,6 +44,12 @@ dot-configs/
 5. Symlinks every file in `claude/` into `~/.claude/`. **Creates the
    destination directory if missing** (Claude Code only creates `~/.claude/`
    on first launch; mkdir-p so install.sh wires things up on a fresh box).
+   `settings.json` is the one exception — instead of a plain symlink it is
+   **generated** by jq-merging the committed `claude/settings.json` with
+   the local `~/.config/github-copilot/mcp.json` so Claude Code sees the
+   exact same MCP servers Copilot CLI does, without committing
+   secret-bearing MCP env (e.g. `WAKATIME_API_KEY`) to this public repo.
+   Falls back to a plain symlink if `jq` or `mcp.json` is missing.
 6. Bootstraps **TPM** (Tmux Plugin Manager): clones it under `~/.tmux/plugins/tpm`
    if missing, then runs `tpm/bin/install_plugins` to clone every plugin
    listed in `.tmux.conf`. Skipped if `tmux` isn't on PATH.
