@@ -61,11 +61,57 @@
 set -u
 
 # --- Configuration ---------------------------------------------------------
-SEGMENTS="time model effort timer wall api_time cost diff ctx vim agent worktree style git branch stash venv gh_account"
+SEGMENTS="time model effort timer cost ctx vim agent worktree style git branch stash venv gh_account skills mcp"
 SEP=' │ '
 
 ICONS_ON=1
 [ -n "${CLAUDE_STATUSLINE_NO_ICONS:-}" ] && ICONS_ON=0
+
+# Nerd Font icons. Bash 3.2 (macOS default) does not support `\uXXXX` in
+# $'...' quoting — only `\xHH` — so each codepoint is spelled as raw
+# UTF-8 bytes. All glyphs are FontAwesome (U+F0xx-F2xx range), the same
+# subset Copilot's statusline uses, so they render in any Nerd Font
+# variant including `Symbols Nerd Font Mono`. Verify with --test.
+#
+#   U+F252 hourglass-half  = EF 89 92   Time
+#   U+F2DB microchip        = EF 8B 9B   Model
+#   U+F0E4 dashboard        = EF 83 A4   Effort
+#   U+F254 hourglass        = EF 89 94   Wall
+#   U+F233 server           = EF 88 B3   API
+#   U+F155 dollar           = EF 85 95   Cost
+#   U+F12A asterisk         = EF 84 AA   Diff (stand-in for "changes")
+#   U+F0C2 cloud            = EF 83 82   Context
+#   U+F121 code             = EF 84 A1   Vim
+#   U+F135 rocket           = EF 84 B5   Agent / Run (also)
+#   U+F1BB tree             = EF 86 BB   Worktree
+#   U+F0AD wrench           = EF 82 AD   Style
+#   U+F1D3 git              = EF 87 93   Repo
+#   U+F126 code-fork        = EF 84 A6   Branch
+#   U+F187 archive          = EF 86 87   Stash
+#   U+F1AE flask            = EF 86 AE   Venv
+#   U+F09B github           = EF 82 9B   GH
+#   U+F0AE list-task        = EF 82 AE   Skills
+#   U+F1E6 plug             = EF 87 A6   MCP
+ICON_TIME=$'\xef\x89\x92'
+ICON_MODEL=$'\xef\x8b\x9b'
+ICON_EFFORT=$'\xef\x83\xa4'
+ICON_RUN=$'\xef\x84\xb5'
+ICON_WALL=$'\xef\x89\x94'
+ICON_API=$'\xef\x88\xb3'
+ICON_COST=$'\xef\x85\x95'
+ICON_DIFF=$'\xef\x84\xaa'
+ICON_CTX=$'\xef\x83\x82'
+ICON_VIM=$'\xef\x84\xa1'
+ICON_AGENT=$'\xef\x84\xb5'
+ICON_WORKTREE=$'\xef\x86\xbb'
+ICON_STYLE=$'\xef\x82\xad'
+ICON_REPO=$'\xef\x87\x93'
+ICON_BRANCH=$'\xef\x84\xa6'
+ICON_STASH=$'\xef\x86\x87'
+ICON_VENV=$'\xef\x86\xae'
+ICON_GH=$'\xef\x82\x9b'
+ICON_SKILLS=$'\xef\x82\xae'
+ICON_MCP=$'\xef\x87\xa6'
 
 # Gruvbox Dark Hard accents — match alacritty/wezterm/.tmux.conf palette.
 # Use 24-bit ANSI so we don't depend on the terminal's 256-color cube.
@@ -117,25 +163,25 @@ if [ "${1:-}" = "--test" ]; then
       fi
     fi
     printf 'U+%-7s  %s     %-7s  %s\n' "$cp_hex" "$glyph" "$lbl" "$fc_status"
-  done <<'TEST_ICONS_EOF'
-f017||Time
-f085||Model
-f0e7||Effort
-f252||Run
-f254||Wall
-f233||API
-f155||Cost
-f12a||Diff
-f0c2||Ctx
-f12b||Vim
-f135||Agent
-f1bb||Worktree
-f0ad||Style
-f1d3||Repo
-f126||Branch
-f187||Stash
-f1ae||Venv
-f09b||GH
+  done <<TEST_ICONS_EOF
+f017|${ICON_TIME}|Time
+f085|${ICON_MODEL}|Model
+f0e7|${ICON_EFFORT}|Effort
+f252|${ICON_RUN}|Run
+f254|${ICON_WALL}|Wall
+f233|${ICON_API}|API
+f155|${ICON_COST}|Cost
+f12a|${ICON_DIFF}|Diff
+f0c2|${ICON_CTX}|Ctx
+f121|${ICON_VIM}|Vim
+f135|${ICON_AGENT}|Agent
+f1bb|${ICON_WORKTREE}|Worktree
+f0ad|${ICON_STYLE}|Style
+f1d3|${ICON_REPO}|Repo
+f126|${ICON_BRANCH}|Branch
+f187|${ICON_STASH}|Stash
+f1ae|${ICON_VENV}|Venv
+f09b|${ICON_GH}|GH
 TEST_ICONS_EOF
   exit 0
 fi
@@ -261,7 +307,7 @@ fmt_tokens() {
 
 # --- 4. Segment functions --------------------------------------------------
 seg_time() {
-  printf '%s%s%s' "$(label "$C_YELLOW" '' 'Time')" "$C_FG$(date '+%H:%M:%S')" "$C_RESET"
+  printf '%s%s%s' "$(label "$C_YELLOW" "$ICON_TIME" 'Time')" "$C_FG$(date '+%H:%M:%S')" "$C_RESET"
 }
 
 seg_model() {
@@ -270,12 +316,12 @@ seg_model() {
   local short="$model_name"
   short="${short#claude-}"
   short="${short%-internal}"
-  printf '%s%s%s%s' "$(label "$C_AQUA" '' 'Model')" "$C_FG" "$short" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_AQUA" "$ICON_MODEL" 'Model')" "$C_FG" "$short" "$C_RESET"
 }
 
 seg_effort() {
   [ -n "$effort_level" ] || return 0
-  printf '%s%s%s%s' "$(label "$C_PURPLE" '' 'Effort')" "$C_FG" "$effort_level" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_PURPLE" "$ICON_EFFORT" 'Effort')" "$C_FG" "$effort_level" "$C_RESET"
 }
 
 seg_timer() {
@@ -290,40 +336,30 @@ seg_timer() {
   now="$(date +%s)"
   mins=$(((now - started) / 60))
   [ "$mins" -gt 0 ] || return 0
-  printf '%s%s%dm%s' "$(label "$C_ORANGE" '' 'Run')" "$C_FG" "$mins" "$C_RESET"
+  printf '%s%s%dm%s' "$(label "$C_ORANGE" "$ICON_RUN" 'Run')" "$C_FG" "$mins" "$C_RESET"
 }
 
 seg_wall() {
   is_pos_int "$total_ms" || return 0
-  printf '%s%s%s%s' "$(label "$C_PURPLE" '' 'Wall')" "$C_FG" "$(fmt_ms "$total_ms")" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_PURPLE" "$ICON_WALL" 'Wall')" "$C_FG" "$(fmt_ms "$total_ms")" "$C_RESET"
 }
 
 seg_api_time() {
   is_pos_int "$api_ms" || return 0
-  printf '%s%s%s%s' "$(label "$C_BLUE" '' 'API')" "$C_FG" "$(fmt_ms "$api_ms")" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_BLUE" "$ICON_API" 'API')" "$C_FG" "$(fmt_ms "$api_ms")" "$C_RESET"
 }
 
 seg_cost() {
   is_pos_num "$cost_usd" || return 0
   local pretty
   pretty="$(awk -v c="$cost_usd" 'BEGIN{ printf("$%.2f", c+0) }')"
-  printf '%s%s%s%s' "$(label "$C_GREEN" '' 'Cost')" "$C_FG" "$pretty" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_GREEN" "$ICON_COST" 'Cost')" "$C_FG" "$pretty" "$C_RESET"
 }
 
 seg_diff() {
-  local has=0
-  is_pos_int "$lines_added" && has=1
-  is_pos_int "$lines_removed" && has=1
-  [ "$has" = "1" ] || return 0
-  local body=""
-  if is_pos_int "$lines_added"; then
-    body="${C_GREEN}+${lines_added}${C_RESET}"
-  fi
-  if is_pos_int "$lines_removed"; then
-    [ -n "$body" ] && body="${body}${C_FG}/"
-    body="${body}${C_RED}-${lines_removed}${C_RESET}"
-  fi
-  printf '%s%s' "$(label "$C_GREEN" '' 'Diff')" "$body"
+  # Disabled — user removed Diff from SEGMENTS. Kept here so re-enabling
+  # is just a matter of adding `diff` back to the list at the top.
+  return 0
 }
 
 # Ctx — context window usage. Prefer the rich `.context_window.used_percentage`
@@ -346,7 +382,7 @@ seg_ctx() {
     else
       body="${color}${pct_int}%${C_RESET}"
     fi
-    printf '%s%s' "$(label "$C_AQUA" '' 'Ctx')" "$body"
+    printf '%s%s' "$(label "$C_AQUA" "$ICON_CTX" 'Context')" "$body"
     return 0
   fi
   return 0
@@ -354,23 +390,23 @@ seg_ctx() {
 
 seg_vim() {
   [ -n "$vim_mode" ] || return 0
-  printf '%s%s%s%s' "$(label "$C_ORANGE" '' 'Vim')" "$C_FG" "$vim_mode" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_ORANGE" "$ICON_VIM" 'Vim')" "$C_FG" "$vim_mode" "$C_RESET"
 }
 
 seg_agent() {
   [ -n "$agent_name" ] || return 0
-  printf '%s%s%s%s' "$(label "$C_PURPLE" '' 'Agent')" "$C_FG" "$agent_name" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_PURPLE" "$ICON_AGENT" 'Agent')" "$C_FG" "$agent_name" "$C_RESET"
 }
 
 seg_worktree() {
   [ -n "$worktree_name" ] || return 0
-  printf '%s%s%s%s' "$(label "$C_AQUA" '' 'Worktree')" "$C_FG" "$worktree_name" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_AQUA" "$ICON_WORKTREE" 'Worktree')" "$C_FG" "$worktree_name" "$C_RESET"
 }
 
 seg_style() {
   [ -n "$output_style" ] || return 0
   [ "$output_style" = "default" ] && return 0
-  printf '%s%s%s%s' "$(label "$C_PURPLE" '' 'Style')" "$C_FG" "$output_style" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_PURPLE" "$ICON_STYLE" 'Style')" "$C_FG" "$output_style" "$C_RESET"
 }
 
 seg_git() {
@@ -392,12 +428,12 @@ seg_git() {
   fi
   if [ -n "$sync" ]; then
     printf '%s%s%s%s %s(%s)%s' \
-      "$(label "$C_AQUA" '' 'Repo')" \
+      "$(label "$C_AQUA" "$ICON_REPO" 'Repo')" \
       "$state_color" "$state" "$C_RESET" \
       "$C_ORANGE" "$sync" "$C_RESET"
   else
     printf '%s%s%s%s' \
-      "$(label "$C_AQUA" '' 'Repo')" \
+      "$(label "$C_AQUA" "$ICON_REPO" 'Repo')" \
       "$state_color" "$state" "$C_RESET"
   fi
 }
@@ -411,7 +447,7 @@ seg_branch() {
   if [ ${#br} -gt 24 ]; then
     br="${br:0:23}…"
   fi
-  printf '%s%s%s%s' "$(label "$C_YELLOW" '' 'Branch')" "$C_FG" "$br" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_YELLOW" "$ICON_BRANCH" 'Branch')" "$C_FG" "$br" "$C_RESET"
 }
 
 seg_stash() {
@@ -419,12 +455,12 @@ seg_stash() {
   local count
   count="$(git stash list 2>/dev/null | wc -l | tr -d ' ')"
   is_pos_int "$count" || return 0
-  printf '%s%s%d%s' "$(label "$C_ORANGE" '' 'Stash')" "$C_FG" "$count" "$C_RESET"
+  printf '%s%s%d%s' "$(label "$C_ORANGE" "$ICON_STASH" 'Stash')" "$C_FG" "$count" "$C_RESET"
 }
 
 seg_venv() {
   [ -n "${VIRTUAL_ENV:-}" ] || return 0
-  printf '%s%s%s%s' "$(label "$C_BLUE" '' 'Venv')" "$C_FG" "$(basename "$VIRTUAL_ENV")" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_BLUE" "$ICON_VENV" 'Venv')" "$C_FG" "$(basename "$VIRTUAL_ENV")" "$C_RESET"
 }
 
 seg_gh_account() {
@@ -446,7 +482,37 @@ seg_gh_account() {
     printf '%s' "$account" >"$cf" 2>/dev/null || true
   fi
   [ -n "$account" ] || return 0
-  printf '%s%s%s%s' "$(label "$C_PURPLE" '' 'GH')" "$C_FG" "$account" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_PURPLE" "$ICON_GH" 'GH')" "$C_FG" "$account" "$C_RESET"
+}
+
+# Skills — count user-scope + workspace-scope skill bundles. Claude Code
+# loads skills from ~/.claude/skills/<name>/SKILL.md (user) and
+# <cwd>/.claude/skills/<name>/SKILL.md (project). The statusline JSON
+# doesn't expose a count, so we compute it ourselves. Hidden dirs (the
+# .git inside .claude/skills, dotfiles) are excluded.
+seg_skills() {
+  local total=0 d count
+  for d in "${HOME}/.claude/skills" "${PWD}/.claude/skills"; do
+    [ -d "$d" ] || continue
+    count="$(find "$d" -mindepth 1 -maxdepth 1 -type d ! -name '.*' 2>/dev/null | wc -l | tr -d ' ')"
+    total=$((total + count))
+  done
+  is_pos_int "$total" || return 0
+  printf '%s%s%d%s' "$(label "$C_AQUA" "$ICON_SKILLS" 'Skills')" "$C_FG" "$total" "$C_RESET"
+}
+
+# MCP — number of servers in ~/.claude/settings.json's .mcpServers map.
+# Mirrors the copilot statusline's MCP segment but reads Claude's own
+# config (which install.sh now jq-merges from the copilot mcp.json so
+# the count matches what `copilot` shows).
+seg_mcp() {
+  local f="$HOME/.claude/settings.json"
+  [ -f "$f" ] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+  local count
+  count="$(jq -r '(.mcpServers // {}) | length' "$f" 2>/dev/null)"
+  is_pos_int "$count" || return 0
+  printf '%s%s%d%s' "$(label "$C_BLUE" "$ICON_MCP" 'MCP')" "$C_FG" "$count" "$C_RESET"
 }
 
 # --- 5. Render -------------------------------------------------------------
