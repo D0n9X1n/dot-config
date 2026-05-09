@@ -146,10 +146,13 @@ The terminal config kept in-repo. **Not auto-linked** by `install.sh`; the
 ln -sfn "$(pwd)/wezterm/wezterm.lua" ~/.wezterm.lua
 ```
 
-Highlights of the in-repo config: GruvboxDarkHard, Rec Mono St.Helens,
-custom 5-row "floating tabs" with Nerd Font process icons and a
-Knight-Rider loading bar for vibe-coding sessions, DPI-adaptive font
-weight, FreeType fine-tuning, smart `Cmd+C` (copy if selection else SIGINT).
+Highlights of the in-repo config: `color_scheme = "Gruvbox dark, hard
+(base16)"`, Rec Mono St.Helens, custom 5-row "floating tabs" with Nerd
+Font process icons and a Knight-Rider loading bar for vibe-coding
+sessions, DPI-adaptive font weight, FreeType fine-tuning, smart `Cmd+C`
+(copy if selection else SIGINT), `inactive_pane_hsb = {1,1,1}` (no
+dimming of inactive panes), and a tab-bar `BAR_BG` derived from the
+active color scheme so swapping schemes auto-aligns the tab strip.
 
 ### Terminal — tmux (`.tmux.conf`)
 
@@ -159,7 +162,7 @@ Primary tab/split/session manager. Linked to `~/.tmux.conf` by `install.sh`.
 |---|---|
 | Theme | hand-rolled Gruvbox Dark Hard palette (matches WezTerm) |
 | Prefix | `C-q` (chosen over default C-b for ergonomics — far from C-c/d/z, doesn't clash with readline, modern macOS disables the legacy C-q XON flow control so nothing reclaims the keystroke; press `prefix + C-q` to send a literal `C-q` to the active pane) |
-| `default-terminal` | `tmux-256color` + `RGB` overrides for `wezterm`, `xterm-256color`, `*-direct` |
+| `default-terminal` | `tmux-256color` + `RGB` overrides for `wezterm`, `xterm-256color`, `*-direct`; `terminal-features … :RGB` so tmux 3.2+ actually advertises truecolor (without it tmux silently downsamples to the 256-color cube) |
 | Env scrubbing | `set-environment -gu TERMINFO TERMINFO_DIRS TERMCAP TERM_PROGRAM TERM_PROGRAM_VERSION` + `set -g COLORTERM truecolor` — defends against long-lived tmux servers inheriting dead `$TERMINFO` from previously installed terminals (which otherwise silently degrades panes from `tmux-256color` to `xterm-color` and breaks Copilot CLI's truecolor input panel). **Recovery for an already-poisoned server**: save state with `prefix + Ctrl-s`, then `tmux kill-server` from a non-tmux shell. |
 | Mouse | `on` (scroll, click-to-select, drag-to-resize) |
 | `escape-time` | `0` (vim-friendly) |
@@ -203,7 +206,7 @@ Plugins (managed by **TPM** — bootstrap is automatic on first run, both via
 | `tmux-plugins/tmux-sensible` | Opinionated defaults that don't fight ours |
 | `tmux-plugins/tmux-yank` | Cross-platform clipboard helpers |
 | `tmux-plugins/tmux-resurrect` | Save/restore sessions (`prefix + Ctrl-s` / `Ctrl-r`); pane contents and Vim/NeoVim sessions captured |
-| `tmux-plugins/tmux-continuum` | Auto-save every 15 min, auto-restore on tmux start |
+| `tmux-plugins/tmux-continuum` | Auto-save every 5 min, auto-restore on tmux start |
 
 > **Validate locally** with
 > `tmux -f .tmux.conf -L _v new-session -d -s _v ; tmux -L _v kill-server`
@@ -261,6 +264,17 @@ your terminal (uses `fc-list` if installed). Parses Copilot's session JSON
 from stdin via a single `jq` call and caches `gh auth status` for 5
 minutes. Bash 3.2-compatible. `install.sh` keeps the executable bit set.
 
+> **Perf (v0.6.0):** the sibling `claude/statusline.sh` was rewritten for
+> warm-cache latency 125ms → 18ms — pure-bash JSON parsing (no `jq`
+> dependency), per-cwd git state cached for 5s under
+> `$TMPDIR/claude-statusline-cache-$USER/git-<hash>`, awk forks dropped
+> in favour of bash printf / arithmetic for `cost`/`ctx`/`fmt_tokens`,
+> and `printf -v __SEG` replaces the per-segment `$(seg_$s)` subshell
+> capture. `seg_vim` is the new far-left segment, rendered as a vim-airline
+> gruvbox mode badge — NORMAL=yellow bg, INSERT=blue bg, VISUAL=orange bg,
+> REPLACE=red bg, all on a `#1d2021` dark fg. `copilot/statusline.sh`
+> tracks the same shape.
+
 #### `copilot-instructions.md`
 
 Global agent instructions — autonomous mode (no per-action confirmation):
@@ -286,7 +300,12 @@ proxy that translates Anthropic-format requests into Copilot ones.
   "model": "claude-opus-4.7-1m-internal",
   "modelOverrides": { "...": "..." },
   "effortLevel": "max",
-  "theme": "dark",
+  "theme": "dark-ansi",
+  "editorMode": "vim",
+  "statusLine": {
+    "hideVimModeIndicator": true,
+    "refreshInterval": 100
+  },
   "skipAutoPermissionPrompt": true,
   "permissions": { "defaultMode": "auto" }
 }
@@ -309,6 +328,14 @@ Defaults pinned globally (synced across machines via this repo):
   (`dummy` is fine; real auth happens in `copilot-api`'s GitHub flow).
 - `skipAutoPermissionPrompt: true` + `permissions.defaultMode: "auto"` —
   autonomous mode by default (no per-action confirmation).
+- `editorMode: "vim"` boots Claude Code's prompt editor straight into vim
+  mode. `statusLine.hideVimModeIndicator: true` suppresses the built-in
+  `-- INSERT --` chrome since `statusline.sh`'s `seg_vim` renders an
+  airline-style mode badge instead. `statusLine.refreshInterval: 100`
+  drops the redraw cadence so mode flips feel snappy.
+- `theme: "dark-ansi"` lets the chrome inherit the terminal's ANSI palette
+  (so it tracks the WezTerm Gruvbox scheme rather than hard-coding its
+  own colors).
 
 One-time setup (after running `install.sh` on a fresh box):
 

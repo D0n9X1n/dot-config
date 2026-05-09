@@ -16,7 +16,10 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     from C-c/d/z, doesn't clash with readline, and modern macOS disables
     the legacy C-q XON flow control), mouse on, top status bar, vim-style
     splits (`prefix + |` / `prefix + -`), 1-indexed windows, OSC 52
-    clipboard, TPM + tmux-sensible/yank/resurrect/continuum). Also
+    clipboard, TPM + tmux-sensible/yank/resurrect/continuum (continuum
+    auto-save every 5 min)). Declares `terminal-features … :RGB` so
+    tmux 3.2+ advertises truecolor instead of downsampling to the
+    256-color cube. Also
     **scrubs stale terminal-identity env** at server start
     (`set-environment -gu TERMINFO TERMINFO_DIRS TERMCAP TERM_PROGRAM
     TERM_PROGRAM_VERSION` + `set -g COLORTERM truecolor`) so a long-lived
@@ -37,6 +40,10 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
   opt in with `ln -sfn "$(pwd)/wezterm/wezterm.lua" ~/.wezterm.lua` (the
   `-fn` flags safely overwrite any stale symlink). The `wezterm` cask is
   auto-installed by `install.sh` so the terminal is one symlink away.
+  Config uses `color_scheme = "Gruvbox dark, hard (base16)"`,
+  `inactive_pane_hsb = {1,1,1}` (no inactive-pane dimming), and the
+  custom tab-bar `BAR_BG` is derived from the active scheme so swapping
+  schemes auto-aligns the tab strip.
 - `<repo>/copilot/<file>` — files linked to `$HOME/.copilot/<file>`. Currently:
   - `settings.json` — Copilot CLI settings (model: `claude-opus-4.7-1m-internal`,
     theme `dark`, `keepAlive: busy`, `continueOnAutoMode: true`, custom
@@ -72,7 +79,14 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     your terminal (uses `fc-list` if installed). Parses Copilot's session
     JSON from stdin (single `jq` call) and caches `gh auth status` for
     5 min. Bash 3.2-compatible. `install.sh` ensures the executable bit
-    is set.
+    is set. v0.6.0: sibling `claude/statusline.sh` warm-cache 125ms→18ms
+    via pure-bash JSON parsing (no jq dep), per-cwd git cache (5s TTL
+    at `$TMPDIR/claude-statusline-cache-$USER/git-<hash>`), no awk
+    forks (`cost`/`ctx`/`fmt_tokens` use bash printf/arith), and
+    `printf -v __SEG` instead of per-segment subshells. Adds `seg_vim`
+    as the leftmost segment — vim-airline gruvbox mode badge
+    (NORMAL=yellow, INSERT=blue, VISUAL=orange, REPLACE=red bg, all on
+    `#1d2021` fg).
   - `copilot-instructions.md` — global agent instructions (autonomous mode).
 - `<repo>/claude/<file>` — files linked to `$HOME/.claude/<file>`. Currently:
   - `settings.json` — Claude Code → Copilot bridge AND global default-pinning.
@@ -88,6 +102,12 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     `ANTHROPIC_SMALL_FAST_MODEL=gpt-5.5` (cheap subtask model for things
     like git-commit message generation) and autonomous mode
     (`skipAutoPermissionPrompt=true`, `permissions.defaultMode="auto"`).
+    v0.6.0 also pins `editorMode="vim"` (boots vim mode by default),
+    `statusLine.hideVimModeIndicator=true` (suppresses the built-in
+    `-- INSERT --` chrome since `statusline.sh`'s `seg_vim` renders an
+    airline-style badge instead), `statusLine.refreshInterval=100` for
+    snappy mode-flip redraws, and `theme="dark-ansi"` so chrome inherits
+    the terminal's ANSI palette.
     Requires a local [`copilot-api`](https://www.npmjs.com/package/copilot-api)
     proxy running (`copilot-api start --claude-code`) which translates
     Anthropic-format requests into GitHub Copilot ones. One-time bootstrap
