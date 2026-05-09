@@ -303,6 +303,16 @@ config.term = "xterm-256color"
 config.scrollback_lines = 20000
 config.audible_bell = "Disabled"
 
+-- COLORTERM / FORCE_COLOR — exported into every shell WezTerm spawns.
+-- COLORTERM short-circuits truecolor detection in Node/Rust/Python TUIs;
+-- FORCE_COLOR=3 overrides ALL detection logic in Node-based supports-color
+-- (Copilot CLI, ink TUIs) and forces 24-bit regardless of TERM. Mirrors
+-- the matching env in alacritty/alacritty.toml + .tmux.conf.
+config.set_environment_variables = {
+  COLORTERM   = "truecolor",
+  FORCE_COLOR = "3",
+}
+
 -- =========================================================
 -- Adaptive rendering per display DPI
 -- =========================================================

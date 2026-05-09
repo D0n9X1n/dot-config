@@ -53,6 +53,13 @@ option_as_alt = "OnlyLeft"
 # WezTerm's weight=500 or Ghostty's font-variation = wght=500). The Rec Mono
 # St.Helens cask only ships static Regular/Bold/Italic/BoldItalic, so we
 # use Regular here. Visual difference vs. WezTerm's Medium is mild at 14pt.
+#
+# macOS rendering tip: CoreText defaults to "strong" subpixel-AA stem
+# darkening (AppleFontSmoothing=3 globally), which blooms Gruvbox text on
+# dark backgrounds. For crisper, less-bleedy strokes apply per-bundle:
+#   defaults write org.alacritty AppleFontSmoothing -int 0
+# Then quit & relaunch Alacritty. To revert: defaults delete org.alacritty
+# AppleFontSmoothing.
 # =========================================================
 [font]
 size = 14.0
@@ -125,6 +132,15 @@ osc52 = "CopyPaste"
 # reopen always lands you back where you were. The wrapper falls back to
 # plain zsh if tmux isn't installed.
 #
+# The leading `unset TERMINFO TERM_PROGRAM TERM_PROGRAM_VERSION` scrubs
+# stale identity env that may have been inherited from a previous terminal
+# install (e.g., Ghostty leaves $TERMINFO pointing at its bundle dir; if
+# you uninstall it, that dir disappears but the value lingers in launchd
+# and breaks tmux's `default-terminal "tmux-256color"` lookup → fallback
+# to xterm-color → Copilot CLI degrades its UI). .tmux.conf has the
+# corresponding `set-environment -gu TERMINFO ...` defense for tmux's own
+# global env; this wrapper is the upstream belt to that suspenders.
+#
 # Opt-out: set `ALACRITTY_NO_TMUX=1` in your launchctl env (or temporarily
 # launch with `alacritty -o terminal.shell.args='["-l"]'`) and you'll get a
 # bare login zsh instead.
@@ -138,8 +154,24 @@ program = "/bin/zsh"
 args    = [
   "-l",
   "-c",
-  "if [ \"${ALACRITTY_NO_TMUX:-0}\" = \"1\" ] || ! command -v tmux >/dev/null 2>&1; then exec /bin/zsh -l; else exec tmux new-session -A -s main; fi",
+  "unset TERMINFO TERMINFO_DIRS TERMCAP TERM_PROGRAM TERM_PROGRAM_VERSION; if [ \"${ALACRITTY_NO_TMUX:-0}\" = \"1\" ] || ! command -v tmux >/dev/null 2>&1; then exec /bin/zsh -l; else exec tmux new-session -A -s main; fi",
 ]
+
+# =========================================================
+# Environment — exported into every shell Alacritty spawns
+# =========================================================
+# TERM advertises Alacritty's terminfo entry (~/.terminfo/a/alacritty,
+# installed by the alacritty cask). tmux uses this as `client_termname`
+# and matches it against terminal-overrides in .tmux.conf for RGB.
+# COLORTERM short-circuits truecolor detection in Node/Rust/Python TUIs
+# (incl. Copilot CLI) so they don't depend on the full terminfo lookup.
+# FORCE_COLOR=3 is the next layer of defense — it overrides ALL detection
+# logic in Node-based supports-color (Copilot CLI, ink TUIs) and forces
+# 24-bit color regardless of whatever TERM the shell ended up with.
+[env]
+TERM        = "alacritty"
+COLORTERM   = "truecolor"
+FORCE_COLOR = "3"
 
 # =========================================================
 # Colors — Gruvbox Dark Hard (matches wezterm/wezterm.lua GruvboxDarkHard)
