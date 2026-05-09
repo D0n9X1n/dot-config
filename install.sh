@@ -133,7 +133,17 @@ if [ -d "$claude_src" ]; then
   mkdir -p "$claude_dest"
   while IFS= read -r -d '' entry; do
     base="$(basename "$entry")"
+    # Skip in-folder docs (README*) — they belong next to the config in the
+    # repo but shouldn't pollute ~/.claude/ where Claude Code keeps state.
+    case "$base" in
+      README*) continue ;;
+    esac
     link_file "$entry" "${claude_dest}/${base}"
+    # Preserve executable bit on shell scripts (e.g., statusline.sh) so
+    # Claude Code can run them directly without chmod each time.
+    case "$base" in
+      *.sh) chmod +x "$entry" ;;
+    esac
   done < <(find "$claude_src" -maxdepth 1 -mindepth 1 -type f -print0)
   echo "Linked Claude Code config files to $claude_dest"
 fi

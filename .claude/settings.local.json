@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash *)",
+      "Bash(git *)",
+      "Bash(chmod +x *)",
+      "Bash(./claude/statusline.sh *)"
+    ]
+  }
+}
