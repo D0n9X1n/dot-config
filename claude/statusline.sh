@@ -61,7 +61,7 @@
 set -u
 
 # --- Configuration ---------------------------------------------------------
-SEGMENTS="time timer cost git branch model effort mcp skills ctx vim agent worktree style stash venv"
+SEGMENTS="vim time timer cost git branch model effort mcp skills ctx agent worktree style stash venv"
 SEP=' │ '
 
 ICONS_ON=1
@@ -122,6 +122,21 @@ if [ -z "${CLAUDE_STATUSLINE_NO_COLOR:-}" ]; then
   C_GREEN=$'\033[38;2;184;187;38m'                # #b8bb26
   C_YELLOW=$'\033[38;2;250;189;47m'               # #fabd2f
   C_BLUE=$'\033[38;2;131;165;152m'                # #83a598
+  # Background variants for highlighted values (e.g., vim mode badge).
+  # Palette + role assignment match vim-airline's gruvbox theme:
+  #   NORMAL  → yellow bg
+  #   INSERT  → blue bg
+  #   VISUAL  → orange bg
+  #   REPLACE → red bg
+  # Airline pairs each with a dark foreground (#1d2021) for contrast — the
+  # vim segment uses $C_BG_FG below instead of $C_FG.
+  CB_RED=$'\033[48;2;204;36;29m'                   # #cc241d — gruvbox red
+  CB_BLUE=$'\033[48;2;69;133;136m'                 # #458588 — gruvbox blue
+  CB_YELLOW=$'\033[48;2;215;153;33m'               # #d79921 — gruvbox yellow
+  CB_ORANGE=$'\033[48;2;214;93;14m'                # #d65d0e — gruvbox orange
+  CB_GREEN=$'\033[48;2;152;151;26m'                # #98971a — gruvbox green (kept for back-compat)
+  C_FG_DIM=$'\033[38;2;168;153;132m'               # #a89984 — gruvbox fg3
+  C_BG_FG=$'\033[38;2;29;32;33m'                   # #1d2021 — gruvbox dark0_hard, for text on bright bg
   C_PURPLE=$'\033[38;2;211;134;155m'              # #d3869b
   C_AQUA=$'\033[38;2;142;192;124m'                # #8ec07c
   C_ORANGE=$'\033[38;2;254;128;25m'               # #fe8019
@@ -129,6 +144,8 @@ if [ -z "${CLAUDE_STATUSLINE_NO_COLOR:-}" ]; then
 else
   C_RESET=""; C_DIM=""; C_RED=""; C_GREEN=""; C_YELLOW=""; C_BLUE=""
   C_PURPLE=""; C_AQUA=""; C_ORANGE=""; C_FG=""
+  CB_RED=""; CB_BLUE=""; CB_YELLOW=""; CB_ORANGE=""; CB_GREEN=""
+  C_FG_DIM=""; C_BG_FG=""
 fi
 
 PAD_TOP="${CLAUDE_STATUSLINE_PAD_TOP:-0}"
@@ -192,7 +209,11 @@ if [ ! -t 0 ]; then
   session_json="$(cat 2>/dev/null || true)"
 fi
 
-# --- 2. Parse all fields with one jq call (one field per line) -------------
+# --- 2. Parse all fields with pure-bash regex (no jq fork) -----------------
+# Claude Code's payload is shallow JSON with stable keys. Pure-bash parsing
+# avoids the ~22ms jq startup per render. We use targeted regex against the
+# raw payload — every key we care about is unique within the payload, so we
+# don't even need to descend into objects.
 session_id=""
 model_name=""
 cwd=""
@@ -208,40 +229,48 @@ lines_removed="0"
 ctx_pct=""
 ctx_size=""
 output_style=""
-if [ -n "$session_json" ] && command -v jq >/dev/null 2>&1; then
-  {
-    IFS= read -r session_id    || session_id=""
-    IFS= read -r model_name    || model_name=""
-    IFS= read -r cwd           || cwd=""
-    IFS= read -r effort_level  || effort_level=""
-    IFS= read -r vim_mode      || vim_mode=""
-    IFS= read -r agent_name    || agent_name=""
-    IFS= read -r worktree_name || worktree_name=""
-    IFS= read -r cost_usd      || cost_usd="0"
-    IFS= read -r total_ms      || total_ms="0"
-    IFS= read -r api_ms        || api_ms="0"
-    IFS= read -r lines_added   || lines_added="0"
-    IFS= read -r lines_removed || lines_removed="0"
-    IFS= read -r ctx_pct       || ctx_pct=""
-    IFS= read -r ctx_size      || ctx_size=""
-    IFS= read -r output_style  || output_style=""
-  } < <(printf '%s' "$session_json" | jq -r '
-        (.session_id // ""),
-        ((.model.display_name // .model.id) // ""),
-        ((.workspace.current_dir // .cwd) // ""),
-        (.effort.level // ""),
-        (.vim.mode // ""),
-        (.agent.name // ""),
-        (.workspace.git_worktree // .worktree.name // ""),
-        (.cost.total_cost_usd // 0),
-        (.cost.total_duration_ms // 0),
-        (.cost.total_api_duration_ms // 0),
-        (.cost.total_lines_added // 0),
-        (.cost.total_lines_removed // 0),
-        (.context_window.used_percentage // ""),
-        (.context_window.context_window_size // ""),
-        (.output_style.name // "")
-      ' 2>/dev/null)
+
+# jget_str <key>  -> first matching "key": "value" string into __JV
+# jget_num <key>  -> first matching "key": number/bool/null into __JV
+# Both use the global $session_json haystack; both clear __JV on no-match.
+__JV=""
+jget_str() {
+  __JV=""
+  [[ "$session_json" =~ \"$1\"[[:space:]]*:[[:space:]]*\"([^\"]*)\" ]] && __JV="${BASH_REMATCH[1]}"
+}
+jget_num() {
+  __JV=""
+  if [[ "$session_json" =~ \"$1\"[[:space:]]*:[[:space:]]*([-0-9.]+|true|false|null) ]]; then
+    [ "${BASH_REMATCH[1]}" != "null" ] && __JV="${BASH_REMATCH[1]}"
+  fi
+}
+
+if [ -n "$session_json" ]; then
+  jget_str "session_id";                session_id="$__JV"
+  jget_str "display_name";              model_name="$__JV"
+  [ -z "$model_name" ] && { jget_str "id"; model_name="$__JV"; }
+  jget_str "current_dir";               cwd="$__JV"
+  [ -z "$cwd" ] && { jget_str "cwd";   cwd="$__JV"; }
+  jget_str "level";                     effort_level="$__JV"
+  jget_str "mode";                      vim_mode="$__JV"
+  # agent.name and worktree.name share the key "name" — disambiguate by
+  # presence of agent. block first.
+  if [[ "$session_json" == *'"agent"'* ]]; then
+    jget_str "name";                    agent_name="$__JV"
+  fi
+  jget_str "git_worktree";              worktree_name="$__JV"
+  jget_num "total_cost_usd";            cost_usd="${__JV:-0}"
+  jget_num "total_duration_ms";         total_ms="${__JV:-0}"
+  jget_num "total_api_duration_ms";     api_ms="${__JV:-0}"
+  jget_num "total_lines_added";         lines_added="${__JV:-0}"
+  jget_num "total_lines_removed";       lines_removed="${__JV:-0}"
+  jget_num "used_percentage";           ctx_pct="$__JV"
+  jget_num "context_window_size";       ctx_size="$__JV"
+  # output_style.name — only read if no agent (which would have stolen the
+  # "name" match above). Output style is rarely set, so this is best-effort.
+  if [[ "$session_json" == *'"output_style"'* ]] && [ -z "$agent_name" ]; then
+    jget_str "name";                    output_style="$__JV"
+  fi
 fi
 
 # Make $cwd's git state available to seg_git / seg_branch / seg_stash so
@@ -253,14 +282,13 @@ fi
 
 # --- 3. Helpers ------------------------------------------------------------
 label() {
-  # "<color><icon> <Label> <reset>" — icon + label share the dim accent so
-  # the value (printed by the segment after this returns) reads as the
-  # bright eye-catcher.
+  # "<color><icon> <Label> <reset>" — written into $__LBL via printf -v so
+  # callers can splice it without a `$(label ...)` subshell fork.
   local color="$1" icon="$2" text="$3"
   if [ "$ICONS_ON" = "1" ]; then
-    printf '%s%s %s%s ' "$color" "$icon" "$text" "$C_RESET"
+    printf -v __LBL '%s%s %s%s ' "$color" "$icon" "$text" "$C_RESET"
   else
-    printf '%s%s%s ' "$color" "$text" "$C_RESET"
+    printf -v __LBL '%s%s%s ' "$color" "$text" "$C_RESET"
   fi
 }
 
@@ -294,20 +322,29 @@ fmt_ms() {
 }
 
 # Format a token count for the Ctx segment: 200000 -> 200k, 1000000 -> 1M.
+# Pure-bash arithmetic; no awk fork.
 fmt_tokens() {
   local n=${1:-0}
-  if [ "$n" -ge 1000000 ]; then
-    awk -v n="$n" 'BEGIN{ printf("%.1fM", n/1000000) }'
-  elif [ "$n" -ge 1000 ]; then
-    awk -v n="$n" 'BEGIN{ printf("%dk", int(n/1000)) }'
+  if [ "$n" -ge 1000000 ] 2>/dev/null; then
+    # Integer math: e.g. 1500000 -> "1.5M". Compute tenths separately.
+    local whole=$(( n / 1000000 ))
+    local tenths=$(( (n % 1000000) / 100000 ))
+    printf '%d.%dM' "$whole" "$tenths"
+  elif [ "$n" -ge 1000 ] 2>/dev/null; then
+    printf '%dk' $(( n / 1000 ))
   else
     printf '%d' "$n"
   fi
 }
 
 # --- 4. Segment functions --------------------------------------------------
+# Each seg_* writes its rendered text into the global $__SEG via `printf -v`.
+# Returning early (no output) leaves __SEG untouched — the render loop reads
+# it and skips empty values. This avoids one `$(...)` subshell fork per
+# segment per render.
 seg_time() {
-  printf '%s%s%s' "$(label "$C_YELLOW" "$ICON_TIME" 'Time')" "$C_FG$(date '+%H:%M:%S')" "$C_RESET"
+  label "$C_YELLOW" "$ICON_TIME" 'Time'
+  printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$(date '+%H:%M:%S')" "$C_RESET"
 }
 
 seg_model() {
@@ -316,12 +353,14 @@ seg_model() {
   local short="$model_name"
   short="${short#claude-}"
   short="${short%-internal}"
-  printf '%s%s%s%s' "$(label "$C_AQUA" "$ICON_MODEL" 'Model')" "$C_FG" "$short" "$C_RESET"
+  label "$C_AQUA" "$ICON_MODEL" 'Model'
+  printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$short" "$C_RESET"
 }
 
 seg_effort() {
   [ -n "$effort_level" ] || return 0
-  printf '%s%s%s%s' "$(label "$C_PURPLE" "$ICON_EFFORT" 'Effort')" "$C_FG" "$effort_level" "$C_RESET"
+  label "$C_PURPLE" "$ICON_EFFORT" 'Effort'
+  printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$effort_level" "$C_RESET"
 }
 
 seg_timer() {
@@ -332,28 +371,33 @@ seg_timer() {
   fi
   [ -f "$f" ] || return 0
   local started now mins
-  started="$(cat "$f" 2>/dev/null || echo 0)"
+  read -r started <"$f" 2>/dev/null || started=0
   now="$(date +%s)"
   mins=$(((now - started) / 60))
   [ "$mins" -gt 0 ] || return 0
-  printf '%s%s%dm%s' "$(label "$C_ORANGE" "$ICON_RUN" 'Run')" "$C_FG" "$mins" "$C_RESET"
+  label "$C_ORANGE" "$ICON_RUN" 'Run'
+  printf -v __SEG '%s%s%dm%s' "$__LBL" "$C_FG" "$mins" "$C_RESET"
 }
 
 seg_wall() {
   is_pos_int "$total_ms" || return 0
-  printf '%s%s%s%s' "$(label "$C_PURPLE" "$ICON_WALL" 'Wall')" "$C_FG" "$(fmt_ms "$total_ms")" "$C_RESET"
+  label "$C_PURPLE" "$ICON_WALL" 'Wall'
+  printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$(fmt_ms "$total_ms")" "$C_RESET"
 }
 
 seg_api_time() {
   is_pos_int "$api_ms" || return 0
-  printf '%s%s%s%s' "$(label "$C_BLUE" "$ICON_API" 'API')" "$C_FG" "$(fmt_ms "$api_ms")" "$C_RESET"
+  label "$C_BLUE" "$ICON_API" 'API'
+  printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$(fmt_ms "$api_ms")" "$C_RESET"
 }
 
 seg_cost() {
   is_pos_num "$cost_usd" || return 0
   local pretty
-  pretty="$(awk -v c="$cost_usd" 'BEGIN{ printf("$%.2f", c+0) }')"
-  printf '%s%s%s%s' "$(label "$C_GREEN" "$ICON_COST" 'Cost')" "$C_FG" "$pretty" "$C_RESET"
+  # bash printf handles floats — saves an awk fork.
+  printf -v pretty '$%.2f' "$cost_usd"
+  label "$C_GREEN" "$ICON_COST" 'Cost'
+  printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$pretty" "$C_RESET"
 }
 
 seg_diff() {
@@ -367,100 +411,158 @@ seg_diff() {
 # parenthetically when known. Falls back to the old 200k+ red badge if the
 # rich field is missing.
 seg_ctx() {
-  if [ -n "$ctx_pct" ]; then
-    local pct_int
-    pct_int="$(awk -v p="$ctx_pct" 'BEGIN{ printf("%d", p+0) }')"
-    local color="$C_GREEN"
-    if [ "$pct_int" -ge 80 ]; then
-      color="$C_RED"
-    elif [ "$pct_int" -ge 50 ]; then
-      color="$C_YELLOW"
-    fi
-    local body
-    if [ -n "$ctx_size" ] && [ "$ctx_size" != "null" ]; then
-      body="${color}${pct_int}%${C_RESET}${C_DIM}/$(fmt_tokens "$ctx_size")${C_RESET}"
-    else
-      body="${color}${pct_int}%${C_RESET}"
-    fi
-    printf '%s%s' "$(label "$C_AQUA" "$ICON_CTX" 'Context')" "$body"
-    return 0
+  [ -n "$ctx_pct" ] || return 0
+  # Truncate to int by stripping the decimal portion — saves an awk fork.
+  # ctx_pct comes in as a float like "8.234" or "12"; we want "8" / "12".
+  local pct_int="${ctx_pct%%.*}"
+  pct_int="${pct_int:-0}"
+  local color="$C_GREEN"
+  if [ "$pct_int" -ge 80 ] 2>/dev/null; then
+    color="$C_RED"
+  elif [ "$pct_int" -ge 50 ] 2>/dev/null; then
+    color="$C_YELLOW"
   fi
-  return 0
+  local body
+  if [ -n "$ctx_size" ] && [ "$ctx_size" != "null" ]; then
+    body="${color}${pct_int}%${C_RESET}${C_DIM}/$(fmt_tokens "$ctx_size")${C_RESET}"
+  else
+    body="${color}${pct_int}%${C_RESET}"
+  fi
+  label "$C_AQUA" "$ICON_CTX" 'Context'
+  printf -v __SEG '%s%s' "$__LBL" "$body"
 }
 
 seg_vim() {
   [ -n "$vim_mode" ] || return 0
-  printf '%s%s%s%s' "$(label "$C_ORANGE" "$ICON_VIM" 'Vim')" "$C_FG" "$vim_mode" "$C_RESET"
+  # vim-airline gruvbox palette:
+  #   NORMAL  → yellow / dark fg
+  #   INSERT  → blue   / dark fg
+  #   VISUAL  → orange / dark fg
+  #   REPLACE → red    / dark fg
+  # Dark foreground on each bright bg follows airline's high-contrast style.
+  local mode_bg="$CB_YELLOW"
+  case "$vim_mode" in
+    [Ii][Nn][Ss][Ee][Rr][Tt]*)     mode_bg="$CB_BLUE"   ;;
+    [Vv][Ii][Ss][Uu][Aa][Ll]*)     mode_bg="$CB_ORANGE" ;;
+    [Nn][Oo][Rr][Mm][Aa][Ll]*)     mode_bg="$CB_YELLOW" ;;
+    [Rr][Ee][Pp][Ll][Aa][Cc][Ee]*) mode_bg="$CB_RED"    ;;
+  esac
+  label "$C_RED" "$ICON_VIM" 'Vim'
+  printf -v __SEG '%s%s%s %s %s' "$__LBL" "$mode_bg" "$C_BG_FG" "$vim_mode" "$C_RESET"
 }
 
 seg_agent() {
   [ -n "$agent_name" ] || return 0
-  printf '%s%s%s%s' "$(label "$C_PURPLE" "$ICON_AGENT" 'Agent')" "$C_FG" "$agent_name" "$C_RESET"
+  label "$C_PURPLE" "$ICON_AGENT" 'Agent'
+  printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$agent_name" "$C_RESET"
 }
 
 seg_worktree() {
   [ -n "$worktree_name" ] || return 0
-  printf '%s%s%s%s' "$(label "$C_AQUA" "$ICON_WORKTREE" 'Worktree')" "$C_FG" "$worktree_name" "$C_RESET"
+  label "$C_AQUA" "$ICON_WORKTREE" 'Worktree'
+  printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$worktree_name" "$C_RESET"
 }
 
 seg_style() {
   [ -n "$output_style" ] || return 0
   [ "$output_style" = "default" ] && return 0
-  printf '%s%s%s%s' "$(label "$C_PURPLE" "$ICON_STYLE" 'Style')" "$C_FG" "$output_style" "$C_RESET"
+  label "$C_PURPLE" "$ICON_STYLE" 'Style'
+  printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$output_style" "$C_RESET"
 }
 
+# --- Pre-compute shared git state ------------------------------------------
+# git/branch/stash all need the same plumbing. Calling git on every render
+# costs ~50ms even after consolidation — and git state almost never changes
+# between keystrokes. Cache the computed values per-cwd with a 5-second TTL,
+# so vim-mode-driven re-renders (which dominate after pressing Esc) skip
+# git entirely on the hot path.
+GIT_INSIDE=0
+GIT_DIRTY=""
+GIT_BRANCH=""
+GIT_SYNC=""
+GIT_STASH_COUNT=0
+
+# Per-cwd cache key. Keep it short — just the cwd hash, since we don't
+# invalidate across branches; that's fine because the TTL caps staleness.
+__cwd_hash="$(printf '%s' "${PWD}" | cksum | awk '{print $1}')"
+__git_cache="$CACHE_DIR/git-${__cwd_hash}"
+__use_cache=0
+if [ -f "$__git_cache" ]; then
+  __mtime="$(stat -f %m "$__git_cache" 2>/dev/null || stat -c %Y "$__git_cache" 2>/dev/null || echo 0)"
+  __age=$(( $(date +%s) - __mtime ))
+  if [ "$__age" -lt 5 ]; then
+    __use_cache=1
+    # shellcheck disable=SC1090
+    . "$__git_cache" 2>/dev/null || __use_cache=0
+  fi
+fi
+
+if [ "$__use_cache" = 0 ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  GIT_INSIDE=1
+  # status + branch + upstream sync in one shot via `git status --porcelain=v2 --branch`.
+  __gs="$(git status --porcelain=v2 --branch 2>/dev/null)"
+  __dirty_lines="$(printf '%s\n' "$__gs" | grep -cv '^#')"
+  [ "$__dirty_lines" -gt 0 ] 2>/dev/null && GIT_DIRTY=1
+  GIT_BRANCH="$(printf '%s\n' "$__gs" | awk '/^# branch.head /{print $3; exit}')"
+  __ab="$(printf '%s\n' "$__gs" | awk '/^# branch.ab /{print $3" "$4; exit}')"
+  if [ -n "$__ab" ]; then
+    __ahead="${__ab%% *}"; __behind="${__ab##* }"
+    __ahead="${__ahead#+}"; __behind="${__behind#-}"
+    [ "${__ahead:-0}" -gt 0 ] 2>/dev/null && GIT_SYNC="${GIT_SYNC}↑${__ahead}"
+    [ "${__behind:-0}" -gt 0 ] 2>/dev/null && GIT_SYNC="${GIT_SYNC}↓${__behind}"
+  fi
+  if [ "$GIT_BRANCH" = "(detached)" ] || [ -z "$GIT_BRANCH" ]; then
+    GIT_BRANCH="$(git rev-parse --short HEAD 2>/dev/null)"
+  fi
+  GIT_STASH_COUNT="$(git stash list 2>/dev/null | wc -l | tr -d ' ')"
+  # Persist for the next renders within the TTL window.
+  {
+    printf 'GIT_INSIDE=%s\n' "$GIT_INSIDE"
+    printf 'GIT_DIRTY=%q\n' "$GIT_DIRTY"
+    printf 'GIT_BRANCH=%q\n' "$GIT_BRANCH"
+    printf 'GIT_SYNC=%q\n' "$GIT_SYNC"
+    printf 'GIT_STASH_COUNT=%s\n' "$GIT_STASH_COUNT"
+  } >"$__git_cache" 2>/dev/null || true
+fi
+
 seg_git() {
-  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+  [ "$GIT_INSIDE" = 1 ] || return 0
   local state="clean" state_color="$C_GREEN"
-  if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+  if [ -n "$GIT_DIRTY" ]; then
     state="dirty"; state_color="$C_YELLOW"
   fi
-  local sync="" counts behind ahead
-  if counts="$(git rev-list --left-right --count '@{u}...HEAD' 2>/dev/null)"; then
-    behind="${counts%%	*}"
-    ahead="${counts##*	}"
-    if [ "${ahead:-0}" -gt 0 ] 2>/dev/null; then
-      sync="${sync}↑${ahead}"
-    fi
-    if [ "${behind:-0}" -gt 0 ] 2>/dev/null; then
-      sync="${sync}↓${behind}"
-    fi
-  fi
-  if [ -n "$sync" ]; then
-    printf '%s%s%s%s %s(%s)%s' \
-      "$(label "$C_AQUA" "$ICON_REPO" 'Repo')" \
-      "$state_color" "$state" "$C_RESET" \
-      "$C_ORANGE" "$sync" "$C_RESET"
+  label "$C_AQUA" "$ICON_REPO" 'Repo'
+  if [ -n "$GIT_SYNC" ]; then
+    printf -v __SEG '%s%s%s%s %s(%s)%s' \
+      "$__LBL" "$state_color" "$state" "$C_RESET" \
+      "$C_ORANGE" "$GIT_SYNC" "$C_RESET"
   else
-    printf '%s%s%s%s' \
-      "$(label "$C_AQUA" "$ICON_REPO" 'Repo')" \
-      "$state_color" "$state" "$C_RESET"
+    printf -v __SEG '%s%s%s%s' "$__LBL" "$state_color" "$state" "$C_RESET"
   fi
 }
 
 seg_branch() {
-  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
-  local br
-  br="$(git symbolic-ref --short HEAD 2>/dev/null \
-        || git rev-parse --short HEAD 2>/dev/null)"
+  [ "$GIT_INSIDE" = 1 ] || return 0
+  local br="$GIT_BRANCH"
   [ -n "$br" ] || return 0
   if [ ${#br} -gt 24 ]; then
     br="${br:0:23}…"
   fi
-  printf '%s%s%s%s' "$(label "$C_YELLOW" "$ICON_BRANCH" 'Branch')" "$C_FG" "$br" "$C_RESET"
+  label "$C_YELLOW" "$ICON_BRANCH" 'Branch'
+  printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$br" "$C_RESET"
 }
 
 seg_stash() {
-  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
-  local count
-  count="$(git stash list 2>/dev/null | wc -l | tr -d ' ')"
-  is_pos_int "$count" || return 0
-  printf '%s%s%d%s' "$(label "$C_ORANGE" "$ICON_STASH" 'Stash')" "$C_FG" "$count" "$C_RESET"
+  [ "$GIT_INSIDE" = 1 ] || return 0
+  is_pos_int "$GIT_STASH_COUNT" || return 0
+  label "$C_ORANGE" "$ICON_STASH" 'Stash'
+  printf -v __SEG '%s%s%d%s' "$__LBL" "$C_FG" "$GIT_STASH_COUNT" "$C_RESET"
 }
 
 seg_venv() {
   [ -n "${VIRTUAL_ENV:-}" ] || return 0
-  printf '%s%s%s%s' "$(label "$C_BLUE" "$ICON_VENV" 'Venv')" "$C_FG" "$(basename "$VIRTUAL_ENV")" "$C_RESET"
+  label "$C_BLUE" "$ICON_VENV" 'Venv'
+  printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "${VIRTUAL_ENV##*/}" "$C_RESET"
 }
 
 seg_gh_account() {
@@ -473,7 +575,7 @@ seg_gh_account() {
     mtime="$(stat -f %m "$cf" 2>/dev/null || stat -c %Y "$cf" 2>/dev/null || echo 0)"
   fi
   if [ -f "$cf" ] && [ $((now - mtime)) -lt 300 ]; then
-    account="$(cat "$cf" 2>/dev/null || true)"
+    read -r account <"$cf" 2>/dev/null || account=""
   else
     account="$(gh auth status 2>&1 | awk '
       /Logged in to github\.com account /{
@@ -482,7 +584,8 @@ seg_gh_account() {
     printf '%s' "$account" >"$cf" 2>/dev/null || true
   fi
   [ -n "$account" ] || return 0
-  printf '%s%s%s%s' "$(label "$C_PURPLE" "$ICON_GH" 'GH')" "$C_FG" "$account" "$C_RESET"
+  label "$C_PURPLE" "$ICON_GH" 'GH'
+  printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$account" "$C_RESET"
 }
 
 # Skills — count user-scope + workspace-scope skill bundles. Claude Code
@@ -498,32 +601,71 @@ seg_skills() {
     total=$((total + count))
   done
   is_pos_int "$total" || return 0
-  printf '%s%s%d%s' "$(label "$C_AQUA" "$ICON_SKILLS" 'Skills')" "$C_FG" "$total" "$C_RESET"
+  label "$C_AQUA" "$ICON_SKILLS" 'Skills'
+  printf -v __SEG '%s%s%d%s' "$__LBL" "$C_FG" "$total" "$C_RESET"
 }
 
 # MCP — number of servers in ~/.claude.json's .mcpServers map. Claude
 # Code reads MCP servers from ~/.claude.json (top-level), NOT from
 # settings.json. install.sh seeds this map from copilot's mcp.json so
 # the count matches what `copilot` shows.
+#
+# Counted via grep of the mcpServers block (no jq fork). The ~/.claude.json
+# format is stable JSON, one server per "name": { ... } entry inside the
+# mcpServers object; we count those object-opening braces.
 seg_mcp() {
   local f="$HOME/.claude.json"
   [ -f "$f" ] || return 0
-  command -v jq >/dev/null 2>&1 || return 0
   local count
-  count="$(jq -r '(.mcpServers // {}) | length' "$f" 2>/dev/null)"
+  # Extract the mcpServers value block, then count `"name": {` openings.
+  # Cache by mtime to avoid re-reading the (potentially large) settings
+  # file on every render.
+  local cf="$CACHE_DIR/mcp_count"
+  local fmtime
+  fmtime="$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null || echo 0)"
+  local cached_mtime cached_count=""
+  if [ -f "$cf" ]; then
+    IFS='|' read -r cached_mtime cached_count <"$cf" 2>/dev/null
+    if [ "$cached_mtime" = "$fmtime" ]; then
+      count="$cached_count"
+    fi
+  fi
+  if [ -z "$count" ]; then
+    # awk: find the `"mcpServers": {` line; from there, count `"key": {`
+    # openings until the matching close brace at depth 0 (i.e. depth
+    # returns to 0 after entering the mcpServers value).
+    count="$(awk '
+      BEGIN { in_blk=0; depth=0; n=0 }
+      !in_blk { if ($0 ~ /"mcpServers"[[:space:]]*:[[:space:]]*\{/) { in_blk=1; depth=1; next } }
+      in_blk {
+        for (i=1; i<=length($0); i++) {
+          c = substr($0, i, 1)
+          if (c == "{") { depth++ ; if (depth == 2) n++ }
+          else if (c == "}") { depth-- ; if (depth == 0) { print n; exit } }
+        }
+      }
+    ' "$f" 2>/dev/null)"
+    [ -z "$count" ] && count=0
+    printf '%s|%s\n' "$fmtime" "$count" >"$cf" 2>/dev/null || true
+  fi
   is_pos_int "$count" || return 0
-  printf '%s%s%d%s' "$(label "$C_BLUE" "$ICON_MCP" 'MCP')" "$C_FG" "$count" "$C_RESET"
+  label "$C_BLUE" "$ICON_MCP" 'MCP'
+  printf -v __SEG '%s%s%d%s' "$__LBL" "$C_FG" "$count" "$C_RESET"
 }
 
 # --- 5. Render -------------------------------------------------------------
+# Each seg_* writes its output to the global $__SEG via `printf -v` instead
+# of stdout. We can then concatenate without forking a `$(...)` subshell
+# per segment — saves ~2ms × 16 segments ≈ 30ms on every render.
 out=""
 for s in $SEGMENTS; do
-  part="$("seg_$s" 2>/dev/null || true)"
-  [ -n "$part" ] || continue
+  __SEG=""
+  "seg_$s" 2>/dev/null || true
+  [ -n "$__SEG" ] || continue
   if [ -n "$out" ]; then
-    out="${out}${C_DIM}${SEP}${C_RESET}${part}"
+    out="${out}${C_DIM}${SEP}${C_RESET}${__SEG}"
   else
-    out="${part}"
+    out="${__SEG}"
   fi
 done
 

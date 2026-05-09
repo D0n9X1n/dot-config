@@ -40,23 +40,34 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
 - `<repo>/copilot/<file>` — files linked to `$HOME/.copilot/<file>`. Currently:
   - `settings.json` — Copilot CLI settings (model: `claude-opus-4.7-1m-internal`,
     theme `dark`, `keepAlive: busy`, `continueOnAutoMode: true`, custom
-    footer (hides code-changes), custom status line). The `statusLine`
-    block only takes a single `padding` field — per-side spacing is done
-    in `statusline.sh` (newlines for top, leading spaces for left). Note:
+    footer (now hides `showModelEffort` / `showBranch` / `showContextWindow`
+    because `statusline.sh` renders them — keeps `showDirectory` and
+    `showAgent`), custom status line). The `statusLine` block only
+    takes a single `padding` field — per-side spacing is done in
+    `statusline.sh` (newlines for top, leading spaces for left). Note:
     Copilot itself injects/strips a `"staff": true` field at runtime based
     on org membership; keep that field out of the committed file to avoid
     spurious diffs.
   - `statusline.sh` — executable script printing the custom status line.
-    Renders 11 segments separated by `│` (each shown only when its data is
-    available): `<icon> <Label> <value>` — Time, Req, Run, API, Cache,
-    Last, Repo (clean/dirty + ↑↓), Stash, Venv, GH, MCP. The whole line is
-    wrapped in ANSI dim (`\e[2m`…`\e[0m`) so it recedes from the prompt.
-    Env overrides: `COPILOT_STATUSLINE_NO_ICONS=1` drops icons (keeps text
-    labels); `COPILOT_STATUSLINE_NO_DIM=1` drops the dim wrap;
+    A "full mirror" of `~/.claude/statusline.sh`: per-segment Gruvbox
+    color accents, color-graded Cache % and Context %, and every Claude
+    segment reproduced (segments whose data Copilot's statusLine JSON
+    doesn't expose silently no-op, so `vim`/`agent`/`style` cost nothing
+    until a future CLI version starts emitting them). Renders these
+    segments in order, `<icon> <Label> <value>` separated by `│`:
+    Time, Model, Effort (parsed from `model.display_name` `(xhigh)` etc),
+    Run, Wall, API, Req, Cache, Last, Ctx, Worktree, Repo (clean/dirty
+    + ↑↓), Branch, Stash, Venv, GH, Ext, MCP. `diff` is defined but
+    omitted from the default segment list — opt in via
+    `COPILOT_STATUSLINE_SEGMENTS`. Env overrides:
+    `COPILOT_STATUSLINE_NO_ICONS=1` drops icons (keeps text labels);
+    `COPILOT_STATUSLINE_NO_COLOR=1` drops color (legacy
+    `COPILOT_STATUSLINE_NO_DIM=1` is honored as an alias);
     `COPILOT_STATUSLINE_PAD_TOP=N` / `..._PAD_LEFT=N` / `..._PAD_RIGHT=N`
-    override per-side padding (default top=8, left=0, right=0). The CLI's
-    `statusLine.padding*` fields are silently ignored — only `padding`
-    works there, so we emit our own spacing instead. Run
+    override per-side padding (default top=8, left=1, right=0);
+    `COPILOT_STATUSLINE_SEGMENTS="…"` overrides the segment list and order.
+    The CLI's `statusLine.padding*` fields are silently ignored — only
+    `padding` works there, so we emit our own spacing instead. Run
     `~/.copilot/statusline.sh --test` to verify each codepoint renders in
     your terminal (uses `fc-list` if installed). Parses Copilot's session
     JSON from stdin (single `jq` call) and caches `gh auth status` for

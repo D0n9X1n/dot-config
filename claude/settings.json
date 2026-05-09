@@ -24,10 +24,13 @@
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
-    "padding": 0
+    "padding": 0,
+    "hideVimModeIndicator": true,
+    "refreshInterval": 100
   },
   "effortLevel": "xhigh",
   "skipDangerousModePermissionPrompt": true,
   "theme": "dark-ansi",
-  "skipAutoPermissionPrompt": true
+  "skipAutoPermissionPrompt": true,
+  "editorMode": "vim"
 }

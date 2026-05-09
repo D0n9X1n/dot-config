@@ -220,8 +220,9 @@ installed).
 
 Copilot CLI configuration. Pinned model `claude-opus-4.7-1m-internal`, theme
 `dark`, `keepAlive: busy`, `continueOnAutoMode: true`, custom footer (hides
-code-changes; shows agent + branch + context window + custom segment), and a
-custom status line provided by `statusline.sh`.
+code-changes plus everything `statusline.sh` now renders — model/effort,
+branch, context window — to avoid duplication; keeps directory + agent +
+custom segment), and a custom status line provided by `statusline.sh`.
 
 > **Caveat:** Copilot CLI rewrites `settings.json` at runtime to inject /
 > strip a `staff` field and to toggle UI defaults — edit it via atomic
@@ -232,18 +233,28 @@ custom status line provided by `statusline.sh`.
 
 #### `statusline.sh`
 
-Executable script that renders 11 segments separated by `│` (each shown only
-when its data is available): `<icon> <Label> <value>` for **Time, Req, Run,
-API, Cache, Last, Repo (clean / dirty + ↑↓), Stash, Venv, GH, MCP**. The
-whole line is wrapped in ANSI dim (`\e[2m` … `\e[0m`) so it recedes from the
-prompt.
+Executable script — a "full mirror" of `~/.claude/statusline.sh` adapted to
+Copilot's `statusLine` JSON. Per-segment Gruvbox color accents, color-graded
+Cache % and Context %. Renders these segments in order, `<icon> <Label>
+<value>` separated by `│` (each shown only when its data is available):
+**Time, Model, Effort, Run, Wall, API, Req, Cache, Last, Ctx, Worktree,
+Repo (clean / dirty + ↑↓), Branch, Stash, Venv, GH, Ext, MCP**. Effort is
+parsed from `model.display_name` (Copilot bakes `(xhigh)` etc into the
+display name rather than exposing `.effort.level`). Worktree is detected
+via `git rev-parse --git-dir` and only shown when actually inside a linked
+worktree. Vim, Agent, and Style are defined but no-op until Copilot starts
+exposing them in JSON; `diff` is defined but omitted from the default
+segment list (opt in via `COPILOT_STATUSLINE_SEGMENTS`).
 
 Environment overrides:
 
 - `COPILOT_STATUSLINE_NO_ICONS=1` — drop icons, keep text labels.
-- `COPILOT_STATUSLINE_NO_DIM=1` — drop the dim wrap.
+- `COPILOT_STATUSLINE_NO_COLOR=1` — drop color (legacy
+  `COPILOT_STATUSLINE_NO_DIM=1` is honored as an alias for backwards-compat).
 - `COPILOT_STATUSLINE_PAD_TOP=N` / `..._PAD_LEFT=N` / `..._PAD_RIGHT=N` —
-  override per-side padding (defaults: top = 8, left = 0, right = 0).
+  override per-side padding (defaults: top = 8, left = 1, right = 0).
+- `COPILOT_STATUSLINE_SEGMENTS="…"` — override the segment list and order
+  (e.g. add `diff`, drop `cache_pct`, reorder freely).
 
 Run `~/.copilot/statusline.sh --test` to verify each codepoint renders in
 your terminal (uses `fc-list` if installed). Parses Copilot's session JSON
