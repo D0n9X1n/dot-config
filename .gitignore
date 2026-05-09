@@ -5,3 +5,6 @@
 *.swo
 *~
 *.bak.*
+
+# Claude Code's per-project state dir — auto-created in cwd; not a dotfile.
+.claude/
