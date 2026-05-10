@@ -8,23 +8,38 @@ that creates symlinks into the home directory.
 
 ```
 dot-configs/
-├── install.sh                   # idempotent linker; safe to re-run
+├── install.sh                   # idempotent linker for macOS / Linux
+├── install.ps1                  # idempotent linker for Windows (PowerShell 7+)
 ├── .tmux.conf                   # -> ~/.tmux.conf  (tab/split/session manager)
 ├── oh-my-zsh-custom/            # contents -> ~/.oh-my-zsh/custom/
 │   ├── custom.zsh               # aliases, proxy helpers, brew completions, env
 │   └── gg.zsh                   # gg() function (terminal title + copilot)
 ├── copilot/                     # contents -> ~/.copilot/
-│   ├── settings.json            # Copilot CLI settings (model, footer, status line)
-│   ├── statusline.sh            # custom multi-segment status line
+│   ├── settings.json            # macOS/Linux Copilot CLI settings
+│   ├── settings-windows.json    # Windows variant (statusline.command -> .ps1)
+│   ├── statusline.sh            # POSIX statusline (bash 3.2+)
+│   ├── statusline.ps1           # Windows statusline (PowerShell 7+, parity with .sh)
 │   └── copilot-instructions.md  # global agent instructions
 ├── claude/                      # contents -> ~/.claude/
-│   └── settings.json            # Claude Code → copilot-api proxy bridge config
+│   ├── settings.json            # macOS/Linux Claude Code settings
+│   ├── settings-windows.json    # Windows variant (statusline.command -> .ps1)
+│   ├── statusline.sh            # POSIX statusline
+│   └── statusline.ps1           # Windows statusline (parity with .sh)
 ├── wezterm/                     # terminal config (NOT auto-linked — opt-in)
 │   └── wezterm.lua              # WezTerm config — link manually if used
 ├── LICENSE
 ├── ReadMe.md                    # this file
 └── QUICKREF.md                  # condensed reference (agent-friendly)
 ```
+
+Two installers, one source tree:
+
+- **`install.sh`** (macOS/Linux): links `.sh` siblings, skips `.ps1` and
+  `settings-windows.json`.
+- **`install.ps1`** (Windows): links `.ps1` siblings, skips `.sh`, and
+  links `settings-windows.json` AS `settings.json` at the destination.
+
+Both are idempotent and use symlinks so the live config tracks repo edits.
 
 `install.sh` is the only entry point. It:
 
@@ -234,12 +249,21 @@ Gruvbox-aligned tmux/wezterm chrome are all live.
 - **Linux**: skip the `brew` casks (wezterm, fonts) — install equivalents
   via your distro package manager. Everything else (steps 1–10) works
   unchanged.
-- **Windows / Git Bash / MSYS2**: `install.sh`'s `ln -s` requires
-  Developer Mode + `MSYS=winsymlinks:nativestrict` — without these,
-  symlinks silently degrade to copies and repo edits won't propagate.
-  The pure-bash statusline parser, `cksum`, `stat -f/-c`, and
-  `BASH_REMATCH` all work in Git Bash. tmux/wezterm setup is identical
-  via WSL2.
+- **Windows**: use **`install.ps1`** instead of `install.sh`. Requirements:
+  - PowerShell 7+ (`winget install Microsoft.PowerShell`).
+  - Either Developer Mode (Settings → Privacy & security → For developers
+    → Developer Mode) or run from an elevated (Administrator) shell — both
+    let `New-Item -ItemType SymbolicLink` succeed.
+  - Run: `pwsh -ExecutionPolicy Bypass -File install.ps1`
+  - The script links `statusline.ps1` (parity with `statusline.sh` —
+    same Gruvbox accents, same vim-airline mode badge, same per-cwd git
+    cache) and uses `settings-windows.json` as the canonical
+    `settings.json` at the destination so `statusLine.command` invokes
+    `pwsh` instead of bash.
+- **WSL2** is treated as Linux — run `install.sh` from inside WSL.
+- **Git Bash / MSYS2** is **not** the recommended path on Windows; use
+  `install.ps1` from native PowerShell instead. (Git Bash's `ln -s`
+  silently degrades to copies without `MSYS=winsymlinks:nativestrict`.)
 - **The proxy must keep running** for Claude Code to function. Quitting
   the `copilot-api start --claude-code` process breaks every Claude Code
   session immediately.

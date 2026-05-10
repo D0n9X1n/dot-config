@@ -109,6 +109,14 @@ if [ -d "$copilot_src" ]; then
   if [ -d "$copilot_dest" ]; then
     while IFS= read -r -d '' entry; do
       base="$(basename "$entry")"
+      # Skip the PowerShell statusline on POSIX — it's only meaningful on
+      # Windows (linked by install.ps1). Symlinking it here would just
+      # clutter ~/.copilot with a script that never runs.
+      # Skip settings-windows.json — POSIX uses the canonical settings.json.
+      case "$base" in
+        *.ps1) continue ;;
+        settings-windows.json) continue ;;
+      esac
       link_file "$entry" "${copilot_dest}/${base}"
       # Preserve executable bit on shell scripts (e.g., statusline.sh) so
       # Copilot CLI can run them directly without chmod each time.
@@ -135,8 +143,12 @@ if [ -d "$claude_src" ]; then
     base="$(basename "$entry")"
     # Skip in-folder docs (README*) — they belong next to the config in the
     # repo but shouldn't pollute ~/.claude/ where Claude Code keeps state.
+    # Skip the PowerShell statusline on POSIX (Windows-only — see install.ps1).
+    # Skip settings-windows.json — POSIX uses the canonical settings.json.
     case "$base" in
       README*) continue ;;
+      *.ps1) continue ;;
+      settings-windows.json) continue ;;
     esac
     link_file "$entry" "${claude_dest}/${base}"
     # Preserve executable bit on shell scripts (e.g., statusline.sh) so
