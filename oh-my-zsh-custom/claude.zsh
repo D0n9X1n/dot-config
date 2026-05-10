@@ -1,4 +1,4 @@
-# claude / claude-opus / claude-gpt
+# claude (function wrapper)
 #
 # Bare `claude` is overridden as a function (not an alias — aliases can't
 # pass through positional args like `claude --resume`). It tacks on
@@ -8,8 +8,10 @@
 # "...is disabled by settings"). The flag is the only path the binary
 # honors.
 #
-# claude-opus / claude-gpt are thin model-pinned wrappers around the same
-# function so they inherit bypass mode automatically.
+# Model + effort defaults live in ~/.claude/settings.json (model =
+# claude-opus-4.7-1m-internal, effortLevel = "xhigh"); to switch models
+# mid-session use Claude Code's `/model <name>` — the proxy passes
+# free-form model names through.
 
 unalias claude 2>/dev/null
 unfunction claude 2>/dev/null
@@ -17,6 +19,3 @@ function claude {
   emulate -L zsh
   command claude --permission-mode bypassPermissions "$@"
 }
-
-alias claude-opus='claude --model claude-opus-4.7-xhigh'
-alias claude-gpt='claude --model gpt-5.5'

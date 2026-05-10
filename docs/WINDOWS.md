@@ -160,7 +160,7 @@ PowerShell session. It defines:
 - **`c`** — `Set-Location ..` (zsh `c=cd ..` equivalent).
 - **`ll`** — `Get-ChildItem` (zsh `ll=eza -l` equivalent — `eza` isn't
   on Windows, falls back to PowerShell's native listing).
-- **`claude-opus`**, **`claude-gpt`** — model-pinned `claude` shortcuts.
+- **`claude`** — wrapped to always pass `--permission-mode bypassPermissions`. Model + effort defaults come from `~/.claude/settings.json`.
 
 The installer never overwrites your existing `$PROFILE`. It only appends
 a single `. "<repo path>\powershell-profile.ps1"` line, marked with a

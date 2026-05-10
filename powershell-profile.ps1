@@ -64,8 +64,8 @@ function global:cc {
     & claude --permission-mode bypassPermissions
 }
 
-# --- claude convenience aliases (mirror oh-my-zsh-custom/claude.zsh) -----
-# Bare `claude` is also a wrapper that auto-applies bypass mode.
+# --- claude wrapper (mirror oh-my-zsh-custom/claude.zsh) ------------------
+# Bare `claude` is also a wrapper that auto-applies bypass mode. Model +
+# effort defaults live in ~/.claude/settings.json; use `/model <name>`
+# mid-session to switch.
 function global:claude { & (Get-Command claude -CommandType Application) --permission-mode bypassPermissions @args }
-function global:claude-opus { claude --model claude-opus-4.7-xhigh @args }
-function global:claude-gpt  { claude --model gpt-5.5 @args }
