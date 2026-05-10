@@ -27,6 +27,12 @@ dot-configs/
 │   └── statusline.ps1           # Windows statusline (parity with .sh)
 ├── wezterm/                     # terminal config (NOT auto-linked — opt-in)
 │   └── wezterm.lua              # WezTerm config — link manually if used
+├── powershell-profile.ps1       # Windows-only: cc/gg/c/ll, dot-sourced into $PROFILE
+├── mcp-shared.json              # secret-free MCP entries synced via git
+├── .claude/CLAUDE.md            # agent instructions for Claude Code working in this repo
+├── .github/copilot-instructions.md  # agent instructions for Copilot CLI
+├── docs/
+│   └── WINDOWS.md               # Windows runbook + PowerShell port story
 ├── LICENSE
 ├── ReadMe.md                    # this file
 └── QUICKREF.md                  # condensed reference (agent-friendly)
@@ -203,16 +209,42 @@ tmux new-window -n proxy 'copilot-api start --claude-code'
 
 ### 7. Wire up MCP servers (optional but recommended)
 
-If you use Copilot CLI's MCP servers, install.sh's settings-merge step
-imports them into Claude Code automatically. Confirm:
+This repo handles MCP servers in two layers:
+
+- **Synced, secret-free entries** live in `mcp-shared.json` at the repo
+  root. install.sh merges them into your local Copilot MCP config on
+  every install, then the existing pipeline imports the result into
+  Claude Code's `~/.claude.json`. Add anything that's safe to commit
+  (URL-only HTTP MCPs, public NPM stdio commands) here.
+- **Per-machine entries with secrets** (PATs, API keys) live ONLY in
+  the gitignored `~/.config/github-copilot/mcp.json`. install.sh's merge
+  preserves them.
+
+Confirm everything got wired:
 
 ```bash
 test -f ~/.config/github-copilot/mcp.json && echo "Copilot MCP file present"
-jq '.mcpServers | keys' ~/.claude/settings.json   # should list servers
+jq '.mcpServers | keys' ~/.claude.json   # should list servers
 ```
 
-If there are none yet, add them via Copilot CLI as usual; re-run
-`install.sh` to re-merge into Claude Code.
+**GitHub MCP setup (special case):** GitHub's hosted MCP at
+`https://api.githubcopilot.com/mcp/` does NOT support OAuth Dynamic
+Client Registration with Anthropic's SDK. Use Bearer-PAT auth instead.
+The template entry is documented in `mcp-shared.json` under
+`_github_template`. To enable it on a device:
+
+```bash
+PAT='github_pat_XXXXX'   # create at https://github.com/settings/personal-access-tokens/new
+jq --arg pat "$PAT" '.mcpServers.github = {
+  type: "http",
+  url: "https://api.githubcopilot.com/mcp/",
+  headers: { Authorization: ("Bearer " + $pat) }
+}' ~/.config/github-copilot/mcp.json > /tmp/mcp.json \
+  && mv /tmp/mcp.json ~/.config/github-copilot/mcp.json
+bash ~/Public/dot-configs/install.sh    # re-import into ~/.claude.json
+```
+
+Then restart Claude Code; `/mcp` should show `github ✓ ready`.
 
 ### 8. Optional: WezTerm (terminal)
 
@@ -468,6 +500,12 @@ minutes. Bash 3.2-compatible. `install.sh` keeps the executable bit set.
 > gruvbox mode badge — NORMAL=yellow bg, INSERT=blue bg, VISUAL=orange bg,
 > REPLACE=red bg, all on a `#1d2021` dark fg. `copilot/statusline.sh`
 > tracks the same shape.
+
+> **Layout (v0.8.0):** two-line layout by default. A literal `\n` token
+> in the `SEGMENTS` list introduces a line break — status segments
+> (Vim/Time/Cost/Model/Effort) on line 1, repo + integrations
+> (Repo/Branch/Stash/MCP/Skills/Context) on line 2. Override the layout
+> per-shell via `COPILOT_STATUSLINE_SEGMENTS='vim time \n cost ctx'`.
 
 #### `copilot-instructions.md`
 

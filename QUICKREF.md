@@ -9,8 +9,26 @@ configuration; synced across machines via git + an idempotent installer that
 creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
 
 ## Layout
-- `install.sh` — single entry point; idempotent; safe to re-run.
-- `<repo>/.<name>` — root dotfiles linked to `$HOME/.<name>`. Currently:
+- `install.sh` — POSIX entry point; idempotent; safe to re-run.
+- `install.ps1` — Windows entry point (PowerShell 7+); idempotent;
+  symlinks `.ps1` siblings + the Windows variant of `settings.json`;
+  dot-sources `powershell-profile.ps1` into `$PROFILE.CurrentUserAllHosts`.
+  On Windows, install.sh detects MSYS/MINGW/CYGWIN and skips POSIX-only
+  files; install.ps1 skips `.sh` files in turn.
+- `mcp-shared.json` — secret-free MCP entries synced via git. install.sh
+  merges into local Copilot mcp.json; the existing pipeline lifts the
+  merged set into `~/.claude.json`. Secrets stay per-device.
+- `.claude/CLAUDE.md` — agent instructions for Claude Code working in
+  this repo. Mirrors `.github/copilot-instructions.md`.
+- `docs/WINDOWS.md` — Windows runbook (winget, install.ps1, npm CLIs,
+  proxy, smoke test) + troubleshooting.
+- `powershell-profile.ps1` — Windows-only, defines `cc <title>` /
+  `gg <title>` (tab rename + launch Claude Code / Copilot CLI),
+  `c`/`ll`/`claude-opus`/`claude-gpt` aliases. Dot-sourced from
+  `$PROFILE.CurrentUserAllHosts` (install.ps1 appends one line; never
+  overwrites your existing profile).
+- `<repo>/.<name>` — root dotfiles linked to `$HOME/.<name>` (POSIX
+  only — install.sh skips on Windows). Currently:
   - `.tmux.conf` — primary tab/split/session manager (Gruvbox Dark Hard
     palette, prefix `C-q` (chosen over default C-b for ergonomics — far
     from C-c/d/z, doesn't clash with readline, and modern macOS disables
@@ -86,7 +104,8 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     `printf -v __SEG` instead of per-segment subshells. Adds `seg_vim`
     as the leftmost segment — vim-airline gruvbox mode badge
     (NORMAL=yellow, INSERT=blue, VISUAL=orange, REPLACE=red bg, all on
-    `#1d2021` fg).
+    `#1d2021` fg). v0.8.0: two-line layout via literal `\n` token in
+    `SEGMENTS` — status row up top, repo/integrations below.
   - `copilot-instructions.md` — global agent instructions (autonomous mode).
 - `<repo>/claude/<file>` — files linked to `$HOME/.claude/<file>`. Currently:
   - `settings.json` — Claude Code → Copilot bridge AND global default-pinning.
@@ -165,6 +184,14 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
   Note: `mcp-config.json` is excluded (contains secrets) — manage it manually.
 - New Claude Code config: add a file to `claude/`, run `install.sh`.
   The destination directory is created automatically.
+- New synced MCP server (secret-free): add to `mcp-shared.json`,
+  run `install.sh`. Merged into the local Copilot mcp.json (shared
+  wins on collision), then imported into `~/.claude.json` so both tools
+  see it. Secret-bearing MCPs (PATs, API keys) go in the gitignored
+  `~/.config/github-copilot/mcp.json` per device — install.sh's merge
+  preserves them. **GitHub MCP**: needs Bearer-PAT in `headers`
+  (no OAuth/DCR support in the hosted server) — see `_github_template`
+  in mcp-shared.json.
 - Editing existing config: edit in this repo. Symlinks make changes live
   immediately on every machine (tmux: `prefix + r`; wezterm: auto-reloads).
 
