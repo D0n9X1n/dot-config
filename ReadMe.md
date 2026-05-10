@@ -85,10 +85,18 @@ all machines because every config file is a symlink into this repo.
 
 ## Usage
 
+**macOS / Linux** (the supported, tested path):
+
 ```bash
 git clone git@github.com:D0n9X1n/dot-config.git ~/Public/dot-configs
 bash ~/Public/dot-configs/install.sh
 ```
+
+**Windows** — see [`docs/WINDOWS.md`](docs/WINDOWS.md) for the full
+runbook. The PowerShell port (`statusline.ps1`, `install.ps1`) ships in
+this repo but is **not regression-tested by the maintainer** — it's a
+1:1 functional translation of the .sh scripts intended for Windows users
+willing to file issues for any rough edges.
 
 Subsequent updates on a machine:
 

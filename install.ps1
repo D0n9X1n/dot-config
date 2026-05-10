@@ -150,7 +150,33 @@ if (Test-Path $weztermSrc) {
     Link-File -src $weztermSrc -dst $weztermDst
 }
 
-# --- 4. Inform user about the proxy ---------------------------------------
+# --- 4. PowerShell profile (cc, gg, c, ll) --------------------------------
+# We don't symlink $PROFILE itself — the user may have personal additions
+# we shouldn't clobber. Instead we append a single dot-source line that
+# pulls in our shared snippet. Idempotent: existing line is detected and
+# skipped.
+$profileSrc = Join-Path $srcDir 'powershell-profile.ps1'
+$profileDst = $PROFILE.CurrentUserAllHosts
+if (Test-Path $profileSrc) {
+    Write-Host "Wiring PowerShell profile snippet (cc, gg, c, ll, claude-*)"
+    $profileDir = Split-Path -Parent $profileDst
+    if (-not (Test-Path $profileDir)) {
+        New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
+    }
+    if (-not (Test-Path $profileDst)) {
+        Set-Content -Path $profileDst -Value '' -Encoding UTF8
+    }
+    $sourceLine = ". `"$profileSrc`""
+    $existing = Get-Content $profileDst -Raw -ErrorAction SilentlyContinue
+    if ($existing -notmatch [regex]::Escape($profileSrc)) {
+        Add-Content -Path $profileDst -Value "`n# dot-configs (auto-injected by install.ps1)`n$sourceLine`n"
+        Write-Host "  Appended dot-source to $profileDst"
+    } else {
+        Write-Host "  Already wired: $profileDst"
+    }
+}
+
+# --- 5. Inform user about the proxy ---------------------------------------
 Write-Host ""
 Write-Host "===================================================================="
 Write-Host "Install complete."
