@@ -23,10 +23,11 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
 - `docs/WINDOWS.md` — Windows runbook (winget, install.ps1, npm CLIs,
   proxy, smoke test) + troubleshooting.
 - `powershell-profile.ps1` — Windows-only, defines `cc <title>` /
-  `gg <title>` (tab rename + launch Claude Code / Copilot CLI),
-  `c`/`ll`/`claude-opus`/`claude-gpt` aliases. Dot-sourced from
-  `$PROFILE.CurrentUserAllHosts` (install.ps1 appends one line; never
-  overwrites your existing profile).
+  `gg <title>` (tab rename + launch Claude Code / Copilot CLI), plus
+  `c` and `ll` aliases. Bare `claude` is also wrapped to inject
+  `--permission-mode bypassPermissions` on every invocation. Dot-sourced
+  from `$PROFILE.CurrentUserAllHosts` (install.ps1 appends one line;
+  never overwrites your existing profile).
 - `<repo>/.<name>` — root dotfiles linked to `$HOME/.<name>` (POSIX
   only — install.sh skips on Windows). Currently:
   - `.tmux.conf` — primary tab/split/session manager (Gruvbox Dark Hard
@@ -110,18 +111,28 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
 - `<repo>/claude/<file>` — files linked to `$HOME/.claude/<file>`. Currently:
   - `settings.json` — Claude Code → Copilot bridge AND global default-pinning.
     Sets `ANTHROPIC_BASE_URL=http://localhost:4141`,
-    `ANTHROPIC_API_KEY=dummy`, and pins **Opus 4.7 1M @ max effort** as the
+    `ANTHROPIC_API_KEY=dummy`, and pins **Opus 4.7 1M @ xhigh effort** as the
     global default for every machine that runs `install.sh`:
     `ANTHROPIC_MODEL=claude-opus-4.7-1m-internal` AND top-level
     `model=claude-opus-4.7-1m-internal` (both required so Claude Code uses it
-    on launch with no `/model` toggle), `effortLevel="max"` (deepest
+    on launch with no `/model` toggle), `effortLevel="xhigh"` (deepest
     reasoning by default, no `/effort` needed), and a `modelOverrides` map
-    that redirects every other Anthropic alias (Opus 4.5/4.6/4.7, Sonnet
-    4.5/4.6, Haiku 4.5) to the same Opus 4.7 1M target. Also pins
-    `ANTHROPIC_SMALL_FAST_MODEL=gpt-5.5` (cheap subtask model for things
-    like git-commit message generation) and autonomous mode
+    that does **family-aware routing** (v0.10.5):
+    Opus 4-5/4-6/4-7 → `claude-opus-4.7-1m-internal` (flagship);
+    Sonnet 4-5/4-6 → `gpt-5.5` (Sonnet "feels mid-tier", map to mid-tier
+    Copilot model — Sonnet and Opus are treated as separate families);
+    Haiku 4-5 → `claude-opus-4.7-1m-internal` (no separate Haiku tier on
+    Copilot, route to Opus). Also pins `ANTHROPIC_SMALL_FAST_MODEL=gpt-5.5`
+    (cheap subtask model for things like git-commit message generation)
+    and autonomous mode
     (`skipAutoPermissionPrompt=true`, `permissions.defaultMode="auto"`).
-    v0.6.0 also pins `editorMode="vim"` (boots vim mode by default),
+    Note: `defaultMode="bypassPermissions"` is silently rejected by the
+    binary ("bypassPermissions mode is disabled by settings"); for full
+    bypass see the wrapper functions in `oh-my-zsh-custom/claude.zsh` and
+    `cc.zsh` (and `powershell-profile.ps1`) which inject
+    `--permission-mode bypassPermissions` per launch — the only path the
+    binary honors.
+    v0.6.0+ also pins `editorMode="vim"` (boots vim mode by default),
     `statusLine.hideVimModeIndicator=true` (suppresses the built-in
     `-- INSERT --` chrome since `statusline.sh`'s `seg_vim` renders an
     airline-style badge instead), `statusLine.refreshInterval=100` for

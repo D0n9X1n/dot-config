@@ -530,16 +530,27 @@ proxy that translates Anthropic-format requests into Copilot ones.
     "ANTHROPIC_API_KEY": "dummy"
   },
   "model": "claude-opus-4.7-1m-internal",
-  "modelOverrides": { "...": "..." },
-  "effortLevel": "max",
+  "modelOverrides": {
+    "claude-opus-4-7": "claude-opus-4.7-1m-internal",
+    "claude-opus-4-6": "claude-opus-4.7-1m-internal",
+    "claude-opus-4-5": "claude-opus-4.7-1m-internal",
+    "claude-sonnet-4-6": "gpt-5.5",
+    "claude-sonnet-4-5": "gpt-5.5",
+    "claude-haiku-4-5": "claude-opus-4.7-1m-internal",
+    "gpt-5-mini": "gpt-5.5"
+  },
+  "effortLevel": "xhigh",
   "theme": "dark-ansi",
   "editorMode": "vim",
   "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline.sh",
+    "padding": 0,
     "hideVimModeIndicator": true,
     "refreshInterval": 100
   },
   "skipAutoPermissionPrompt": true,
-  "permissions": { "defaultMode": "auto" }
+  "permissions": { "allow": ["*"], "defaultMode": "auto" }
 }
 ```
 
@@ -548,18 +559,34 @@ Defaults pinned globally (synced across machines via this repo):
 - **Model: `claude-opus-4.7-1m-internal`** (Opus 4.7, 1M-context internal
   variant). Pinned in both `env.ANTHROPIC_MODEL` *and* the top-level
   `model` field so Claude Code uses it on every launch with no `/model`
-  toggle needed. `modelOverrides` redirects every other Anthropic model
-  alias (Opus 4.5/4.6/4.7, Sonnet 4.5/4.6, Haiku 4.5) to the same target,
-  so requests for any of those resolve to Opus 4.7 1M as well.
-- **Effort: `max`** (`effortLevel: "max"`) — deepest reasoning by default,
-  applied to every session without needing `/effort` each time.
+  toggle needed.
+- **`modelOverrides` — family-aware routing** (Sonnet and Opus are
+  treated as separate families per personal convention):
+  - Every **Opus** alias (4-5 / 4-6 / 4-7) resolves to
+    `claude-opus-4.7-1m-internal` — the flagship.
+  - Every **Sonnet** alias (4-5 / 4-6) resolves to `gpt-5.5` — Sonnet
+    feels like a mid-tier model, so we map it to the mid-tier Copilot
+    model rather than paying for a full Opus call.
+  - **Haiku 4-5** resolves to `claude-opus-4.7-1m-internal` (we don't
+    pay for a separate Haiku tier, so Haiku requests get routed to Opus
+    too — at our usage volume the savings would be negligible).
+  - `gpt-5-mini` resolves to `gpt-5.5`.
+- **Effort: `xhigh`** (`effortLevel: "xhigh"`) — deepest reasoning by
+  default, applied to every session without needing `/effort` each time.
 - **`ANTHROPIC_SMALL_FAST_MODEL: gpt-5.5`** — the cheaper model used for
   sub-tasks like git-commit message generation; pointed at a Copilot model.
-- `ANTHROPIC_BASE_URL` — the local `copilot-api` proxy.
+- `ANTHROPIC_BASE_URL` — the local `copilot-api` proxy on port 4141.
+  All model names above are Copilot-side identifiers the proxy knows how
+  to route. The settings file is **for the copilot-api proxy bridge** —
+  Claude Code itself doesn't know about `gpt-5.5`; the proxy translates
+  every request and replies with Anthropic-shaped JSON.
 - `ANTHROPIC_API_KEY` — required by Claude Code but unused by the proxy
   (`dummy` is fine; real auth happens in `copilot-api`'s GitHub flow).
 - `skipAutoPermissionPrompt: true` + `permissions.defaultMode: "auto"` —
-  autonomous mode by default (no per-action confirmation).
+  autonomous mode by default (no per-action confirmation). Note: the
+  binary explicitly **rejects** `defaultMode: "bypassPermissions"`
+  ("bypassPermissions mode is disabled by settings"), so for full
+  bypass we wrap the launchers — see "Wrappers" below.
 - `editorMode: "vim"` boots Claude Code's prompt editor straight into vim
   mode. `statusLine.hideVimModeIndicator: true` suppresses the built-in
   `-- INSERT --` chrome since `statusline.sh`'s `seg_vim` renders an
@@ -568,6 +595,22 @@ Defaults pinned globally (synced across machines via this repo):
 - `theme: "dark-ansi"` lets the chrome inherit the terminal's ANSI palette
   (so it tracks the WezTerm Gruvbox scheme rather than hard-coding its
   own colors).
+
+#### Wrappers (`oh-my-zsh-custom/claude.zsh`, `cc.zsh`, `powershell-profile.ps1`)
+
+Bare `claude` is wrapped as a shell function (zsh) / PowerShell function
+that always passes `--permission-mode bypassPermissions`. The CLI flag
+is the only path the binary honors for non-interactive bypass — the
+equivalent settings.json key is gated off by feature flag.
+
+Same applies to `cc <title>`: it renames the active terminal tab via
+OSC 1/2 (+ tmux + WezTerm CLI fallbacks) then launches Claude Code with
+the bypass flag.
+
+To switch models mid-session, use Claude Code's `/model <name>` —
+free-form names pass through the proxy unchanged. The previous
+`claude-opus` / `claude-gpt` aliases have been removed (redundant once
+`model` was pinned in settings.json).
 
 One-time setup (after running `install.sh` on a fresh box):
 

@@ -108,6 +108,14 @@ PowerShell 7+). Each skips the other platform's files.
 - `hideVimModeIndicator` and `refreshInterval` are **nested inside
   `statusLine`**, not top-level. Trust the binary's strings table over
   documentation.
+- `permissions.defaultMode: "bypassPermissions"` is **silently rejected**
+  by Claude Code's binary ("bypassPermissions mode is disabled by
+  settings"). The CLI flag `--permission-mode bypassPermissions` IS
+  honored. Wrap launchers (oh-my-zsh-custom/claude.zsh,
+  oh-my-zsh-custom/cc.zsh, powershell-profile.ps1) to inject the flag.
+- `skipDangerousModePermissionPrompt` is dead config (only meaningful
+  when bypass mode is active, which is gated off in settings). Claude
+  Code's runtime sometimes re-adds it on its own writes; treat as noise.
 - WezTerm's `inactive_pane_hsb` defaults to `{1, 0.9, 0.8}` — that
   desaturates unfocused windows and makes side-by-side comparisons
   look mismatched. Set `{1, 1, 1}` to disable.
@@ -117,6 +125,20 @@ PowerShell 7+). Each skips the other platform's files.
 - GitHub's hosted MCP doesn't support OAuth Dynamic Client Registration
   with Anthropic's SDK. Use Bearer-PAT auth in HTTP headers (per
   github/github-mcp-server's official Claude Code guide).
+
+## Model-routing convention (modelOverrides in claude/settings.json)
+
+Sonnet and Opus are treated as **separate model families** by user
+convention. Current routing:
+
+- Opus 4-5 / 4-6 / 4-7 → `claude-opus-4.7-1m-internal`
+- Sonnet 4-5 / 4-6 → `gpt-5.5`
+- Haiku 4-5 → `claude-opus-4.7-1m-internal`
+- gpt-5-mini → `gpt-5.5`
+
+When asked to "use the same model for the family", apply within Opus or
+within Sonnet — never both. When adding a new alias, default to the
+family rule above.
 
 ## Don't do
 
