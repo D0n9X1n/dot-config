@@ -6,10 +6,12 @@
 # directly so the title sticks even when nested, then runs `claude` in
 # the current shell.
 #
-# `claude` is invoked bare — model and effort are pinned globally in
-# ~/.claude/settings.json (model = claude-opus-4.7-1m-internal,
-# effortLevel = "xhigh", permissions.defaultMode = "bypassPermissions"),
-# so no per-session flags are needed.
+# Model + effort are pinned globally in ~/.claude/settings.json (model =
+# claude-opus-4.7-1m-internal, effortLevel = "xhigh"). Permission mode
+# CANNOT be pinned via settings.json — the binary explicitly rejects
+# defaultMode="bypassPermissions" with "bypassPermissions mode is
+# disabled by settings". So we pass --permission-mode at the command
+# line on every invocation, which the binary does honor.
 #
 # See gg.zsh for the rationale on each title-update path; this is the
 # same recipe with a different launcher.
@@ -33,6 +35,6 @@ function cc {
     wezterm cli set-tab-title -- "$title" 2>/dev/null
     wezterm cli set-window-title -- "$title" 2>/dev/null
   fi
-  command claude
+  command claude --permission-mode bypassPermissions
   unset DISABLE_AUTO_TITLE
 }

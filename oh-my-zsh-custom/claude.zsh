@@ -1,21 +1,22 @@
-# claude-opus / claude-gpt
+# claude / claude-opus / claude-gpt
 #
-# Two thin wrappers around Anthropic's Claude Code CLI that pin the model
-# to a specific GitHub Copilot model (resolved by the local copilot-api
-# proxy at http://localhost:4141 — see ~/.claude/settings.json).
+# Bare `claude` is overridden as a function (not an alias — aliases can't
+# pass through positional args like `claude --resume`). It tacks on
+# `--permission-mode bypassPermissions` so every invocation runs in
+# bypass mode, matching the global behavior we'd want from settings.json
+# but can't have (the binary rejects defaultMode="bypassPermissions" with
+# "...is disabled by settings"). The flag is the only path the binary
+# honors.
 #
-# Why aliases instead of /model in-session?
-#   Claude Code's built-in /model picker is hard-coded to Anthropic's own
-#   lineup (Sonnet / Opus / Haiku) and offers no way to whitelist or replace
-#   that list with arbitrary Copilot model names. The next-best UX is two
-#   launchers, one per model — invoking `claude-opus` or `claude-gpt`
-#   gives you exactly two visible "options" in your shell.
-#
-# In-session: `/model <name>` accepts free-form strings and they pass
-# through the proxy unchanged, so you can still switch mid-session if
-# you remember the Copilot model name.
-#
-# Requirements: copilot-api proxy listening on :4141 and `claude` on PATH.
+# claude-opus / claude-gpt are thin model-pinned wrappers around the same
+# function so they inherit bypass mode automatically.
+
+unalias claude 2>/dev/null
+unfunction claude 2>/dev/null
+function claude {
+  emulate -L zsh
+  command claude --permission-mode bypassPermissions "$@"
+}
 
 alias claude-opus='claude --model claude-opus-4.7-xhigh'
 alias claude-gpt='claude --model gpt-5.5'

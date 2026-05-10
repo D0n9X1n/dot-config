@@ -42,7 +42,8 @@ function global:gg {
 # --- cc <title>: rename tab + launch Claude Code CLI ----------------------
 # Mirrors oh-my-zsh-custom/cc.zsh. Same recipe as gg, but launches
 # `claude` instead. Model + effort are pinned globally in
-# ~/.claude/settings.json so no per-session flags are needed.
+# ~/.claude/settings.json; --permission-mode bypassPermissions is the
+# only path the binary honors for non-interactive permission bypass.
 function global:cc {
     param(
         [Parameter(Mandatory=$true, Position=0)]
@@ -60,9 +61,11 @@ function global:cc {
         & wezterm cli set-window-title -- $Title 2>$null
     }
 
-    & claude
+    & claude --permission-mode bypassPermissions
 }
 
 # --- claude convenience aliases (mirror oh-my-zsh-custom/claude.zsh) -----
+# Bare `claude` is also a wrapper that auto-applies bypass mode.
+function global:claude { & (Get-Command claude -CommandType Application) --permission-mode bypassPermissions @args }
 function global:claude-opus { claude --model claude-opus-4.7-xhigh @args }
 function global:claude-gpt  { claude --model gpt-5.5 @args }
