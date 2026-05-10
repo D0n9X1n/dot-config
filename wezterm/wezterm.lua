@@ -304,6 +304,11 @@ config.inactive_pane_hsb = {
 -- =========================================================
 -- Keybindings
 -- =========================================================
+-- Two parallel binding sets: macOS uses CMD as the primary modifier
+-- (matching iTerm2 / native mac convention); Windows + Linux use
+-- CTRL|SHIFT as the equivalent. Both are registered unconditionally —
+-- WezTerm just ignores keymaps whose modifier doesn't exist on the
+-- current platform, so the same lua file works everywhere.
 config.keys = {
   -- Only copy when there is a selection; otherwise send Ctrl+C (SIGINT)
   { key = "c", mods = "CMD", action = wezterm.action_callback(function(window, pane)
@@ -315,15 +320,26 @@ config.keys = {
     end
   end) },
 
-  -- Splits
+  -- Splits — macOS
   { key = "d", mods = "CMD",       action = act.SplitVertical({ domain = "CurrentPaneDomain" }) },
   { key = "d", mods = "CMD|SHIFT", action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }) },
+  -- Splits — Windows / Linux (CTRL|SHIFT plays the role of CMD)
+  -- Note: CTRL|SHIFT+D is the same chord on macOS too; the macOS CMD
+  -- bindings above stay for muscle memory, but if you're on a Windows
+  -- keyboard plugged into a Mac these still work.
+  { key = "d", mods = "CTRL|SHIFT",     action = act.SplitVertical({ domain = "CurrentPaneDomain" }) },
+  { key = "D", mods = "CTRL|SHIFT|ALT", action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }) },
 
-  -- Cmd + Left/Right: switch tabs
-  { key = "LeftArrow",  mods = "CMD", action = act.ActivateTabRelative(-1) },
-  { key = "RightArrow", mods = "CMD", action = act.ActivateTabRelative(1) },
+  -- Tabs — macOS
+  { key = "t", mods = "CMD",                action = act.SpawnTab("CurrentPaneDomain") },
+  { key = "LeftArrow",  mods = "CMD",       action = act.ActivateTabRelative(-1) },
+  { key = "RightArrow", mods = "CMD",       action = act.ActivateTabRelative(1) },
+  -- Tabs — Windows / Linux
+  { key = "t", mods = "CTRL|SHIFT",         action = act.SpawnTab("CurrentPaneDomain") },
+  { key = "LeftArrow",  mods = "CTRL|SHIFT|ALT", action = act.ActivateTabRelative(-1) },
+  { key = "RightArrow", mods = "CTRL|SHIFT|ALT", action = act.ActivateTabRelative(1) },
 
-  -- Pane navigation
+  -- Pane navigation (CTRL|SHIFT — same chord on every OS)
   { key = "LeftArrow",  mods = "CTRL|SHIFT", action = act.ActivatePaneDirection("Left") },
   { key = "RightArrow", mods = "CTRL|SHIFT", action = act.ActivatePaneDirection("Right") },
   { key = "UpArrow",    mods = "CTRL|SHIFT", action = act.ActivatePaneDirection("Up") },
@@ -335,11 +351,13 @@ config.keys = {
   { key = "UpArrow",    mods = "CMD|CTRL|ALT|SHIFT", action = act.AdjustPaneSize({ "Up", 3 }) },
   { key = "DownArrow",  mods = "CMD|CTRL|ALT|SHIFT", action = act.AdjustPaneSize({ "Down", 3 }) },
 
-  -- Zoom current pane: Cmd+Ctrl+Alt+Enter
-  { key = "Enter", mods = "CMD|CTRL|ALT", action = act.TogglePaneZoomState },
+  -- Zoom current pane: Cmd+Ctrl+Alt+Enter (mac) / Ctrl+Shift+Enter (win/linux)
+  { key = "Enter", mods = "CMD|CTRL|ALT",  action = act.TogglePaneZoomState },
+  { key = "Enter", mods = "CTRL|SHIFT",    action = act.TogglePaneZoomState },
 
-  -- Cmd+w: close current pane (closes tab only if it's the last pane)
-  { key = "w", mods = "CMD", action = act.CloseCurrentPane({ confirm = true }) },
+  -- Close current pane (closes tab only if it's the last pane)
+  { key = "w", mods = "CMD",        action = act.CloseCurrentPane({ confirm = true }) },
+  { key = "w", mods = "CTRL|SHIFT", action = act.CloseCurrentPane({ confirm = true }) },
 }
 
 -- =========================================================
