@@ -18,6 +18,12 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
 - `mcp-shared.json` — secret-free MCP entries synced via git. install.sh
   merges into local Copilot mcp.json; the existing pipeline lifts the
   merged set into `~/.claude.json`. Secrets stay per-device.
+- `launchd/com.d0n9x1n.copilot-api.plist` — macOS launchd agent
+  **template** (not symlinked; install.sh renders `__HOME__` -> `$HOME`
+  into `~/Library/LaunchAgents/` then `bootout`+`bootstrap` into
+  `gui/<uid>`). Starts copilot-api proxy on login, restarts on crash,
+  logs to `~/Library/Logs/copilot-api.{out,err}.log`. Skipped on
+  non-macOS.
 - `.claude/CLAUDE.md` — agent instructions for Claude Code working in
   this repo. Mirrors `.github/copilot-instructions.md`.
 - `docs/WINDOWS.md` — Windows runbook (winget, install.ps1, npm CLIs,

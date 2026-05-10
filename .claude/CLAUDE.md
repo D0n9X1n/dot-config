@@ -30,6 +30,7 @@ PowerShell 7+). Each skips the other platform's files.
 │   ├── statusline.sh + .ps1     # bash + PowerShell, parity-maintained
 ├── copilot/                     # Same shape for GitHub Copilot CLI
 ├── wezterm/wezterm.lua          # opt-in symlink
+├── launchd/                     # macOS launchd agent templates (rendered by install.sh)
 ├── mcp-shared.json              # secret-free MCP entries (synced)
 └── .github/, .claude/, docs/
 ```
@@ -49,6 +50,11 @@ PowerShell 7+). Each skips the other platform's files.
   Same segments, same output shape, same Gruvbox palette, same
   vim-airline mode badge, same per-cwd 5s git cache. When you change
   one, port the change to the other (and to the copilot/* siblings).
+- **launchd plists in `launchd/` are templates, not symlinks.**
+  install.sh substitutes `__HOME__` -> `$HOME` (launchd doesn't expand
+  `$HOME` at runtime) and writes the rendered file to
+  `~/Library/LaunchAgents/`, then `bootout`+`bootstrap` into
+  `gui/<uid>`. macOS-only; install.sh skips this step on other OSes.
 
 ## Conventions
 

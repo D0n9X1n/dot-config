@@ -27,6 +27,8 @@ dot-configs/
 │   └── statusline.ps1           # Windows statusline (parity with .sh)
 ├── wezterm/                     # terminal config (NOT auto-linked — opt-in)
 │   └── wezterm.lua              # WezTerm config — link manually if used
+├── launchd/                     # macOS launchd agent templates
+│   └── com.d0n9x1n.copilot-api.plist  # copilot-api proxy on login (rendered by install.sh)
 ├── powershell-profile.ps1       # Windows-only: cc/gg/c/ll, dot-sourced into $PROFILE
 ├── mcp-shared.json              # secret-free MCP entries synced via git
 ├── .claude/CLAUDE.md            # agent instructions for Claude Code working in this repo
@@ -192,19 +194,32 @@ test -f ~/.local/share/copilot-api/github_token && echo "ok" || echo "FAIL: auth
 
 ### 6. Start the proxy daemon (must stay running for Claude Code)
 
+If you ran `install.sh` after step 4, **the launchd agent is already
+loaded** and the proxy is running — skip ahead. The agent
+(`com.d0n9x1n.copilot-api`) starts on every login, restarts on crash,
+and logs to `~/Library/Logs/copilot-api.{out,err}.log`. Verify:
+
 ```bash
-# Foreground for first run so you can confirm it's listening.
+launchctl print "gui/$(id -u)/com.d0n9x1n.copilot-api" | grep state
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:4141/v1/models  # expect 200
+```
+
+If you want to manage the agent manually:
+
+```bash
+launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.d0n9x1n.copilot-api.plist
+launchctl bootout   "gui/$(id -u)" ~/Library/LaunchAgents/com.d0n9x1n.copilot-api.plist
+launchctl kickstart -k "gui/$(id -u)/com.d0n9x1n.copilot-api"   # restart in place
+tail -f ~/Library/Logs/copilot-api.{out,err}.log
+```
+
+For a one-off foreground run (debugging, no auto-restart):
+
+```bash
 copilot-api start --claude-code &
 sleep 2
 curl -s http://localhost:4141/v1/models | head -c 100 \
   && echo "" || echo "FAIL: proxy not responding on :4141"
-```
-
-For long-running setup, daemonize via launchd / tmux / nohup — the simplest:
-
-```bash
-# In a dedicated tmux window:
-tmux new-window -n proxy 'copilot-api start --claude-code'
 ```
 
 ### 7. Wire up MCP servers (optional but recommended)

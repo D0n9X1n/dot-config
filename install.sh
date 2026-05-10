@@ -277,3 +277,36 @@ if have_cmd tmux && [ -f "${HOME}/.tmux.conf" ]; then
 fi
 
 echo "Linked dotfiles from $src_dir to $dest_dir"
+
+# launchd agent: copilot-api proxy on login (macOS only). Renders the
+# template (substituting absolute $HOME paths — launchd doesn't expand
+# $HOME at runtime) into ~/Library/LaunchAgents and bootstraps it.
+# Idempotent: if the agent is already loaded with the same content,
+# bootout+bootstrap is a no-op restart; if content differs, the new
+# version replaces the old.
+if is_macos; then
+  launchd_src="${src_dir}/launchd/com.d0n9x1n.copilot-api.plist"
+  launchd_dest="${HOME}/Library/LaunchAgents/com.d0n9x1n.copilot-api.plist"
+  if [ -f "$launchd_src" ]; then
+    if ! have_cmd copilot-api; then
+      echo "launchd: copilot-api not on PATH — skipping agent install (run 'npm i -g copilot-api' first, then re-run install.sh)"
+    else
+      mkdir -p "$(dirname "$launchd_dest")"
+      mkdir -p "${HOME}/Library/Logs"
+      # Render template — only touches __HOME__ tokens. Use sed -i'' for
+      # BSD-sed compatibility on macOS (GNU-style `sed -i` would fail).
+      sed "s|__HOME__|${HOME}|g" "$launchd_src" > "$launchd_dest"
+      echo "Wrote $launchd_dest"
+      # Bootstrap into the GUI domain of the current user. bootout first
+      # so a content change actually replaces the running agent (load is
+      # a no-op when the label already exists).
+      uid="$(id -u)"
+      launchctl bootout "gui/${uid}/com.d0n9x1n.copilot-api" 2>/dev/null || true
+      if launchctl bootstrap "gui/${uid}" "$launchd_dest" 2>/dev/null; then
+        echo "Loaded launchd agent com.d0n9x1n.copilot-api (logs: ~/Library/Logs/copilot-api.{out,err}.log)"
+      else
+        echo "Warning: launchctl bootstrap failed for com.d0n9x1n.copilot-api"
+      fi
+    fi
+  fi
+fi
