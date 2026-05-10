@@ -1,9 +1,14 @@
 {
-  "_comment": "Synced MCP servers — secret-free entries only (tokens/keys live in ~/.config/github-copilot/mcp.json which is gitignored). install.sh merges these into ~/.config/github-copilot/mcp.json on install, then the existing pipeline imports the result into both Copilot CLI and Claude Code (~/.claude.json).",
-  "mcpServers": {
+  "_comment": "Synced MCP servers — secret-free entries only. install.sh merges this into ~/.config/github-copilot/mcp.json on install (shared wins on key collision); the existing pipeline then imports the merged set into ~/.claude.json so Claude Code sees it too. Per-machine secret-bearing entries (PATs, API keys) live ONLY in the gitignored ~/.config/github-copilot/mcp.json and are preserved by the merge.",
+  "_github_template": {
+    "_note": "GitHub's hosted MCP requires Bearer-PAT auth (no OAuth/DCR support). Add a copy of this entry to your gitignored ~/.config/github-copilot/mcp.json, replacing YOUR_GITHUB_PAT with a token from https://github.com/settings/personal-access-tokens/new. Do NOT add it here — that would commit the secret.",
     "github": {
       "type": "http",
-      "url": "https://api.githubcopilot.com/mcp/"
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer YOUR_GITHUB_PAT"
+      }
     }
-  }
+  },
+  "mcpServers": {}
 }
