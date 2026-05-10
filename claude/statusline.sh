@@ -61,7 +61,10 @@
 set -u
 
 # --- Configuration ---------------------------------------------------------
-SEGMENTS="vim time timer cost git branch model effort mcp skills ctx agent worktree style stash venv"
+# Two-line layout: "status" segments (mode/time/usage) on line 1, "repo"
+# segments (git/integrations/context) on line 2. The literal string `\n`
+# in SEGMENTS is recognized by the render loop as a line break.
+SEGMENTS="vim time timer cost model effort agent worktree style \n git branch stash mcp skills ctx venv"
 SEP=' │ '
 
 ICONS_ON=1
@@ -657,15 +660,27 @@ seg_mcp() {
 # Each seg_* writes its output to the global $__SEG via `printf -v` instead
 # of stdout. We can then concatenate without forking a `$(...)` subshell
 # per segment — saves ~2ms × 16 segments ≈ 30ms on every render.
+#
+# A literal `\n` token in $SEGMENTS introduces a line break: segments
+# before it form line 1, segments after it form line 2, etc. Empty
+# segments don't trigger a separator, so a line break followed by all-empty
+# segments collapses cleanly.
 out=""
+line_started=0
 for s in $SEGMENTS; do
+  if [ "$s" = '\n' ]; then
+    out="${out}"$'\n'
+    line_started=0
+    continue
+  fi
   __SEG=""
   "seg_$s" 2>/dev/null || true
   [ -n "$__SEG" ] || continue
-  if [ -n "$out" ]; then
+  if [ "$line_started" = 1 ]; then
     out="${out}${C_DIM}${SEP}${C_RESET}${__SEG}"
   else
-    out="${__SEG}"
+    out="${out}${__SEG}"
+    line_started=1
   fi
 done
 

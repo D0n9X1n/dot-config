@@ -16,8 +16,11 @@ $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false  # don't blow up on git nonzero
 
 # --- Config ---------------------------------------------------------------
-$Segments = @('vim','time','timer','cost','git','branch','model','effort',
-              'mcp','skills','ctx','agent','worktree','style','stash','venv')
+# Two-line layout: status segments line 1, repo segments line 2. The literal
+# string "\n" in $Segments triggers a line break in the render loop.
+$Segments = @('vim','time','timer','cost','model','effort','agent','worktree','style',
+              '\n',
+              'git','branch','stash','mcp','skills','ctx','venv')
 $Sep = ' | '
 
 $IconsOn = -not $env:CLAUDE_STATUSLINE_NO_ICONS
@@ -337,13 +340,22 @@ function Seg-Diff { return '' }
 function Seg-Gh_account { return '' }
 
 # --- Render ---------------------------------------------------------------
+# A literal '\n' token in $Segments introduces a line break: segments before
+# it form line 1, segments after it form line 2.
 $out = New-Object System.Text.StringBuilder
+$lineStarted = $false
 foreach ($s in $Segments) {
+    if ($s -eq '\n') {
+        [void]$out.Append("`n")
+        $lineStarted = $false
+        continue
+    }
     $fn = "Seg-$($s.Substring(0,1).ToUpper() + $s.Substring(1))"
     $part = & $fn 2>$null
     if (-not $part) { continue }
-    if ($out.Length -gt 0) { [void]$out.Append("$Dim$Sep$Reset") }
+    if ($lineStarted) { [void]$out.Append("$Dim$Sep$Reset") }
     [void]$out.Append($part)
+    $lineStarted = $true
 }
 
 # `\r` snaps cursor to column 1 — same as the .sh version.

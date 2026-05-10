@@ -14,9 +14,12 @@ $PSNativeCommandUseErrorActionPreference = $false
 $Segments = if ($env:COPILOT_STATUSLINE_SEGMENTS) {
     $env:COPILOT_STATUSLINE_SEGMENTS -split '\s+'
 } else {
+    # Two-line layout: status segments line 1, repo/integrations line 2.
+    # The literal '\n' token in the array introduces a line break.
     @('time','model','effort','timer','wall','api','premium','cache_pct',
-      'last_call','ctx','vim','agent','worktree','style','repo','branch',
-      'stash','venv','gh_account','ext_count','mcp_count')
+      'last_call','ctx','vim','agent','style',
+      '\n',
+      'repo','branch','worktree','stash','venv','gh_account','ext_count','mcp_count')
 }
 $Sep = ' | '
 
@@ -385,15 +388,24 @@ function Seg-Mcp_count {
 }
 
 # --- Render ---------------------------------------------------------------
+# A literal '\n' token in $Segments introduces a line break: segments before
+# it form line 1, segments after it form line 2.
 $out = New-Object System.Text.StringBuilder
+$lineStarted = $false
 foreach ($s in $Segments) {
+    if ($s -eq '\n') {
+        [void]$out.Append("`n")
+        $lineStarted = $false
+        continue
+    }
     # Build the function name: snake_case -> "Seg-Snake_case" (PowerShell verb-noun convention)
     $fn = "Seg-$($s.Substring(0,1).ToUpper() + $s.Substring(1))"
     if (-not (Get-Command $fn -ErrorAction SilentlyContinue)) { continue }
     $part = & $fn 2>$null
     if (-not $part) { continue }
-    if ($out.Length -gt 0) { [void]$out.Append("$Dim$Sep$Reset") }
+    if ($lineStarted) { [void]$out.Append("$Dim$Sep$Reset") }
     [void]$out.Append($part)
+    $lineStarted = $true
 }
 
 [Console]::Out.Write("`r$($out.ToString())")

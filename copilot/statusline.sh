@@ -77,7 +77,7 @@ set -u
 # SEGMENTS controls which segments render and in what order. Override
 # via `COPILOT_STATUSLINE_SEGMENTS="…"` to add/remove without editing
 # the file (e.g. add `diff` for code-changes, drop `cache_pct` etc).
-SEGMENTS="${COPILOT_STATUSLINE_SEGMENTS:-time model effort timer wall api premium cache_pct last_call ctx vim agent worktree style repo branch stash venv gh_account ext_count mcp_count}"
+SEGMENTS="${COPILOT_STATUSLINE_SEGMENTS:-time model effort timer wall api premium cache_pct last_call ctx vim agent style \n repo branch worktree stash venv gh_account ext_count mcp_count}"
 SEP=' │ '
 
 ICONS_ON=1
@@ -596,14 +596,23 @@ seg_mcp_count() {
 }
 
 # --- 5. Render -------------------------------------------------------------
+# A literal `\n` token in $SEGMENTS introduces a line break: segments before
+# it form line 1, segments after it form line 2.
 out=""
+line_started=0
 for s in $SEGMENTS; do
+  if [ "$s" = '\n' ]; then
+    out="${out}"$'\n'
+    line_started=0
+    continue
+  fi
   part="$("seg_$s" 2>/dev/null || true)"
   [ -n "$part" ] || continue
-  if [ -n "$out" ]; then
+  if [ "$line_started" = 1 ]; then
     out="${out}${C_DIM}${SEP}${C_RESET}${part}"
   else
-    out="${part}"
+    out="${out}${part}"
+    line_started=1
   fi
 done
 
