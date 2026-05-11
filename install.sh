@@ -213,6 +213,67 @@ if [ -d "$claude_src" ]; then
     fi
   fi
 
+  # wakatime-mcp: vendored Python MCP server (server.py + wakatime_client.py
+  # under wakatime-mcp/ in this repo). Bootstrap a venv at the canonical
+  # ~/.local/share/wakatime-mcp location and register an mcpServers entry
+  # pointing at it. Idempotent — venv is reused if already present;
+  # requirements.txt drives pip install (no-op when nothing changed).
+  #
+  # Skipped if the user has no ~/.wakatime.cfg (i.e. they don't use
+  # WakaTime). The key is read from that file rather than committed
+  # because it's a secret.
+  wm_src="${src_dir}/wakatime-mcp"
+  wm_dest="${HOME}/.local/share/wakatime-mcp"
+  wm_cfg="${HOME}/.wakatime.cfg"
+  if [ -d "$wm_src" ] && have_cmd python3; then
+    if [ ! -f "$wm_cfg" ]; then
+      echo "wakatime-mcp: ~/.wakatime.cfg not found — skipping (run 'wakatime --help' or visit https://wakatime.com/settings to set up)"
+    else
+      wm_key="$(awk -F'= *' '/^api_key/{print $2; exit}' "$wm_cfg" | tr -d ' \r')"
+      if [ -z "$wm_key" ]; then
+        echo "wakatime-mcp: no api_key in $wm_cfg — skipping"
+      else
+        mkdir -p "$wm_dest"
+        cp "$wm_src/server.py" "$wm_src/wakatime_client.py" "$wm_dest/"
+        if [ ! -d "$wm_dest/venv" ]; then
+          echo "wakatime-mcp: bootstrapping venv at $wm_dest/venv (one-time, ~30s)"
+          python3 -m venv "$wm_dest/venv" \
+            && "$wm_dest/venv/bin/pip" install -q --upgrade pip \
+            && "$wm_dest/venv/bin/pip" install -q -r "$wm_src/requirements.txt" \
+            && echo "wakatime-mcp: venv ready" \
+            || echo "Warning: wakatime-mcp venv bootstrap failed"
+        else
+          # Refresh deps quietly only if requirements.txt is newer than
+          # the venv's marker. Cheap mtime check; pip itself is idempotent.
+          if [ "$wm_src/requirements.txt" -nt "$wm_dest/venv/pyvenv.cfg" ]; then
+            "$wm_dest/venv/bin/pip" install -q -r "$wm_src/requirements.txt" \
+              && touch "$wm_dest/venv/pyvenv.cfg"
+          fi
+        fi
+        # Register the MCP entry into the user's per-machine mcp.json so
+        # the existing copilot->claude pipeline lifts it into ~/.claude.json.
+        # We write directly here (not via mcp-shared.json) because the
+        # entry carries the WAKATIME_API_KEY secret.
+        if [ -d "$wm_dest/venv" ]; then
+          tmp_mcp="$(mktemp)"
+          jq --arg cmd "$wm_dest/venv/bin/python3" \
+             --arg srv "$wm_dest/server.py" \
+             --arg key "$wm_key" \
+             --arg pp  "$wm_dest" \
+            '.mcpServers.wakatime = {
+                type: "stdio",
+                command: $cmd,
+                args: [$srv],
+                env: { WAKATIME_API_KEY: $key, PYTHONPATH: $pp }
+              }' "$copilot_mcp_pre" >"$tmp_mcp" 2>/dev/null \
+            && mv "$tmp_mcp" "$copilot_mcp_pre" \
+            && echo "wakatime-mcp: registered in $copilot_mcp_pre" \
+            || { rm -f "$tmp_mcp"; echo "Warning: wakatime-mcp jq registration failed"; }
+        fi
+      fi
+    fi
+  fi
+
   # Import Copilot CLI's MCP servers into Claude Code's user-scope config.
   # Claude Code reads MCP servers from ~/.claude.json (top-level
   # `mcpServers` key) — NOT from ~/.claude/settings.json — so we have to
