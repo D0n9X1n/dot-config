@@ -64,12 +64,12 @@ set -u
 # Five-line layout. A literal `\n` token in SEGMENTS introduces a line
 # break in the render loop. Empty/no-op segments collapse cleanly so
 # auto-hiding ones (worktree, venv, stash, diff) take no space when off.
-#   L1: status       — time, run timer, wall, api, cost
+#   L1: status       — time, run timer, api, cost
 #   L2: model        — model, effort, context
 #   L3: integrations — mcp, skills, agents, style
 #   L4: cwd path     — full directory path
 #   L5: repo + git   — repo, diff, branch, stash, worktree
-SEGMENTS="time timer wall api_time cost \n model effort ctx \n mcp skills agent style \n path \n git branch diff stash worktree"
+SEGMENTS="time timer api_time cost \n model effort ctx \n mcp skills agent style \n path \n git branch diff stash worktree"
 SEP=' │ '
 
 ICONS_ON=1
