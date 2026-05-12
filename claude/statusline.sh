@@ -61,14 +61,15 @@
 set -u
 
 # --- Configuration ---------------------------------------------------------
-# Four-line layout. A literal `\n` token in SEGMENTS introduces a line
+# Five-line layout. A literal `\n` token in SEGMENTS introduces a line
 # break in the render loop. Empty/no-op segments collapse cleanly so
 # auto-hiding ones (worktree, venv, stash, diff) take no space when off.
-#   L1: status            — time, run timer, wall, api, cost, model, effort
-#   L2: repo + context    — context, repo, diff, branch, stash, worktree
-#   L3: integrations      — mcp, skills, agent, style
-#   L4: cwd path          — full directory path
-SEGMENTS="time timer wall api_time cost model effort \n ctx git diff branch stash worktree \n mcp skills agent style \n path"
+#   L1: status       — time, run timer, wall, api, cost
+#   L2: model        — model, effort, context
+#   L3: integrations — mcp, skills, agents, style
+#   L4: cwd path     — full directory path
+#   L5: repo + git   — repo, diff, branch, stash, worktree
+SEGMENTS="time timer wall api_time cost \n model effort ctx \n mcp skills agent style \n path \n git diff branch stash worktree"
 SEP=' │ '
 
 ICONS_ON=1
@@ -87,7 +88,9 @@ ICONS_ON=1
 #   U+F233 server           = EF 88 B3   API
 #   U+F155 dollar           = EF 85 95   Cost
 #   U+F12A asterisk         = EF 84 AA   Diff (stand-in for "changes")
-#   U+F1C0 database         = EF 87 80   Context
+#   U+F121 code            = EF 84 A1   Diff (angle brackets, code edits)
+#   U+F07C folder-open    = EF 81 BC   Path (cwd, "currently in")
+#   U+F1C0 database        = EF 87 80   Context
 #   U+F121 code             = EF 84 A1   Vim
 #   U+F135 rocket           = EF 84 B5   Agent / Run (also)
 #   U+F1BB tree             = EF 86 BB   Worktree
@@ -106,7 +109,7 @@ ICON_RUN=$'\xef\x84\xb5'
 ICON_WALL=$'\xef\x89\x94'
 ICON_API=$'\xef\x88\xb3'
 ICON_COST=$'\xef\x85\x95'
-ICON_DIFF=$'\xef\x84\xaa'
+ICON_DIFF=$'\xef\x84\xa1'
 ICON_CTX=$'\xef\x87\x80'
 ICON_VIM=$'\xef\x84\xa1'
 ICON_AGENT=$'\xef\x84\xb5'
@@ -116,6 +119,7 @@ ICON_REPO=$'\xef\x83\xa8'
 ICON_BRANCH=$'\xef\x84\xa6'
 ICON_STASH=$'\xef\x86\x87'
 ICON_VENV=$'\xef\x86\xae'
+ICON_PATH=$'\xef\x81\xbc'
 ICON_GH=$'\xef\x82\x9b'
 ICON_SKILLS=$'\xef\x82\xae'
 ICON_MCP=$'\xef\x87\xa6'
@@ -427,7 +431,7 @@ seg_path() {
     "$HOME") p="~" ;;
     "$HOME"/*) p="~${p#$HOME}" ;;
   esac
-  label "$C_BLUE" "$ICON_VENV" 'Path'
+  label "$C_BLUE" "$ICON_PATH" 'Path'
   printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$p" "$C_RESET"
 }
 
@@ -476,10 +480,21 @@ seg_vim() {
   printf -v __SEG '%s%s%s %s %s' "$__LBL" "$mode_bg" "$C_BG_FG" "$vim_mode" "$C_RESET"
 }
 
+# Agent — count *.md agent definitions in user + project scope. Claude
+# Code loads agents from ~/.claude/agents/<name>.md (user) and
+# <cwd>/.claude/agents/<name>.md (project). Mirrors seg_skills' shape.
+# Note: this counts AVAILABLE agents (definitions on disk), not currently
+# running ones — the statusline JSON doesn't expose a runtime list.
 seg_agent() {
-  [ -n "$agent_name" ] || return 0
-  label "$C_PURPLE" "$ICON_AGENT" 'Agent'
-  printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$agent_name" "$C_RESET"
+  local total=0 d count
+  for d in "${HOME}/.claude/agents" "${PWD}/.claude/agents"; do
+    [ -d "$d" ] || continue
+    count="$(find "$d" -mindepth 1 -maxdepth 1 -type f -name '*.md' ! -name '.*' 2>/dev/null | wc -l | tr -d ' ')"
+    total=$((total + count))
+  done
+  is_pos_int "$total" || return 0
+  label "$C_PURPLE" "$ICON_AGENT" 'Agents'
+  printf -v __SEG '%s%s%d%s' "$__LBL" "$C_FG" "$total" "$C_RESET"
 }
 
 seg_worktree() {
