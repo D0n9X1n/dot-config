@@ -10,46 +10,37 @@
    Update it when behavior changes.
 2. **`ReadMe.md`** — human-facing README. Update separately when
    user-visible details change.
-3. **`docs/WINDOWS.md`** — Windows runbook + the PowerShell port story.
 
 ## Repo summary
 
-Personal dotfiles, synced across machines via git + symlinks. Two
-installers — `install.sh` (macOS / Linux) and `install.ps1` (Windows
-PowerShell 7+). Each skips the other platform's files.
+Personal dotfiles, synced across machines via git + symlinks. macOS-only;
+`install.sh` is the single installer.
 
 ```
 .
-├── install.sh / install.ps1     # idempotent linkers, platform-split
-├── .tmux.conf                   # symlinked into $HOME on POSIX
-├── oh-my-zsh-custom/            # zsh customs (POSIX only)
-├── powershell-profile.ps1       # PowerShell equivalent (cc/gg/c/ll)
+├── install.sh                   # idempotent linker (macOS only)
+├── .tmux.conf                   # symlinked into $HOME
+├── oh-my-zsh-custom/            # zsh customs
 ├── claude/                      # Claude Code config + statusline
-│   ├── settings.json            # macOS/Linux
-│   ├── settings-windows.json    # Windows variant (statusLine.command -> .ps1)
-│   ├── statusline.sh + .ps1     # bash + PowerShell, parity-maintained
+│   ├── settings.json
+│   └── statusline.sh
 ├── copilot/                     # Same shape for GitHub Copilot CLI
 ├── wezterm/wezterm.lua          # opt-in symlink
 ├── launchd/                     # macOS launchd agent templates (rendered by install.sh)
 ├── mcp-shared.json              # secret-free MCP entries (synced)
-└── .github/, .claude/, docs/
+└── .github/, .claude/
 ```
 
 ## Architecture rules
 
-- **install.sh and install.ps1 must stay in lockstep.** When you add a
-  new linkable file, both installers must learn about it. The split
-  rule: `.sh` files are linked only by install.sh; `.ps1` files only by
-  install.ps1; `settings-windows.json` exists everywhere but only
-  install.ps1 picks it (and lands it as the canonical `settings.json`).
 - **`mcp-shared.json` is for non-secret MCP entries only.** Anything
   needing a token/key goes in the gitignored
   `~/.config/github-copilot/mcp.json` per device — install.sh's merge
   step preserves it.
-- **statusline.sh and statusline.ps1 must stay functionally aligned.**
-  Same segments, same output shape, same Gruvbox palette, same
-  vim-airline mode badge, same per-cwd 5s git cache. When you change
-  one, port the change to the other (and to the copilot/* siblings).
+- **`claude/statusline.sh` and `copilot/statusline.sh` must stay
+  functionally aligned.** Same segments, same output shape, same Gruvbox
+  palette, same per-cwd 5s git cache. When you change one, port the
+  change to the sibling.
 - **launchd plists in `launchd/` are templates, not symlinks.**
   install.sh substitutes `__HOME__` -> `$HOME` (launchd doesn't expand
   `$HOME` at runtime) and writes the rendered file to
@@ -68,25 +59,16 @@ PowerShell 7+). Each skips the other platform's files.
 - Statusline scripts use `printf -v __SEG` instead of `$(seg_$s)`
   capture — saves one fork per segment.
 
-### PowerShell scripts (.ps1)
-
-- PowerShell 7+ syntax (the cross-platform pwsh, not Windows
-  PowerShell 5.1). The `?.` operator, modern `Get-Command -ErrorAction`
-  patterns are fine.
-- `$ErrorActionPreference = 'Stop'` at top.
-- `$PSNativeCommandUseErrorActionPreference = $false` so a non-zero
-  `git` exit doesn't blow up the whole script.
-- Indent 4 spaces; helpers as `function Verb-Noun` (verb-noun convention).
-
 ### Config files
 
 - Color scheme: **Gruvbox dark hard (base16)** in WezTerm; matching
   Gruvbox accents in tmux + statusline.
 - Statusline label icons are **FontAwesome** glyphs (U+F0xx–F2xx),
   rendered via raw UTF-8 bytes in bash (since bash 3.2 doesn't support
-  `\u`) and `\u{F0xx}` in PowerShell.
-- Two-line layout: a literal `\n` token in `SEGMENTS` introduces a
-  line break. Status segments line 1, repo + integrations line 2.
+  `\u`).
+- Five-line layout: literal `\n` tokens in `SEGMENTS` introduce line
+  breaks. L1 time/run/api/cost · L2 model/effort/context ·
+  L3 mcp/skills/agents/style · L4 cwd path · L5 repo/branch/diff/stash/worktree.
 
 ## When you make changes
 
@@ -100,7 +82,7 @@ PowerShell 7+). Each skips the other platform's files.
 
   ```bash
   bash -n install.sh
-  echo '{"vim":{"mode":"INSERT"}}' | ~/.claude/statusline.sh
+  echo '{}' | ~/.claude/statusline.sh
   echo '{"model":{"display_name":"Claude (xhigh)"}}' | ~/.copilot/statusline.sh
   ```
 
@@ -111,14 +93,13 @@ PowerShell 7+). Each skips the other platform's files.
 - `~/.claude/settings.json` and `~/.claude.json` are **different files**
   with different responsibilities. Settings: behavior. `.claude.json`
   (top level): MCP servers + state.
-- `hideVimModeIndicator` and `refreshInterval` are **nested inside
-  `statusLine`**, not top-level. Trust the binary's strings table over
-  documentation.
+- `refreshInterval` is **nested inside `statusLine`**, not top-level.
+  Trust the binary's strings table over documentation.
 - `permissions.defaultMode: "bypassPermissions"` is **silently rejected**
   by Claude Code's binary ("bypassPermissions mode is disabled by
   settings"). The CLI flag `--permission-mode bypassPermissions` IS
   honored. Wrap launchers (oh-my-zsh-custom/claude.zsh,
-  oh-my-zsh-custom/cc.zsh, powershell-profile.ps1) to inject the flag.
+  oh-my-zsh-custom/cc.zsh) to inject the flag.
 - `skipDangerousModePermissionPrompt` is dead config (only meaningful
   when bypass mode is active, which is gated off in settings). Claude
   Code's runtime sometimes re-adds it on its own writes; treat as noise.
@@ -150,7 +131,6 @@ family rule above.
 
 - Don't commit secrets. The repo is public on github.com/D0n9X1n/dot-config.
 - Don't add files outside `claude/`, `copilot/`, `oh-my-zsh-custom/`,
-  `wezterm/` without updating both installers.
-- Don't break Mac. macOS is the regression-tested target; Windows ports
-  are 1:1 translations not run-tested by the maintainer.
+  `wezterm/` without updating install.sh.
+- macOS-only. The repo is not regression-tested on other platforms.
 - Don't `--no-verify` git commits unless the user explicitly asks.

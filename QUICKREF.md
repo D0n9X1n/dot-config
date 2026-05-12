@@ -9,12 +9,7 @@ configuration; synced across machines via git + an idempotent installer that
 creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
 
 ## Layout
-- `install.sh` — POSIX entry point; idempotent; safe to re-run.
-- `install.ps1` — Windows entry point (PowerShell 7+); idempotent;
-  symlinks `.ps1` siblings + the Windows variant of `settings.json`;
-  dot-sources `powershell-profile.ps1` into `$PROFILE.CurrentUserAllHosts`.
-  On Windows, install.sh detects MSYS/MINGW/CYGWIN and skips POSIX-only
-  files; install.ps1 skips `.sh` files in turn.
+- `install.sh` — macOS entry point; idempotent; safe to re-run.
 - `mcp-shared.json` — secret-free MCP entries synced via git. install.sh
   merges into local Copilot mcp.json; the existing pipeline lifts the
   merged set into `~/.claude.json`. Secrets stay per-device.
@@ -22,20 +17,10 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
   **template** (not symlinked; install.sh renders `__HOME__` -> `$HOME`
   into `~/Library/LaunchAgents/` then `bootout`+`bootstrap` into
   `gui/<uid>`). Starts copilot-api proxy on login, restarts on crash,
-  logs to `~/Library/Logs/copilot-api.{out,err}.log`. Skipped on
-  non-macOS.
+  logs to `~/Library/Logs/copilot-api.{out,err}.log`.
 - `.claude/CLAUDE.md` — agent instructions for Claude Code working in
   this repo. Mirrors `.github/copilot-instructions.md`.
-- `docs/WINDOWS.md` — Windows runbook (winget, install.ps1, npm CLIs,
-  proxy, smoke test) + troubleshooting.
-- `powershell-profile.ps1` — Windows-only, defines `cc <title>` /
-  `gg <title>` (tab rename + launch Claude Code / Copilot CLI), plus
-  `c` and `ll` aliases. Bare `claude` is also wrapped to inject
-  `--permission-mode bypassPermissions` on every invocation. Dot-sourced
-  from `$PROFILE.CurrentUserAllHosts` (install.ps1 appends one line;
-  never overwrites your existing profile).
-- `<repo>/.<name>` — root dotfiles linked to `$HOME/.<name>` (POSIX
-  only — install.sh skips on Windows). Currently:
+- `<repo>/.<name>` — root dotfiles linked to `$HOME/.<name>`. Currently:
   - `.tmux.conf` — primary tab/split/session manager (Gruvbox Dark Hard
     palette, prefix `C-q` (chosen over default C-b for ergonomics — far
     from C-c/d/z, doesn't clash with readline, and modern macOS disables
@@ -84,14 +69,13 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     A "full mirror" of `~/.claude/statusline.sh`: per-segment Gruvbox
     color accents, color-graded Cache % and Context %, and every Claude
     segment reproduced (segments whose data Copilot's statusLine JSON
-    doesn't expose silently no-op, so `vim`/`agent`/`style` cost nothing
+    doesn't expose silently no-op, so `agent`/`style` cost nothing
     until a future CLI version starts emitting them). Renders these
     segments in order, `<icon> <Label> <value>` separated by `│`:
     Time, Model, Effort (parsed from `model.display_name` `(xhigh)` etc),
-    Run, Wall, API, Req, Cache, Last, Ctx, Worktree, Repo (clean/dirty
-    + ↑↓), Branch, Stash, Venv, GH, Ext, MCP. `diff` is defined but
-    omitted from the default segment list — opt in via
-    `COPILOT_STATUSLINE_SEGMENTS`. Env overrides:
+    Run, API, Req, Cache, Last, Ctx, Worktree, Repo (clean/dirty
+    + ↑↓), Branch, Stash, Venv, GH, Ext, MCP, Diff (enabled by default,
+    icon U+F121 angle-brackets). Env overrides:
     `COPILOT_STATUSLINE_NO_ICONS=1` drops icons (keeps text labels);
     `COPILOT_STATUSLINE_NO_COLOR=1` drops color (legacy
     `COPILOT_STATUSLINE_NO_DIM=1` is honored as an alias);
@@ -108,11 +92,14 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     via pure-bash JSON parsing (no jq dep), per-cwd git cache (5s TTL
     at `$TMPDIR/claude-statusline-cache-$USER/git-<hash>`), no awk
     forks (`cost`/`ctx`/`fmt_tokens` use bash printf/arith), and
-    `printf -v __SEG` instead of per-segment subshells. Adds `seg_vim`
-    as the leftmost segment — vim-airline gruvbox mode badge
-    (NORMAL=yellow, INSERT=blue, VISUAL=orange, REPLACE=red bg, all on
-    `#1d2021` fg). v0.8.0: two-line layout via literal `\n` token in
-    `SEGMENTS` — status row up top, repo/integrations below.
+    `printf -v __SEG` instead of per-segment subshells. v0.8.0: multi-line
+    layout via literal `\n` token in `SEGMENTS`. v0.13.x: 5-line default —
+    L1 time/run/api/cost · L2 model/effort/context · L3 mcp/skills/agents/style ·
+    L4 cwd path (new `seg_path`, U+F07C, $HOME→~) · L5 repo/branch/diff/stash/worktree.
+    `seg_agent` counts available agent definitions (`*.md` in `~/.claude/agents/`
+    + `<cwd>/.claude/agents/`) — NOT live sub-agents (statusline JSON doesn't
+    expose runtime sub-agent state). `seg_timer` formats as `Nh Mm` for
+    sessions ≥ 1h (v0.13.2). v0.13.3 drops `wall` from the default list.
   - `copilot-instructions.md` — global agent instructions (autonomous mode).
 - `<repo>/claude/<file>` — files linked to `$HOME/.claude/<file>`. Currently:
   - `settings.json` — Claude Code → Copilot bridge AND global default-pinning.
@@ -133,17 +120,12 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     and autonomous mode
     (`skipAutoPermissionPrompt=true`, `permissions.defaultMode="auto"`).
     Note: `defaultMode="bypassPermissions"` is silently rejected by the
-    binary ("bypassPermissions mode is disabled by settings"); for full
+    binary honors ("bypassPermissions mode is disabled by settings"); for full
     bypass see the wrapper functions in `oh-my-zsh-custom/claude.zsh` and
-    `cc.zsh` (and `powershell-profile.ps1`) which inject
-    `--permission-mode bypassPermissions` per launch — the only path the
-    binary honors.
-    v0.6.0+ also pins `editorMode="vim"` (boots vim mode by default),
-    `statusLine.hideVimModeIndicator=true` (suppresses the built-in
-    `-- INSERT --` chrome since `statusline.sh`'s `seg_vim` renders an
-    airline-style badge instead), `statusLine.refreshInterval=100` for
-    snappy mode-flip redraws, and `theme="dark-ansi"` so chrome inherits
-    the terminal's ANSI palette.
+    `cc.zsh` which inject `--permission-mode bypassPermissions` per launch —
+    the only path the binary honors.
+    Also pins `statusLine.refreshInterval=100` for snappy redraws and
+    `theme="dark-ansi"` so chrome inherits the terminal's ANSI palette.
     Requires a local [`copilot-api`](https://www.npmjs.com/package/copilot-api)
     proxy running (`copilot-api start --claude-code`) which translates
     Anthropic-format requests into GitHub Copilot ones. One-time bootstrap

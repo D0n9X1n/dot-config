@@ -8,46 +8,32 @@ that creates symlinks into the home directory.
 
 ```
 dot-configs/
-├── install.sh                   # idempotent linker for macOS / Linux
-├── install.ps1                  # idempotent linker for Windows (PowerShell 7+)
+├── install.sh                   # idempotent linker (macOS only)
 ├── .tmux.conf                   # -> ~/.tmux.conf  (tab/split/session manager)
 ├── oh-my-zsh-custom/            # contents -> ~/.oh-my-zsh/custom/
 │   ├── custom.zsh               # aliases, proxy helpers, brew completions, env
 │   └── gg.zsh                   # gg() function (terminal title + copilot)
 ├── copilot/                     # contents -> ~/.copilot/
-│   ├── settings.json            # macOS/Linux Copilot CLI settings
-│   ├── settings-windows.json    # Windows variant (statusline.command -> .ps1)
-│   ├── statusline.sh            # POSIX statusline (bash 3.2+)
-│   ├── statusline.ps1           # Windows statusline (PowerShell 7+, parity with .sh)
+│   ├── settings.json            # Copilot CLI settings
+│   ├── statusline.sh            # statusline (bash 3.2+)
 │   └── copilot-instructions.md  # global agent instructions
 ├── claude/                      # contents -> ~/.claude/
-│   ├── settings.json            # macOS/Linux Claude Code settings
-│   ├── settings-windows.json    # Windows variant (statusline.command -> .ps1)
-│   ├── statusline.sh            # POSIX statusline
-│   └── statusline.ps1           # Windows statusline (parity with .sh)
+│   ├── settings.json            # Claude Code settings
+│   └── statusline.sh            # statusline
 ├── wezterm/                     # terminal config (NOT auto-linked — opt-in)
 │   └── wezterm.lua              # WezTerm config — link manually if used
 ├── launchd/                     # macOS launchd agent templates
 │   └── com.d0n9x1n.copilot-api.plist  # copilot-api proxy on login (rendered by install.sh)
-├── powershell-profile.ps1       # Windows-only: cc/gg/c/ll, dot-sourced into $PROFILE
 ├── mcp-shared.json              # secret-free MCP entries synced via git
 ├── .claude/CLAUDE.md            # agent instructions for Claude Code working in this repo
 ├── .github/copilot-instructions.md  # agent instructions for Copilot CLI
-├── docs/
-│   └── WINDOWS.md               # Windows runbook + PowerShell port story
 ├── LICENSE
 ├── ReadMe.md                    # this file
 └── QUICKREF.md                  # condensed reference (agent-friendly)
 ```
 
-Two installers, one source tree:
-
-- **`install.sh`** (macOS/Linux): links `.sh` siblings, skips `.ps1` and
-  `settings-windows.json`.
-- **`install.ps1`** (Windows): links `.ps1` siblings, skips `.sh`, and
-  links `settings-windows.json` AS `settings.json` at the destination.
-
-Both are idempotent and use symlinks so the live config tracks repo edits.
+`install.sh` is the only entry point (macOS-only). It uses symlinks so
+the live config tracks repo edits, and is idempotent.
 
 `install.sh` is the only entry point. It:
 
@@ -93,18 +79,12 @@ all machines because every config file is a symlink into this repo.
 
 ## Usage
 
-**macOS / Linux** (the supported, tested path):
-
 ```bash
 git clone git@github.com:D0n9X1n/dot-config.git ~/Public/dot-configs
 bash ~/Public/dot-configs/install.sh
 ```
 
-**Windows** — see [`docs/WINDOWS.md`](docs/WINDOWS.md) for the full
-runbook. The PowerShell port (`statusline.ps1`, `install.ps1`) ships in
-this repo but is **not regression-tested by the maintainer** — it's a
-1:1 functional translation of the .sh scripts intended for Windows users
-willing to file issues for any rough edges.
+macOS only.
 
 Subsequent updates on a machine:
 
@@ -122,7 +102,7 @@ the check command before moving on. Stop at the first failure and report.
 ### 0. Prerequisites
 
 ```bash
-# macOS only. On Linux/Windows, see the "Cross-platform notes" section below.
+# macOS only.
 xcode-select --install            # Apple CLI tools (provides git, make, etc.)
 xcode-select -p                   # check: should print a path
 ```
@@ -295,30 +275,13 @@ claude --print "say 'hello from devbox'" 2>&1 | head -5
 ```
 
 If all 10 steps print `ok` (or the equivalent positive signal), the box is
-fully set up. The `gg <title>` function, the statusline (`Vim` mode badge,
-git/branch/cost/ctx segments), the dark-ansi Claude Code theme, and the
-Gruvbox-aligned tmux/wezterm chrome are all live.
+fully set up. The `gg <title>` function, the statusline (5-line layout
+with git/branch/cost/ctx/agents/skills segments), the dark-ansi Claude Code
+theme, and the Gruvbox-aligned tmux/wezterm chrome are all live.
 
-### Cross-platform notes
+### Platform notes
 
-- **Linux**: skip the `brew` casks (wezterm, fonts) — install equivalents
-  via your distro package manager. Everything else (steps 1–10) works
-  unchanged.
-- **Windows**: use **`install.ps1`** instead of `install.sh`. Requirements:
-  - PowerShell 7+ (`winget install Microsoft.PowerShell`).
-  - Either Developer Mode (Settings → Privacy & security → For developers
-    → Developer Mode) or run from an elevated (Administrator) shell — both
-    let `New-Item -ItemType SymbolicLink` succeed.
-  - Run: `pwsh -ExecutionPolicy Bypass -File install.ps1`
-  - The script links `statusline.ps1` (parity with `statusline.sh` —
-    same Gruvbox accents, same vim-airline mode badge, same per-cwd git
-    cache) and uses `settings-windows.json` as the canonical
-    `settings.json` at the destination so `statusLine.command` invokes
-    `pwsh` instead of bash.
-- **WSL2** is treated as Linux — run `install.sh` from inside WSL.
-- **Git Bash / MSYS2** is **not** the recommended path on Windows; use
-  `install.ps1` from native PowerShell instead. (Git Bash's `ln -s`
-  silently degrades to copies without `MSYS=winsymlinks:nativestrict`.)
+- **macOS-only.** `install.sh` is the single supported installer.
 - **The proxy must keep running** for Claude Code to function. Quitting
   the `copilot-api start --claude-code` process breaks every Claude Code
   session immediately.
@@ -481,14 +444,14 @@ Executable script — a "full mirror" of `~/.claude/statusline.sh` adapted to
 Copilot's `statusLine` JSON. Per-segment Gruvbox color accents, color-graded
 Cache % and Context %. Renders these segments in order, `<icon> <Label>
 <value>` separated by `│` (each shown only when its data is available):
-**Time, Model, Effort, Run, Wall, API, Req, Cache, Last, Ctx, Worktree,
-Repo (clean / dirty + ↑↓), Branch, Stash, Venv, GH, Ext, MCP**. Effort is
-parsed from `model.display_name` (Copilot bakes `(xhigh)` etc into the
-display name rather than exposing `.effort.level`). Worktree is detected
+**Time, Model, Effort, Run, API, Req, Cache, Last, Ctx, Worktree,
+Repo (clean / dirty + ↑↓), Branch, Stash, Venv, GH, Ext, MCP, Diff**.
+Effort is parsed from `model.display_name` (Copilot bakes `(xhigh)` etc into
+the display name rather than exposing `.effort.level`). Worktree is detected
 via `git rev-parse --git-dir` and only shown when actually inside a linked
-worktree. Vim, Agent, and Style are defined but no-op until Copilot starts
-exposing them in JSON; `diff` is defined but omitted from the default
-segment list (opt in via `COPILOT_STATUSLINE_SEGMENTS`).
+worktree. Agent and Style are defined but no-op until Copilot starts
+exposing them in JSON. The Diff segment uses U+F121 (angle-bracket "code"
+icon) and is enabled by default as of v0.13.x.
 
 Environment overrides:
 
@@ -511,16 +474,19 @@ minutes. Bash 3.2-compatible. `install.sh` keeps the executable bit set.
 > `$TMPDIR/claude-statusline-cache-$USER/git-<hash>`, awk forks dropped
 > in favour of bash printf / arithmetic for `cost`/`ctx`/`fmt_tokens`,
 > and `printf -v __SEG` replaces the per-segment `$(seg_$s)` subshell
-> capture. `seg_vim` is the new far-left segment, rendered as a vim-airline
-> gruvbox mode badge — NORMAL=yellow bg, INSERT=blue bg, VISUAL=orange bg,
-> REPLACE=red bg, all on a `#1d2021` dark fg. `copilot/statusline.sh`
-> tracks the same shape.
+> capture. `copilot/statusline.sh` tracks the same shape.
 
-> **Layout (v0.8.0):** two-line layout by default. A literal `\n` token
-> in the `SEGMENTS` list introduces a line break — status segments
-> (Vim/Time/Cost/Model/Effort) on line 1, repo + integrations
-> (Repo/Branch/Stash/MCP/Skills/Context) on line 2. Override the layout
-> per-shell via `COPILOT_STATUSLINE_SEGMENTS='vim time \n cost ctx'`.
+> **Layout (v0.13.x):** five-line layout by default. Literal `\n` tokens
+> in the `SEGMENTS` list introduce line breaks:
+> L1 `time | run | api | cost`, L2 `model | effort | context`,
+> L3 `mcp | skills | agents | style`, L4 cwd path, L5
+> `repo | branch | diff | stash | worktree`. `seg_path` (icon U+F07C
+> folder-open) renders the full cwd with `$HOME` collapsed to `~`.
+> `seg_agent` counts `*.md` files in `~/.claude/agents/` +
+> `<cwd>/.claude/agents/` — i.e. **available agent definitions**, not
+> currently-running sub-agents (statusline JSON doesn't expose runtime
+> sub-agent state). `seg_timer` shows `Nh Mm` once the session crosses
+> one hour (v0.13.2). Override per-shell via `COPILOT_STATUSLINE_SEGMENTS`.
 
 #### `copilot-instructions.md`
 
@@ -556,12 +522,10 @@ proxy that translates Anthropic-format requests into Copilot ones.
   },
   "effortLevel": "xhigh",
   "theme": "dark-ansi",
-  "editorMode": "vim",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
     "padding": 0,
-    "hideVimModeIndicator": true,
     "refreshInterval": 100
   },
   "skipAutoPermissionPrompt": true,
@@ -602,30 +566,25 @@ Defaults pinned globally (synced across machines via this repo):
   binary explicitly **rejects** `defaultMode: "bypassPermissions"`
   ("bypassPermissions mode is disabled by settings"), so for full
   bypass we wrap the launchers — see "Wrappers" below.
-- `editorMode: "vim"` boots Claude Code's prompt editor straight into vim
-  mode. `statusLine.hideVimModeIndicator: true` suppresses the built-in
-  `-- INSERT --` chrome since `statusline.sh`'s `seg_vim` renders an
-  airline-style mode badge instead. `statusLine.refreshInterval: 100`
-  drops the redraw cadence so mode flips feel snappy.
+- `editorMode`: not pinned. `statusLine.refreshInterval: 100` drops the
+  redraw cadence so the statusline updates feel snappy.
 - `theme: "dark-ansi"` lets the chrome inherit the terminal's ANSI palette
   (so it tracks the WezTerm Gruvbox scheme rather than hard-coding its
   own colors).
 
-#### Wrappers (`oh-my-zsh-custom/claude.zsh`, `cc.zsh`, `powershell-profile.ps1`)
+#### Wrappers (`oh-my-zsh-custom/claude.zsh`, `cc.zsh`)
 
-Bare `claude` is wrapped as a shell function (zsh) / PowerShell function
-that always passes `--permission-mode bypassPermissions`. The CLI flag
-is the only path the binary honors for non-interactive bypass — the
-equivalent settings.json key is gated off by feature flag.
+Bare `claude` is wrapped as a shell function that always passes
+`--permission-mode bypassPermissions`. The CLI flag is the only path
+the binary honors for non-interactive bypass — the equivalent
+settings.json key is gated off by feature flag.
 
 Same applies to `cc <title>`: it renames the active terminal tab via
 OSC 1/2 (+ tmux + WezTerm CLI fallbacks) then launches Claude Code with
 the bypass flag.
 
 To switch models mid-session, use Claude Code's `/model <name>` —
-free-form names pass through the proxy unchanged. The previous
-`claude-opus` / `claude-gpt` aliases have been removed (redundant once
-`model` was pinned in settings.json).
+free-form names pass through the proxy unchanged.
 
 One-time setup (after running `install.sh` on a fresh box):
 
