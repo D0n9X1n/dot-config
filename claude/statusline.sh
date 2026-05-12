@@ -69,7 +69,7 @@ set -u
 #   L3: integrations — mcp, skills, agents, style
 #   L4: cwd path     — full directory path
 #   L5: repo + git   — repo, diff, branch, stash, worktree
-SEGMENTS="time timer wall api_time cost \n model effort ctx \n mcp skills agent style \n path \n git diff branch stash worktree"
+SEGMENTS="time timer wall api_time cost \n model effort ctx \n mcp skills agent style \n path \n git branch diff stash worktree"
 SEP=' │ '
 
 ICONS_ON=1
@@ -381,13 +381,21 @@ seg_timer() {
     date +%s >"$f" 2>/dev/null || true
   fi
   [ -f "$f" ] || return 0
-  local started now mins
+  local started now elapsed
   read -r started <"$f" 2>/dev/null || started=0
   now="$(date +%s)"
-  mins=$(((now - started) / 60))
-  [ "$mins" -gt 0 ] || return 0
+  elapsed=$(( now - started ))
+  [ "$elapsed" -ge 60 ] || return 0
   label "$C_ORANGE" "$ICON_RUN" 'Run'
-  printf -v __SEG '%s%s%dm%s' "$__LBL" "$C_FG" "$mins" "$C_RESET"
+  # Format like "2h35m" / "47m" — same shape as Wall (fmt_ms), so the two
+  # timing segments read consistently. Below 1h, just minutes; ≥1h, h+m.
+  local pretty
+  if [ "$elapsed" -ge 3600 ]; then
+    printf -v pretty '%dh%dm' $(( elapsed / 3600 )) $(( (elapsed % 3600) / 60 ))
+  else
+    printf -v pretty '%dm' $(( elapsed / 60 ))
+  fi
+  printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$pretty" "$C_RESET"
 }
 
 seg_wall() {
