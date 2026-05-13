@@ -126,7 +126,7 @@ fi
 # Link Claude Code config files (claude/* -> ~/.claude/*). Claude Code
 # normally creates ~/.claude on first launch; mkdir -p so install.sh can
 # wire things up on a fresh box without requiring a Claude Code launch
-# first. Used to point Claude Code at the local copilot-api proxy so it
+# first. Used to point Claude Code at the local copilot-bridge proxy so it
 # can talk to GitHub Copilot models (see ReadMe.md).
 claude_src="${src_dir}/claude"
 claude_dest="${HOME}/.claude"
@@ -304,18 +304,32 @@ fi
 
 echo "Linked dotfiles from $src_dir to $dest_dir"
 
-# launchd agent: copilot-api proxy on login (macOS only). Renders the
+# launchd agent: copilot-bridge on login (macOS only). Renders the
 # template (substituting absolute $HOME paths — launchd doesn't expand
 # $HOME at runtime) into ~/Library/LaunchAgents and bootstraps it.
+# Also unloads the legacy com.d0n9x1n.copilot-api agent if present
+# (migration from copilot-api to copilot-bridge in v0.14.x).
 # Idempotent: if the agent is already loaded with the same content,
 # bootout+bootstrap is a no-op restart; if content differs, the new
 # version replaces the old.
 if is_macos; then
-  launchd_src="${src_dir}/launchd/com.d0n9x1n.copilot-api.plist"
-  launchd_dest="${HOME}/Library/LaunchAgents/com.d0n9x1n.copilot-api.plist"
+  uid="$(id -u)"
+
+  # Migration: bootout the old copilot-api agent if it's still loaded
+  # from a previous install. The new bridge listens on a different port
+  # (4142 vs 4141), so leaving both running wastes a port + GH token.
+  legacy_plist="${HOME}/Library/LaunchAgents/com.d0n9x1n.copilot-api.plist"
+  if launchctl print "gui/${uid}/com.d0n9x1n.copilot-api" >/dev/null 2>&1; then
+    launchctl bootout "gui/${uid}/com.d0n9x1n.copilot-api" 2>/dev/null \
+      && echo "Migration: unloaded legacy com.d0n9x1n.copilot-api"
+  fi
+  [ -f "$legacy_plist" ] && rm -f "$legacy_plist" && echo "Migration: removed $legacy_plist"
+
+  launchd_src="${src_dir}/launchd/com.d0n9x1n.copilot-bridge.plist"
+  launchd_dest="${HOME}/Library/LaunchAgents/com.d0n9x1n.copilot-bridge.plist"
   if [ -f "$launchd_src" ]; then
-    if ! have_cmd copilot-api; then
-      echo "launchd: copilot-api not on PATH — skipping agent install (run 'npm i -g copilot-api' first, then re-run install.sh)"
+    if ! have_cmd copilot-bridge; then
+      echo "launchd: copilot-bridge not on PATH — skipping agent install (run 'npm i -g betahi-copilot-bridge' first, then re-run install.sh)"
     else
       mkdir -p "$(dirname "$launchd_dest")"
       mkdir -p "${HOME}/Library/Logs"
@@ -326,12 +340,11 @@ if is_macos; then
       # Bootstrap into the GUI domain of the current user. bootout first
       # so a content change actually replaces the running agent (load is
       # a no-op when the label already exists).
-      uid="$(id -u)"
-      launchctl bootout "gui/${uid}/com.d0n9x1n.copilot-api" 2>/dev/null || true
+      launchctl bootout "gui/${uid}/com.d0n9x1n.copilot-bridge" 2>/dev/null || true
       if launchctl bootstrap "gui/${uid}" "$launchd_dest" 2>/dev/null; then
-        echo "Loaded launchd agent com.d0n9x1n.copilot-api (logs: ~/Library/Logs/copilot-api.{out,err}.log)"
+        echo "Loaded launchd agent com.d0n9x1n.copilot-bridge (logs: ~/Library/Logs/copilot-bridge.{out,err}.log)"
       else
-        echo "Warning: launchctl bootstrap failed for com.d0n9x1n.copilot-api"
+        echo "Warning: launchctl bootstrap failed for com.d0n9x1n.copilot-bridge"
       fi
     fi
   fi

@@ -64,12 +64,12 @@ set -u
 # Five-line layout. A literal `\n` token in SEGMENTS introduces a line
 # break in the render loop. Empty/no-op segments collapse cleanly so
 # auto-hiding ones (worktree, venv, stash, diff) take no space when off.
-#   L1: status       — time, run timer, api, cost
+#   L1: status       — time, waka today, run timer, api, cost
 #   L2: model        — model, effort, context
 #   L3: integrations — mcp, skills, agents, style
 #   L4: cwd path     — full directory path
 #   L5: repo + git   — repo, diff, branch, stash, worktree
-SEGMENTS="time timer api_time cost \n model effort ctx \n mcp skills agent style \n path \n git branch diff stash worktree"
+SEGMENTS="time waka timer api_time cost \n model effort ctx \n mcp skills agent style \n path \n git branch diff stash worktree"
 SEP=' │ '
 
 ICONS_ON=1
@@ -121,6 +121,7 @@ ICON_STASH=$'\xef\x86\x87'
 ICON_VENV=$'\xef\x86\xae'
 ICON_PATH=$'\xef\x81\xbc'
 ICON_GH=$'\xef\x82\x9b'
+ICON_WAKA=$'\xef\x80\x97'
 ICON_SKILLS=$'\xef\x82\xae'
 ICON_MCP=$'\xef\x87\xa6'
 
@@ -634,6 +635,39 @@ seg_gh_account() {
   [ -n "$account" ] || return 0
   label "$C_PURPLE" "$ICON_GH" 'GH'
   printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$account" "$C_RESET"
+}
+
+# WakaTime — today's coding time as recorded by WakaTime. The `wakatime-cli
+# --today` call hits the network internally (~250ms), way too slow for
+# every render. Cache for 5 minutes; on a miss, kick off a background
+# refresh and serve the previous value (returns nothing the first time
+# until the bg fetch lands). Skipped if wakatime-cli isn't installed.
+seg_waka() {
+  local wt="$HOME/.wakatime/wakatime-cli"
+  [ -x "$wt" ] || return 0
+  local cf="$CACHE_DIR/waka_today"
+  local lock="$CACHE_DIR/waka_today.lock"
+  local now mtime val=""
+  now="$(date +%s)"
+  mtime=0
+  [ -f "$cf" ] && mtime="$(stat -f %m "$cf" 2>/dev/null || stat -c %Y "$cf" 2>/dev/null || echo 0)"
+  if [ -f "$cf" ] && [ $((now - mtime)) -lt 300 ]; then
+    read -r val <"$cf" 2>/dev/null || val=""
+  else
+    # Background refresh — don't block the render. Use a lockfile so
+    # multiple concurrent statusline runs don't all spawn fetchers.
+    if mkdir "$lock" 2>/dev/null; then
+      ( "$wt" --today >"$cf.tmp" 2>/dev/null \
+        && mv "$cf.tmp" "$cf" 2>/dev/null
+        rmdir "$lock" 2>/dev/null
+      ) &
+    fi
+    # Serve stale value while the bg refresh runs (avoids flicker).
+    [ -f "$cf" ] && read -r val <"$cf" 2>/dev/null
+  fi
+  [ -n "$val" ] || return 0
+  label "$C_AQUA" "$ICON_WAKA" 'Today'
+  printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$val" "$C_RESET"
 }
 
 # Skills — count user-scope + workspace-scope skill bundles. Claude Code

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  TEMPLATE — copilot-bridge as a per-user launchd agent.
+
+  This file is consumed by install.sh; do NOT symlink it directly.
+  install.sh substitutes __HOME__ -> $HOME and writes the rendered plist
+  to ~/Library/LaunchAgents/com.d0n9x1n.copilot-bridge.plist, then runs
+  launchctl bootstrap.
+
+  What the agent does once loaded:
+    - Starts `copilot-bridge start --no-claude-setup --no-codex-setup`
+      on login. The `--no-*-setup` flags prevent the bridge from
+      rewriting our settings.json / config.toml on every restart —
+      we manage those files ourselves via this repo.
+    - Re-spawns it if it crashes (KeepAlive throttled to one restart per 10s).
+    - Listens on http://127.0.0.1:4142 — Claude Code reads this from
+      ANTHROPIC_BASE_URL in ~/.claude/settings.json.
+
+  Logs:
+    stdout -> ~/Library/Logs/copilot-bridge.out.log
+    stderr -> ~/Library/Logs/copilot-bridge.err.log
+
+  Manage with:
+    launchctl bootstrap   gui/$(id -u) ~/Library/LaunchAgents/com.d0n9x1n.copilot-bridge.plist
+    launchctl bootout     gui/$(id -u) ~/Library/LaunchAgents/com.d0n9x1n.copilot-bridge.plist
+    launchctl kickstart -k gui/$(id -u)/com.d0n9x1n.copilot-bridge
+    launchctl print       gui/$(id -u)/com.d0n9x1n.copilot-bridge
+    tail -f ~/Library/Logs/copilot-bridge.{out,err}.log
+
+  Notes:
+    - launchd plists don't expand $HOME at runtime, so absolute paths are
+      required. install.sh templates them per machine.
+    - PATH covers Apple Silicon (/opt/homebrew/bin) and Intel
+      (/usr/local/bin) Homebrew prefixes so the same plist works on
+      both archs.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.d0n9x1n.copilot-bridge</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/copilot-bridge</string>
+        <string>start</string>
+        <string>--no-claude-setup</string>
+        <string>--no-codex-setup</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>StandardOutPath</key>
+    <string>__HOME__/Library/Logs/copilot-bridge.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>__HOME__/Library/Logs/copilot-bridge.err.log</string>
+
+    <key>WorkingDirectory</key>
+    <string>__HOME__</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

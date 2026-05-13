@@ -1,9 +1,11 @@
 {
   "env": {
-    "ANTHROPIC_BASE_URL": "http://localhost:4141",
-    "ANTHROPIC_MODEL": "claude-opus-4.7-1m-internal",
+    "ANTHROPIC_BASE_URL": "http://127.0.0.1:4142",
+    "ANTHROPIC_AUTH_TOKEN": "dummy",
+    "ANTHROPIC_MODEL": "claude-opus-4.7-[1m]",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5.5",
     "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.5",
-    "ANTHROPIC_API_KEY": "dummy"
+    "MODEL_REASONING_EFFORT": "xhigh"
   },
   "permissions": {
     "allow": [
@@ -11,16 +13,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "claude-opus-4.7-1m-internal",
-  "modelOverrides": {
-    "claude-opus-4-7": "claude-opus-4.7-1m-internal",
-    "claude-opus-4-6": "claude-opus-4.7-1m-internal",
-    "claude-opus-4-5": "claude-opus-4.7-1m-internal",
-    "claude-sonnet-4-6": "gpt-5.5",
-    "claude-sonnet-4-5": "gpt-5.5",
-    "claude-haiku-4-5": "claude-opus-4.7-1m-internal",
-    "gpt-5-mini": "gpt-5.5"
-  },
+  "model": "claude-opus-4.7-[1m]",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
