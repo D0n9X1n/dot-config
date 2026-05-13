@@ -69,7 +69,7 @@ set -u
 #   L3: integrations — mcp, skills, agents, style
 #   L4: cwd path     — full directory path
 #   L5: repo + git   — repo, diff, branch, stash, worktree
-SEGMENTS="time waka timer api_time cost \n model effort ctx \n mcp skills agent style \n path \n git branch diff stash worktree"
+SEGMENTS="time waka timer cost \n model effort ctx \n mcp skills agent style \n path \n git branch diff stash worktree"
 SEP=' │ '
 
 ICONS_ON=1
@@ -102,7 +102,7 @@ ICONS_ON=1
 #   U+F09B github           = EF 82 9B   GH
 #   U+F0AE list-task        = EF 82 AE   Skills
 #   U+F1E6 plug             = EF 87 A6   MCP
-ICON_TIME=$'\xef\x89\x92'
+ICON_TIME=$'\xef\x80\x97'
 ICON_MODEL=$'\xef\x8b\x9b'
 ICON_EFFORT=$'\xef\x83\xa4'
 ICON_RUN=$'\xef\x84\xb5'
@@ -121,7 +121,7 @@ ICON_STASH=$'\xef\x86\x87'
 ICON_VENV=$'\xef\x86\xae'
 ICON_PATH=$'\xef\x81\xbc'
 ICON_GH=$'\xef\x82\x9b'
-ICON_WAKA=$'\xef\x80\x97'
+ICON_WAKA=$'\xef\x84\xb3'
 ICON_SKILLS=$'\xef\x82\xae'
 ICON_MCP=$'\xef\x87\xa6'
 
@@ -666,8 +666,35 @@ seg_waka() {
     [ -f "$cf" ] && read -r val <"$cf" 2>/dev/null
   fi
   [ -n "$val" ] || return 0
-  label "$C_AQUA" "$ICON_WAKA" 'Today'
-  printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$val" "$C_RESET"
+  # wakatime-cli prints variants: "2 hrs 9 mins" / "1 hr 5 mins" /
+  # "47 mins" / "1 min" / "8 secs". Reformat to seg_timer's "Nh Mm" /
+  # "Nm" shape so the two timing-style segments read consistently.
+  local hrs=0 mins=0 pretty=""
+  # Hours: digits before " hr" or " hrs"
+  case "$val" in
+    *' hr'*) hrs="${val%% hr*}" ;;
+  esac
+  # Minutes: digits before " min" or " mins". Strip the optional "Nh"
+  # prefix first so we don't grab the hour digits.
+  local rest="$val"
+  case "$rest" in
+    *' hr'*) rest="${rest#*hrs }"; rest="${rest#*hr }" ;;
+  esac
+  case "$rest" in
+    *' min'*) mins="${rest%% min*}" ;;
+  esac
+  # Sanitize to integers (defensive against unexpected wakatime formats)
+  case "$hrs" in '' | *[!0-9]*) hrs=0 ;; esac
+  case "$mins" in '' | *[!0-9]*) mins=0 ;; esac
+  if [ "$hrs" -gt 0 ] 2>/dev/null; then
+    printf -v pretty '%dh%dm' "$hrs" "$mins"
+  elif [ "$mins" -gt 0 ] 2>/dev/null; then
+    printf -v pretty '%dm' "$mins"
+  else
+    return 0
+  fi
+  label "$C_AQUA" "$ICON_WAKA" 'WakaTime'
+  printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$pretty" "$C_RESET"
 }
 
 # Skills — count user-scope + workspace-scope skill bundles. Claude Code
