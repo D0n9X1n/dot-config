@@ -64,12 +64,12 @@ set -u
 # Five-line layout. A literal `\n` token in SEGMENTS introduces a line
 # break in the render loop. Empty/no-op segments collapse cleanly so
 # auto-hiding ones (worktree, venv, stash, diff) take no space when off.
-#   L1: status       — time, waka today, run timer, api, cost
+#   L1: status       — time, run timer, cost, waka today
 #   L2: model        — model, effort, context
 #   L3: integrations — mcp, skills, agents, style
 #   L4: cwd path     — full directory path
 #   L5: repo + git   — repo, diff, branch, stash, worktree
-SEGMENTS="time waka timer cost \n model effort ctx \n mcp skills agent style \n path \n git branch diff stash worktree"
+SEGMENTS="time timer cost waka \n model effort ctx \n mcp skills agent style \n path \n git branch diff stash worktree"
 SEP=' │ '
 
 ICONS_ON=1
@@ -121,7 +121,7 @@ ICON_STASH=$'\xef\x86\x87'
 ICON_VENV=$'\xef\x86\xae'
 ICON_PATH=$'\xef\x81\xbc'
 ICON_GH=$'\xef\x82\x9b'
-ICON_WAKA=$'\xef\x84\xb3'
+ICON_WAKA=$'\xef\x84\x9c'
 ICON_SKILLS=$'\xef\x82\xae'
 ICON_MCP=$'\xef\x87\xa6'
 
@@ -333,6 +333,23 @@ fmt_ms() {
   fi
 }
 
+# Format a duration in seconds as "Nd Hh Mm" / "Nh Mm" / "Nm" — the unit
+# of the largest non-zero component plus the next one down. Used by Run
+# and WakaTime so the two timing segments read consistently for any
+# duration (multi-day WakaTime totals included).
+fmt_dhm() {
+  local s=${1:-0}
+  if [ "$s" -ge 86400 ]; then
+    printf '%dd%dh%dm' $((s / 86400)) $(((s % 86400) / 3600)) $(((s % 3600) / 60))
+  elif [ "$s" -ge 3600 ]; then
+    printf '%dh%dm' $((s / 3600)) $(((s % 3600) / 60))
+  elif [ "$s" -ge 60 ]; then
+    printf '%dm' $((s / 60))
+  else
+    printf '%ds' "$s"
+  fi
+}
+
 # Format a token count for the Ctx segment: 200000 -> 200k, 1000000 -> 1M.
 # Pure-bash arithmetic; no awk fork.
 fmt_tokens() {
@@ -388,15 +405,7 @@ seg_timer() {
   elapsed=$(( now - started ))
   [ "$elapsed" -ge 60 ] || return 0
   label "$C_ORANGE" "$ICON_RUN" 'Run'
-  # Format like "2h35m" / "47m" — same shape as Wall (fmt_ms), so the two
-  # timing segments read consistently. Below 1h, just minutes; ≥1h, h+m.
-  local pretty
-  if [ "$elapsed" -ge 3600 ]; then
-    printf -v pretty '%dh%dm' $(( elapsed / 3600 )) $(( (elapsed % 3600) / 60 ))
-  else
-    printf -v pretty '%dm' $(( elapsed / 60 ))
-  fi
-  printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$pretty" "$C_RESET"
+  printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$(fmt_dhm "$elapsed")" "$C_RESET"
 }
 
 seg_wall() {
@@ -654,12 +663,25 @@ seg_waka() {
   if [ -f "$cf" ] && [ $((now - mtime)) -lt 300 ]; then
     read -r val <"$cf" 2>/dev/null || val=""
   else
-    # Background refresh — don't block the render. Use a lockfile so
-    # multiple concurrent statusline runs don't all spawn fetchers.
+    # Stale-lock recovery: if the lockdir is older than 60s the previous
+    # bg fetch died (network hang, SIGKILL on logout, OOM) without
+    # cleanup. Without this guard the dir persists forever, no further
+    # refresh ever runs, and the segment silently freezes on the last
+    # cached value — invisible failure mode. (Reviewer flagged this.)
+    if [ -d "$lock" ]; then
+      local lock_mtime
+      lock_mtime="$(stat -f %m "$lock" 2>/dev/null || stat -c %Y "$lock" 2>/dev/null || echo 0)"
+      [ $((now - lock_mtime)) -gt 60 ] && rmdir "$lock" 2>/dev/null
+    fi
+    # Background refresh — don't block the render. mkdir-based lock so
+    # multiple concurrent statusline runs don't all spawn fetchers. The
+    # subshell's EXIT trap guarantees the lock is removed even if the
+    # fetch hangs and we get killed mid-call.
     if mkdir "$lock" 2>/dev/null; then
-      ( "$wt" --today >"$cf.tmp" 2>/dev/null \
-        && mv "$cf.tmp" "$cf" 2>/dev/null
-        rmdir "$lock" 2>/dev/null
+      (
+        trap 'rmdir "'"$lock"'" 2>/dev/null' EXIT
+        "$wt" --today >"$cf.tmp" 2>/dev/null \
+          && mv "$cf.tmp" "$cf" 2>/dev/null
       ) &
     fi
     # Serve stale value while the bg refresh runs (avoids flicker).
@@ -667,34 +689,24 @@ seg_waka() {
   fi
   [ -n "$val" ] || return 0
   # wakatime-cli prints variants: "2 hrs 9 mins" / "1 hr 5 mins" /
-  # "47 mins" / "1 min" / "8 secs". Reformat to seg_timer's "Nh Mm" /
-  # "Nm" shape so the two timing-style segments read consistently.
-  local hrs=0 mins=0 pretty=""
-  # Hours: digits before " hr" or " hrs"
-  case "$val" in
-    *' hr'*) hrs="${val%% hr*}" ;;
-  esac
-  # Minutes: digits before " min" or " mins". Strip the optional "Nh"
-  # prefix first so we don't grab the hour digits.
+  # "47 mins" / "1 min" / "8 secs". Convert to total seconds, then
+  # render via fmt_dhm so multi-day totals format as "Nd Hh Mm" / "Nh Mm"
+  # consistently with seg_timer.
+  local hrs=0 mins=0 secs=0 total
+  case "$val" in *' hr'*) hrs="${val%% hr*}" ;; esac
   local rest="$val"
-  case "$rest" in
-    *' hr'*) rest="${rest#*hrs }"; rest="${rest#*hr }" ;;
-  esac
-  case "$rest" in
-    *' min'*) mins="${rest%% min*}" ;;
-  esac
-  # Sanitize to integers (defensive against unexpected wakatime formats)
+  case "$rest" in *' hr'*) rest="${rest#*hrs }"; rest="${rest#*hr }" ;; esac
+  case "$rest" in *' min'*) mins="${rest%% min*}" ;; esac
+  rest="$val"
+  case "$rest" in *' min'*) rest="${rest#*mins }"; rest="${rest#*min }" ;; esac
+  case "$rest" in *' sec'*) secs="${rest%% sec*}" ;; esac
   case "$hrs" in '' | *[!0-9]*) hrs=0 ;; esac
   case "$mins" in '' | *[!0-9]*) mins=0 ;; esac
-  if [ "$hrs" -gt 0 ] 2>/dev/null; then
-    printf -v pretty '%dh%dm' "$hrs" "$mins"
-  elif [ "$mins" -gt 0 ] 2>/dev/null; then
-    printf -v pretty '%dm' "$mins"
-  else
-    return 0
-  fi
+  case "$secs" in '' | *[!0-9]*) secs=0 ;; esac
+  total=$(( hrs * 3600 + mins * 60 + secs ))
+  [ "$total" -ge 60 ] || return 0
   label "$C_AQUA" "$ICON_WAKA" 'WakaTime'
-  printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$pretty" "$C_RESET"
+  printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$(fmt_dhm "$total")" "$C_RESET"
 }
 
 # Skills — count user-scope + workspace-scope skill bundles. Claude Code
@@ -725,14 +737,17 @@ seg_skills() {
 seg_mcp() {
   local f="$HOME/.claude.json"
   [ -f "$f" ] || return 0
-  local count
-  # Extract the mcpServers value block, then count `"name": {` openings.
-  # Cache by mtime to avoid re-reading the (potentially large) settings
-  # file on every render.
+  command -v jq >/dev/null 2>&1 || return 0
+  # Cache by file mtime to avoid re-reading + re-parsing the (potentially
+  # large) ~/.claude.json on every render. jq is required by install.sh
+  # for the MCP merge anyway, so it's always available — using it here
+  # too keeps claude/statusline.sh and copilot/statusline.sh aligned
+  # (was awk-based brace-counting; copilot uses jq; reviewer flagged the
+  # drift). jq also handles MCP server names containing `}` in string
+  # values correctly, which the awk parser would miscount.
   local cf="$CACHE_DIR/mcp_count"
-  local fmtime
+  local fmtime cached_mtime cached_count="" count
   fmtime="$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null || echo 0)"
-  local cached_mtime cached_count=""
   if [ -f "$cf" ]; then
     IFS='|' read -r cached_mtime cached_count <"$cf" 2>/dev/null
     if [ "$cached_mtime" = "$fmtime" ]; then
@@ -740,20 +755,7 @@ seg_mcp() {
     fi
   fi
   if [ -z "$count" ]; then
-    # awk: find the `"mcpServers": {` line; from there, count `"key": {`
-    # openings until the matching close brace at depth 0 (i.e. depth
-    # returns to 0 after entering the mcpServers value).
-    count="$(awk '
-      BEGIN { in_blk=0; depth=0; n=0 }
-      !in_blk { if ($0 ~ /"mcpServers"[[:space:]]*:[[:space:]]*\{/) { in_blk=1; depth=1; next } }
-      in_blk {
-        for (i=1; i<=length($0); i++) {
-          c = substr($0, i, 1)
-          if (c == "{") { depth++ ; if (depth == 2) n++ }
-          else if (c == "}") { depth-- ; if (depth == 0) { print n; exit } }
-        }
-      }
-    ' "$f" 2>/dev/null)"
+    count="$(jq -r '(.mcpServers // {}) | length' "$f" 2>/dev/null)"
     [ -z "$count" ] && count=0
     printf '%s|%s\n' "$fmtime" "$count" >"$cf" 2>/dev/null || true
   fi

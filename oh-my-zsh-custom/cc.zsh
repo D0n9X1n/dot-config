@@ -24,7 +24,13 @@ function cc {
     print -u2 "Usage: cc <tab title>"
     return 1
   fi
-  local title="$1"
+  # Prepend a Nerd Font glyph so the tab is visually distinct as a Claude
+  # Code session. mdi-creation (U+F0674) renders as sparkles in any Nerd
+  # Font — fits the "AI agent" vibe and reads cleanly even without color.
+  # Wrap in $'...' (zsh ANSI-C quoting) so the literal codepoint sits in
+  # the title bytes.
+  local icon=$''
+  local title="$icon $1"
   DISABLE_AUTO_TITLE=true
   print -Pn "\e]2;${title}\a"
   print -Pn "\e]1;${title}\a"

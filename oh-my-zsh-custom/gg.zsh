@@ -27,7 +27,11 @@ function gg {
     print -u2 "Usage: gg <tab title>"
     return 1
   fi
-  local title="$1"
+  # Prepend a Nerd Font glyph so the tab is visually distinct as a
+  # Copilot CLI session. fa-github (U+F09B) is the GitHub octocat — the
+  # most direct "this is GitHub Copilot" signal.
+  local icon=$''
+  local title="$icon $1"
   DISABLE_AUTO_TITLE=true
   print -Pn "\e]2;${title}\a"
   print -Pn "\e]1;${title}\a"

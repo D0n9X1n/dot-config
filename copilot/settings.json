@@ -66,6 +66,5 @@
       "level": "local"
     }
   ],
-  "showReasoning": false,
-  "staff": true
+  "showReasoning": false
 }

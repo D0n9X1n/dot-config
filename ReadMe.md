@@ -331,6 +331,11 @@ Implementation notes:
 - Sends OSC 1 (icon name / tab title) and OSC 2 (window title) — terminals
   that pull the window title from the active surface's OSC 2 (WezTerm) pick
   this up automatically when not nested in tmux.
+- Prepends a Nerd Font glyph (`fa-github`, U+F09B) to the title so Copilot
+  tabs are visually distinct from plain shells / `cc` tabs at a glance.
+  Requires a Nerd-patched font in the terminal — Rec Mono St.Helens (the
+  default in this repo's `wezterm.lua`) is itself a Nerd Font 3.4.0 build
+  so the glyph renders natively, no fallback needed.
 - When `$TMUX` is set, also runs `tmux rename-window -- "$title"` so tmux's
   own window-name machinery is in sync (it doesn't read OSC sequences once
   `automatic-rename` is off).
@@ -588,7 +593,9 @@ settings.json key is gated off by feature flag.
 
 Same applies to `cc <title>`: it renames the active terminal tab via
 OSC 1/2 (+ tmux + WezTerm CLI fallbacks) then launches Claude Code with
-the bypass flag.
+the bypass flag. The title is prefixed with a Nerd Font glyph
+(`mdi-creation`, U+F0674 — sparkles) so Claude tabs are visually distinct
+from Copilot's `gg` tabs (which use `fa-github`) and from plain shells.
 
 To switch models mid-session, use Claude Code's `/model <name>` —
 free-form names pass through the proxy unchanged.

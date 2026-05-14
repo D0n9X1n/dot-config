@@ -159,6 +159,10 @@ config.show_tab_index_in_tab_bar = false
 -- comfortably tall bar without dwarfing terminal text. Chrome harmonised
 -- with the bar so the whole title-bar area is one continuous Gruvbox surface.
 config.window_frame = {
+  -- Rec Mono St.Helens is itself a Nerd-patched font (verified via the
+  -- font's name table: "Nerd Fonts 3.4.0"), so it already ships fa-bolt,
+  -- fa-github, fa-keyboard_o etc. natively — no fallback needed for
+  -- icons in tab titles. We just need the bare font here.
   font = wezterm.font({ family = "Rec Mono St.Helens", weight = "Medium" }),
   font_size = 15.0,
   active_titlebar_bg = BAR_BG,
