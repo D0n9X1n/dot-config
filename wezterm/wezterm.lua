@@ -115,7 +115,10 @@ config.font_rules = {
 -- Gruvbox variants (dark hard / medium / Material) keeps the chrome
 -- aligned automatically — no hex hunt required.
 local SCHEME      = wezterm.color.get_builtin_schemes()[config.color_scheme] or {}
-local BAR_BG      = (config.colors and config.colors.background) or SCHEME.background or "#1d2021"
+-- Override scheme bg with a slightly darker shade than Gruvbox hard's #1d2021
+-- for a deeper canvas while keeping the warm Gruvbox tint.
+local DARK_BG     = "#141617"
+local BAR_BG      = DARK_BG
 local TAB_BG      = BAR_BG
 
 -- Backwards-compat aliases (still referenced by the format-tab-title body):
@@ -128,6 +131,7 @@ local FG          = "#d5c4a1"  -- gruvbox fg2 (hover — slightly brighter)
 local FG_ACCENT   = "#fabd2f"  -- gruvbox bright yellow (active title)
 
 config.colors = {
+  background = DARK_BG,
   tab_bar = {
     background = BAR_BG,
     inactive_tab_edge = BAR_BG,

@@ -50,10 +50,19 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
   opt in with `ln -sfn "$(pwd)/wezterm/wezterm.lua" ~/.wezterm.lua` (the
   `-fn` flags safely overwrite any stale symlink). The `wezterm` cask is
   auto-installed by `install.sh` so the terminal is one symlink away.
-  Config uses `color_scheme = "Gruvbox dark, hard (base16)"`,
-  `inactive_pane_hsb = {1,1,1}` (no inactive-pane dimming), and the
-  custom tab-bar `BAR_BG` is derived from the active scheme so swapping
-  schemes auto-aligns the tab strip.
+  Config uses `color_scheme = "Gruvbox dark, hard (base16)"` with
+  `config.colors.background = "#141617"` (slightly darker than the stock
+  Hard `#1d2021`), `inactive_pane_hsb = {1,1,1}` (no inactive-pane
+  dimming), and the custom tab-bar `BAR_BG` derived from the active
+  background so the tab strip auto-aligns when the bg changes.
+- `<repo>/themes/apollo/` — **reference theme files; NOT auto-linked**.
+  Apollo = Gruvbox hard + Material warm-beige ANSI 7 + `#141617` canvas.
+  Ships matched colorschemes for WezTerm (`apollo.lua`), Vim
+  (`apollo.vim`), Neovim (`apollo.nvim.lua`), VS Code
+  (`apollo-color-theme.json`), and Windows Terminal
+  (`apollo.terminal.json`). `PALETTE.md` is the single source of truth —
+  when you change a color, update every file in this directory.
+  See `themes/apollo/README.md` for per-editor install snippets.
 - `<repo>/copilot/<file>` — files linked to `$HOME/.copilot/<file>`. Currently:
   - `settings.json` — Copilot CLI settings (model: `claude-opus-4.7-1m-internal`,
     theme `dark`, `keepAlive: busy`, `continueOnAutoMode: true`, custom

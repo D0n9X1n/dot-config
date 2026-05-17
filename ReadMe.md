@@ -22,6 +22,7 @@ dot-configs/
 │   └── statusline.sh            # statusline
 ├── wezterm/                     # terminal config (NOT auto-linked — opt-in)
 │   └── wezterm.lua              # WezTerm config — link manually if used
+├── themes/apollo/               # Apollo theme (wezterm/vim/nvim/vscode/wt) — reference, not auto-linked
 ├── launchd/                     # macOS launchd agent templates
 │   └── com.d0n9x1n.copilot-bridge.plist  # copilot-bridge proxy on login (rendered by install.sh)
 ├── mcp-shared.json              # secret-free MCP entries synced via git
