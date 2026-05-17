@@ -252,6 +252,52 @@ ln -sfn ~/Public/dot-configs/wezterm/wezterm.lua ~/.wezterm.lua
 # Open WezTerm; verify Gruvbox dark hard scheme is active.
 ```
 
+### 8.5. Optional: Apollo theme (wezterm / vim / neovim / vscode / windows terminal)
+
+Apollo lives at `themes/apollo/`. `PALETTE.md` is the single source of
+truth — every editor file mirrors it. `install.sh` does **not** wire
+these up; install per-editor manually (one-time per machine).
+
+```bash
+THEMES=~/Public/dot-configs/themes/apollo
+
+# Vim
+mkdir -p ~/.vim/colors
+ln -sfn "$THEMES/apollo.vim" ~/.vim/colors/apollo.vim
+# then in .vimrc:  colorscheme apollo
+
+# Neovim (any nvim config — drop into a `colors/` on rtp)
+mkdir -p ~/.config/nvim/colors
+ln -sfn "$THEMES/apollo.nvim.lua" ~/.config/nvim/colors/apollo.lua
+# then in init.lua:  vim.cmd('colorscheme apollo')
+
+# WezTerm — already wired via wezterm/wezterm.lua (#141617 bg). To use
+# the standalone scheme instead, in wezterm.lua:
+#   local apollo = dofile(os.getenv("HOME") .. "/Public/dot-configs/themes/apollo/apollo.lua")
+#   config.color_schemes = { Apollo = apollo }
+#   config.color_scheme  = "Apollo"
+
+# VS Code — local extension (NOT synced via Settings Sync; copy per machine)
+EXT=~/.vscode/extensions/apollo-theme-0.0.1
+mkdir -p "$EXT/themes"
+cp "$THEMES/apollo-color-theme.json" "$EXT/themes/"
+cat > "$EXT/package.json" <<'JSON'
+{
+  "name": "apollo-theme", "displayName": "Apollo", "version": "0.0.1",
+  "publisher": "local", "engines": {"vscode": "^1.60.0"},
+  "categories": ["Themes"],
+  "contributes": {"themes": [{"label": "Apollo", "uiTheme": "vs-dark",
+    "path": "./themes/apollo-color-theme.json"}]}
+}
+JSON
+# then in VS Code settings.json:  "workbench.colorTheme": "Apollo"
+# Reload window (⌘⇧P → Developer: Reload Window).
+
+# Windows Terminal — paste themes/apollo/apollo.terminal.json into the
+# "schemes" array in settings.json, then set "colorScheme": "Apollo"
+# on the profile(s) you want.
+```
+
 ### 9. Optional: tmux plugins
 
 `install.sh` runs TPM bootstrap automatically. Verify:
