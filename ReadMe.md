@@ -1,5 +1,16 @@
 # dot-configs
 
+[![CI](https://github.com/D0n9X1n/dot-config/actions/workflows/ci.yml/badge.svg)](https://github.com/D0n9X1n/dot-config/actions/workflows/ci.yml)
+[![Release](https://github.com/D0n9X1n/dot-config/actions/workflows/release.yml/badge.svg)](https://github.com/D0n9X1n/dot-config/actions/workflows/release.yml)
+[![Latest release](https://img.shields.io/github/v/release/D0n9X1n/dot-config?sort=semver&color=fe8019)](https://github.com/D0n9X1n/dot-config/releases/latest)
+[![License](https://img.shields.io/github/license/D0n9X1n/dot-config?color=b8bb26)](./LICENSE)
+[![Last commit](https://img.shields.io/github/last-commit/D0n9X1n/dot-config?color=83a598)](https://github.com/D0n9X1n/dot-config/commits/main)
+[![Repo size](https://img.shields.io/github/repo-size/D0n9X1n/dot-config?color=d3869b)](https://github.com/D0n9X1n/dot-config)
+[![Platform](https://img.shields.io/badge/platform-macOS-1d2021?logo=apple&logoColor=ebdbb2)](#)
+[![Made with Bash](https://img.shields.io/badge/made%20with-bash-fabd2f?logo=gnubash&logoColor=1d2021)](#)
+[![ShellCheck](https://img.shields.io/badge/lint-shellcheck-8ec07c?logo=gnubash&logoColor=1d2021)](https://www.shellcheck.net/)
+[![Gruvbox](https://img.shields.io/badge/theme-gruvbox%20dark%20hard-fb4934)](#)
+
 Personal dotfiles repository. Single source of truth for shell, terminal, and
 editor configuration; synced across machines via git + an idempotent installer
 that creates symlinks into the home directory.

@@ -10,6 +10,13 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
 
 ## Layout
 - `install.sh` — macOS entry point; idempotent; safe to re-run.
+- `.github/workflows/ci.yml` — push/PR. macOS smoke: `bash -n` every
+  tracked `.sh`, pipes `'{}'` into `claude/statusline.sh` and a sample
+  model JSON into `copilot/statusline.sh`, asserts non-empty output.
+  Ubuntu: `shellcheck -S error` (with SC1090/1091/2148/2155 excluded).
+- `.github/workflows/release.yml` — on tag `v*.*.*`, publishes a GitHub
+  Release with auto-generated notes (`softprops/action-gh-release@v2`).
+  Flow: bump version, commit, `git tag v0.X.Y && git push --tags`.
 - `mcp-shared.json` — secret-free MCP entries synced via git. install.sh
   merges into local Copilot mcp.json; the existing pipeline lifts the
   merged set into `~/.claude.json`. Secrets stay per-device.

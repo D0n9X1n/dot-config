@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    name: Smoke tests (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bash syntax check (all tracked .sh)
+        run: |
+          set -euo pipefail
+          fail=0
+          while IFS= read -r f; do
+            echo "bash -n $f"
+            bash -n "$f" || fail=1
+          done < <(git ls-files '*.sh')
+          exit "$fail"
+
+      - name: Claude statusline smoke
+        run: |
+          set -euo pipefail
+          out=$(echo '{}' | bash claude/statusline.sh)
+          [ -n "$out" ] && echo "ok: ${#out} bytes"
+
+      - name: Copilot statusline smoke
+        run: |
+          set -euo pipefail
+          out=$(echo '{"model":{"display_name":"Claude (xhigh)"}}' | bash copilot/statusline.sh)
+          [ -n "$out" ] && echo "ok: ${#out} bytes"
+
+      - name: install.sh dry parse
+        run: bash -n install.sh
+
+  shellcheck:
+    name: ShellCheck (errors only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run shellcheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          severity: error
+          scandir: '.'
+          additional_files: 'install.sh'
+        env:
+          SHELLCHECK_OPTS: -e SC1090 -e SC1091 -e SC2155 -e SC2148

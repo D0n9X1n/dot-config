@@ -74,7 +74,9 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
 
 - **Bump version + tag**. We use semver-ish tags (`v0.X.Y`); patch for
   bugfixes, minor for new features, major for breaking changes.
-  Existing history: v0.1.0 → v0.9.1.
+  Existing history: v0.1.0 → v0.9.1. Pushing a `v*.*.*` tag triggers
+  `.github/workflows/release.yml`, which publishes a GitHub Release
+  with auto-generated notes.
 - **Update QUICKREF.md** when behavior changes — the agent-facing brief
   must stay accurate.
 - **Update ReadMe.md** when user-visible details change.
@@ -86,7 +88,9 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
   echo '{"model":{"display_name":"Claude (xhigh)"}}' | ~/.copilot/statusline.sh
   ```
 
-  All three should succeed silently / print colored output.
+  All three should succeed silently / print colored output. CI
+  (`.github/workflows/ci.yml`) runs the same checks on macOS plus
+  `shellcheck -S error` on Ubuntu for every push/PR.
 
 ## Things that have bitten us
 
