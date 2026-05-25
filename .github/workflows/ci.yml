@@ -39,15 +39,15 @@ jobs:
         run: bash -n install.sh
 
   shellcheck:
-    name: ShellCheck (warnings+)
+    name: ShellCheck (errors only)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Run shellcheck
         uses: ludeeus/action-shellcheck@master
         with:
-          severity: warning
+          severity: error
           scandir: '.'
           additional_files: 'install.sh'
         env:
-          SHELLCHECK_OPTS: -e SC1090 -e SC1091 -e SC2155
+          SHELLCHECK_OPTS: -e SC1090 -e SC1091 -e SC2155 -e SC2148

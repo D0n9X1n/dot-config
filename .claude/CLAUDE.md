@@ -90,7 +90,7 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
 
   All three should succeed silently / print colored output. CI
   (`.github/workflows/ci.yml`) runs the same checks on macOS plus
-  `shellcheck -S warning` on Ubuntu for every push/PR.
+  `shellcheck -S error` on Ubuntu for every push/PR.
 
 ## Things that have bitten us
 
