@@ -71,38 +71,34 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
   when you change a color, update every file in this directory.
   See `themes/apollo/README.md` for per-editor install snippets.
 - `<repo>/copilot/<file>` — files linked to `$HOME/.copilot/<file>`. Currently:
-  - `settings.json` — Copilot CLI settings (model: `claude-opus-4.7-1m-internal`,
-    theme `dark`, `keepAlive: busy`, `continueOnAutoMode: true`, custom
-    footer (now hides `showModelEffort` / `showBranch` / `showContextWindow`
-    because `statusline.sh` renders them — keeps `showDirectory` and
-    `showAgent`), custom status line). The `statusLine` block only
+  - `settings.json` — Copilot CLI settings (model: `gpt-5.5`, effort
+    `xhigh`, `contextTier: long_context`, theme `dark`, `keepAlive: busy`,
+    `continueOnAutoMode: true`, custom footer/status line). The `statusLine` block only
     takes a single `padding` field — per-side spacing is done in
     `statusline.sh` (newlines for top, leading spaces for left). Note:
     Copilot itself injects/strips a `"staff": true` field at runtime based
     on org membership; keep that field out of the committed file to avoid
     spurious diffs.
   - `statusline.sh` — executable script printing the custom status line.
-    A "full mirror" of `~/.claude/statusline.sh`: per-segment Gruvbox
-    color accents, color-graded Cache % and Context %, and every Claude
-    segment reproduced (segments whose data Copilot's statusLine JSON
-    doesn't expose silently no-op, so `agent`/`style` cost nothing
-    until a future CLI version starts emitting them). Renders these
-    segments in order, `<icon> <Label> <value>` separated by `│`:
-    Time, Model, Effort (parsed from `model.display_name` `(xhigh)` etc),
-    Run, API, Req, Cache, Last, Ctx, Worktree, Repo (clean/dirty
-    + ↑↓), Branch, Stash, Venv, GH, Ext, MCP, Diff (enabled by default,
-    icon U+F121 angle-brackets). Env overrides:
+    A "full mirror" of `~/.claude/statusline.sh`: five-line default layout
+    with per-segment Gruvbox accents and color-graded Context %. Renders
+    `<icon> <Label> <value>` separated by `│`: L1 time/run/req/wakatime,
+    L2 model/effort/context, L3 mcp/skills/agents/tasks/style, L4 cwd path,
+    L5 repo/branch/diff/stash/worktree. Copilot-only segments (`wall`,
+    `api`, `cache_pct`, `last_call`, `gh_account`, `ext_count`, `venv`)
+    remain available via `COPILOT_STATUSLINE_SEGMENTS`. Env overrides:
     `COPILOT_STATUSLINE_NO_ICONS=1` drops icons (keeps text labels);
     `COPILOT_STATUSLINE_NO_COLOR=1` drops color (legacy
     `COPILOT_STATUSLINE_NO_DIM=1` is honored as an alias);
     `COPILOT_STATUSLINE_PAD_TOP=N` / `..._PAD_LEFT=N` / `..._PAD_RIGHT=N`
-    override per-side padding (default top=8, left=1, right=0);
+    override per-side padding (default top=0, left=0, right=0);
     `COPILOT_STATUSLINE_SEGMENTS="…"` overrides the segment list and order.
     The CLI's `statusLine.padding*` fields are silently ignored — only
     `padding` works there, so we emit our own spacing instead. Run
     `~/.copilot/statusline.sh --test` to verify each codepoint renders in
     your terminal (uses `fc-list` if installed). Parses Copilot's session
-    JSON from stdin (single `jq` call) and caches `gh auth status` for
+    JSON from stdin (single `jq` call), caches git state for 5s
+    (`COPILOT_STATUSLINE_GIT_TTL=N`), and caches `gh auth status` for
     5 min. Bash 3.2-compatible. `install.sh` ensures the executable bit
     is set. v0.6.0: sibling `claude/statusline.sh` warm-cache 125ms→18ms
     via pure-bash JSON parsing (no jq dep), per-cwd git cache (5s TTL
@@ -110,12 +106,21 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     forks (`cost`/`ctx`/`fmt_tokens` use bash printf/arith), and
     `printf -v __SEG` instead of per-segment subshells. v0.8.0: multi-line
     layout via literal `\n` token in `SEGMENTS`. v0.13.x: 5-line default —
-    L1 time/run/api/cost · L2 model/effort/context · L3 mcp/skills/agents/style ·
-    L4 cwd path (new `seg_path`, U+F07C, $HOME→~) · L5 repo/branch/diff/stash/worktree.
-    `seg_agent` counts available agent definitions (`*.md` in `~/.claude/agents/`
-    + `<cwd>/.claude/agents/`) — NOT live sub-agents (statusline JSON doesn't
-    expose runtime sub-agent state). `seg_timer` formats as `Nh Mm` for
-    sessions ≥ 1h (v0.13.2). v0.13.3 drops `wall` from the default list.
+    L1 time/run/req/wakatime · L2 model/effort/context ·
+    L3 mcp/skills/agents/tasks/style · L4 cwd path (new `seg_path`, U+F07C,
+    $HOME→~) · L5 repo/branch/diff/stash/worktree. `seg_agent` counts
+    local custom agent profiles (`*.md` in `~/.copilot/agents/` +
+    `<cwd>/.github/agents/`) and `seg_skills` counts skill bundles
+    (`SKILL.md` under `~/.copilot/skills/`, `~/.agents/skills/`,
+    `<cwd>/.github/skills/`, `<cwd>/.claude/skills/`, and
+    `<cwd>/.agents/skills/`) — NOT live sub-agents. Both show `0`.
+    `seg_subagents` shows the live running-subagent count. `seg_timer`
+    formats as `Nh Mm` for sessions ≥ 1h (v0.13.2).
+    Active subagent rows (below L5) now show agent name, purpose, and
+    running time (elapsed since the subagent started, formatted via
+    `fmt_dhm`). Controlled by `COPILOT_STATUSLINE_MAX_SUBAGENTS=N`
+    (default 8) and `COPILOT_STATUSLINE_SUBAGENT_ROOT=0` to hide the
+    root "main" row.
   - `copilot-instructions.md` — global agent instructions (autonomous mode).
 - `<repo>/claude/<file>` — files linked to `$HOME/.claude/<file>`. Currently:
   - `settings.json` — Claude Code → Copilot bridge AND global default-pinning.
@@ -160,6 +165,19 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     betahi-copilot-bridge && copilot-bridge auth` (browser device-code flow).
     After auth, leave `copilot-bridge start --no-claude-setup --no-codex-setup`
     running and launch `claude` in another shell.
+    The `hooks` block wires `PreToolUse|PostToolUse` (matcher `Task|Agent`)
+    and `SubagentStop` to `~/.claude/hooks/subagent-counter.sh start|stop`
+    so the statusline's running-subagent count is event-driven (O(1) read
+    from a per-session counter file) instead of polling the transcript.
+  - `hooks/subagent-counter.sh` — maintains
+    `$TMPDIR/claude-subagents-$USER/<session_id>` (single integer).
+    +1 on Task/Agent `start`, -1 on `stop`. Dedupes overlapping
+    `PostToolUse` + `SubagentStop` events via a `.seen` sidecar keyed by
+    `tool_use_id`. Uses `mkdir` lock for concurrency safety, falls back
+    to bash regex if `jq` is absent, always exits 0 so a hook bug never
+    blocks Claude. `seg_subagents` in the statusline reads this file
+    directly; if missing (legacy sessions started before the hooks were
+    installed) it falls back to a signature-cached transcript scan.
 - `<repo>/oh-my-zsh-custom/<file>` — files linked to
   `$HOME/.oh-my-zsh/custom/<file>`. Currently:
   - `custom.zsh` — aliases, proxy helpers (`enable_proxy`/`disable_proxy`),

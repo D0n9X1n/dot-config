@@ -488,11 +488,10 @@ installed).
 
 #### `settings.json`
 
-Copilot CLI configuration. Pinned model `claude-opus-4.7-1m-internal`, theme
-`dark`, `keepAlive: busy`, `continueOnAutoMode: true`, custom footer (hides
-code-changes plus everything `statusline.sh` now renders — model/effort,
-branch, context window — to avoid duplication; keeps directory + agent +
-custom segment), and a custom status line provided by `statusline.sh`.
+Copilot CLI configuration. Pinned model `gpt-5.5`, `effortLevel: xhigh`,
+`contextTier: long_context`, theme `dark`, `keepAlive: busy`,
+`continueOnAutoMode: true`, custom footer, and a custom status line provided
+by `statusline.sh`.
 
 > **Caveat:** Copilot CLI rewrites `settings.json` at runtime to inject /
 > strip a `staff` field and to toggle UI defaults — edit it via atomic
@@ -504,17 +503,12 @@ custom segment), and a custom status line provided by `statusline.sh`.
 #### `statusline.sh`
 
 Executable script — a "full mirror" of `~/.claude/statusline.sh` adapted to
-Copilot's `statusLine` JSON. Per-segment Gruvbox color accents, color-graded
-Cache % and Context %. Renders these segments in order, `<icon> <Label>
-<value>` separated by `│` (each shown only when its data is available):
-**Time, Model, Effort, Run, API, Req, Cache, Last, Ctx, Worktree,
-Repo (clean / dirty + ↑↓), Branch, Stash, Venv, GH, Ext, MCP, Diff**.
-Effort is parsed from `model.display_name` (Copilot bakes `(xhigh)` etc into
-the display name rather than exposing `.effort.level`). Worktree is detected
-via `git rev-parse --git-dir` and only shown when actually inside a linked
-worktree. Agent and Style are defined but no-op until Copilot starts
-exposing them in JSON. The Diff segment uses U+F121 (angle-bracket "code"
-icon) and is enabled by default as of v0.13.x.
+Copilot's `statusLine` JSON. Per-segment Gruvbox color accents and
+color-graded Context %. Default layout is five lines: L1 time/run/req/wakatime,
+L2 model/effort/context, L3 mcp/skills/agents/tasks/style, L4 cwd path, L5
+repo/branch/diff/stash/worktree. Copilot-only segments such as `api`,
+`cache_pct`, `last_call`, `gh_account`, `ext_count`, and `venv` remain
+available via `COPILOT_STATUSLINE_SEGMENTS`.
 
 Environment overrides:
 
@@ -522,14 +516,15 @@ Environment overrides:
 - `COPILOT_STATUSLINE_NO_COLOR=1` — drop color (legacy
   `COPILOT_STATUSLINE_NO_DIM=1` is honored as an alias for backwards-compat).
 - `COPILOT_STATUSLINE_PAD_TOP=N` / `..._PAD_LEFT=N` / `..._PAD_RIGHT=N` —
-  override per-side padding (defaults: top = 8, left = 1, right = 0).
+  override per-side padding (defaults: top = 0, left = 0, right = 0).
 - `COPILOT_STATUSLINE_SEGMENTS="…"` — override the segment list and order
   (e.g. add `diff`, drop `cache_pct`, reorder freely).
 
 Run `~/.copilot/statusline.sh --test` to verify each codepoint renders in
 your terminal (uses `fc-list` if installed). Parses Copilot's session JSON
-from stdin via a single `jq` call and caches `gh auth status` for 5
-minutes. Bash 3.2-compatible. `install.sh` keeps the executable bit set.
+from stdin via a single `jq` call, caches git state for 5s
+(`COPILOT_STATUSLINE_GIT_TTL=N` overrides), and caches `gh auth status` for
+5 minutes. Bash 3.2-compatible. `install.sh` keeps the executable bit set.
 
 > **Perf (v0.6.0):** the sibling `claude/statusline.sh` was rewritten for
 > warm-cache latency 125ms → 18ms — pure-bash JSON parsing (no `jq`
@@ -541,15 +536,19 @@ minutes. Bash 3.2-compatible. `install.sh` keeps the executable bit set.
 
 > **Layout (v0.13.x):** five-line layout by default. Literal `\n` tokens
 > in the `SEGMENTS` list introduce line breaks:
-> L1 `time | run | api | cost`, L2 `model | effort | context`,
-> L3 `mcp | skills | agents | style`, L4 cwd path, L5
+> L1 `time | run | req | wakatime`, L2 `model | effort | context`,
+> L3 `mcp | skills | agents | tasks | style`, L4 cwd path, L5
 > `repo | branch | diff | stash | worktree`. `seg_path` (icon U+F07C
 > folder-open) renders the full cwd with `$HOME` collapsed to `~`.
-> `seg_agent` counts `*.md` files in `~/.claude/agents/` +
-> `<cwd>/.claude/agents/` — i.e. **available agent definitions**, not
-> currently-running sub-agents (statusline JSON doesn't expose runtime
-> sub-agent state). `seg_timer` shows `Nh Mm` once the session crosses
-> one hour (v0.13.2). Override per-shell via `COPILOT_STATUSLINE_SEGMENTS`.
+> `seg_agent` counts local custom agent profiles (`*.md` in
+> `~/.copilot/agents/` + `<cwd>/.github/agents/`), and `seg_skills` counts
+> skill bundles (`SKILL.md` under `~/.copilot/skills/`, `~/.agents/skills/`,
+> `<cwd>/.github/skills/`, `<cwd>/.claude/skills/`, and
+> `<cwd>/.agents/skills/`) — i.e. **available definitions**, not live
+> sub-agents. `seg_subagents` shows the live running-subagent count.
+> `seg_timer` shows `Nh Mm` once the session crosses one hour (v0.13.2).
+> Override per-shell via
+> `COPILOT_STATUSLINE_SEGMENTS`.
 
 #### `copilot-instructions.md`
 

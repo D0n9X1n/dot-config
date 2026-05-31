@@ -31,39 +31,30 @@
 #   .vim.mode, .agent.name, .workspace.git_worktree, .output_style.name,
 #   .cost.total_cost_usd
 #
-# Segments (in render order; each omitted when its data is unavailable):
-#   Time      wall-clock HH:MM:SS                          yellow
-#   Model     short model name                             aqua
-#   Effort    parsed from model.display_name "(xhigh)"     purple
-#   Run       minutes since this session_id was first seen orange
-#   Wall      total_duration_ms formatted (Hh Mm / Mm / Ss) purple
-#   API       total_api_duration_ms formatted              blue
-#   Req       total_premium_requests count                 green
-#   Cache     cache_read / total_input_tokens, %           aqua, color-graded
-#   Last      last-turn input→output tokens, k/M-formatted purple
-#   Diff      +added / -removed lines (off by default)     green/red
-#   Ctx       context_window.used_percentage               green→yellow→red
-#   Vim       .vim.mode (no-op — Copilot doesn't expose)   orange
-#   Agent     .agent.name (no-op — Copilot doesn't expose) purple
-#   Worktree  detected via git rev-parse --git-dir         aqua
-#   Style     .output_style.name (no-op)                   purple
-#   Repo      git clean/dirty + ↑ahead/↓behind upstream    aqua
-#   Branch    git branch (truncated)                       yellow
-#   Stash     git stash count (omitted when 0)             orange
-#   Venv      basename of $VIRTUAL_ENV                     blue
-#   GH        `gh auth status` account (cached 5 min)      purple
-#   Ext       Copilot extensions count                     aqua
-#   MCP       servers in ~/.copilot/mcp-config.json        blue
+# Default layout matches ~/.claude/statusline.sh:
+#   L1: status       — time, run timer, premium requests, waka today
+#   L2: model        — model, effort, context
+#   L3: integrations — mcp, skills, agents, style
+#   L4: cwd path     — full directory path
+#   L5: repo + git   — repo, branch, diff, stash, worktree
+#   Bottom: active subagents — root + one line per live task subagent
+#           each row shows: agent name, purpose, and running time
+#
+# Additional Copilot-only segments remain available via
+# COPILOT_STATUSLINE_SEGMENTS: wall, api, cache_pct, last_call,
+# gh_account, ext_count, venv.
 #
 # Env overrides (mirror the Claude one for muscle memory):
 #   COPILOT_STATUSLINE_NO_ICONS=1   drop icons, keep text labels
 #   COPILOT_STATUSLINE_NO_COLOR=1   drop color (still pads + separators);
 #                                   legacy COPILOT_STATUSLINE_NO_DIM=1
 #                                   is honored as an alias.
-#   COPILOT_STATUSLINE_PAD_TOP=N    blank lines before the line (default 8)
-#   COPILOT_STATUSLINE_PAD_LEFT=N   spaces before the line     (default 1)
+#   COPILOT_STATUSLINE_PAD_TOP=N    blank lines before the line (default 0)
+#   COPILOT_STATUSLINE_PAD_LEFT=N   spaces before the line     (default 0)
 #   COPILOT_STATUSLINE_PAD_RIGHT=N  spaces after the line      (default 0)
 #   COPILOT_STATUSLINE_SEGMENTS="…" override the segment list (and order)
+#   COPILOT_STATUSLINE_MAX_SUBAGENTS=N max active subagent rows (default 8)
+#   COPILOT_STATUSLINE_SUBAGENT_ROOT=0 hide the "main" root row
 #
 # Quick check that all icons render in your terminal:
 #     ~/.copilot/statusline.sh --test
@@ -74,10 +65,11 @@
 set -u
 
 # --- Configuration ---------------------------------------------------------
-# SEGMENTS controls which segments render and in what order. Override
-# via `COPILOT_STATUSLINE_SEGMENTS="…"` to add/remove without editing
-# the file (e.g. add `diff` for code-changes, drop `cache_pct` etc).
-SEGMENTS="${COPILOT_STATUSLINE_SEGMENTS:-time model effort timer wall api premium cache_pct last_call ctx vim agent style \n repo branch worktree stash venv gh_account ext_count mcp_count}"
+# Five-line layout. A literal `\n` token in SEGMENTS introduces a line
+# break in the render loop. Empty/no-op segments collapse cleanly so
+# auto-hiding ones (worktree, stash, diff, skills, agents) take no space
+# when off.
+SEGMENTS="${COPILOT_STATUSLINE_SEGMENTS:-time timer premium waka \n model effort ctx \n mcp skills agent subagents style \n path \n git branch diff stash worktree}"
 SEP=' │ '
 
 ICONS_ON=1
@@ -89,7 +81,7 @@ ICONS_ON=1
 # subset Claude's statusline uses, so they render in any Nerd Font
 # variant including `Symbols Nerd Font Mono`. Verify with --test.
 #
-#   U+F252 hourglass-half  = EF 89 92   Time
+#   U+F017 clock           = EF 80 97   Time
 #   U+F2DB microchip        = EF 8B 9B   Model
 #   U+F0E4 dashboard        = EF 83 A4   Effort
 #   U+F254 hourglass        = EF 89 94   Wall
@@ -97,7 +89,8 @@ ICONS_ON=1
 #   U+F155 dollar           = EF 85 95   Req (premium request count)
 #   U+F021 refresh          = EF 80 A1   Cache
 #   U+F1D8 paper-plane      = EF 87 98   Last
-#   U+F12A asterisk         = EF 84 AA   Diff
+#   U+F121 code            = EF 84 A1   Diff
+#   U+F07C folder-open     = EF 81 BC   Path
 #   U+F1C0 database         = EF 87 80   Context
 #   U+F121 code             = EF 84 A1   Vim
 #   U+F135 rocket           = EF 84 B5   Agent / Run
@@ -108,9 +101,10 @@ ICONS_ON=1
 #   U+F187 archive          = EF 86 87   Stash
 #   U+F1AE flask            = EF 86 AE   Venv
 #   U+F09B github           = EF 82 9B   GH
+#   U+F11C keyboard         = EF 84 9C   WakaTime
+#   U+F0AE list-task        = EF 82 AE   Skills / Ext
 #   U+F1E6 plug             = EF 87 A6   MCP
-#   U+F0AE list-task        = EF 82 AE   Ext
-ICON_TIME=$'\xef\x89\x92'
+ICON_TIME=$'\xef\x80\x97'
 ICON_MODEL=$'\xef\x8b\x9b'
 ICON_EFFORT=$'\xef\x83\xa4'
 ICON_RUN=$'\xef\x84\xb5'
@@ -119,7 +113,7 @@ ICON_API=$'\xef\x88\xb3'
 ICON_REQ=$'\xef\x85\x95'
 ICON_CACHE=$'\xef\x80\xa1'
 ICON_LAST=$'\xef\x87\x98'
-ICON_DIFF=$'\xef\x84\xaa'
+ICON_DIFF=$'\xef\x84\xa1'
 ICON_CTX=$'\xef\x87\x80'
 ICON_VIM=$'\xef\x84\xa1'
 ICON_AGENT=$'\xef\x84\xb5'
@@ -129,9 +123,18 @@ ICON_REPO=$'\xef\x83\xa8'
 ICON_BRANCH=$'\xef\x84\xa6'
 ICON_STASH=$'\xef\x86\x87'
 ICON_VENV=$'\xef\x86\xae'
+ICON_PATH=$'\xef\x81\xbc'
 ICON_GH=$'\xef\x82\x9b'
+ICON_WAKA=$'\xef\x84\x9c'
+ICON_SKILLS=$'\xef\x82\xae'
 ICON_EXT=$'\xef\x82\xae'
 ICON_MCP=$'\xef\x87\xa6'
+# U+F085 cogs             = EF 82 85   Mode
+# U+F111 circle           = EF 84 91   Main (root) row
+# U+F135 rocket           = EF 84 B5   Active subagent row
+ICON_SUBAGENT_ROOT=$'\xef\x84\x91'
+ICON_SUBAGENT=$'\xef\x84\xb5'
+ICON_MODE=$'\xef\x82\x85'
 
 # Gruvbox Dark Hard accents — match alacritty/wezterm/.tmux.conf palette.
 # Use 24-bit ANSI so we don't depend on the terminal's 256-color cube.
@@ -148,17 +151,19 @@ if [ -z "${COPILOT_STATUSLINE_NO_COLOR:-}" ] && [ -z "${COPILOT_STATUSLINE_NO_DI
   C_AQUA=$'\033[38;2;142;192;124m'                # #8ec07c
   C_ORANGE=$'\033[38;2;254;128;25m'               # #fe8019
   C_FG=$'\033[38;2;235;219;178m'                  # #ebdbb2
+  C_FG_DIM=$'\033[38;2;168;153;132m'              # #a89984 — gruvbox fg3
 else
   C_RESET=""; C_DIM=""; C_RED=""; C_GREEN=""; C_YELLOW=""; C_BLUE=""
   C_PURPLE=""; C_AQUA=""; C_ORANGE=""; C_FG=""
+  C_FG_DIM=""
 fi
 
 # Per-side padding emitted from inside the script. Copilot CLI's
 # statusLine.padding* fields are silently ignored — only the single
 # `padding` key is honored — so we apply our own spacing here for
 # finer control.
-PAD_TOP="${COPILOT_STATUSLINE_PAD_TOP:-8}"
-PAD_LEFT="${COPILOT_STATUSLINE_PAD_LEFT:-1}"
+PAD_TOP="${COPILOT_STATUSLINE_PAD_TOP:-0}"
+PAD_LEFT="${COPILOT_STATUSLINE_PAD_LEFT:-0}"
 PAD_RIGHT="${COPILOT_STATUSLINE_PAD_RIGHT:-0}"
 
 repeat() {
@@ -190,7 +195,7 @@ if [ "${1:-}" = "--test" ]; then
     fi
     printf 'U+%-7s  %s     %-7s  %s\n' "$cp_hex" "$glyph" "$lbl" "$fc_status"
   done <<TEST_ICONS_EOF
-f252|${ICON_TIME}|Time
+f017|${ICON_TIME}|Time
 f2db|${ICON_MODEL}|Model
 f0e4|${ICON_EFFORT}|Effort
 f135|${ICON_RUN}|Run
@@ -199,7 +204,7 @@ f233|${ICON_API}|API
 f155|${ICON_REQ}|Req
 f021|${ICON_CACHE}|Cache
 f1d8|${ICON_LAST}|Last
-f12a|${ICON_DIFF}|Diff
+f121|${ICON_DIFF}|Diff
 f1c0|${ICON_CTX}|Context
 f121|${ICON_VIM}|Vim
 f135|${ICON_AGENT}|Agent
@@ -209,9 +214,14 @@ f0e8|${ICON_REPO}|Repo
 f126|${ICON_BRANCH}|Branch
 f187|${ICON_STASH}|Stash
 f1ae|${ICON_VENV}|Venv
+f07c|${ICON_PATH}|Path
 f09b|${ICON_GH}|GH
+f11c|${ICON_WAKA}|WakaTime
+f0ae|${ICON_SKILLS}|Skills
 f0ae|${ICON_EXT}|Ext
 f1e6|${ICON_MCP}|MCP
+f111|${ICON_SUBAGENT_ROOT}|Main
+f135|${ICON_SUBAGENT}|SubAgent
 TEST_ICONS_EOF
   exit 0
 fi
@@ -225,6 +235,7 @@ fi
 # --- 2. Parse all fields with one jq call (one field per line) -------------
 session_id=""
 session_name=""
+transcript_path=""
 model_name=""
 cwd=""
 premium="0"
@@ -238,10 +249,12 @@ last_in="0"
 last_out="0"
 ctx_pct=""
 ctx_size=""
+json_mode=""
 if [ -n "$session_json" ] && command -v jq >/dev/null 2>&1; then
   {
     IFS= read -r session_id    || session_id=""
     IFS= read -r session_name  || session_name=""
+    IFS= read -r transcript_path || transcript_path=""
     IFS= read -r model_name    || model_name=""
     IFS= read -r cwd           || cwd=""
     IFS= read -r premium       || premium="0"
@@ -255,9 +268,11 @@ if [ -n "$session_json" ] && command -v jq >/dev/null 2>&1; then
     IFS= read -r last_out      || last_out="0"
     IFS= read -r ctx_pct       || ctx_pct=""
     IFS= read -r ctx_size      || ctx_size=""
+    IFS= read -r json_mode     || json_mode=""
   } < <(printf '%s' "$session_json" | jq -r '
         (.session_id // ""),
         (.session_name // ""),
+        (.transcript_path // ""),
         ((.model.display_name // .model.id) // ""),
         ((.workspace.current_dir // .cwd) // ""),
         (.cost.total_premium_requests // 0),
@@ -270,8 +285,20 @@ if [ -n "$session_json" ] && command -v jq >/dev/null 2>&1; then
         (.context_window.last_call_input_tokens // 0),
         (.context_window.last_call_output_tokens // 0),
         (.context_window.used_percentage // ""),
-        (.context_window.context_window_size // "")
+        (.context_window.context_window_size // .context_window.size // ""),
+        (.mode // .session.mode // .config.mode // "")
       ' 2>/dev/null)
+fi
+
+# Copilot sends transcript_path as a directory; append events.jsonl if needed.
+if [ -n "$transcript_path" ] && [ -d "$transcript_path" ]; then
+  transcript_path="${transcript_path}/events.jsonl"
+fi
+
+if [ -z "$transcript_path" ] && [ -n "$session_id" ]; then
+  candidate="$HOME/.copilot/session-state/$session_id/events.jsonl"
+  [ -f "$candidate" ] && transcript_path="$candidate"
+  unset candidate
 fi
 
 # Make $cwd's git state available to seg_repo / seg_branch / seg_stash so
@@ -328,6 +355,26 @@ fmt_ms() {
   fi
 }
 
+fmt_dhm() {
+  local s=${1:-0}
+  local days rem hours mins
+  is_pos_int "$s" || { printf ''; return; }
+  days=$((s / 86400))
+  rem=$((s % 86400))
+  hours=$((rem / 3600))
+  mins=$(((rem % 3600) / 60))
+
+  if [ "$days" -gt 0 ]; then
+    if [ "$hours" -gt 0 ]; then printf '%sd %sh' "$days" "$hours"; else printf '%sd' "$days"; fi
+  elif [ "$hours" -gt 0 ]; then
+    if [ "$mins" -gt 0 ]; then printf '%sh %sm' "$hours" "$mins"; else printf '%sh' "$hours"; fi
+  elif [ "$mins" -gt 0 ]; then
+    printf '%sm' "$mins"
+  else
+    printf '%ss' "$s"
+  fi
+}
+
 # Format a token count: 200000 -> 200k, 1000000 -> 1M.
 fmt_tokens() {
   local n=${1:-0}
@@ -379,12 +426,13 @@ seg_timer() {
     date +%s >"$f" 2>/dev/null || true
   fi
   [ -f "$f" ] || return 0
-  local started now mins
-  started="$(cat "$f" 2>/dev/null || echo 0)"
+  local started now elapsed
+  read -r started <"$f" 2>/dev/null || started=0
   now="$(date +%s)"
-  mins=$(((now - started) / 60))
-  [ "$mins" -gt 0 ] || return 0
-  printf '%s%s%dm%s' "$(label "$C_ORANGE" "$ICON_RUN" 'Run')" "$C_FG" "$mins" "$C_RESET"
+  is_pos_int "$started" || started="$now"
+  elapsed=$((now - started))
+  [ "$elapsed" -ge 60 ] || return 0
+  printf '%s%s%s%s' "$(label "$C_ORANGE" "$ICON_RUN" 'Run')" "$C_FG" "$(fmt_dhm "$elapsed")" "$C_RESET"
 }
 
 seg_wall() {
@@ -457,68 +505,207 @@ seg_ctx() {
   printf '%s%s' "$(label "$C_AQUA" "$ICON_CTX" 'Context')" "$body"
 }
 
-# Vim / Agent / Style — Copilot CLI doesn't surface these in statusLine
-# JSON (no .vim.mode / .agent.name / .output_style.name fields in v1.0.44),
-# so these silently no-op. Kept for visual parity with Claude — if the
-# CLI exposes them in a future version, just teach the jq block above.
+# Path — full cwd as its own line, matching the Claude statusline. Replace
+# $HOME with ~ for brevity.
+seg_path() {
+  [ -n "$cwd" ] || return 0
+  local p="$cwd"
+  case "$p" in
+    "$HOME") p="~" ;;
+    "$HOME"/*) p="~${p#$HOME}" ;;
+  esac
+  printf '%s%s%s%s' "$(label "$C_BLUE" "$ICON_PATH" 'Path')" "$C_FG" "$p" "$C_RESET"
+}
+
+# Vim / Style — Copilot CLI doesn't currently surface equivalent runtime
+# JSON fields, so these no-op for visual/layout parity with Claude.
 seg_vim()    { return 0; }
-seg_agent()  { return 0; }
 seg_style()  { return 0; }
+
+# Subagents — inline count of currently running subagents. Shows "0" when
+# idle, colored by activity: green=0, yellow=1-2, orange=3+. The detailed
+# per-agent rows render at the bottom of the statusline separately.
+seg_subagents() {
+  local n="${__SUBAGENT_COUNT:-0}"
+  local color="$C_GREEN"
+  if [ "$n" -ge 3 ]; then
+    color="$C_ORANGE"
+  elif [ "$n" -ge 1 ]; then
+    color="$C_YELLOW"
+  fi
+  printf '%s%s%d%s' "$(label "$C_PURPLE" "$ICON_SUBAGENT" 'Tasks')" "$color" "$n" "$C_RESET"
+}
+
+# Agent — count Copilot custom agent definitions in user + project scope.
+# This counts local profile files on disk, not currently running subagents.
+seg_agent() {
+  local total=0 d count seen=""
+  local project_root="${cwd:-$PWD}"
+  for d in \
+      "${HOME}/.copilot/agents" \
+      "${project_root}/.github/agents"; do
+    [ -d "$d" ] || continue
+    case "$seen" in *":$d:"*) continue ;; esac
+    seen="$seen:$d:"
+    count="$(find "$d" -mindepth 1 -maxdepth 1 -type f -name '*.md' ! -name '.*' ! -iname 'README.md' 2>/dev/null | wc -l | tr -d ' ')"
+    total=$((total + count))
+  done
+  printf '%s%s%d%s' "$(label "$C_PURPLE" "$ICON_AGENT" 'Agents')" "$C_FG" "$total" "$C_RESET"
+}
+
+# Skills — count user-scope + workspace-scope skill bundles.
+seg_skills() {
+  local total=0 d count seen=""
+  local project_root="${cwd:-$PWD}"
+  for d in \
+      "${HOME}/.copilot/skills" \
+      "${HOME}/.agents/skills" \
+      "${project_root}/.github/skills" \
+      "${project_root}/.claude/skills" \
+      "${project_root}/.agents/skills"; do
+    [ -d "$d" ] || continue
+    case "$seen" in *":$d:"*) continue ;; esac
+    seen="$seen:$d:"
+    count="$(find "$d" -mindepth 2 -maxdepth 2 -type f -name 'SKILL.md' 2>/dev/null | wc -l | tr -d ' ')"
+    total=$((total + count))
+  done
+  printf '%s%s%d%s' "$(label "$C_AQUA" "$ICON_SKILLS" 'Skills')" "$C_FG" "$total" "$C_RESET"
+}
 
 # Worktree — Copilot doesn't expose .workspace.git_worktree, but we can
 # detect a worktree by looking at the resolved git dir. In a linked
 # worktree, git rev-parse --git-dir returns "<main>/.git/worktrees/<name>".
 # Emit only the worktree name, and only when not in the main worktree
 # (where the segment would otherwise appear on every repo).
-seg_worktree() {
-  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
-  local gd
-  gd="$(git rev-parse --git-dir 2>/dev/null)" || return 0
-  case "$gd" in
-    *'/.git/worktrees/'*)
-      local name="${gd##*/.git/worktrees/}"
-      name="${name%%/*}"
-      [ -n "$name" ] || return 0
-      printf '%s%s%s%s' "$(label "$C_AQUA" "$ICON_WORKTREE" 'Worktree')" "$C_FG" "$name" "$C_RESET"
-      ;;
-    *) return 0 ;;
-  esac
-}
+GIT_INSIDE=0
+GIT_STATE=""
+GIT_SYNC=""
+GIT_BRANCH=""
+GIT_STASH="0"
+GIT_WORKTREE=""
+GIT_STATE_READY=0
 
-seg_repo() {
-  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
-  local state="clean" state_color="$C_GREEN"
-  if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
-    state="dirty"; state_color="$C_YELLOW"
+load_git_state() {
+  [ "$GIT_STATE_READY" = "1" ] && return 0
+  GIT_STATE_READY=1
+
+  GIT_INSIDE=0
+  GIT_STATE=""
+  GIT_SYNC=""
+  GIT_BRANCH=""
+  GIT_STASH="0"
+  GIT_WORKTREE=""
+
+  local key cf now mtime ttl cache_src
+  cache_src="${cwd:-$PWD}"
+  key="${cache_src//[^A-Za-z0-9_.-]/_}"
+  cf="$CACHE_DIR/git-${key}"
+  now="$(date +%s)"
+  ttl="${COPILOT_STATUSLINE_GIT_TTL:-5}"
+  case "$ttl" in '' | *[!0-9]*) ttl=5 ;; esac
+
+  mtime=0
+  [ -f "$cf" ] && mtime="$(stat -f %m "$cf" 2>/dev/null || stat -c %Y "$cf" 2>/dev/null || echo 0)"
+  if [ -f "$cf" ] && [ $((now - mtime)) -lt "$ttl" ]; then
+    {
+      IFS= read -r GIT_INSIDE || GIT_INSIDE=0
+      IFS= read -r GIT_STATE || GIT_STATE=""
+      IFS= read -r GIT_SYNC || GIT_SYNC=""
+      IFS= read -r GIT_BRANCH || GIT_BRANCH=""
+      IFS= read -r GIT_STASH || GIT_STASH="0"
+      IFS= read -r GIT_WORKTREE || GIT_WORKTREE=""
+    } <"$cf" 2>/dev/null || GIT_INSIDE=0
+    return 0
   fi
-  local sync="" counts behind ahead
+
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    {
+      printf '0\n'
+      printf '\n'
+      printf '\n'
+      printf '\n'
+      printf '0\n'
+      printf '\n'
+    } >"$cf" 2>/dev/null || true
+    return 0
+  fi
+
+  GIT_INSIDE=1
+
+  if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+    GIT_STATE="dirty"
+  else
+    GIT_STATE="clean"
+  fi
+
+  local counts behind ahead
   if counts="$(git rev-list --left-right --count '@{u}...HEAD' 2>/dev/null)"; then
     behind="${counts%%	*}"
     ahead="${counts##*	}"
     if [ "${ahead:-0}" -gt 0 ] 2>/dev/null; then
-      sync="${sync}↑${ahead}"
+      GIT_SYNC="${GIT_SYNC}↑${ahead}"
     fi
     if [ "${behind:-0}" -gt 0 ] 2>/dev/null; then
-      sync="${sync}↓${behind}"
+      GIT_SYNC="${GIT_SYNC}↓${behind}"
     fi
   fi
-  if [ -n "$sync" ]; then
+
+  GIT_BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null \
+    || git rev-parse --short HEAD 2>/dev/null \
+    || true)"
+
+  GIT_STASH="$(git stash list 2>/dev/null | wc -l | tr -d ' ')"
+  is_pos_int "$GIT_STASH" || GIT_STASH="0"
+
+  local gd name
+  gd="$(git rev-parse --git-dir 2>/dev/null || true)"
+  case "$gd" in
+    *'/.git/worktrees/'*)
+      name="${gd##*/.git/worktrees/}"
+      GIT_WORKTREE="${name%%/*}"
+      ;;
+  esac
+
+  {
+    printf '%s\n' "$GIT_INSIDE"
+    printf '%s\n' "$GIT_STATE"
+    printf '%s\n' "$GIT_SYNC"
+    printf '%s\n' "$GIT_BRANCH"
+    printf '%s\n' "$GIT_STASH"
+    printf '%s\n' "$GIT_WORKTREE"
+  } >"$cf" 2>/dev/null || true
+}
+
+seg_worktree() {
+  load_git_state
+  [ "$GIT_INSIDE" = "1" ] || return 0
+  [ -n "$GIT_WORKTREE" ] || return 0
+  printf '%s%s%s%s' "$(label "$C_AQUA" "$ICON_WORKTREE" 'Worktree')" "$C_FG" "$GIT_WORKTREE" "$C_RESET"
+}
+
+seg_repo() {
+  load_git_state
+  [ "$GIT_INSIDE" = "1" ] || return 0
+  local state_color="$C_GREEN"
+  [ "$GIT_STATE" = "dirty" ] && state_color="$C_YELLOW"
+  if [ -n "$GIT_SYNC" ]; then
     printf '%s%s%s%s %s(%s)%s' \
       "$(label "$C_AQUA" "$ICON_REPO" 'Repo')" \
-      "$state_color" "$state" "$C_RESET" \
-      "$C_ORANGE" "$sync" "$C_RESET"
+      "$state_color" "$GIT_STATE" "$C_RESET" \
+      "$C_ORANGE" "$GIT_SYNC" "$C_RESET"
   else
     printf '%s%s%s%s' \
       "$(label "$C_AQUA" "$ICON_REPO" 'Repo')" \
-      "$state_color" "$state" "$C_RESET"
+      "$state_color" "$GIT_STATE" "$C_RESET"
   fi
 }
 
+seg_git() { seg_repo; }
+
 seg_branch() {
-  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
-  local br
-  br="$(git symbolic-ref --short HEAD 2>/dev/null \
-        || git rev-parse --short HEAD 2>/dev/null)"
+  load_git_state
+  [ "$GIT_INSIDE" = "1" ] || return 0
+  local br="$GIT_BRANCH"
   [ -n "$br" ] || return 0
   if [ ${#br} -gt 24 ]; then
     br="${br:0:23}…"
@@ -527,9 +714,9 @@ seg_branch() {
 }
 
 seg_stash() {
-  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
-  local count
-  count="$(git stash list 2>/dev/null | wc -l | tr -d ' ')"
+  load_git_state
+  [ "$GIT_INSIDE" = "1" ] || return 0
+  local count="$GIT_STASH"
   is_pos_int "$count" || return 0
   printf '%s%s%d%s' "$(label "$C_ORANGE" "$ICON_STASH" 'Stash')" "$C_FG" "$count" "$C_RESET"
 }
@@ -559,6 +746,52 @@ seg_gh_account() {
   fi
   [ -n "$account" ] || return 0
   printf '%s%s%s%s' "$(label "$C_PURPLE" "$ICON_GH" 'GH')" "$C_FG" "$account" "$C_RESET"
+}
+
+# WakaTime — today's coding time as recorded by WakaTime. Cache for 5
+# minutes and refresh in the background so statusline rendering stays fast.
+seg_waka() {
+  local wt="$HOME/.wakatime/wakatime-cli"
+  [ -x "$wt" ] || return 0
+  local cf="$CACHE_DIR/waka_today"
+  local lock="$CACHE_DIR/waka_today.lock"
+  local now mtime val=""
+  now="$(date +%s)"
+  mtime=0
+  [ -f "$cf" ] && mtime="$(stat -f %m "$cf" 2>/dev/null || stat -c %Y "$cf" 2>/dev/null || echo 0)"
+  if [ -f "$cf" ] && [ $((now - mtime)) -lt 300 ]; then
+    read -r val <"$cf" 2>/dev/null || val=""
+  else
+    if [ -d "$lock" ]; then
+      local lock_mtime
+      lock_mtime="$(stat -f %m "$lock" 2>/dev/null || stat -c %Y "$lock" 2>/dev/null || echo 0)"
+      [ $((now - lock_mtime)) -gt 60 ] && rmdir "$lock" 2>/dev/null
+    fi
+    if mkdir "$lock" 2>/dev/null; then
+      (
+        trap 'rmdir "'"$lock"'" 2>/dev/null' EXIT
+        "$wt" --today >"$cf.tmp" 2>/dev/null \
+          && mv "$cf.tmp" "$cf" 2>/dev/null
+      ) &
+    fi
+    [ -f "$cf" ] && read -r val <"$cf" 2>/dev/null
+  fi
+  [ -n "$val" ] || return 0
+
+  local hrs=0 mins=0 secs=0 total rest
+  case "$val" in *' hr'*) hrs="${val%% hr*}" ;; esac
+  rest="$val"
+  case "$rest" in *' hr'*) rest="${rest#*hrs }"; rest="${rest#*hr }" ;; esac
+  case "$rest" in *' min'*) mins="${rest%% min*}" ;; esac
+  rest="$val"
+  case "$rest" in *' min'*) rest="${rest#*mins }"; rest="${rest#*min }" ;; esac
+  case "$rest" in *' sec'*) secs="${rest%% sec*}" ;; esac
+  case "$hrs" in '' | *[!0-9]*) hrs=0 ;; esac
+  case "$mins" in '' | *[!0-9]*) mins=0 ;; esac
+  case "$secs" in '' | *[!0-9]*) secs=0 ;; esac
+  total=$((hrs * 3600 + mins * 60 + secs))
+  [ "$total" -ge 60 ] || return 0
+  printf '%s%s%s%s' "$(label "$C_AQUA" "$ICON_WAKA" 'WakaTime')" "$C_FG" "$(fmt_dhm "$total")" "$C_RESET"
 }
 
 # Ext — count Copilot CLI extensions in user-scope + project-scope dirs.
@@ -595,7 +828,337 @@ seg_mcp_count() {
   printf '%s%s%d%s' "$(label "$C_BLUE" "$ICON_MCP" 'MCP')" "$C_FG" "$count" "$C_RESET"
 }
 
+seg_mcp() { seg_mcp_count; }
+
+# Mode — Copilot CLI runs in one of: interactive (default), plan, autopilot,
+# or yolo (all permissions). Detection priority:
+#   1. COPILOT_STATUSLINE_MODE env override (always wins)
+#   2. .mode from the JSON payload (if Copilot exposes it)
+#   3. Latest mode-change event in events.jsonl (catches mid-session switches)
+#   4. Process-tree sniffing of launch args (fallback for initial mode)
+# Manual override:
+#   COPILOT_STATUSLINE_MODE=yolo|autopilot|plan|interactive
+# Cached per-pid for 10s (reduced from 30s for responsiveness).
+
+# Detect mode from events.jsonl transcript — catches mid-session switches
+# (e.g. user types /plan or /autopilot) that process-tree sniffing misses.
+detect_mode_from_transcript() {
+  [ -n "$transcript_path" ] || return 0
+  [ -f "$transcript_path" ] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+
+  local key cf sig cached_sig mode=""
+  key="$(printf '%s' "$transcript_path" | cksum | awk '{print $1}')"
+  cf="$CACHE_DIR/mode-transcript-${key}"
+  sig="$(statusline_file_sig "$transcript_path")"
+
+  if [ -f "$cf" ]; then
+    IFS= read -r cached_sig <"$cf" 2>/dev/null || cached_sig=""
+    if [ "$cached_sig" = "$sig" ]; then
+      sed -n '2p' "$cf" 2>/dev/null || true
+      return 0
+    fi
+  fi
+
+  # Scan the last N lines for mode-change indicators:
+  #   - Events with type containing "mode" and a .data.mode field
+  #   - User messages that are mode-switch slash commands
+  #   - autopilot_mode / plan_mode toggles in event data
+  # Take the LAST match — that's the current mode.
+  mode="$(tail -n 2000 "$transcript_path" 2>/dev/null | jq -r '
+    (
+      # Direct mode field in event data
+      if (.data.mode // "") != "" then .data.mode
+      # session.mode_changed events (Copilot CLI format)
+      elif (.data.newMode // "") != "" then .data.newMode
+      # autopilot_mode flag toggled
+      elif .type == "config.changed" and (.data.key // "") == "autopilot_mode" then
+        if .data.value == true then "autopilot" else "interactive" end
+      elif .type == "config.changed" and (.data.key // "") == "plan_mode" then
+        if .data.value == true then "plan" else "interactive" end
+      # Mode change events (generic pattern)
+      elif (.type | test("mode[._]changed"; "i")) then
+        (.data.mode // .data.newMode // .data.new_mode // "")
+      # User slash commands that switch modes
+      elif .type == "user.message" or .type == "user.command" then
+        ((.data.content // .data.message // .message.content // "") | tostring) as $txt
+        | if ($txt | test("^\\s*/autopilot\\b"; "i")) then "autopilot"
+          elif ($txt | test("^\\s*/plan\\b"; "i")) then "plan"
+          elif ($txt | test("^\\s*/yolo\\b"; "i")) then "yolo"
+          elif ($txt | test("^\\s*/interactive\\b"; "i")) then "interactive"
+          else ""
+          end
+      else ""
+      end
+    ) // ""
+  ' 2>/dev/null | grep -v '^$' | tail -1)"
+
+  { printf '%s\n' "$sig"; printf '%s\n' "$mode"; } >"$cf" 2>/dev/null || true
+  printf '%s' "$mode"
+}
+
+detect_copilot_mode() {
+  local override="${COPILOT_STATUSLINE_MODE:-}"
+  if [ -n "$override" ]; then
+    printf '%s' "$override"
+    return
+  fi
+  # Walk up the process tree from this script to find a `copilot` invocation.
+  local pid=$PPID args="" ppid="" comm="" depth=0 mode=""
+  while [ -n "$pid" ] && [ "$pid" != "0" ] && [ "$pid" != "1" ] && [ "$depth" -lt 8 ]; do
+    args="$(ps -o args= -p "$pid" 2>/dev/null)"
+    comm="$(ps -o comm= -p "$pid" 2>/dev/null)"
+    case "$args $comm" in
+      *' copilot '*|*'/copilot '*|*' copilot'|*'/copilot'|*'copilot-cli'*)
+        case "$args" in
+          *' --yolo'*)            mode="yolo" ;;
+          *' --autopilot'*)       mode="autopilot" ;;
+          *' --plan'*)            mode="plan" ;;
+          *' --mode yolo'*)       mode="yolo" ;;
+          *' --mode autopilot'*)  mode="autopilot" ;;
+          *' --mode plan'*)       mode="plan" ;;
+          *' --mode interactive'*) mode="interactive" ;;
+          *)                      mode="interactive" ;;
+        esac
+        break
+        ;;
+    esac
+    ppid="$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')"
+    [ -n "$ppid" ] && [ "$ppid" != "$pid" ] || break
+    pid="$ppid"
+    depth=$((depth + 1))
+  done
+  printf '%s' "$mode"
+}
+
+seg_mode() {
+  local mode=""
+
+  # Priority 1: env override
+  if [ -n "${COPILOT_STATUSLINE_MODE:-}" ]; then
+    mode="$COPILOT_STATUSLINE_MODE"
+
+  # Priority 2: JSON payload
+  elif [ -n "$json_mode" ]; then
+    mode="$json_mode"
+
+  # Priority 3: transcript events (catches mid-session switches)
+  # Priority 4: process-tree sniffing (launch-time fallback)
+  else
+    local cf="$CACHE_DIR/mode-$PPID" now mtime
+    now="$(date +%s)"
+    mtime=0
+    [ -f "$cf" ] && mtime="$(stat -f %m "$cf" 2>/dev/null || stat -c %Y "$cf" 2>/dev/null || echo 0)"
+    if [ -f "$cf" ] && [ $((now - mtime)) -lt 10 ]; then
+      read -r mode <"$cf" 2>/dev/null || mode=""
+    else
+      # Try transcript first, fall back to process-tree
+      mode="$(detect_mode_from_transcript)"
+      [ -n "$mode" ] || mode="$(detect_copilot_mode)"
+      printf '%s\n' "$mode" >"$cf" 2>/dev/null || true
+    fi
+  fi
+
+  [ -n "$mode" ] || return 0
+  local color="$C_BLUE"
+  case "$mode" in
+    yolo)        color="$C_RED" ;;
+    autopilot)   color="$C_ORANGE" ;;
+    plan)        color="$C_PURPLE" ;;
+    interactive) color="$C_GREEN" ;;
+  esac
+  printf '%s%s%s%s' "$(label "$C_AQUA" "$ICON_MODE" 'Mode')" "$color" "$mode" "$C_RESET"
+}
+
+statusline_int_or_default() {
+  local val="${1:-}" default="$2"
+  case "$val" in
+    '' | *[!0-9]*) printf '%s' "$default" ;;
+    *) printf '%s' "$val" ;;
+  esac
+}
+
+statusline_file_sig() {
+  stat -f '%m:%z' "$1" 2>/dev/null || stat -c '%Y:%s' "$1" 2>/dev/null || echo 0
+}
+
+format_subagent_rows() {
+  local rows="$1" out="" name purpose elapsed root
+  [ -n "$rows" ] || return 0
+
+  root="${STATUSLINE_SUBAGENT_ROOT:-1}"
+  root="${COPILOT_STATUSLINE_SUBAGENT_ROOT:-$root}"
+  case "$root" in
+    0 | false | FALSE | no | NO) root=0 ;;
+    *) root=1 ;;
+  esac
+  if [ "$root" = 1 ]; then
+    out="${C_GREEN}${ICON_SUBAGENT_ROOT}${C_RESET} ${C_FG}main${C_RESET}"
+  fi
+
+  while IFS=$'\037' read -r name purpose elapsed; do
+    [ -n "$name$purpose" ] || continue
+    [ -n "$out" ] && out="${out}"$'\n'
+    [ -n "$name" ] || name="agent"
+    if [ -n "$purpose" ]; then
+      out="${out}${C_YELLOW}${ICON_SUBAGENT}${C_RESET} ${C_FG}${name}${C_RESET}${C_DIM}:${C_RESET} ${C_FG_DIM}${purpose}${C_RESET}"
+    else
+      out="${out}${C_YELLOW}${ICON_SUBAGENT}${C_RESET} ${C_FG}${name}${C_RESET}"
+    fi
+    # Append running time when available (elapsed > 0)
+    case "${elapsed:-}" in
+      '' | *[!0-9]*) ;;
+      0) ;;
+      *)
+        out="${out} ${C_DIM}($(fmt_dhm "$elapsed"))${C_RESET}"
+        ;;
+    esac
+  done <<EOF
+$rows
+EOF
+  printf '%s' "$out"
+}
+
+render_subagents() {
+  [ -n "$transcript_path" ] || return 0
+  [ -f "$transcript_path" ] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+
+  local max tail_lines key cf sig cached_sig rows block cached_block cached_line
+  max="$(statusline_int_or_default "${COPILOT_STATUSLINE_MAX_SUBAGENTS:-${STATUSLINE_MAX_SUBAGENTS:-8}}" 8)"
+  [ "$max" -gt 0 ] 2>/dev/null || return 0
+  tail_lines="$(statusline_int_or_default "${COPILOT_STATUSLINE_SUBAGENT_TAIL:-${STATUSLINE_SUBAGENT_TAIL:-4000}}" 4000)"
+  if [ -n "$session_id" ]; then
+    key="$session_id"
+  else
+    key="$(printf '%s' "$transcript_path" | cksum)"
+    key="${key%% *}"
+  fi
+  cf="$CACHE_DIR/subagents-${key}"
+  sig="$(statusline_file_sig "$transcript_path")"
+
+  if [ -f "$cf" ]; then
+    {
+      IFS= read -r cached_sig || cached_sig=""
+      if [ "$cached_sig" = "$sig" ]; then
+        cached_block=""
+        while IFS= read -r cached_line; do
+          [ -n "$cached_block" ] && cached_block="${cached_block}"$'\n'
+          cached_block="${cached_block}${cached_line}"
+        done
+        printf '%s' "$cached_block"
+        return 0
+      fi
+    } <"$cf" 2>/dev/null || true
+  fi
+
+  rows="$(tail -n "$tail_lines" "$transcript_path" 2>/dev/null | jq -n -r --argjson max "$max" '
+    def clean:
+      tostring
+      | gsub("[\r\n\t]+"; " ")
+      | gsub("  +"; " ")
+      | sub("^ +"; "")
+      | sub(" +$"; "")
+      | .[0:140];
+    def argobj($v):
+      if ($v | type) == "object" then $v
+      elif ($v | type) == "string" then ($v | fromjson? // {})
+      else {} end;
+    def remember($id; $name; $purpose; $started; $ts):
+      if ($id // "") == "" then .
+      else
+        .agents[$id] = ((.agents[$id] // {name:"agent", purpose:"", started:false, done:false, started_at:null, has_subagent:false}) + {
+          name: (if (($name // "") | clean) == "" then ((.agents[$id].name // "agent") | clean) else (($name // "") | clean) end),
+          purpose: (if (($purpose // "") | clean) == "" then ((.agents[$id].purpose // "") | clean) else (($purpose // "") | clean) end),
+          started: (((.agents[$id].started // false) or $started) // false),
+          started_at: (if .agents[$id].started_at then .agents[$id].started_at elif ($ts // "") != "" then $ts else null end)
+        })
+        | if (.order | index($id)) then . else .order += [$id] end
+      end;
+    def done($id):
+      if (($id // "") != "" and .agents[$id]) then .agents[$id].done = true else . end;
+
+    reduce inputs as $o ({agents:{}, order:[]};
+      ($o.timestamp // $o.ts // $o.data.timestamp // "") as $evt_ts
+      | reduce (($o.data.toolRequests? // [])[]) as $r (.;
+        if ($r.name == "task") then
+          (argobj($r.arguments)) as $a
+          | remember(
+              ($r.id // $r.toolCallId // $r.tool_call_id // "");
+              ($a.agent_type // $a.agentType // $a.name // "agent");
+              ($a.description // "");
+              true;
+              $evt_ts
+            )
+        else . end
+      )
+      | if ($o.type == "tool.execution_start" and $o.data.toolName == "task") then
+          (argobj($o.data.arguments)) as $a
+          | remember(
+              ($o.data.toolCallId // "");
+              ($a.agent_type // $a.agentType // $a.name // "agent");
+              ($a.description // "");
+              true;
+              $evt_ts
+            )
+        elif ($o.type == "subagent.started") then
+          ($o.data.toolCallId // "") as $id
+          | remember(
+              $id;
+              ($o.data.agentName // $o.data.agentDisplayName // "agent");
+              (.agents[$id].purpose // $o.data.agentDescription // "");
+              true;
+              $evt_ts
+            )
+          | .agents[$id].has_subagent = true
+        elif ($o.type | test("^subagent\\.(completed|failed|cancelled)$")) then
+          done($o.data.toolCallId // "")
+        elif ($o.type == "tool.execution_complete") then
+          # For task tools, tool.execution_complete fires immediately (before
+          # subagent.started even arrives) and just means "tool call returned".
+          # The real lifecycle is tracked by subagent.completed/failed/cancelled
+          # above, so we skip tool.execution_complete for any agent we track.
+          .
+        else . end
+    )
+    | [ .order[] as $id | .agents[$id] | select(. != null and (.started // false) and (.done | not)) ]
+    | .[:$max][]
+    | (if .started_at then
+        (.started_at | sub("\\.[0-9]+"; "") | try fromdate catch 0) as $ts
+        | if $ts > 0 then ((now - $ts) | floor | if . < 0 then 0 else . end) else 0 end
+       else 0 end) as $elapsed
+    | [.name, .purpose, ($elapsed | tostring)]
+    | join("\u001f")
+  ' 2>/dev/null)"
+  block="$(format_subagent_rows "$rows")"
+  { printf '%s\n' "$sig"; printf '%s' "$block"; } >"$cf" 2>/dev/null || true
+  printf '%s' "$block"
+}
+
 # --- 5. Render -------------------------------------------------------------
+# Pre-compute git once in the main shell. Segment functions run via command
+# substitution, so they inherit these already-loaded values instead of each
+# segment re-reading the git cache in its own subshell.
+load_git_state
+
+# Pre-compute subagent data so seg_subagents (inline count) and the bottom
+# rows share a single jq pass. render_subagents runs in a subshell, so we
+# can't rely on it setting globals. Instead, call it, then count the output
+# lines (minus the "main" root line).
+__SUBAGENT_BLOCK="$(render_subagents 2>/dev/null || true)"
+__SUBAGENT_COUNT=0
+if [ -n "$__SUBAGENT_BLOCK" ]; then
+  _total_lines=0
+  while IFS= read -r _subagent_line; do
+    _total_lines=$((_total_lines + 1))
+  done <<EOF
+$__SUBAGENT_BLOCK
+EOF
+  _root="${COPILOT_STATUSLINE_SUBAGENT_ROOT:-${STATUSLINE_SUBAGENT_ROOT:-1}}"
+  case "$_root" in 0|false|FALSE|no|NO) __SUBAGENT_COUNT="$_total_lines" ;; *) __SUBAGENT_COUNT=$((_total_lines - 1)) ;; esac
+  [ "$__SUBAGENT_COUNT" -ge 0 ] 2>/dev/null || __SUBAGENT_COUNT=0
+fi
+
 # A literal `\n` token in $SEGMENTS introduces a line break: segments before
 # it form line 1, segments after it form line 2.
 out=""
@@ -615,6 +1178,8 @@ for s in $SEGMENTS; do
     line_started=1
   fi
 done
+
+[ -n "$__SUBAGENT_BLOCK" ] && out="${out}"$'\n'"${__SUBAGENT_BLOCK}"
 
 # Emit top padding via dedicated printfs — $(...) command substitution
 # strips trailing newlines, which would silently drop PAD_TOP entirely.

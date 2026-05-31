@@ -11,6 +11,7 @@
 # Fields we read (all `// ""` / `// 0` guarded so missing field == segment
 # silently skipped, never an error):
 #   .session_id                              -> Run timer key
+#   .transcript_path                         -> Active subagent tree source
 #   .model.display_name | .model.id          -> Model
 #   .workspace.current_dir                   -> cwd for git segments
 #   .workspace.git_worktree                  -> Worktree (when set)
@@ -51,6 +52,8 @@
 #   CLAUDE_STATUSLINE_PAD_TOP=N   blank lines before the line (default 0)
 #   CLAUDE_STATUSLINE_PAD_LEFT=N  spaces before the line     (default 0)
 #   CLAUDE_STATUSLINE_PAD_RIGHT=N spaces after the line      (default 0)
+#   CLAUDE_STATUSLINE_MAX_SUBAGENTS=N max active subagent rows (default 8)
+#   CLAUDE_STATUSLINE_SUBAGENT_ROOT=0 hide the "main" root row
 #
 # Quick check that all icons render in your terminal:
 #     ~/.claude/statusline.sh --test
@@ -69,7 +72,8 @@ set -u
 #   L3: integrations — mcp, skills, agents, style
 #   L4: cwd path     — full directory path
 #   L5: repo + git   — repo, diff, branch, stash, worktree
-SEGMENTS="time timer cost waka \n model effort ctx \n mcp skills agent style \n path \n git branch diff stash worktree"
+#   Bottom: active subagents — root + one line per live Agent/Task
+SEGMENTS="time timer cost waka \n model effort ctx \n mcp skills agent subagents style \n path \n git branch diff stash worktree"
 SEP=' │ '
 
 ICONS_ON=1
@@ -124,6 +128,8 @@ ICON_GH=$'\xef\x82\x9b'
 ICON_WAKA=$'\xef\x84\x9c'
 ICON_SKILLS=$'\xef\x82\xae'
 ICON_MCP=$'\xef\x87\xa6'
+# U+F0C0 users           = EF 83 80   Running subagents
+ICON_SUBAGENT=$'\xef\x83\x80'
 
 # Gruvbox Dark Hard accents — match alacritty/wezterm/.tmux.conf palette.
 # Use 24-bit ANSI so we don't depend on the terminal's 256-color cube.
@@ -227,6 +233,7 @@ fi
 # raw payload — every key we care about is unique within the payload, so we
 # don't even need to descend into objects.
 session_id=""
+transcript_path=""
 model_name=""
 cwd=""
 effort_level=""
@@ -259,6 +266,7 @@ jget_num() {
 
 if [ -n "$session_json" ]; then
   jget_str "session_id";                session_id="$__JV"
+  jget_str "transcript_path";           transcript_path="$__JV"
   jget_str "display_name";              model_name="$__JV"
   [ -z "$model_name" ] && { jget_str "id"; model_name="$__JV"; }
   jget_str "current_dir";               cwd="$__JV"
@@ -743,6 +751,84 @@ seg_skills() {
 # Counted via grep of the mcpServers block (no jq fork). The ~/.claude.json
 # format is stable JSON, one server per "name": { ... } entry inside the
 # mcpServers object; we count those object-opening braces.
+seg_subagents() {
+  # Count currently-running subagents.
+  #
+  # Primary source: per-session counter file maintained by the Claude
+  # Code hooks at ~/.claude/hooks/subagent-counter.sh (wired up in
+  # ~/.claude/settings.json under PreToolUse/PostToolUse/SubagentStop).
+  # The hook does +1 on Task start and -1 on Task stop, so reading the
+  # counter is one `read` from a tiny file — no jq, no tail, no scan.
+  #
+  # Fallback: if the counter file doesn't exist (e.g. session started
+  # before the hooks were installed, or hooks somehow disabled), scan
+  # the transcript with the signature-cached approach below.
+  local n=0 src="hook"
+  if [ -n "${session_id:-}" ]; then
+    local hf="${TMPDIR:-/tmp}/claude-subagents-${USER:-default}/${session_id}"
+    if [ -f "$hf" ]; then
+      read -r n <"$hf" 2>/dev/null || n=0
+      case "$n" in '' | *[!0-9]*) n=0 ;; esac
+    else
+      src="scan"
+    fi
+  else
+    src="scan"
+  fi
+
+  if [ "$src" = "scan" ] && [ -n "${transcript_path:-}" ] && [ -f "$transcript_path" ] \
+     && command -v jq >/dev/null 2>&1; then
+    # Signature-cached transcript scan (fallback only).
+    local key cf sig cached_sig cached_n tail_lines
+    key="$(printf '%s' "$transcript_path" | cksum | awk '{print $1}')"
+    cf="$CACHE_DIR/subagents-count-${key}"
+    sig="$(statusline_file_sig "$transcript_path")"
+    cached_sig=""; cached_n=""
+    if [ -f "$cf" ]; then
+      { IFS= read -r cached_sig; IFS= read -r cached_n; } <"$cf" 2>/dev/null
+    fi
+    if [ -n "$cached_sig" ] && [ "$cached_sig" = "$sig" ]; then
+      case "$cached_n" in
+        '' | *[!0-9]*) n=0 ;;
+        *) n="$cached_n" ;;
+      esac
+    else
+      tail_lines="$(statusline_int_or_default "${CLAUDE_STATUSLINE_SUBAGENT_TAIL:-${STATUSLINE_SUBAGENT_TAIL:-4000}}" 4000)"
+      n="$(tail -n "$tail_lines" "$transcript_path" 2>/dev/null | jq -n -r '
+        def content_items: if (.message.content? | type) == "array" then .message.content else [] end;
+        def text_content: if (.message.content? | type) == "string" then .message.content else "" end;
+        def async_handle($c): ($c.content | tostring | contains("Async agent launched successfully"));
+        reduce inputs as $o ({agents:{}};
+          ($o | text_content) as $txt
+          | (if ($txt | contains("<task-notification>") and contains("<tool-use-id>")) then
+              ($txt | capture("<tool-use-id>(?<id>[^<]+)</tool-use-id>")? // {}) as $m
+              | if (($m.id // "") != "" and ($txt | test("<status>(completed|failed|cancelled)</status>"))) then
+                  if .agents[$m.id] then .agents[$m.id].done = true else . end
+                else . end
+            else . end)
+          | reduce ($o | content_items[]) as $c (.;
+              if ($c.type == "tool_use" and ($c.name == "Agent" or $c.name == "Task")) then
+                ($c.id // "") as $id
+                | if $id == "" then . else
+                    .agents[$id] = {background: ($c.input.run_in_background // false), done: false}
+                  end
+              elif ($c.type == "tool_result") then
+                ($c.tool_use_id // "") as $id
+                | if ($id != "" and .agents[$id]) then
+                    if (.agents[$id].background and async_handle($c)) then .
+                    else .agents[$id].done = true end
+                  else . end
+              else . end))
+        | [ .agents | to_entries[] | select(.value.done | not) ] | length
+      ' 2>/dev/null)"
+      case "$n" in '' | *[!0-9]*) n=0 ;; esac
+      { printf '%s\n%s\n' "$sig" "$n"; } >"$cf" 2>/dev/null || true
+    fi
+  fi
+  label "$C_PURPLE" "$ICON_SUBAGENT" 'Subagents'
+  printf -v __SEG '%s%s%d%s' "$__LBL" "$C_FG" "$n" "$C_RESET"
+}
+
 seg_mcp() {
   local f="$HOME/.claude.json"
   [ -f "$f" ] || return 0
@@ -773,6 +859,120 @@ seg_mcp() {
   printf -v __SEG '%s%s%d%s' "$__LBL" "$C_FG" "$count" "$C_RESET"
 }
 
+statusline_int_or_default() {
+  local val="${1:-}" default="$2"
+  case "$val" in
+    '' | *[!0-9]*) printf '%s' "$default" ;;
+    *) printf '%s' "$val" ;;
+  esac
+}
+
+statusline_file_sig() {
+  stat -f '%m:%z' "$1" 2>/dev/null || stat -c '%Y:%s' "$1" 2>/dev/null || echo 0
+}
+
+format_subagent_rows() {
+  local rows="$1" out="" name purpose root
+  [ -n "$rows" ] || return 0
+
+  root="${STATUSLINE_SUBAGENT_ROOT:-1}"
+  root="${CLAUDE_STATUSLINE_SUBAGENT_ROOT:-$root}"
+  case "$root" in
+    0 | false | FALSE | no | NO) root=0 ;;
+    *) root=1 ;;
+  esac
+  if [ "$root" = 1 ]; then
+    out="${C_GREEN}●${C_RESET} ${C_FG}main${C_RESET}"
+  fi
+
+  while IFS=$'\t' read -r name purpose; do
+    [ -n "$name$purpose" ] || continue
+    [ -n "$out" ] && out="${out}"$'\n'
+    [ -n "$name" ] || name="agent"
+    out="${out}${C_YELLOW}○${C_RESET} ${C_FG}${name}${C_RESET}"
+    [ -n "$purpose" ] && out="${out}  ${C_FG_DIM}${purpose}${C_RESET}"
+  done <<EOF
+$rows
+EOF
+  printf '%s' "$out"
+}
+
+render_subagents() {
+  [ -n "$transcript_path" ] || return 0
+  [ -f "$transcript_path" ] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+
+  local max tail_lines key cf sig cached_sig rows block
+  max="$(statusline_int_or_default "${CLAUDE_STATUSLINE_MAX_SUBAGENTS:-${STATUSLINE_MAX_SUBAGENTS:-8}}" 8)"
+  [ "$max" -gt 0 ] 2>/dev/null || return 0
+  tail_lines="$(statusline_int_or_default "${CLAUDE_STATUSLINE_SUBAGENT_TAIL:-${STATUSLINE_SUBAGENT_TAIL:-4000}}" 4000)"
+  key="$(printf '%s' "$transcript_path" | cksum | awk '{print $1}')"
+  cf="$CACHE_DIR/subagents-${key}"
+  sig="$(statusline_file_sig "$transcript_path")"
+
+  if [ -f "$cf" ]; then
+    IFS= read -r cached_sig <"$cf" 2>/dev/null || cached_sig=""
+    if [ "$cached_sig" = "$sig" ]; then
+      sed '1d' "$cf" 2>/dev/null || true
+      return 0
+    fi
+  fi
+
+  rows="$(tail -n "$tail_lines" "$transcript_path" 2>/dev/null | jq -r --argjson max "$max" '
+    def clean:
+      tostring
+      | gsub("[\r\n\t]+"; " ")
+      | gsub("  +"; " ")
+      | sub("^ +"; "")
+      | sub(" +$"; "")
+      | .[0:140];
+    def content_items:
+      if (.message.content? | type) == "array" then .message.content else [] end;
+    def text_content:
+      if (.message.content? | type) == "string" then .message.content else "" end;
+    def async_handle($c):
+      ($c.content | tostring | contains("Async agent launched successfully"));
+
+    reduce inputs as $o ({agents:{}, order:[]};
+      (text_content($o)) as $txt
+      | (if ($txt | contains("<task-notification>") and contains("<tool-use-id>")) then
+          ($txt | capture("<tool-use-id>(?<id>[^<]+)</tool-use-id>")? // {}) as $m
+          | if (($m.id // "") != "" and ($txt | test("<status>(completed|failed|cancelled)</status>"))) then
+              if .agents[$m.id] then .agents[$m.id].done = true else . end
+            else . end
+        else . end)
+      | reduce ($o | content_items[]) as $c (.;
+          if ($c.type == "tool_use" and ($c.name == "Agent" or $c.name == "Task")) then
+            ($c.id // "") as $id
+            | if $id == "" then .
+              else
+                .agents[$id] = {
+                  name: (($c.input.subagent_type // $c.input.agent_type // $c.input.name // "agent") | clean),
+                  purpose: (($c.input.description // $c.input.subject // $c.input.prompt // "") | clean),
+                  background: ($c.input.run_in_background // false),
+                  done: false
+                }
+                | .order += [$id]
+              end
+          elif ($c.type == "tool_result") then
+            ($c.tool_use_id // "") as $id
+            | if ($id != "" and .agents[$id]) then
+                if (.agents[$id].background and async_handle($c)) then .
+                else .agents[$id].done = true end
+              else . end
+          else . end
+        )
+    )
+    | [ .order[] as $id | .agents[$id] | select(. != null and (.done | not)) ]
+    | .[:$max][]
+    | [.name, .purpose]
+    | @tsv
+  ' 2>/dev/null)"
+  block="$(format_subagent_rows "$rows")"
+  { printf '%s\n' "$sig"; printf '%s' "$block"; } >"$cf" 2>/dev/null || true
+  printf '%s' "$block"
+}
+
 # --- 5. Render -------------------------------------------------------------
 # Each seg_* writes its output to the global $__SEG via `printf -v` instead
 # of stdout. We can then concatenate without forking a `$(...)` subshell
@@ -800,6 +1000,9 @@ for s in $SEGMENTS; do
     line_started=1
   fi
 done
+
+__SUBAGENTS="$(render_subagents 2>/dev/null || true)"
+[ -n "$__SUBAGENTS" ] && out="${out}"$'\n'"${__SUBAGENTS}"
 
 i=0
 while [ "$i" -lt "$PAD_TOP" ]; do

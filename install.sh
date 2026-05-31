@@ -148,6 +148,21 @@ if [ -d "$claude_src" ]; then
   done < <(find "$claude_src" -maxdepth 1 -mindepth 1 -type f -print0)
   echo "Linked Claude Code config files to $claude_dest"
 
+  # Link the hooks/ subdirectory (claude/hooks/*.sh -> ~/.claude/hooks/*).
+  # These are invoked by Claude Code's hook system (PreToolUse,
+  # PostToolUse, SubagentStop, …) per ~/.claude/settings.json.
+  if [ -d "${claude_src}/hooks" ]; then
+    mkdir -p "${claude_dest}/hooks"
+    while IFS= read -r -d '' entry; do
+      base="$(basename "$entry")"
+      link_file "$entry" "${claude_dest}/hooks/${base}"
+      case "$base" in
+        *.sh) chmod +x "$entry" ;;
+      esac
+    done < <(find "${claude_src}/hooks" -maxdepth 1 -mindepth 1 -type f -print0)
+    echo "Linked Claude Code hooks to ${claude_dest}/hooks"
+  fi
+
   # Merge tracked, secret-free MCP servers from this repo into the user's
   # Copilot MCP config. mcp-shared.json carries entries that are safe to
   # commit (e.g. the GitHub remote MCP — OAuth, no PAT in the file). Per-
