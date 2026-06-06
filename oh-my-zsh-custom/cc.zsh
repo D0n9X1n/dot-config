@@ -41,6 +41,6 @@ function cc {
     wezterm cli set-tab-title -- "$title" 2>/dev/null
     wezterm cli set-window-title -- "$title" 2>/dev/null
   fi
-  command claude --permission-mode bypassPermissions --model claude-opus-4-8 --effort xhigh
+  command claude --permission-mode bypassPermissions --model 'claude-opus-4-8[1m]' --effort xhigh
   unset DISABLE_AUTO_TITLE
 }

@@ -600,14 +600,14 @@ proxy that translates Anthropic-format requests into Copilot ones.
   "env": {
     "ANTHROPIC_BASE_URL": "http://127.0.0.1:4142",
     "ANTHROPIC_AUTH_TOKEN": "dummy",
-    "ANTHROPIC_MODEL": "claude-opus-4-8",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5.5",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-5.5",
-    "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.5",
+    "ANTHROPIC_MODEL": "claude-opus-4-8[1m]",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5.5[1m]",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-5.5[1m]",
+    "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.5[1m]",
     "MODEL_REASONING_EFFORT": "xhigh"
   },
   "permissions": { "allow": ["*"], "defaultMode": "auto" },
-  "model": "claude-opus-4-8",
+  "model": "claude-opus-4-8[1m]",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
@@ -623,23 +623,27 @@ proxy that translates Anthropic-format requests into Copilot ones.
 
 Defaults pinned globally (synced across machines via this repo):
 
-- **Model: `claude-opus-4-8`** (Opus 4.8). This is Claude Code's recognized
-  Opus 4.8 name, so the UI uses the 1M context window. `copilot-relay` routes
-  Opus-family requests to Copilot upstream `opusModel: claude-opus-4.8`, so
-  **no `[1m]` / `-1m` alias is needed**. `env.ANTHROPIC_MODEL`, top-level
-  `model`, and the zsh wrappers are all pinned to `claude-opus-4-8`. Do not
+- **Model: `claude-opus-4-8[1m]`** (Opus 4.8, 1M window). The `[1m]` suffix
+  is the explicit opt-in for Claude Code's 1M context — it matches the in-app
+  "Opus 1M" picker entry and the binary's `Xx3` gate (model name must contain
+  both `opus` and `[1m]`). `copilot-relay` matches on the `opus` substring and
+  ignores the suffix, mapping the request to Copilot upstream
+  `opusModel: claude-opus-4.8`. `env.ANTHROPIC_MODEL`, top-level
+  `model`, and the zsh wrappers are all pinned to `claude-opus-4-8[1m]`. Do not
   use top-level `model: "default"` here: relay routes model names that do not
   contain `opus` to `gptModel` (`gpt-5.5`), which appears as 200k context.
 - **Family-aware routing via env vars + relay**:
-  - **`ANTHROPIC_DEFAULT_SONNET_MODEL: gpt-5.5`** — every Sonnet alias from
-    Claude Code's built-in picker routes to `gpt-5.5`.
-  - **`ANTHROPIC_DEFAULT_HAIKU_MODEL: gpt-5.5`** — Haiku tier for current
+  - **`ANTHROPIC_DEFAULT_SONNET_MODEL: gpt-5.5[1m]`** — every Sonnet alias
+    from Claude Code's built-in picker uses the GPT route while preserving
+    Claude-side 1M context accounting.
+  - **`ANTHROPIC_DEFAULT_HAIKU_MODEL: gpt-5.5[1m]`** — Haiku tier for current
     Claude Code versions, including sub-agents and small-fast side tasks.
-  - **`ANTHROPIC_SMALL_FAST_MODEL: gpt-5.5`** — legacy alias for older Claude
-    Code versions.
+  - **`ANTHROPIC_SMALL_FAST_MODEL: gpt-5.5[1m]`** — legacy alias for older
+    Claude Code versions.
   - `copilot-relay` also has `gptModel: gpt-5.5` and
-    `opusModel: claude-opus-4.8`, so Claude-side aliases and relay routing
-    agree.
+    `opusModel: claude-opus-4.8`, so Claude-facing `gpt-5.5[1m]` is still
+    routed to upstream `gpt-5.5`. Plain `gpt-5.5` works, but Claude Code
+    treats unknown custom model names as 200k.
 - **Effort: `xhigh`** — applied two ways:
   `effortLevel: "xhigh"` (Claude Code's client-side reasoning budget,
   applied to every session) and `thinkEffort: xhigh` in
@@ -672,7 +676,7 @@ settings.json key is gated off by feature flag.
 
 Same applies to `cc <title>`: it renames the active terminal tab via
 OSC 1/2 (+ tmux + WezTerm CLI fallbacks) then launches Claude Code with
-the bypass flag plus `--model claude-opus-4-8 --effort xhigh`. The title is prefixed with a Nerd Font glyph
+the bypass flag plus `--model 'claude-opus-4-8[1m]' --effort xhigh`. The title is prefixed with a Nerd Font glyph
 (`mdi-creation`, U+F0674 — sparkles) so Claude tabs are visually distinct
 from Copilot's `gg` tabs (which use `fa-github`) and from plain shells.
 

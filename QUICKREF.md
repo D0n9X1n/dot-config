@@ -140,21 +140,27 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     custom key; relay auth is handled by `copilot-relay auth`), and pins
     **Opus 4.8 @ xhigh effort** as the
     global default for every machine that runs `install.sh`:
-    `ANTHROPIC_MODEL=claude-opus-4-8` plus top-level
-    `model=claude-opus-4-8`; wrappers also inject
-    `--model claude-opus-4-8 --effort xhigh` because Claude Code can rewrite
-    `settings.json` at runtime. This is Claude Code's recognized Opus 4.8
-    name, so the UI uses the 1M context window. Do not use top-level `model=default` with
+    `ANTHROPIC_MODEL=claude-opus-4-8[1m]`; wrappers also inject
+    `--model 'claude-opus-4-8[1m]' --effort xhigh` because Claude Code can rewrite
+    `settings.json` at runtime. The `[1m]` suffix is the **explicit opt-in**
+    for the 1M window — it matches the in-app "Opus 1M" picker entry and the
+    `Xx3` gate in the binary (name must contain both `opus` and `[1m]`); it
+    removes any ambiguity about the bare name's default, which has varied
+    across Claude Code versions. Verified live: `claude-opus-4-8[1m]` is
+    accepted by the relay and returns normally (no `opus_1m_unavailable`).
+    Do not use top-level `model=default` with
     `copilot-relay`: relay routes non-`opus` model names to `gptModel`
-    (`gpt-5.5`), which appears as 200k context. Relay still maps Opus
-    requests to Copilot upstream `opusModel: claude-opus-4.8`; no `-1m`
-    alias is needed),
+    (`gpt-5.5`), which appears as 200k context. Relay matches on the `opus`
+    substring, so `claude-opus-4-8[1m]` still maps to Copilot upstream
+    `opusModel: claude-opus-4.8` (the `[1m]` suffix is ignored relay-side),
     `effortLevel="xhigh"` (deepest reasoning client-side, no
     `/effort` needed) plus `MODEL_REASONING_EFFORT=xhigh` so the
     statusline can display the pinned effort. Claude's Sonnet/Haiku/small-fast
-    env overrides are all pinned to `gpt-5.5`, matching relay-side
-    `gptModel: gpt-5.5`; relay-side thinking is pinned by
-    `~/.copilot-relay/config.yaml` as `thinkEffort: xhigh`.
+    env overrides are all pinned to Claude-facing `gpt-5.5[1m]` so Claude
+    Code treats the custom GPT route as 1M instead of falling back to 200k;
+    relay still maps those non-Opus requests to upstream `gptModel: gpt-5.5`.
+    Relay-side thinking is pinned by `~/.copilot-relay/config.yaml` as
+    `thinkEffort: xhigh`.
     Autonomous mode is enabled via
     `skipAutoPermissionPrompt=true` + `skipDangerousModePermissionPrompt=true` +
     `permissions.defaultMode="auto"`.

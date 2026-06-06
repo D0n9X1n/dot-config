@@ -123,12 +123,13 @@ Sonnet and Opus are treated as **separate model families** by user
 convention. Current routing:
 
 - Opus 4-5 / 4-6 / 4-7 / 4-8 → top-level `model` plus zsh wrappers
-  (`claude-opus-4-8`, already 1M in Claude Code; relay maps it to upstream
-  `claude-opus-4.8`; do not use `default` with copilot-relay because it
-  routes to `gpt-5.5`)
-- Sonnet 4-5 / 4-6 → `gpt-5.5`
-- Haiku 4-5 → `gpt-5.5`
-- gpt-5-mini → `gpt-5.5`
+  (`claude-opus-4-8[1m]`; the `[1m]` suffix is the explicit 1M opt-in in
+  Claude Code; relay matches the `opus` substring and maps it to upstream
+  `claude-opus-4.8`, ignoring the suffix; do not use `default` with
+  copilot-relay because it routes to `gpt-5.5`)
+- Sonnet 4-5 / 4-6 → Claude-facing `gpt-5.5[1m]` (relay upstream `gpt-5.5`)
+- Haiku 4-5 → `gpt-5.5[1m]`
+- gpt-5-mini → `gpt-5.5[1m]`
 
 When asked to "use the same model for the family", apply within Opus or
 within Sonnet — never both. When adding a new alias, default to the
