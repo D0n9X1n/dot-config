@@ -68,8 +68,9 @@ probes do not appear as errors.
    Nerd Font, and Noto Color Emoji. It also downloads the latest
    `RecMonoBaker-*.ttf` and `RecMonoSt.Helens-*.ttf` assets from
    `MOSconfig/recursive-code-config` releases into `~/Library/Fonts`.
-2. Installs npm global CLIs: `@github/copilot` and `copilot-relay`. Set
-   `SKIP_NPM_GLOBALS=1` to skip.
+2. Installs/updates npm global CLIs only when they are missing or already
+   npm-managed. Existing non-npm binaries (for example cask-managed `copilot`)
+   are left in place to avoid npm `EEXIST`. Set `SKIP_NPM_GLOBALS=1` to skip.
 3. Installs oh-my-zsh unattended if missing (`RUNZSH=no`, `CHSH=no`), then
    fixes insecure zsh completion directory permissions so `compinit` does not
    block new shells. Set `SKIP_OH_MY_ZSH=1` to skip installation.
@@ -89,11 +90,16 @@ probes do not appear as errors.
 9. Merges tracked, secret-free MCP servers into
    `~/.config/github-copilot/mcp.json`, then imports Copilot's MCP servers into
    Claude Code's `~/.claude.json` when `jq` and the MCP file are available.
+   For WakaTime MCP, if `~/.wakatime.cfg` lacks `api_key`, the installer prints
+   a red `ACTION REQUIRED` prompt and asks for the key twice with hidden input
+   before writing the local config file.
 10. Bootstraps **TPM** (Tmux Plugin Manager): clones it under `~/.tmux/plugins/tpm`
    if missing, then runs `tpm/bin/install_plugins` to clone every plugin
    listed in `.tmux.conf`. Skipped if `tmux` isn't on PATH.
 11. Configures `~/.copilot-relay/config.yaml`, removes legacy proxy launchd jobs,
-   writes the per-user launchd agent, and starts/restarts `copilot-relay`.
+   and writes the per-user launchd agent. If relay is not authenticated, the
+   installer prints a red `ACTION REQUIRED` message to run
+   `npx copilot-relay auth` first; after auth, re-run `install.sh` to start it.
 12. Backs up any existing destination file or symlink that doesn't already point
    at the repo as `<name>.bak.YYYYMMDDHHMMSS` before linking.
 13. Leaves correctly-pointing symlinks alone (no-op).
@@ -161,7 +167,8 @@ brew --version
 node --version
 python3 --version
 brew list --cask claude-code
-npm list -g @github/copilot copilot-relay --depth=0
+copilot --version
+npm list -g copilot-relay --depth=0
 ls -l ~/.tmux.conf ~/.copilot/settings.json ~/.claude/settings.json ~/.oh-my-zsh/custom/custom.zsh
 launchctl print "gui/$(id -u)/com.d0n9x1n.copilot-relay" | grep state
 ```
@@ -169,14 +176,14 @@ launchctl print "gui/$(id -u)/com.d0n9x1n.copilot-relay" | grep state
 ### 3. Authenticate the proxy (one-time, browser device-code flow)
 
 ```bash
-copilot-relay auth                   # opens browser; enter the device code
+npx copilot-relay auth               # opens browser; enter the device code
 # Verify token landed:
 test -f ~/.copilot-relay/github_token && echo "ok" || echo "FAIL: auth incomplete"
 ```
 
 ### 4. Start the proxy daemon (must stay running for Claude Code)
 
-After `copilot-relay auth`, the launchd agent installed by `install.sh` should
+After `npx copilot-relay auth`, re-run `install.sh`; the launchd agent should
 start serving the proxy. The agent
 (`com.d0n9x1n.copilot-relay`) starts on every login, restarts on crash,
 and logs to `~/Library/Logs/copilot-relay.{out,err}.log` plus
@@ -205,10 +212,10 @@ tail -f ~/Library/Logs/copilot-relay.{out,err}.log ~/.copilot-relay/logs/copilot
 For a one-off foreground run (debugging, no auto-restart):
 
 ```bash
-copilot-relay start &
+npx copilot-relay start &
 sleep 2
-curl -s http://127.0.0.1:4142/healthz | head -c 100 \
-  && echo "" || echo "FAIL: proxy not responding on :4142"
+curl -sS -o /dev/null --connect-timeout 1 http://127.0.0.1:4142/ \
+  && echo "listening" || echo "FAIL: proxy not responding on :4142"
 ```
 
 ### 5. Wire up MCP servers (optional but recommended)
@@ -635,7 +642,7 @@ Defaults pinned globally (synced across machines via this repo):
   to route. Claude Code itself doesn't know about `gpt-5.5`; the proxy
   translates every request and replies with Anthropic-shaped JSON.
 - `ANTHROPIC_AUTH_TOKEN` — required by Claude Code's startup check.
-  `dummy` is fine; real auth happens in `copilot-relay auth`.
+  `dummy` is fine; real auth happens in `npx copilot-relay auth`.
 - `skipAutoPermissionPrompt: true` + `permissions.defaultMode: "auto"` —
   autonomous mode by default (no per-action confirmation). Note: the
   binary explicitly **rejects** `defaultMode: "bypassPermissions"`
@@ -666,7 +673,7 @@ free-form names pass through the proxy unchanged.
 One-time setup (after running `install.sh` on a fresh box):
 
 ```bash
-copilot-relay auth  # browser device-code login (GitHub)
+npx copilot-relay auth  # browser device-code login (GitHub)
 claude              # in another shell — uses Opus 4.8 1M @ xhigh effort
 ```
 
@@ -691,8 +698,9 @@ safe user-scope MCP import from Copilot's MCP file.
   automatically; config symlinked to `~/.wezterm.lua`)
 - [oh-my-zsh](https://ohmyz.sh/) — installed unattended if missing so
   `oh-my-zsh-custom/` files can be linked
-- [GitHub Copilot CLI](https://github.com/github/copilot) — installed as npm
-  global `@github/copilot`
+- [GitHub Copilot CLI](https://github.com/github/copilot) — existing non-npm
+  install is preserved; npm `@github/copilot` is installed only when `copilot`
+  is missing or already npm-managed
 - [Claude Code CLI](https://github.com/anthropics/claude-code) — installed via
   Homebrew cask `claude-code`
 - [`copilot-relay`](https://www.npmjs.com/package/copilot-relay) — installed as

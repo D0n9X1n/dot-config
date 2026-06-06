@@ -22,7 +22,10 @@ claude (Anthropic CLI) -> http://127.0.0.1:4142 (copilot-relay) -> GitHub Copilo
 bash ~/Public/dot-configs/install.sh
 
 # 2. GitHub device-code login (browser opens, paste the printed code).
-copilot-relay auth
+npx copilot-relay auth
+
+# 3. Re-run install.sh so launchd starts the authenticated relay.
+bash ~/Public/dot-configs/install.sh
 ```
 
 After auth, `~/.copilot-relay/github_token` is written and the
@@ -79,7 +82,7 @@ The `oh-my-zsh-custom/claude.zsh` wrapper launches `claude` with
 | Key | Purpose |
 |---|---|
 | `env.ANTHROPIC_BASE_URL` | Points Claude Code at the local proxy instead of `api.anthropic.com`. |
-| `env.ANTHROPIC_AUTH_TOKEN` | Required by Claude Code's startup check. `dummy` is fine; real auth happens via `copilot-relay auth`. **First launch will prompt** "Use this custom API key? (y/N)" — pick **Yes**, otherwise it lands in `~/.claude.json#customApiKeyResponses.rejected` and Claude refuses to use it. |
+| `env.ANTHROPIC_AUTH_TOKEN` | Required by Claude Code's startup check. `dummy` is fine; real auth happens via `npx copilot-relay auth`. **First launch will prompt** "Use this custom API key? (y/N)" — pick **Yes**, otherwise it lands in `~/.claude.json#customApiKeyResponses.rejected` and Claude refuses to use it. |
 | `env.ANTHROPIC_MODEL` | Claude Code-facing Opus 4.8 default. The `[1m]` suffix is the explicit 1M opt-in (matches the in-app "Opus 1M" picker / binary `Xx3` gate, which keys on the name containing both `opus` and `[1m]`). Relay matches on the `opus` substring, so `claude-opus-4-8[1m]` still maps to upstream `opusModel: claude-opus-4.8` (the `[1m]` suffix is ignored relay-side). |
 | `env.ANTHROPIC_DEFAULT_SONNET_MODEL` | Routes every Sonnet alias through Claude-facing `gpt-5.5[1m]`; relay maps it to upstream `gpt-5.5`. |
 | `env.ANTHROPIC_DEFAULT_HAIKU_MODEL` | Routes current Claude Code's Haiku tier, including sub-agents and small-fast side tasks, through `gpt-5.5[1m]`. |
@@ -135,8 +138,8 @@ opusModel: claude-opus-4.8
 ## Maintenance
 
 - Stop/restart the proxy: `launchctl kickstart -k "gui/$(id -u)/com.d0n9x1n.copilot-relay"`.
-- Inspect health: `curl -s http://127.0.0.1:4142/healthz`.
-- Refresh GitHub token: `copilot-relay auth` again.
+- Inspect listener: `curl -sS -o /dev/null --connect-timeout 1 http://127.0.0.1:4142/ && echo "listening"`.
+- Refresh GitHub token: `npx copilot-relay auth` again, then re-run `install.sh`.
 - Switch default model: edit top-level `model` in `settings.json`, plus
   `env.ANTHROPIC_MODEL` and `opusModel` / `gptModel` in
   `~/.copilot-relay/config.yaml`.

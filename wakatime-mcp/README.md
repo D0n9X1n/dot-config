@@ -24,6 +24,11 @@ install.sh writes to `~/.config/github-copilot/mcp.json` references this
 key via the `WAKATIME_API_KEY` env var — but that file is gitignored, so
 the key never lands in this repo.
 
+If `~/.wakatime.cfg` is missing or has no `api_key`, `install.sh` prints a red
+`ACTION REQUIRED` prompt, asks you to enter the key twice with hidden input, and
+writes the local config file with mode `600`. The key itself is never printed to
+the install log.
+
 ## Tools exposed
 
 - `get_coding_stats` — languages, projects, editors over a time range

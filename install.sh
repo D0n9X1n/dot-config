@@ -5,6 +5,9 @@ src_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 dest_dir="${HOME}"
 timestamp="$(date +"%Y%m%d%H%M%S")"
 install_log="${DOT_CONFIGS_INSTALL_LOG:-${HOME}/Library/Logs/dot-configs-install.log}"
+RED="$(printf '\033[31m')"
+BOLD="$(printf '\033[1m')"
+RESET="$(printf '\033[0m')"
 
 setup_logging() {
   local log_dir
@@ -38,6 +41,10 @@ log_command() {
   done
   printf '\n'
   "$@"
+}
+
+action_required() {
+  printf '%s%sACTION REQUIRED:%s %s\n' "$RED" "$BOLD" "$RESET" "$*" >&2
 }
 
 prepend_path_dir() {
@@ -178,12 +185,6 @@ ensure_npm_cli_latest() {
     return 1
   fi
 
-  latest="$(npm view "$package" version || true)"
-  if [ -z "$latest" ]; then
-    echo "Warning: could not check latest npm version for $package (skipping)"
-    return 1
-  fi
-
   if have_cmd "$binary"; then
     current="$(npm list -g "$package" --depth=0 --json 2>/dev/null \
       | node -e '
@@ -197,15 +198,24 @@ ensure_npm_cli_latest() {
             } catch {}
           });
         ' "$package" 2>/dev/null || true)"
+    if [ -z "$current" ]; then
+      echo "$binary already exists at $(command -v "$binary"), but $package is not tracked by npm; leaving it in place."
+      return 0
+    fi
+  fi
+
+  latest="$(npm view "$package" version || true)"
+  if [ -z "$latest" ]; then
+    echo "Warning: could not check latest npm version for $package (skipping)"
+    return 1
+  fi
+
+  if [ -n "$current" ]; then
     if [ "$current" = "$latest" ]; then
       echo "$package is up to date ($current)."
       return 0
     fi
-    if [ -n "$current" ]; then
-      echo "Updating $package from $current to $latest."
-    else
-      echo "$binary is installed, but $package is not tracked by npm; installing $package@$latest."
-    fi
+    echo "Updating $package from $current to $latest."
   else
     echo "Installing $package@$latest."
   fi
@@ -309,6 +319,90 @@ EOF
   if [ "$expect_absent" = "1" ] && have_cmd "$binary"; then
     echo "Warning: legacy command '$binary' is still on PATH after cleanup"
   fi
+}
+
+prompt_wakatime_api_key() {
+  local first=""
+  local second=""
+  local attempt=1
+
+  if [ ! -t 0 ] || [ ! -r /dev/tty ]; then
+    action_required "WakaTime API key missing; non-interactive shell cannot prompt. Create ~/.wakatime.cfg, then re-run install.sh."
+    return 1
+  fi
+
+  action_required "WakaTime API key missing. Enter it twice on the terminal; input is hidden and not written to the install log."
+  while [ "$attempt" -le 3 ]; do
+    printf '%s%sWakaTime API key:%s ' "$RED" "$BOLD" "$RESET" >/dev/tty
+    IFS= read -r -s first </dev/tty
+    printf '\n' >/dev/tty
+    printf '%s%sWakaTime API key again:%s ' "$RED" "$BOLD" "$RESET" >/dev/tty
+    IFS= read -r -s second </dev/tty
+    printf '\n' >/dev/tty
+
+    if [ -z "$first" ]; then
+      action_required "WakaTime API key was empty; try again."
+    elif [ "$first" != "$second" ]; then
+      action_required "WakaTime API key entries did not match; try again."
+    else
+      printf '%s' "$first"
+      return 0
+    fi
+    attempt=$((attempt + 1))
+  done
+
+  action_required "WakaTime API key was not written after 3 failed attempts."
+  return 1
+}
+
+ensure_wakatime_cfg_api_key() {
+  local cfg="$1"
+  local key=""
+  local tmp_cfg=""
+
+  if [ -f "$cfg" ]; then
+    key="$(awk -F'= *' '/^api_key[[:space:]]*=/{print $2; exit}' "$cfg" | tr -d ' \r')"
+    if [ -n "$key" ]; then
+      printf '%s' "$key"
+      return 0
+    fi
+  fi
+
+  key="$(prompt_wakatime_api_key || true)"
+  if [ -z "$key" ]; then
+    return 1
+  fi
+
+  mkdir -p "$(dirname "$cfg")"
+  tmp_cfg="$(mktemp -t wakatime-cfg.XXXXXX)"
+  if [ -f "$cfg" ]; then
+    if grep -Eq '^[[:space:]]*api_key[[:space:]]*=' "$cfg"; then
+      sed -E "s|^[[:space:]]*api_key[[:space:]]*=.*|api_key = ${key}|" "$cfg" >"$tmp_cfg"
+    elif grep -Eq '^[[:space:]]*\[settings\][[:space:]]*$' "$cfg"; then
+      awk -v key="$key" '
+        /^[[:space:]]*\[settings\][[:space:]]*$/ && !inserted {
+          print
+          print "api_key = " key
+          inserted = 1
+          next
+        }
+        { print }
+      ' "$cfg" >"$tmp_cfg"
+    else
+      cp "$cfg" "$tmp_cfg"
+      printf '\n[settings]\n' >>"$tmp_cfg"
+      printf 'api_key = %s\n' "$key" >>"$tmp_cfg"
+    fi
+  else
+    {
+      printf '[settings]\n'
+      printf 'api_key = %s\n' "$key"
+    } >"$tmp_cfg"
+  fi
+  mv "$tmp_cfg" "$cfg"
+  chmod 600 "$cfg"
+  echo "wakatime-mcp: wrote API key to $cfg (secret not printed)" >&2
+  printf '%s' "$key"
 }
 
 install_recursive_code_config_fonts() {
@@ -682,20 +776,17 @@ if [ -d "$claude_src" ]; then
   # pointing at it. Idempotent — venv is reused if already present;
   # requirements.txt drives pip install (no-op when nothing changed).
   #
-  # Skipped if the user has no ~/.wakatime.cfg (i.e. they don't use
-  # WakaTime). The key is read from that file rather than committed
-  # because it's a secret.
+  # If ~/.wakatime.cfg has no api_key, prompt twice on /dev/tty and write it
+  # locally. The key is never printed; only the per-machine MCP config receives
+  # it as WAKATIME_API_KEY.
   wm_src="${src_dir}/wakatime-mcp"
   wm_dest="${HOME}/.local/share/wakatime-mcp"
   wm_cfg="${HOME}/.wakatime.cfg"
   if [ -d "$wm_src" ] && have_cmd python3; then
-    if [ ! -f "$wm_cfg" ]; then
-      echo "wakatime-mcp: ~/.wakatime.cfg not found — skipping (run 'wakatime --help' or visit https://wakatime.com/settings to set up)"
+    wm_key="$(ensure_wakatime_cfg_api_key "$wm_cfg" || true)"
+    if [ -z "$wm_key" ]; then
+      echo "wakatime-mcp: no API key available — skipping registration"
     else
-      wm_key="$(awk -F'= *' '/^api_key/{print $2; exit}' "$wm_cfg" | tr -d ' \r')"
-      if [ -z "$wm_key" ]; then
-        echo "wakatime-mcp: no api_key in $wm_cfg — skipping"
-      else
         mkdir -p "$wm_dest"
         cp "$wm_src/server.py" "$wm_src/wakatime_client.py" "$wm_dest/"
         if [ ! -d "$wm_dest/venv" ]; then
@@ -733,7 +824,6 @@ if [ -d "$claude_src" ]; then
             && echo "wakatime-mcp: registered in $copilot_mcp_pre" \
             || { rm -f "$tmp_mcp"; echo "Warning: wakatime-mcp jq registration failed"; }
         fi
-      fi
     fi
   fi
 
@@ -839,54 +929,62 @@ if is_macos; then
       # BSD-sed compatibility on macOS (GNU-style `sed -i` would fail).
       sed "s|__HOME__|${HOME}|g" "$launchd_src" > "$launchd_dest"
       echo "Wrote $launchd_dest"
-      # Bootstrap into the GUI domain of the current user. bootout first
-      # so a content change actually replaces the running agent (load is
-      # a no-op when the label already exists).
-      if launchctl print "gui/${uid}/com.d0n9x1n.copilot-relay" >/dev/null 2>&1; then
-        echo "Restarting launchd agent com.d0n9x1n.copilot-relay with the latest copilot-relay."
+
+      if [ ! -f "${HOME}/.copilot-relay/github_token" ]; then
+        if launchctl print "gui/${uid}/com.d0n9x1n.copilot-relay" >/dev/null 2>&1; then
+          launchctl bootout "gui/${uid}/com.d0n9x1n.copilot-relay" 2>/dev/null || true
+        fi
+        action_required "copilot-relay is installed but not authenticated."
+        action_required "Run 'npx copilot-relay auth', then re-run install.sh to start the launchd agent."
       else
-        echo "Starting launchd agent com.d0n9x1n.copilot-relay."
-      fi
-      launchctl bootout "gui/${uid}/com.d0n9x1n.copilot-relay" 2>/dev/null || true
-      for attempt in 1 2 3 4 5; do
-        if ! launchctl print "gui/${uid}/com.d0n9x1n.copilot-relay" >/dev/null 2>&1; then
-          break
+        # Bootstrap into the GUI domain of the current user. bootout first
+        # so a content change actually replaces the running agent (load is
+        # a no-op when the label already exists).
+        if launchctl print "gui/${uid}/com.d0n9x1n.copilot-relay" >/dev/null 2>&1; then
+          echo "Restarting launchd agent com.d0n9x1n.copilot-relay with the latest copilot-relay."
+        else
+          echo "Starting launchd agent com.d0n9x1n.copilot-relay."
         fi
-        sleep 1
-      done
-
-      loaded=0
-      for attempt in 1 2 3 4 5; do
-        if log_command launchctl bootstrap "gui/${uid}" "$launchd_dest"; then
-          loaded=1
-          break
-        fi
-        echo "Warning: launchctl bootstrap attempt ${attempt}/5 failed for com.d0n9x1n.copilot-relay"
-        sleep 1
-      done
-
-      if [ "$loaded" = "1" ]; then
-        log_command launchctl kickstart -k "gui/${uid}/com.d0n9x1n.copilot-relay" || true
-        if have_cmd curl; then
-          relay_ready=0
-          for attempt in 1 2 3 4 5; do
-            if curl -sS -o /dev/null --connect-timeout 1 http://127.0.0.1:4142/ 2>/dev/null; then
-              relay_ready=1
-              break
-            fi
-            sleep 1
-          done
-          if [ "$relay_ready" = "1" ]; then
-            echo "copilot-relay is running at http://127.0.0.1:4142"
-          elif [ ! -f "${HOME}/.copilot-relay/github_token" ]; then
-            echo "Warning: copilot-relay is installed but not authenticated; run 'copilot-relay auth', then 'launchctl kickstart -k gui/$(id -u)/com.d0n9x1n.copilot-relay'"
-          else
-            echo "Warning: copilot-relay launchd agent loaded, but port 4142 is not accepting connections yet"
+        launchctl bootout "gui/${uid}/com.d0n9x1n.copilot-relay" 2>/dev/null || true
+        for attempt in 1 2 3 4 5; do
+          if ! launchctl print "gui/${uid}/com.d0n9x1n.copilot-relay" >/dev/null 2>&1; then
+            break
           fi
+          sleep 1
+        done
+
+        loaded=0
+        for attempt in 1 2 3 4 5; do
+          if log_command launchctl bootstrap "gui/${uid}" "$launchd_dest"; then
+            loaded=1
+            break
+          fi
+          echo "Warning: launchctl bootstrap attempt ${attempt}/5 failed for com.d0n9x1n.copilot-relay"
+          sleep 1
+        done
+
+        if [ "$loaded" = "1" ]; then
+          log_command launchctl kickstart -k "gui/${uid}/com.d0n9x1n.copilot-relay" || true
+          if have_cmd curl; then
+            relay_ready=0
+            for attempt in 1 2 3 4 5; do
+              if curl -sS -o /dev/null --connect-timeout 1 http://127.0.0.1:4142/ 2>/dev/null; then
+                relay_ready=1
+                break
+              fi
+              sleep 1
+            done
+            if [ "$relay_ready" = "1" ]; then
+              echo "copilot-relay is running at http://127.0.0.1:4142"
+            else
+              echo "Warning: copilot-relay launchd agent loaded, but port 4142 is not accepting connections yet"
+              echo "If authentication expired, run 'npx copilot-relay auth', then re-run install.sh."
+            fi
+          fi
+          echo "Loaded launchd agent com.d0n9x1n.copilot-relay (logs: ~/Library/Logs/copilot-relay.{out,err}.log, ~/.copilot-relay/logs/copilot-relay.log)"
+        else
+          echo "Warning: launchctl bootstrap failed for com.d0n9x1n.copilot-relay"
         fi
-        echo "Loaded launchd agent com.d0n9x1n.copilot-relay (logs: ~/Library/Logs/copilot-relay.{out,err}.log, ~/.copilot-relay/logs/copilot-relay.log)"
-      else
-        echo "Warning: launchctl bootstrap failed for com.d0n9x1n.copilot-relay"
       fi
     fi
   fi
