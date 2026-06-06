@@ -60,17 +60,19 @@ probes do not appear as errors.
 1. Installs Homebrew if missing, then installs required macOS apps, fonts, and
    command-line tools via Homebrew (best-effort after Homebrew itself exists).
    Set `SKIP_BREW=1` to skip this step entirely (useful for CI / fake-`HOME`
-   testing). Formulae: `git`, `python` (provides `python3`), `node`, `jq`,
-   `tmux`. Before installing Claude Code, the installer removes any old global
-   npm `@anthropic-ai/claude-code` package, then installs casks:
+   testing). Formulae: `autojump`, `eza`, `git`, `jq`, `neovim`, `node`,
+   `python` (provides `python3`), `tmux`, `zsh-completions`, and
+   `zsh-fast-syntax-highlighting`. Before installing Claude Code, the installer
+   removes any old global npm `@anthropic-ai/claude-code` package, then installs casks:
    `claude-code`, `wezterm`, the Recursive base/Nerd Font casks, Symbols Only
    Nerd Font, and Noto Color Emoji. It also downloads the latest
    `RecMonoBaker-*.ttf` and `RecMonoSt.Helens-*.ttf` assets from
    `MOSconfig/recursive-code-config` releases into `~/Library/Fonts`.
 2. Installs npm global CLIs: `@github/copilot` and `copilot-relay`. Set
    `SKIP_NPM_GLOBALS=1` to skip.
-3. Installs oh-my-zsh unattended if missing (`RUNZSH=no`, `CHSH=no`). Set
-   `SKIP_OH_MY_ZSH=1` to skip.
+3. Installs oh-my-zsh unattended if missing (`RUNZSH=no`, `CHSH=no`), then
+   fixes insecure zsh completion directory permissions so `compinit` does not
+   block new shells. Set `SKIP_OH_MY_ZSH=1` to skip installation.
 4. Symlinks every **top-level** dotfile in this repo (files starting with `.`)
    into `$HOME` (currently `.tmux.conf`, plus the existing `.gitignore` /
    `.DS_Store` pass-through which has been there since v0.1).
@@ -182,7 +184,13 @@ and logs to `~/Library/Logs/copilot-relay.{out,err}.log` plus
 
 ```bash
 launchctl print "gui/$(id -u)/com.d0n9x1n.copilot-relay" | grep state
-curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:4142/healthz  # expect 200
+curl -sS -o /dev/null --connect-timeout 1 http://127.0.0.1:4142/ && echo "listening"
+```
+
+If the agent is loaded but port 4142 is not listening after auth, restart it:
+
+```bash
+launchctl kickstart -k "gui/$(id -u)/com.d0n9x1n.copilot-relay"
 ```
 
 If you want to manage the agent manually:
@@ -355,9 +363,10 @@ After adding/editing, commit and push. Other machines pick up the change with
 - Aliases: `ls=eza`, `ll=eza -l`, `c=cd ..`, `vim=nvim`, `proxy/unproxy`.
 - `enable_proxy` / `disable_proxy` functions: toggle SOCKS5 proxy at
   `127.0.0.1:46971` for shell env vars, git, and npm in one call.
-- Sources `zsh-fast-syntax-highlighting` and `zsh-completions` from Homebrew if
-  available.
-- Loads optional autojump if installed.
+- Uses Homebrew-installed `eza`, `neovim`, `autojump`,
+  `zsh-fast-syntax-highlighting`, and `zsh-completions`.
+- Repairs group/world-writable completion directories before running
+  `compinit -i`, avoiding zsh's insecure-directory interactive prompt.
 - Adds `.NET` and Android SDK tooling to `PATH`.
 
 #### `copilot.zsh`
@@ -715,10 +724,10 @@ safe user-scope MCP import from Copilot's MCP file.
 - Symbols Only Nerd Font — `font-symbols-only-nerd-font`
 - Noto Color Emoji — `font-noto-color-emoji`
 
-### Optional Homebrew formulae used by `custom.zsh`
+### Shell helper formulae used by `custom.zsh`
 
-- `autojump`, `zsh-fast-syntax-highlighting`, `zsh-completions` — sourced if
-  present; absence is silently ignored.
+- `eza`, `neovim`, `autojump`, `zsh-fast-syntax-highlighting`, and
+  `zsh-completions` are installed by `install.sh`.
 
 ## License
 

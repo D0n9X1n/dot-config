@@ -75,8 +75,27 @@ alias unproxy="disable_proxy"
 if type brew &>/dev/null; then
   FPATH=$(brew --prefix)/share/zsh-completions:$FPATH
 
+  # Homebrew completion directories can become group-writable after installs.
+  # Fix what we can, then ignore any remaining insecure paths instead of
+  # blocking every new shell with compinit's interactive prompt.
+  fix_compaudit_permissions() {
+    emulate -L zsh
+    local dir
+    local -a insecure_dirs
+
+    autoload -Uz compaudit
+    insecure_dirs=("${(@f)$(compaudit 2>/dev/null)}")
+    for dir in "${insecure_dirs[@]}"; do
+      [[ -n "$dir" && -e "$dir" ]] || continue
+      chmod go-w "$dir" 2>/dev/null || true
+    done
+  }
+
+  fix_compaudit_permissions
+  unfunction fix_compaudit_permissions
+
   autoload -Uz compinit
-  compinit
+  compinit -i
 fi
 
 

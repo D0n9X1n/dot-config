@@ -108,6 +108,65 @@ ensure_oh_my_zsh() {
   rm -f "$installer"
 }
 
+fix_zsh_compaudit_permissions() {
+  local insecure_dirs=""
+  local dir=""
+  local remaining=""
+
+  if ! have_cmd zsh; then
+    echo "Skipping zsh compaudit permission fix: zsh not found."
+    return 0
+  fi
+
+  insecure_dirs="$(zsh -fc '
+    if command -v brew >/dev/null 2>&1; then
+      brew_prefix="$(brew --prefix 2>/dev/null || true)"
+      if [ -n "$brew_prefix" ] && [ -d "$brew_prefix/share/zsh-completions" ]; then
+        fpath=("$brew_prefix/share/zsh-completions" $fpath)
+      fi
+    fi
+    autoload -Uz compaudit
+    compaudit 2>/dev/null
+  ' || true)"
+
+  if [ -z "$insecure_dirs" ]; then
+    echo "zsh compaudit: completion directories are secure."
+    return 0
+  fi
+
+  echo "zsh compaudit: fixing insecure completion directory permissions."
+  while IFS= read -r dir; do
+    [ -n "$dir" ] || continue
+    case "$dir" in
+      /*) ;;
+      *) continue ;;
+    esac
+    [ -e "$dir" ] || continue
+    if chmod go-w "$dir" 2>/dev/null; then
+      echo "Fixed zsh completion permissions: $dir"
+    else
+      echo "Warning: could not chmod go-w '$dir' (check owner/permissions)"
+    fi
+  done <<EOF
+$insecure_dirs
+EOF
+
+  remaining="$(zsh -fc '
+    if command -v brew >/dev/null 2>&1; then
+      brew_prefix="$(brew --prefix 2>/dev/null || true)"
+      if [ -n "$brew_prefix" ] && [ -d "$brew_prefix/share/zsh-completions" ]; then
+        fpath=("$brew_prefix/share/zsh-completions" $fpath)
+      fi
+    fi
+    autoload -Uz compaudit
+    compaudit 2>/dev/null
+  ' || true)"
+  if [ -n "$remaining" ]; then
+    echo "Warning: zsh compaudit still reports insecure directories:"
+    printf '%s\n' "$remaining"
+  fi
+}
+
 ensure_npm_cli_latest() {
   local package="$1"
   local binary="$2"
@@ -417,11 +476,16 @@ install_macos_deps() {
     font-noto-color-emoji
   )
   local formulae=(
+    autojump
+    eza
     git
-    python
-    node
     jq
+    neovim
+    node
+    python
     tmux
+    zsh-completions
+    zsh-fast-syntax-highlighting
   )
 
   local formula
@@ -482,6 +546,7 @@ if is_macos; then
   else
     ensure_oh_my_zsh
   fi
+  fix_zsh_compaudit_permissions
 else
   echo "Auto-install only supports macOS + Homebrew. Install apps/fonts/CLIs manually."
 fi
@@ -805,7 +870,7 @@ if is_macos; then
         if have_cmd curl; then
           relay_ready=0
           for attempt in 1 2 3 4 5; do
-            if curl -fsS -o /dev/null http://127.0.0.1:4142/healthz 2>/dev/null; then
+            if curl -sS -o /dev/null --connect-timeout 1 http://127.0.0.1:4142/ 2>/dev/null; then
               relay_ready=1
               break
             fi
@@ -813,8 +878,10 @@ if is_macos; then
           done
           if [ "$relay_ready" = "1" ]; then
             echo "copilot-relay is running at http://127.0.0.1:4142"
+          elif [ ! -f "${HOME}/.copilot-relay/github_token" ]; then
+            echo "Warning: copilot-relay is installed but not authenticated; run 'copilot-relay auth', then 'launchctl kickstart -k gui/$(id -u)/com.d0n9x1n.copilot-relay'"
           else
-            echo "Warning: copilot-relay launchd agent loaded, but /healthz did not respond yet"
+            echo "Warning: copilot-relay launchd agent loaded, but port 4142 is not accepting connections yet"
           fi
         fi
         echo "Loaded launchd agent com.d0n9x1n.copilot-relay (logs: ~/Library/Logs/copilot-relay.{out,err}.log, ~/.copilot-relay/logs/copilot-relay.log)"

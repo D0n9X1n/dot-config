@@ -197,7 +197,8 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
 - `<repo>/oh-my-zsh-custom/<file>` — files linked to
   `$HOME/.oh-my-zsh/custom/<file>`. Currently:
   - `custom.zsh` — aliases, proxy helpers (`enable_proxy`/`disable_proxy`),
-    brew completions, `PATH` extras (`.NET`, Android SDK).
+    Homebrew completions/syntax highlighting/autojump, compaudit permission
+    repair before `compinit -i`, and `PATH` extras (`.NET`, Android SDK).
   - `copilot.zsh` — wraps `copilot update` so a successful update runs
     `~/.copilot/cleanup-legacy.sh`, pruning stale CLI package payloads
     left by previous upgrades.
@@ -220,8 +221,9 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
 
 1. macOS only: bootstraps Homebrew if missing, then installs deps via
    Homebrew (best-effort after brew exists). Set `SKIP_BREW=1` to skip
-   (useful for CI / fake-`HOME` testing). Formulae: `git`, `python`
-   (provides `python3`), `node`, `jq`, `tmux`. Then removes old npm global
+   (useful for CI / fake-`HOME` testing). Formulae: `autojump`, `eza`, `git`,
+   `jq`, `neovim`, `node`, `python` (provides `python3`), `tmux`,
+   `zsh-completions`, `zsh-fast-syntax-highlighting`. Then removes old npm global
    `@anthropic-ai/claude-code` if present and installs casks: `claude-code`,
    `wezterm`, `font-recursive`, `font-recursive-mono-nerd-font`,
    `font-symbols-only-nerd-font`, `font-noto-color-emoji`. It also downloads
@@ -229,8 +231,9 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
    `MOSconfig/recursive-code-config` release into `~/Library/Fonts`.
 2. Installs npm globals `@github/copilot` and `copilot-relay`; set
    `SKIP_NPM_GLOBALS=1` to skip.
-3. Installs oh-my-zsh unattended if missing (`RUNZSH=no`, `CHSH=no`); set
-   `SKIP_OH_MY_ZSH=1` to skip.
+3. Installs oh-my-zsh unattended if missing (`RUNZSH=no`, `CHSH=no`) and fixes
+   insecure zsh completion directory permissions; set `SKIP_OH_MY_ZSH=1` to skip
+   installation.
 4. Symlinks every top-level `.<name>` file in the repo to `$HOME/.<name>`
    (currently `.tmux.conf`; also passes through `.gitignore` and a stray
    `.DS_Store` — both pre-existing, harmless on macOS).
@@ -294,8 +297,8 @@ cd ~/Public/dot-configs && git pull
 - Fonts (auto-installed): Recursive base/Nerd casks, Symbols Only Nerd Font,
   Noto Color Emoji, plus RecMonoBaker/RecMonoSt.Helens TTFs downloaded from
   `MOSconfig/recursive-code-config` releases into `~/Library/Fonts`.
-- Optional brew formulae sourced if present: `autojump`,
-  `zsh-fast-syntax-highlighting`, `zsh-completions`.
+- Shell helper formulae installed for `custom.zsh`: `eza`, `neovim`,
+  `autojump`, `zsh-fast-syntax-highlighting`, `zsh-completions`.
 
 ## Notes
 - Safe to re-run `install.sh` anytime; existing correct links are skipped.
