@@ -4,6 +4,23 @@ set -euo pipefail
 src_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 dest_dir="${HOME}"
 timestamp="$(date +"%Y%m%d%H%M%S")"
+install_log="${DOT_CONFIGS_INSTALL_LOG:-${HOME}/Library/Logs/dot-configs-install.log}"
+
+setup_logging() {
+  local log_dir
+  log_dir="$(dirname "$install_log")"
+  mkdir -p "$log_dir"
+  if touch "$install_log" >/dev/null 2>&1; then
+    exec > >(while IFS= read -r line; do
+      printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$line"
+    done | tee -a "$install_log") 2>&1
+    echo "Install log: $install_log"
+  else
+    echo "Warning: cannot write install log at $install_log"
+  fi
+}
+
+setup_logging
 
 is_macos() {
   [ "$(uname -s)" = "Darwin" ]
@@ -11,6 +28,163 @@ is_macos() {
 
 have_cmd() {
   command -v "$1" >/dev/null 2>&1
+}
+
+ensure_npm_cli_latest() {
+  local package="$1"
+  local binary="$2"
+  local current=""
+  local latest=""
+
+  if ! have_cmd npm; then
+    echo "Warning: npm not found; cannot install or update $package (skipping)"
+    return 1
+  fi
+
+  latest="$(npm view "$package" version 2>/dev/null || true)"
+  if [ -z "$latest" ]; then
+    echo "Warning: could not check latest npm version for $package (skipping)"
+    return 1
+  fi
+
+  if have_cmd "$binary"; then
+    current="$(npm list -g "$package" --depth=0 --json 2>/dev/null \
+      | node -e '
+          let input = "";
+          process.stdin.on("data", chunk => input += chunk);
+          process.stdin.on("end", () => {
+            try {
+              const parsed = JSON.parse(input);
+              const dep = parsed.dependencies && parsed.dependencies[process.argv[1]];
+              if (dep && dep.version) process.stdout.write(dep.version);
+            } catch {}
+          });
+        ' "$package" 2>/dev/null || true)"
+    if [ "$current" = "$latest" ]; then
+      echo "$package is up to date ($current)."
+      return 0
+    fi
+    if [ -n "$current" ]; then
+      echo "Updating $package from $current to $latest."
+    else
+      echo "$binary is installed, but $package is not tracked by npm; installing $package@$latest."
+    fi
+  else
+    echo "Installing $package@$latest."
+  fi
+
+  npm install -g "${package}@latest" || {
+    echo "Warning: failed to install npm package '$package' (skipping)"
+    return 1
+  }
+}
+
+uninstall_legacy_npm_binary() {
+  local binary="$1"
+  local npm_root=""
+  local packages=""
+  local package=""
+
+  if ! have_cmd npm; then
+    echo "Warning: npm not found; cannot remove legacy command $binary (skipping)"
+    return 0
+  fi
+  if ! have_cmd node; then
+    echo "Warning: node not found; cannot inspect global npm packages for legacy command $binary"
+    return 0
+  fi
+
+  npm_root="$(npm root -g 2>/dev/null || true)"
+  if [ -z "$npm_root" ] || [ ! -d "$npm_root" ]; then
+    echo "Warning: cannot locate global npm root; cannot remove legacy command $binary"
+    return 0
+  fi
+
+  packages="$(node - "$npm_root" "$binary" <<'NODE' 2>/dev/null || true
+const fs = require("node:fs");
+const path = require("node:path");
+
+const [, , root, binary] = process.argv;
+const packageDirs = [];
+
+for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+  if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+  if (entry.name.startsWith("@")) {
+    const scopeDir = path.join(root, entry.name);
+    for (const scoped of fs.readdirSync(scopeDir, { withFileTypes: true })) {
+      if (scoped.isDirectory() && !scoped.name.startsWith(".")) {
+        packageDirs.push(path.join(scopeDir, scoped.name));
+      }
+    }
+  } else {
+    packageDirs.push(path.join(root, entry.name));
+  }
+}
+
+for (const packageDir of packageDirs) {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(packageDir, "package.json"), "utf8"));
+    if (pkg.bin && typeof pkg.bin === "object" && Object.prototype.hasOwnProperty.call(pkg.bin, binary)) {
+      process.stdout.write(`${pkg.name}\n`);
+    }
+  } catch {}
+}
+NODE
+)"
+
+  if [ -n "$packages" ]; then
+    while IFS= read -r package; do
+      [ -n "$package" ] || continue
+      echo "Removing legacy npm package $package (provides $binary)."
+      npm uninstall -g "$package" || echo "Warning: failed to uninstall legacy package '$package'"
+    done <<EOF
+$packages
+EOF
+  fi
+
+  if have_cmd "$binary"; then
+    echo "Warning: legacy command '$binary' is still on PATH after cleanup"
+  fi
+}
+
+configure_copilot_relay() {
+  local relay_dir="${HOME}/.copilot-relay"
+  local relay_config="${relay_dir}/config.yaml"
+  local tmp_config
+
+  mkdir -p "$relay_dir"
+  if [ -f "$relay_config" ]; then
+    tmp_config="$(mktemp)"
+    if grep -Eq '^[[:space:]]*claudeSetup[[:space:]]*:' "$relay_config"; then
+      sed -E 's/^[[:space:]]*claudeSetup[[:space:]]*:.*/claudeSetup: false/' "$relay_config" >"$tmp_config"
+    elif grep -Eq '^[[:space:]]*claude_setup[[:space:]]*:' "$relay_config"; then
+      sed -E 's/^[[:space:]]*claude_setup[[:space:]]*:.*/claudeSetup: false/' "$relay_config" >"$tmp_config"
+    else
+      cp "$relay_config" "$tmp_config"
+      {
+        printf '\n'
+        printf '# Managed by dot-configs: ~/.claude/settings.json is symlinked from this repo.\n'
+        printf 'claudeSetup: false\n'
+      } >>"$tmp_config"
+    fi
+    mv "$tmp_config" "$relay_config"
+  else
+    {
+      printf '# copilot-relay configuration\n'
+      printf '# Managed by dot-configs; copilot-relay hot-reloads this file.\n'
+      printf 'host: 127.0.0.1\n'
+      printf 'port: 4142\n'
+      printf 'copilotBaseUrl: https://api.githubcopilot.com\n'
+      printf 'claudeSetup: false\n'
+      printf 'logLevel: info\n'
+      printf 'logRetentionDays: 3\n'
+      printf 'thinkEffort: xhigh\n'
+      printf 'gptModel: gpt-5.5\n'
+      printf 'opusModel: claude-opus-4.8\n'
+    } >"$relay_config"
+  fi
+  chmod 600 "$relay_config"
+  echo "Configured copilot-relay at $relay_config (claudeSetup=false)"
 }
 
 install_macos_deps() {
@@ -129,7 +303,7 @@ fi
 # Link Claude Code config files (claude/* -> ~/.claude/*). Claude Code
 # normally creates ~/.claude on first launch; mkdir -p so install.sh can
 # wire things up on a fresh box without requiring a Claude Code launch
-# first. Used to point Claude Code at the local copilot-bridge proxy so it
+# first. Used to point Claude Code at the local copilot-relay proxy so it
 # can talk to GitHub Copilot models (see ReadMe.md).
 claude_src="${src_dir}/claude"
 claude_dest="${HOME}/.claude"
@@ -322,32 +496,34 @@ fi
 
 echo "Linked dotfiles from $src_dir to $dest_dir"
 
-# launchd agent: copilot-bridge on login (macOS only). Renders the
+# launchd agent: copilot-relay on login (macOS only). Renders the
 # template (substituting absolute $HOME paths — launchd doesn't expand
 # $HOME at runtime) into ~/Library/LaunchAgents and bootstraps it.
-# Also unloads the legacy com.d0n9x1n.copilot-api agent if present
-# (migration from copilot-api to copilot-bridge in v0.14.x).
+# Also unloads legacy Copilot proxy agents if present.
 # Idempotent: if the agent is already loaded with the same content,
 # bootout+bootstrap is a no-op restart; if content differs, the new
 # version replaces the old.
 if is_macos; then
   uid="$(id -u)"
 
-  # Migration: bootout the old copilot-api agent if it's still loaded
-  # from a previous install. The new bridge listens on a different port
-  # (4142 vs 4141), so leaving both running wastes a port + GH token.
-  legacy_plist="${HOME}/Library/LaunchAgents/com.d0n9x1n.copilot-api.plist"
-  if launchctl print "gui/${uid}/com.d0n9x1n.copilot-api" >/dev/null 2>&1; then
-    launchctl bootout "gui/${uid}/com.d0n9x1n.copilot-api" 2>/dev/null \
-      && echo "Migration: unloaded legacy com.d0n9x1n.copilot-api"
-  fi
-  [ -f "$legacy_plist" ] && rm -f "$legacy_plist" && echo "Migration: removed $legacy_plist"
+  for legacy_label in com.d0n9x1n.copilot-api com.d0n9x1n.copilot-bridge; do
+    legacy_plist="${HOME}/Library/LaunchAgents/${legacy_label}.plist"
+    if launchctl print "gui/${uid}/${legacy_label}" >/dev/null 2>&1; then
+      launchctl bootout "gui/${uid}/${legacy_label}" 2>/dev/null \
+        && echo "Migration: unloaded legacy ${legacy_label}"
+    fi
+    [ -f "$legacy_plist" ] && rm -f "$legacy_plist" && echo "Migration: removed $legacy_plist"
+  done
 
-  launchd_src="${src_dir}/launchd/com.d0n9x1n.copilot-bridge.plist"
-  launchd_dest="${HOME}/Library/LaunchAgents/com.d0n9x1n.copilot-bridge.plist"
+  uninstall_legacy_npm_binary copilot-bridge
+  ensure_npm_cli_latest copilot-relay copilot-relay || true
+  configure_copilot_relay
+
+  launchd_src="${src_dir}/launchd/com.d0n9x1n.copilot-relay.plist"
+  launchd_dest="${HOME}/Library/LaunchAgents/com.d0n9x1n.copilot-relay.plist"
   if [ -f "$launchd_src" ]; then
-    if ! have_cmd copilot-bridge; then
-      echo "launchd: copilot-bridge not on PATH — skipping agent install (run 'npm i -g betahi-copilot-bridge' first, then re-run install.sh)"
+    if ! have_cmd copilot-relay; then
+      echo "launchd: copilot-relay not on PATH — skipping agent install (run 'npm i -g copilot-relay' first, then re-run install.sh)"
     else
       mkdir -p "$(dirname "$launchd_dest")"
       mkdir -p "${HOME}/Library/Logs"
@@ -358,11 +534,34 @@ if is_macos; then
       # Bootstrap into the GUI domain of the current user. bootout first
       # so a content change actually replaces the running agent (load is
       # a no-op when the label already exists).
-      launchctl bootout "gui/${uid}/com.d0n9x1n.copilot-bridge" 2>/dev/null || true
-      if launchctl bootstrap "gui/${uid}" "$launchd_dest" 2>/dev/null; then
-        echo "Loaded launchd agent com.d0n9x1n.copilot-bridge (logs: ~/Library/Logs/copilot-bridge.{out,err}.log)"
+      if launchctl print "gui/${uid}/com.d0n9x1n.copilot-relay" >/dev/null 2>&1; then
+        echo "Restarting launchd agent com.d0n9x1n.copilot-relay with the latest copilot-relay."
       else
-        echo "Warning: launchctl bootstrap failed for com.d0n9x1n.copilot-bridge"
+        echo "Starting launchd agent com.d0n9x1n.copilot-relay."
+      fi
+      launchctl bootout "gui/${uid}/com.d0n9x1n.copilot-relay" 2>/dev/null || true
+      for attempt in 1 2 3 4 5; do
+        if ! launchctl print "gui/${uid}/com.d0n9x1n.copilot-relay" >/dev/null 2>&1; then
+          break
+        fi
+        sleep 1
+      done
+
+      loaded=0
+      for attempt in 1 2 3 4 5; do
+        if launchctl bootstrap "gui/${uid}" "$launchd_dest"; then
+          loaded=1
+          break
+        fi
+        echo "Warning: launchctl bootstrap attempt ${attempt}/5 failed for com.d0n9x1n.copilot-relay"
+        sleep 1
+      done
+
+      if [ "$loaded" = "1" ]; then
+        launchctl kickstart -k "gui/${uid}/com.d0n9x1n.copilot-relay" 2>/dev/null || true
+        echo "Loaded launchd agent com.d0n9x1n.copilot-relay (logs: ~/Library/Logs/copilot-relay.{out,err}.log, ~/.copilot-relay/logs/copilot-relay.log)"
+      else
+        echo "Warning: launchctl bootstrap failed for com.d0n9x1n.copilot-relay"
       fi
     fi
   fi

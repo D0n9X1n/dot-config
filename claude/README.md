@@ -2,11 +2,11 @@
 
 Symlinked into `~/.claude/`. Bridges Anthropic's
 [Claude Code CLI](https://github.com/anthropics/claude-code) to **GitHub
-Copilot** models via a local [`betahi-copilot-bridge`](https://www.npmjs.com/package/betahi-copilot-bridge)
+Copilot** models via a local [`copilot-relay`](https://www.npmjs.com/package/copilot-relay)
 proxy that translates Anthropic-format requests into Copilot ones.
 
 ```
-claude (Anthropic CLI) → http://127.0.0.1:4142 (copilot-bridge) → GitHub Copilot
+claude (Anthropic CLI) -> http://127.0.0.1:4142 (copilot-relay) -> GitHub Copilot
 ```
 
 `install.sh` only symlinks the **config files** in this folder
@@ -18,28 +18,29 @@ claude (Anthropic CLI) → http://127.0.0.1:4142 (copilot-bridge) → GitHub Cop
 ## One-time setup (per machine)
 
 ```bash
-# 1. Install both npm packages globally.
-npm install -g @anthropic-ai/claude-code betahi-copilot-bridge
+# 1. Install Claude Code globally.
+npm install -g @anthropic-ai/claude-code
 
-# 2. GitHub device-code login (browser opens, paste the printed code).
-copilot-bridge auth
+# 2. Install/update copilot-relay and load its launchd agent.
+bash ~/Public/dot-configs/install.sh
+
+# 3. GitHub device-code login (browser opens, paste the printed code).
+copilot-relay auth
 ```
 
-After auth, `~/.local/share/copilot-bridge/github_token` is written and the
+After auth, `~/.copilot-relay/github_token` is written and the
 proxy can mint Copilot tokens on-demand.
 
-> **`copilot-bridge start --no-claude-setup --no-codex-setup` is broken without a TTY.** That flag
-> opens an interactive model picker and crashes (`uv_tty_init returned
-> EINVAL`) when launched headless / detached. Use plain `copilot-bridge start
-> --port 4142` — the model is already pinned in `settings.json`, so the
-> picker is unnecessary.
+`install.sh` writes `~/.copilot-relay/config.yaml` with
+`claudeSetup: false` so the relay does not rewrite this repo's symlinked
+`~/.claude/settings.json`.
 
 ## Daily use
 
 ```bash
-copilot-bridge start --port 4142 &     # leave running (or in a tmux pane)
-claude                              # interactive REPL
-claude -p "explain this repo"       # one-shot
+launchctl print "gui/$(id -u)/com.d0n9x1n.copilot-relay" | grep state
+claude                                # interactive REPL
+claude -p "explain this repo"         # one-shot
 ```
 
 The `oh-my-zsh-custom/claude.zsh` wrapper launches `claude` with
@@ -62,7 +63,7 @@ The `oh-my-zsh-custom/claude.zsh` wrapper launches `claude` with
     "MODEL_REASONING_EFFORT": "xhigh"
   },
   "permissions": { "allow": ["*"], "defaultMode": "auto" },
-  "model": "claude-opus-4.8",
+  "model": "default",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
@@ -79,44 +80,42 @@ The `oh-my-zsh-custom/claude.zsh` wrapper launches `claude` with
 | Key | Purpose |
 |---|---|
 | `env.ANTHROPIC_BASE_URL` | Points Claude Code at the local proxy instead of `api.anthropic.com`. |
-| `env.ANTHROPIC_AUTH_TOKEN` | Required by Claude Code's startup check. copilot-bridge expects the token form (not `ANTHROPIC_API_KEY`) and ignores its value — `dummy` is fine. **First launch will prompt** "Use this custom API key? (y/N)" — pick **Yes**, otherwise it lands in `~/.claude.json#customApiKeyResponses.rejected` and Claude refuses to use it. |
-| `env.ANTHROPIC_MODEL` | Default model for main turns. `claude-opus-4.8` is natively a 1M-context model on Copilot, so no `[1m]` alias is needed. Overridden by top-level `model` and `--model`. |
-| `env.ANTHROPIC_DEFAULT_SONNET_MODEL` | Routes every Sonnet alias (Sonnet 4-5 / 4-6 / Sonnet-1M) to a Copilot model. Pinned to `gpt-5.5` so Sonnet picks land on a mid-tier model rather than full Opus. |
-| `env.ANTHROPIC_DEFAULT_HAIKU_MODEL` | Routes every Haiku alias (and any sub-agent spawned with `model: "haiku"`) to a Copilot model. Pinned to `gpt-5.5`. **This is the variable current Claude Code reads** — the legacy `ANTHROPIC_SMALL_FAST_MODEL` is silently ignored by recent versions, so haiku sub-agents would otherwise leak to upstream `claude-haiku-4-5-20251001`. |
-| `env.ANTHROPIC_SMALL_FAST_MODEL` | Legacy alias for the same Haiku/small-fast tier. Kept for older Claude Code versions; current versions prefer `ANTHROPIC_DEFAULT_HAIKU_MODEL`. Pinning to `gpt-5.5` silences `400 model_not_supported` either way. |
-| `env.MODEL_REASONING_EFFORT` | Read by copilot-bridge per-request and forwarded to Copilot as the reasoning budget. Mirrors the client-side `effortLevel`. |
+| `env.ANTHROPIC_AUTH_TOKEN` | Required by Claude Code's startup check. `dummy` is fine; real auth happens via `copilot-relay auth`. **First launch will prompt** "Use this custom API key? (y/N)" — pick **Yes**, otherwise it lands in `~/.claude.json#customApiKeyResponses.rejected` and Claude refuses to use it. |
+| `env.ANTHROPIC_MODEL` | Underlying Opus model for the relay. `claude-opus-4.8` is the Opus 4.8 1M model exposed by `copilot-relay`, so no `[1m]` / `-1m` alias is needed. |
+| `env.ANTHROPIC_DEFAULT_SONNET_MODEL` | Routes every Sonnet alias to `gpt-5.5`. |
+| `env.ANTHROPIC_DEFAULT_HAIKU_MODEL` | Routes current Claude Code's Haiku tier, including sub-agents and small-fast side tasks, to `gpt-5.5`. |
+| `env.ANTHROPIC_SMALL_FAST_MODEL` | Legacy small-fast alias for older Claude Code versions; pinned to `gpt-5.5`. |
+| `env.MODEL_REASONING_EFFORT` | Kept for the custom statusline; upstream thinking is controlled by `thinkEffort` in `~/.copilot-relay/config.yaml`. |
 | `effortLevel` | Claude Code's client-side reasoning budget. `low / medium / high / xhigh`. |
-| `model` | Top-level default; takes precedence over `env.ANTHROPIC_MODEL`. |
+| `model` | Top-level default; set to `default` so Claude Code opens on menu item 1 ("Default", currently Opus 4.8 1M). |
 
 ### Built-in `/model` menu
 
 Claude Code's `/model` picker is **hard-coded** to its own lineup
 (Default / Sonnet / Sonnet-1M / Haiku / Custom). There is no setting to
-hide entries or substitute a custom list. The pragmatic workaround is
-the two `ANTHROPIC_*_MODEL` env vars above: every menu pick still
-appears, but each Sonnet / Haiku entry routes to `gpt-5.5` while every
-Opus entry resolves to the top-level `model` (`claude-opus-4.8`),
-giving you exactly two effective models. (Older revisions of this config
-used a `modelOverrides` map for the same purpose; the env-var route is
-simpler and works without the proxy maintaining its own routing table.)
+hide entries or substitute a custom list. The pragmatic workaround is the
+`ANTHROPIC_*_MODEL` env vars above: Sonnet / Haiku / small-fast picks all
+route to `gpt-5.5`, while Opus stays on `claude-opus-4.8`.
 
-### Available Copilot models
+### Relay config
 
-Run `copilot-bridge start --port 4142` once and check the startup log — it
-prints every model your account exposes. As of this writing:
+`install.sh` creates or updates `~/.copilot-relay/config.yaml`:
 
-```
-claude-opus-4.8, claude-opus-4.7, claude-opus-4.7-high,
-claude-opus-4.7-xhigh, claude-opus-4.7-1m, claude-opus-4.6,
-claude-opus-4.6-1m,
-claude-sonnet-4.6, claude-sonnet-4.5, claude-haiku-4.5,
-gpt-5.5, gpt-5.4, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2, gpt-5.2-codex,
-gpt-5-mini, gpt-4.1, gpt-4o, gemini-3.1-pro-preview, gemini-2.5-pro, …
+```yaml
+host: 127.0.0.1
+port: 4142
+copilotBaseUrl: https://api.githubcopilot.com
+claudeSetup: false
+logLevel: info
+logRetentionDays: 3
+thinkEffort: xhigh
+gptModel: gpt-5.5
+opusModel: claude-opus-4.8
 ```
 
 > **xhigh + 1M context.** `claude-opus-4.8` is natively 1M-context on Copilot,
-> and `MODEL_REASONING_EFFORT=xhigh` asks the bridge to forward max reasoning
-> per request. No bracketed `[1m]` alias is needed for this model.
+> and `thinkEffort: xhigh` asks the relay to forward max reasoning per
+> request. No bracketed `[1m]` alias is needed for this model.
 
 ---
 
@@ -126,20 +125,20 @@ gpt-5-mini, gpt-4.1, gpt-4o, gemini-3.1-pro-preview, gemini-2.5-pro, …
 |---|---|---|
 | `claude` shows the onboarding wizard / OAuth login every launch | `hasCompletedOnboarding` missing in `~/.claude.json` | Set `"hasCompletedOnboarding": true` in `~/.claude.json` (one-time, per machine — `~/.claude.json` is **not** synced via dot-configs because it carries per-machine state like `userID` and project list). |
 | Claude refuses to start ("This API key is not approved") | First-launch prompt was answered "No"; `dummy` is in `~/.claude.json#customApiKeyResponses.rejected` | Move `"dummy"` from `rejected` to `approved` in `~/.claude.json#customApiKeyResponses`. |
-| `400 model_not_supported` mid-session ("do you have status line?", title generation) | Claude defaults the small-fast model to `claude-haiku-4-5`, which Copilot doesn't expose | Set both `env.ANTHROPIC_DEFAULT_HAIKU_MODEL` **and** `env.ANTHROPIC_SMALL_FAST_MODEL` to a Copilot model (e.g. `gpt-5.5`). Current Claude Code reads `*_DEFAULT_HAIKU_MODEL`; older versions read `*_SMALL_FAST_MODEL`. |
-| `copilot-bridge start --no-claude-setup --no-codex-setup` crashes with `uv_tty_init returned EINVAL` | The `--claude-code` flag opens an interactive model picker; needs a TTY | Use `copilot-bridge start --port 4142` instead. |
+| `400 model_not_supported` mid-session ("do you have status line?", title generation) | Claude defaults the small-fast model to a model Copilot doesn't expose, or relay routing is bypassed | Keep `ANTHROPIC_DEFAULT_HAIKU_MODEL` and `ANTHROPIC_SMALL_FAST_MODEL` pinned to `gpt-5.5`, and confirm `ANTHROPIC_BASE_URL` points to `http://127.0.0.1:4142`. |
+| `copilot-relay` rewrites `~/.claude/settings.json` | `claudeSetup` is true in `~/.copilot-relay/config.yaml` | Re-run `install.sh`; it sets `claudeSetup: false` and restarts the launchd agent. |
 | `settings.json` shows working-tree drift after running `claude` | Claude Code rewrites the file on first launch to inject `theme`, `effortLevel`, etc. | Same caveat as Copilot CLI — selectively `git checkout` runtime-injected fields you don't want to commit. The committed shape is canonical. |
 
 ---
 
 ## Maintenance
 
-- Stop the proxy: `kill <PID>` (find it with `lsof -nP -iTCP:4141 -sTCP:LISTEN`).
-- Inspect quota: `copilot-bridge check-usage`.
-- Refresh GitHub token: `copilot-bridge auth` again.
-- Switch default model: edit `model` + `env.ANTHROPIC_MODEL` in
-  `settings.json` (this folder); takes effect on next `claude` launch
-  (no `install.sh` re-run needed — it's a symlink).
+- Stop/restart the proxy: `launchctl kickstart -k "gui/$(id -u)/com.d0n9x1n.copilot-relay"`.
+- Inspect health: `curl -s http://127.0.0.1:4142/healthz`.
+- Refresh GitHub token: `copilot-relay auth` again.
+- Switch default model: edit top-level `model` in `settings.json`, plus
+  `env.ANTHROPIC_MODEL` and `opusModel` / `gptModel` in
+  `~/.copilot-relay/config.yaml`.
 - Add a new launcher/helper: append to `oh-my-zsh-custom/claude.zsh` and
   `source ~/.zshrc`.
 
@@ -149,7 +148,7 @@ gpt-5-mini, gpt-4.1, gpt-4o, gemini-3.1-pro-preview, gemini-2.5-pro, …
   flow.
 - [`oh-my-zsh-custom/claude.zsh`](../oh-my-zsh-custom/claude.zsh) — the
   bypass-permission launcher wrapper.
-- [copilot-bridge on npm](https://www.npmjs.com/package/betahi-copilot-bridge) — proxy
+- [copilot-relay on npm](https://www.npmjs.com/package/copilot-relay) — proxy
   source / flag reference.
 - [Claude Code docs](https://docs.claude.com/en/docs/claude-code) —
   Anthropic's CLI reference.

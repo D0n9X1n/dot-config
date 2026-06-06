@@ -20,11 +20,15 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
 - `mcp-shared.json` — secret-free MCP entries synced via git. install.sh
   merges into local Copilot mcp.json; the existing pipeline lifts the
   merged set into `~/.claude.json`. Secrets stay per-device.
-- `launchd/com.d0n9x1n.copilot-bridge.plist` — macOS launchd agent
+- `launchd/com.d0n9x1n.copilot-relay.plist` — macOS launchd agent
   **template** (not symlinked; install.sh renders `__HOME__` -> `$HOME`
   into `~/Library/LaunchAgents/` then `bootout`+`bootstrap` into
-  `gui/<uid>`). Starts copilot-bridge proxy on login, restarts on crash,
-  logs to `~/Library/Logs/copilot-bridge.{out,err}.log`.
+  `gui/<uid>`). Starts `copilot-relay` on login, restarts on crash,
+  logs to `~/Library/Logs/copilot-relay.{out,err}.log` and
+  `~/.copilot-relay/logs/copilot-relay.log`. `install.sh` installs or
+  updates the npm package first, writes `~/.copilot-relay/config.yaml`
+  with `claudeSetup: false`, unloads/removes legacy proxy launchd jobs, and
+  restarts the relay agent so it runs the latest installed version.
 - `.claude/CLAUDE.md` — agent instructions for Claude Code working in
   this repo. Mirrors `.github/copilot-instructions.md`.
 - `<repo>/.<name>` — root dotfiles linked to `$HOME/.<name>`. Currently:
@@ -132,29 +136,21 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
 - `<repo>/claude/<file>` — files linked to `$HOME/.claude/<file>`. Currently:
   - `settings.json` — Claude Code → Copilot bridge AND global default-pinning.
     Sets `ANTHROPIC_BASE_URL=http://127.0.0.1:4142`,
-    `ANTHROPIC_AUTH_TOKEN=dummy` (copilot-bridge expects the token form,
-    not `ANTHROPIC_API_KEY`), and pins **Opus 4.8 @ xhigh effort** as the
+    `ANTHROPIC_AUTH_TOKEN=dummy` (Claude Code requires a token-shaped
+    custom key; relay auth is handled by `copilot-relay auth`), and pins
+    **Opus 4.8 @ xhigh effort** as the
     global default for every machine that runs `install.sh`:
-    `ANTHROPIC_MODEL=claude-opus-4.8` AND top-level
-    `model=claude-opus-4.8` (both required so Claude Code uses it
-    on launch with no `/model` toggle; base `claude-opus-4.8` is natively a
-    1M-context model upstream — copilot-bridge passes its 1M window through in
-    `/v1/models`, so no `[1m]` alias is needed), `effortLevel="xhigh"`
-    (deepest reasoning client-side, no
-    `/effort` needed) plus `MODEL_REASONING_EFFORT=xhigh` (read by
-    copilot-bridge per-request and forwarded to Copilot). **Family-aware
-    routing** is now done via two env vars instead of the old
-    `modelOverrides` map (Sonnet and Opus are still treated as separate
-    families per personal convention):
-    `ANTHROPIC_DEFAULT_SONNET_MODEL=gpt-5.5` (every Sonnet alias —
-    4-5 / 4-6 / Sonnet-1M — routes to `gpt-5.5`, the mid-tier Copilot
-    model, itself a ~1M-context model),
-    `ANTHROPIC_DEFAULT_HAIKU_MODEL=gpt-5.5` (read by current
-    Claude Code; covers `Agent({model:"haiku"})` sub-agents and
-    every Haiku-tier side-task), and `ANTHROPIC_SMALL_FAST_MODEL=gpt-5.5`
-    (legacy alias for the same Haiku/small-fast tier, kept for older
-    Claude Code versions that don't yet read `*_DEFAULT_HAIKU_MODEL`).
-    Opus aliases just inherit the top-level `model` value.
+    `ANTHROPIC_MODEL=claude-opus-4.8` plus top-level `model=default` so
+    Claude Code selects menu item 1 ("Default", currently Opus 4.8 1M) on
+    launch with no `/model` toggle; `copilot-relay` exposes only
+    `claude-opus-4.8` for Opus 4.8, which is the 1M-context model, so no
+    `-1m` alias is needed),
+    `effortLevel="xhigh"` (deepest reasoning client-side, no
+    `/effort` needed) plus `MODEL_REASONING_EFFORT=xhigh` so the
+    statusline can display the pinned effort. Claude's Sonnet/Haiku/small-fast
+    env overrides are all pinned to `gpt-5.5`, matching relay-side
+    `gptModel: gpt-5.5`; relay-side thinking is pinned by
+    `~/.copilot-relay/config.yaml` as `thinkEffort: xhigh`.
     Autonomous mode is enabled via
     `skipAutoPermissionPrompt=true` + `skipDangerousModePermissionPrompt=true` +
     `permissions.defaultMode="auto"`.
@@ -165,15 +161,12 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     the only path the binary honors.
     Also pins `statusLine.refreshInterval=100` for snappy redraws and
     `theme="dark-ansi"` so chrome inherits the terminal's ANSI palette.
-    Requires a local [`betahi-copilot-bridge`](https://www.npmjs.com/package/betahi-copilot-bridge)
-    proxy running. The launchd agent runs it as
-    `copilot-bridge start --no-claude-setup --no-codex-setup` — those flags
-    matter: without them the bridge would rewrite our committed
-    `settings.json` (and Codex `config.toml`) on every restart. One-time
-    bootstrap on a fresh box: `npm i -g @anthropic-ai/claude-code
-    betahi-copilot-bridge && copilot-bridge auth` (browser device-code flow).
-    After auth, leave `copilot-bridge start --no-claude-setup --no-codex-setup`
-    running and launch `claude` in another shell.
+    Requires local `copilot-relay` running. The launchd agent runs
+    `copilot-relay start`; `install.sh` keeps the package updated, sets
+    `claudeSetup: false` so the relay does not rewrite this repo's
+    symlinked `settings.json`, and restarts the agent. One-time bootstrap
+    on a fresh box: `npm i -g @anthropic-ai/claude-code copilot-relay`
+    then `copilot-relay auth` (browser device-code flow).
     The `hooks` block wires `PreToolUse|PostToolUse` (matcher `Task|Agent`)
     and `SubagentStop` to `~/.claude/hooks/subagent-counter.sh start|stop`
     so the statusline's running-subagent count is event-driven (O(1) read
@@ -207,6 +200,10 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     don't overwrite the title during the session.
 
 ## How install.sh works
+`install.sh` writes timestamped output to
+`~/Library/Logs/dot-configs-install.log` (override with
+`DOT_CONFIGS_INSTALL_LOG=/path/to/log`).
+
 1. macOS only (auto-installs Homebrew apps and fonts; failures are warnings,
    never fatal — handles deprecated taps and conflicting casks gracefully).
    Set `SKIP_BREW=1` to skip the Homebrew step entirely (useful for CI /
@@ -266,9 +263,9 @@ cd ~/Public/dot-configs && git pull
 ## Requirements (from configs)
 - Apps: WezTerm (terminal — cask auto-installed; config opt-in via symlink).
   oh-my-zsh required only for the `oh-my-zsh-custom/` part; Copilot CLI
-  required only for the `copilot/` part. Claude Code CLI + `copilot-bridge`
-  (npm globals) required only for the `claude/` part — `copilot-bridge start
-  --claude-code` runs a local proxy on port 4142 that the symlinked
+  required only for the `copilot/` part. Claude Code CLI + `copilot-relay`
+  (npm globals) required only for the `claude/` part — `copilot-relay start`
+  runs a local proxy on port 4142 that the symlinked
   `~/.claude/settings.json` points Claude Code at.
 - Tools: tmux ≥ 3.3 (3.6a tested) for the `.tmux.conf` features (TPM,
   OSC-52 set-clipboard, status-format extensions). git for TPM clone.

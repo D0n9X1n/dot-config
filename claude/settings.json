@@ -9,9 +9,7 @@
     "MODEL_REASONING_EFFORT": "xhigh"
   },
   "permissions": {
-    "allow": [
-      "*"
-    ],
+    "allow": [],
     "defaultMode": "auto"
   },
   "hooks": {

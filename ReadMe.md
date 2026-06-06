@@ -37,7 +37,7 @@ dot-configs/
 │   └── wezterm.lua              # WezTerm config — link manually if used
 ├── themes/apollo/               # Apollo theme (wezterm/vim/nvim/vscode/wt) — reference, not auto-linked
 ├── launchd/                     # macOS launchd agent templates
-│   └── com.d0n9x1n.copilot-bridge.plist  # copilot-bridge proxy on login (rendered by install.sh)
+│   └── com.d0n9x1n.copilot-relay.plist  # copilot-relay proxy on login (rendered by install.sh)
 ├── mcp-shared.json              # secret-free MCP entries synced via git
 ├── .claude/CLAUDE.md            # agent instructions for Claude Code working in this repo
 ├── .github/copilot-instructions.md  # agent instructions for Copilot CLI
@@ -50,6 +50,10 @@ dot-configs/
 the live config tracks repo edits, and is idempotent.
 
 `install.sh` is the only entry point. It:
+
+`install.sh` writes timestamped output to
+`~/Library/Logs/dot-configs-install.log` (override with
+`DOT_CONFIGS_INSTALL_LOG=/path/to/log`).
 
 1. Installs required macOS apps and fonts via Homebrew (best-effort; failures
    are logged but never abort the install). Set `SKIP_BREW=1` to skip this
@@ -168,52 +172,58 @@ ls -l ~/.tmux.conf ~/.oh-my-zsh/custom/custom.zsh 2>&1 | grep -q "dot-configs" \
 ### 4. Install the CLIs and proxy (Claude Code + GitHub Copilot)
 
 ```bash
-# Node + npm via Homebrew (skip if already present)
+# Node + npm via Homebrew (skip if already present).
 command -v node >/dev/null || brew install node
-node --version                    # check: v20+ recommended
+node --version                    # check: v22+ required by copilot-relay
 
-# CLIs themselves
-npm install -g @anthropic-ai/claude-code betahi-copilot-bridge @github/copilot
+# CLIs themselves. install.sh manages copilot-relay separately below.
+npm install -g @anthropic-ai/claude-code @github/copilot
 claude --version                  # check: prints version
 copilot --version                 # check: prints version
-copilot-bridge --version             # check: prints version
+
+# Re-run after Node is present: installs or updates copilot-relay, writes
+# ~/.copilot-relay/config.yaml, removes legacy proxy launchd jobs, and loads
+# the relay launchd agent.
+bash ~/Public/dot-configs/install.sh
+npm list -g copilot-relay --depth=0 # check: prints installed relay version
 ```
 
 ### 5. Authenticate the proxy (one-time, browser device-code flow)
 
 ```bash
-copilot-bridge auth                  # opens browser; enter the device code
+copilot-relay auth                   # opens browser; enter the device code
 # Verify token landed:
-test -f ~/.local/share/copilot-bridge/github_token && echo "ok" || echo "FAIL: auth incomplete"
+test -f ~/.copilot-relay/github_token && echo "ok" || echo "FAIL: auth incomplete"
 ```
 
 ### 6. Start the proxy daemon (must stay running for Claude Code)
 
 If you ran `install.sh` after step 4, **the launchd agent is already
 loaded** and the proxy is running — skip ahead. The agent
-(`com.d0n9x1n.copilot-bridge`) starts on every login, restarts on crash,
-and logs to `~/Library/Logs/copilot-bridge.{out,err}.log`. Verify:
+(`com.d0n9x1n.copilot-relay`) starts on every login, restarts on crash,
+and logs to `~/Library/Logs/copilot-relay.{out,err}.log` plus
+`~/.copilot-relay/logs/copilot-relay.log`. Verify:
 
 ```bash
-launchctl print "gui/$(id -u)/com.d0n9x1n.copilot-bridge" | grep state
-curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:4142/v1/models  # expect 200
+launchctl print "gui/$(id -u)/com.d0n9x1n.copilot-relay" | grep state
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:4142/healthz  # expect 200
 ```
 
 If you want to manage the agent manually:
 
 ```bash
-launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.d0n9x1n.copilot-bridge.plist
-launchctl bootout   "gui/$(id -u)" ~/Library/LaunchAgents/com.d0n9x1n.copilot-bridge.plist
-launchctl kickstart -k "gui/$(id -u)/com.d0n9x1n.copilot-bridge"   # restart in place
-tail -f ~/Library/Logs/copilot-bridge.{out,err}.log
+launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.d0n9x1n.copilot-relay.plist
+launchctl bootout   "gui/$(id -u)" ~/Library/LaunchAgents/com.d0n9x1n.copilot-relay.plist
+launchctl kickstart -k "gui/$(id -u)/com.d0n9x1n.copilot-relay"   # restart in place
+tail -f ~/Library/Logs/copilot-relay.{out,err}.log ~/.copilot-relay/logs/copilot-relay.log
 ```
 
 For a one-off foreground run (debugging, no auto-restart):
 
 ```bash
-copilot-bridge start --no-claude-setup --no-codex-setup &
+copilot-relay start &
 sleep 2
-curl -s http://127.0.0.1:4142/v1/models | head -c 100 \
+curl -s http://127.0.0.1:4142/healthz | head -c 100 \
   && echo "" || echo "FAIL: proxy not responding on :4142"
 ```
 
@@ -344,8 +354,9 @@ theme, and the Gruvbox-aligned tmux/wezterm chrome are all live.
 
 - **macOS-only.** `install.sh` is the single supported installer.
 - **The proxy must keep running** for Claude Code to function. Quitting
-  the `copilot-bridge start --no-claude-setup --no-codex-setup` process breaks every Claude Code
-  session immediately.
+  the `copilot-relay start` process breaks every Claude Code session
+  immediately; the launchd agent keeps it running and restarts it after
+  crashes or updates.
 
 ## How to add a new config
 
@@ -579,7 +590,7 @@ operate in plan / exec cycles and verify before claiming completion.
 
 Files in `claude/` are linked into `~/.claude/`. Bridges Anthropic's
 [Claude Code CLI](https://github.com/anthropics/claude-code) to GitHub
-Copilot models via a local [`betahi-copilot-bridge`](https://www.npmjs.com/package/betahi-copilot-bridge)
+Copilot models via a local [`copilot-relay`](https://www.npmjs.com/package/copilot-relay)
 proxy that translates Anthropic-format requests into Copilot ones.
 
 #### `settings.json`
@@ -596,7 +607,7 @@ proxy that translates Anthropic-format requests into Copilot ones.
     "MODEL_REASONING_EFFORT": "xhigh"
   },
   "permissions": { "allow": ["*"], "defaultMode": "auto" },
-  "model": "claude-opus-4.8",
+  "model": "default",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
@@ -613,45 +624,33 @@ proxy that translates Anthropic-format requests into Copilot ones.
 Defaults pinned globally (synced across machines via this repo):
 
 - **Model: `claude-opus-4.8`** (Opus 4.8). Base `claude-opus-4.8` is natively
-  a 1M-context model on Copilot — copilot-bridge passes its 1M window through
-  in `/v1/models`, so **no `[1m]` alias is needed** (and `claude-opus-4.8-[1m]`
-  would actually 400, since there's no `claude-opus-4.8-1m` upstream). Pinned
-  in both `env.ANTHROPIC_MODEL` *and* the top-level `model` field so Claude
-  Code uses it on every launch with no `/model` toggle needed.
-- **Family-aware routing via env vars** (Sonnet and Opus are treated as
-  separate families per personal convention — no `modelOverrides` map
-  needed any more):
-  - **`ANTHROPIC_DEFAULT_SONNET_MODEL: gpt-5.5`** — every Sonnet alias
-    (Sonnet 4-5 / 4-6 / Sonnet-1M from the built-in `/model` picker)
-    routes to `gpt-5.5`. Sonnet feels mid-tier, so we map it to the
-    mid-tier Copilot model rather than paying for a full Opus call.
-    `gpt-5.5` is itself a ~1M-context model upstream.
+  a 1M-context model on Copilot. `copilot-relay` routes Opus-family requests
+  to this upstream model, so **no `[1m]` / `-1m` alias is needed**. Top-level
+  `model: "default"` selects Claude Code's Default menu item, currently
+  Opus 4.8 1M, while `env.ANTHROPIC_MODEL` remains pinned to
+  `claude-opus-4.8`.
+- **Family-aware routing via env vars + relay**:
+  - **`ANTHROPIC_DEFAULT_SONNET_MODEL: gpt-5.5`** — every Sonnet alias from
+    Claude Code's built-in picker routes to `gpt-5.5`.
   - **`ANTHROPIC_DEFAULT_HAIKU_MODEL: gpt-5.5`** — Haiku tier for current
-    Claude Code versions. Covers `Agent({ model: "haiku" })` sub-agents
-    plus every Haiku-tier side-task (titles, summaries, compaction,
-    git-commit message generation). **This is the variable current
-    Claude Code reads** — `ANTHROPIC_SMALL_FAST_MODEL` alone is silently
-    ignored by recent versions and haiku sub-agents leak upstream as
-    `claude-haiku-4-5-20251001` (which Copilot doesn't expose).
-  - **`ANTHROPIC_SMALL_FAST_MODEL: gpt-5.5`** — legacy alias for the same
-    Haiku/small-fast tier. Kept for older Claude Code versions that don't
-    yet read `*_DEFAULT_HAIKU_MODEL`. Pinning to `gpt-5.5` silences
-    `400 model_not_supported` either way.
-  - **Opus** aliases (4-5 / 4-6 / 4-7 / 4-8) just inherit the top-level
-    `model` value above — `claude-opus-4.8`.
+    Claude Code versions, including sub-agents and small-fast side tasks.
+  - **`ANTHROPIC_SMALL_FAST_MODEL: gpt-5.5`** — legacy alias for older Claude
+    Code versions.
+  - `copilot-relay` also has `gptModel: gpt-5.5` and
+    `opusModel: claude-opus-4.8`, so Claude-side aliases and relay routing
+    agree.
 - **Effort: `xhigh`** — applied two ways:
   `effortLevel: "xhigh"` (Claude Code's client-side reasoning budget,
-  applied to every session) and `MODEL_REASONING_EFFORT: xhigh` (read
-  by copilot-bridge per-request and forwarded to Copilot upstream).
-- `ANTHROPIC_BASE_URL` — the local `copilot-bridge` proxy on port 4142.
+  applied to every session) and `thinkEffort: xhigh` in
+  `~/.copilot-relay/config.yaml` (written by `install.sh`, hot-reloaded by
+  the relay, and forwarded to Copilot upstream). `MODEL_REASONING_EFFORT`
+  remains in `settings.json` so the statusline can display the pinned effort.
+- `ANTHROPIC_BASE_URL` — the local `copilot-relay` proxy on port 4142.
   All model names above are Copilot-side identifiers the proxy knows how
-  to route. The settings file is **for the copilot-bridge proxy bridge** —
-  Claude Code itself doesn't know about `gpt-5.5`; the proxy translates
-  every request and replies with Anthropic-shaped JSON.
+  to route. Claude Code itself doesn't know about `gpt-5.5`; the proxy
+  translates every request and replies with Anthropic-shaped JSON.
 - `ANTHROPIC_AUTH_TOKEN` — required by Claude Code's startup check.
-  copilot-bridge expects the token form (not `ANTHROPIC_API_KEY`) and
-  ignores its value (`dummy` is fine; real auth happens in
-  `copilot-bridge`'s GitHub flow).
+  `dummy` is fine; real auth happens in `copilot-relay auth`.
 - `skipAutoPermissionPrompt: true` + `permissions.defaultMode: "auto"` —
   autonomous mode by default (no per-action confirmation). Note: the
   binary explicitly **rejects** `defaultMode: "bypassPermissions"`
@@ -682,9 +681,9 @@ free-form names pass through the proxy unchanged.
 One-time setup (after running `install.sh` on a fresh box):
 
 ```bash
-npm install -g @anthropic-ai/claude-code betahi-copilot-bridge
-copilot-bridge auth                  # browser device-code login (GitHub)
-copilot-bridge start --no-claude-setup --no-codex-setup   # leave running on port 4142
+npm install -g @anthropic-ai/claude-code
+bash ~/Public/dot-configs/install.sh  # installs/updates copilot-relay and starts launchd
+copilot-relay auth                    # browser device-code login (GitHub)
 claude                            # in another shell — uses Opus 4.8 1M @ xhigh effort
 ```
 
@@ -705,7 +704,7 @@ claude                            # in another shell — uses Opus 4.8 1M @ xhig
 - [GitHub Copilot CLI](https://github.com/github/copilot) — required only if
   you want the `copilot/` files linked
 - [Claude Code CLI](https://github.com/anthropics/claude-code) +
-  [`betahi-copilot-bridge`](https://www.npmjs.com/package/betahi-copilot-bridge) — required only
+  [`copilot-relay`](https://www.npmjs.com/package/copilot-relay) — required only
   if you want the `claude/` files linked (Anthropic CLI bridged onto GitHub
   Copilot models via a local proxy on port 4142)
 - [`gh`](https://cli.github.com/) — optional; `statusline.sh` calls

@@ -1,32 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  TEMPLATE — copilot-bridge as a per-user launchd agent.
+  TEMPLATE — copilot-relay as a per-user launchd agent.
 
   This file is consumed by install.sh; do NOT symlink it directly.
   install.sh substitutes __HOME__ -> $HOME and writes the rendered plist
-  to ~/Library/LaunchAgents/com.d0n9x1n.copilot-bridge.plist, then runs
+  to ~/Library/LaunchAgents/com.d0n9x1n.copilot-relay.plist, then runs
   launchctl bootstrap.
 
   What the agent does once loaded:
-    - Starts `copilot-bridge start --no-claude-setup --no-codex-setup`
-      on login. The `--no-*-setup` flags prevent the bridge from
-      rewriting our settings.json / config.toml on every restart —
-      we manage those files ourselves via this repo.
+    - Starts `copilot-relay start` on login. install.sh writes
+      ~/.copilot-relay/config.yaml with `claudeSetup: false` so the relay
+      does not rewrite our symlinked ~/.claude/settings.json.
     - Re-spawns it if it crashes (KeepAlive throttled to one restart per 10s).
     - Listens on http://127.0.0.1:4142 — Claude Code reads this from
       ANTHROPIC_BASE_URL in ~/.claude/settings.json.
 
   Logs:
-    stdout -> ~/Library/Logs/copilot-bridge.out.log
-    stderr -> ~/Library/Logs/copilot-bridge.err.log
+    stdout -> ~/Library/Logs/copilot-relay.out.log
+    stderr -> ~/Library/Logs/copilot-relay.err.log
+    app log -> ~/.copilot-relay/logs/copilot-relay.log
 
   Manage with:
-    launchctl bootstrap   gui/$(id -u) ~/Library/LaunchAgents/com.d0n9x1n.copilot-bridge.plist
-    launchctl bootout     gui/$(id -u) ~/Library/LaunchAgents/com.d0n9x1n.copilot-bridge.plist
-    launchctl kickstart -k gui/$(id -u)/com.d0n9x1n.copilot-bridge
-    launchctl print       gui/$(id -u)/com.d0n9x1n.copilot-bridge
-    tail -f ~/Library/Logs/copilot-bridge.{out,err}.log
+    launchctl bootstrap   gui/$(id -u) ~/Library/LaunchAgents/com.d0n9x1n.copilot-relay.plist
+    launchctl bootout     gui/$(id -u) ~/Library/LaunchAgents/com.d0n9x1n.copilot-relay.plist
+    launchctl kickstart -k gui/$(id -u)/com.d0n9x1n.copilot-relay
+    launchctl print       gui/$(id -u)/com.d0n9x1n.copilot-relay
+    tail -f ~/Library/Logs/copilot-relay.{out,err}.log ~/.copilot-relay/logs/copilot-relay.log
 
   Notes:
     - launchd plists don't expand $HOME at runtime, so absolute paths are
@@ -38,14 +38,13 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.d0n9x1n.copilot-bridge</string>
+    <string>com.d0n9x1n.copilot-relay</string>
 
     <key>ProgramArguments</key>
     <array>
-        <string>/opt/homebrew/bin/copilot-bridge</string>
+        <string>/usr/bin/env</string>
+        <string>copilot-relay</string>
         <string>start</string>
-        <string>--no-claude-setup</string>
-        <string>--no-codex-setup</string>
     </array>
 
     <key>EnvironmentVariables</key>
@@ -64,10 +63,10 @@
     <integer>10</integer>
 
     <key>StandardOutPath</key>
-    <string>__HOME__/Library/Logs/copilot-bridge.out.log</string>
+    <string>__HOME__/Library/Logs/copilot-relay.out.log</string>
 
     <key>StandardErrorPath</key>
-    <string>__HOME__/Library/Logs/copilot-bridge.err.log</string>
+    <string>__HOME__/Library/Logs/copilot-relay.err.log</string>
 
     <key>WorkingDirectory</key>
     <string>__HOME__</string>
