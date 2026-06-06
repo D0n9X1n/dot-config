@@ -18,20 +18,19 @@ claude (Anthropic CLI) -> http://127.0.0.1:4142 (copilot-relay) -> GitHub Copilo
 ## One-time setup (per machine)
 
 ```bash
-# 1. Install Claude Code globally.
-npm install -g @anthropic-ai/claude-code
-
-# 2. Install/update copilot-relay and load its launchd agent.
+# 1. Install/update Claude Code (Homebrew cask), copilot-relay, and launchd.
 bash ~/Public/dot-configs/install.sh
 
-# 3. GitHub device-code login (browser opens, paste the printed code).
+# 2. GitHub device-code login (browser opens, paste the printed code).
 copilot-relay auth
 ```
 
 After auth, `~/.copilot-relay/github_token` is written and the
 proxy can mint Copilot tokens on-demand.
 
-`install.sh` writes `~/.copilot-relay/config.yaml` with
+`install.sh` installs Claude Code via `brew install --cask claude-code`
+(removing any old npm `@anthropic-ai/claude-code` first), installs/updates
+`copilot-relay` via npm, and writes `~/.copilot-relay/config.yaml` with
 `claudeSetup: false` so the relay does not rewrite this repo's symlinked
 `~/.claude/settings.json`.
 

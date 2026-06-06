@@ -33,8 +33,8 @@ dot-configs/
 ├── claude/                      # contents -> ~/.claude/
 │   ├── settings.json            # Claude Code settings
 │   └── statusline.sh            # statusline
-├── wezterm/                     # terminal config (NOT auto-linked — opt-in)
-│   └── wezterm.lua              # WezTerm config — link manually if used
+├── wezterm/                     # terminal config -> ~/.wezterm.lua
+│   └── wezterm.lua              # WezTerm config
 ├── themes/apollo/               # Apollo theme (wezterm/vim/nvim/vscode/wt) — reference, not auto-linked
 ├── launchd/                     # macOS launchd agent templates
 │   └── com.d0n9x1n.copilot-relay.plist  # copilot-relay proxy on login (rendered by install.sh)
@@ -53,45 +53,48 @@ the live config tracks repo edits, and is idempotent.
 
 `install.sh` writes timestamped output to
 `~/Library/Logs/dot-configs-install.log` (override with
-`DOT_CONFIGS_INSTALL_LOG=/path/to/log`).
+`DOT_CONFIGS_INSTALL_LOG=/path/to/log`). Real install/update commands are logged
+with their full output; existence checks stay quiet so expected "not installed"
+probes do not appear as errors.
 
-1. Installs required macOS apps and fonts via Homebrew (best-effort; failures
-   are logged but never abort the install). Set `SKIP_BREW=1` to skip this
-   step entirely (useful for CI / fake-`HOME` testing). Casks: `wezterm`,
-   the Recursive font family, Symbols Only Nerd Font, Noto Color Emoji.
-   Formulae: `tmux`.
-2. Symlinks every **top-level** dotfile in this repo (files starting with `.`)
+1. Installs Homebrew if missing, then installs required macOS apps, fonts, and
+   command-line tools via Homebrew (best-effort after Homebrew itself exists).
+   Set `SKIP_BREW=1` to skip this step entirely (useful for CI / fake-`HOME`
+   testing). Formulae: `git`, `python` (provides `python3`), `node`, `jq`,
+   `tmux`. Before installing Claude Code, the installer removes any old global
+   npm `@anthropic-ai/claude-code` package, then installs casks:
+   `claude-code`, `wezterm`, the Recursive base/Nerd Font casks, Symbols Only
+   Nerd Font, and Noto Color Emoji. It also downloads the latest
+   `RecMonoBaker-*.ttf` and `RecMonoSt.Helens-*.ttf` assets from
+   `MOSconfig/recursive-code-config` releases into `~/Library/Fonts`.
+2. Installs npm global CLIs: `@github/copilot` and `copilot-relay`. Set
+   `SKIP_NPM_GLOBALS=1` to skip.
+3. Installs oh-my-zsh unattended if missing (`RUNZSH=no`, `CHSH=no`). Set
+   `SKIP_OH_MY_ZSH=1` to skip.
+4. Symlinks every **top-level** dotfile in this repo (files starting with `.`)
    into `$HOME` (currently `.tmux.conf`, plus the existing `.gitignore` /
    `.DS_Store` pass-through which has been there since v0.1).
-3. Symlinks every file in `oh-my-zsh-custom/` into `~/.oh-my-zsh/custom/`.
-   Skipped (with a warning) if `~/.oh-my-zsh/custom/` does not exist.
-4. Symlinks every file in `copilot/` into `~/.copilot/`. Skipped (with a
-   warning) if `~/.copilot/` does not exist. Preserves the executable bit on
-   `*.sh` files (so `statusline.sh` runs without re-chmod), then runs
+5. Symlinks every file in `oh-my-zsh-custom/` into `~/.oh-my-zsh/custom/`.
+6. Symlinks every file in `copilot/` into `~/.copilot/`. Creates the
+   destination directory if missing. Preserves the executable bit on `*.sh`
+   files (so `statusline.sh` runs without re-chmod), then runs
    `cleanup-legacy.sh` to prune stale Copilot CLI package versions/logs.
-5. Symlinks every file in `claude/` into `~/.claude/`. **Creates the
+7. Symlinks every file in `claude/` into `~/.claude/`. **Creates the
    destination directory if missing** (Claude Code only creates `~/.claude/`
-   on first launch; mkdir-p so install.sh wires things up on a fresh box).
-   `settings.json` is the one exception — instead of a plain symlink it is
-   **generated** by jq-merging the committed `claude/settings.json` with
-   the local `~/.config/github-copilot/mcp.json` so Claude Code sees the
-   exact same MCP servers Copilot CLI does, without committing
-   secret-bearing MCP env (e.g. `WAKATIME_API_KEY`) to this public repo.
-   Falls back to a plain symlink if `jq` or `mcp.json` is missing.
-6. Bootstraps **TPM** (Tmux Plugin Manager): clones it under `~/.tmux/plugins/tpm`
+   on first launch; mkdir-p so install.sh wires things up on a fresh box), and
+   links `claude/hooks/*.sh` into `~/.claude/hooks/`.
+8. Symlinks `wezterm/wezterm.lua` into `~/.wezterm.lua`.
+9. Merges tracked, secret-free MCP servers into
+   `~/.config/github-copilot/mcp.json`, then imports Copilot's MCP servers into
+   Claude Code's `~/.claude.json` when `jq` and the MCP file are available.
+10. Bootstraps **TPM** (Tmux Plugin Manager): clones it under `~/.tmux/plugins/tpm`
    if missing, then runs `tpm/bin/install_plugins` to clone every plugin
    listed in `.tmux.conf`. Skipped if `tmux` isn't on PATH.
-7. Backs up any existing destination file or symlink that doesn't already point
+11. Configures `~/.copilot-relay/config.yaml`, removes legacy proxy launchd jobs,
+   writes the per-user launchd agent, and starts/restarts `copilot-relay`.
+12. Backs up any existing destination file or symlink that doesn't already point
    at the repo as `<name>.bak.YYYYMMDDHHMMSS` before linking.
-8. Leaves correctly-pointing symlinks alone (no-op).
-
-> **`wezterm/` is intentionally not auto-linked.** The `wezterm` cask is
-> still auto-installed so the terminal is one symlink away. Manually opt in
-> with:
->
-> ```bash
-> ln -sfn "$(pwd)/wezterm/wezterm.lua" ~/.wezterm.lua
-> ```
+13. Leaves correctly-pointing symlinks alone (no-op).
 
 Safe to re-run at any time. Pulling new commits automatically takes effect on
 all machines because every config file is a symlink into this repo.
@@ -121,16 +124,10 @@ the check command before moving on. Stop at the first failure and report.
 ### 0. Prerequisites
 
 ```bash
-# macOS only.
-xcode-select --install            # Apple CLI tools (provides git, make, etc.)
-xcode-select -p                   # check: should print a path
-```
-
-If Homebrew isn't installed:
-
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-brew --version                    # check: prints "Homebrew x.y.z"
+# macOS only. The installer can bootstrap Homebrew, Node/npm, oh-my-zsh,
+# Claude Code, Copilot CLI, and copilot-relay. You still need git or an
+# archive download path to get this repo onto the machine first.
+xcode-select -p 2>/dev/null || xcode-select --install
 ```
 
 If `git` isn't authenticated for github.com:
@@ -149,46 +146,25 @@ git clone git@github.com:D0n9X1n/dot-config.git ~/Public/dot-configs
 test -f ~/Public/dot-configs/install.sh && echo "ok" || echo "FAIL: clone failed"
 ```
 
-### 2. Install oh-my-zsh (required before step 3 if you want zsh customizations)
-
-```bash
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
-test -d ~/.oh-my-zsh/custom && echo "ok" || echo "FAIL: oh-my-zsh missing"
-```
-
-### 3. Run the installer
+### 2. Run the installer
 
 ```bash
 bash ~/Public/dot-configs/install.sh
 ```
 
-Verify symlinks landed:
+Verify bootstrap and symlinks landed:
 
 ```bash
-ls -l ~/.tmux.conf ~/.oh-my-zsh/custom/custom.zsh 2>&1 | grep -q "dot-configs" \
-  && echo "ok" || echo "FAIL: symlinks missing"
+brew --version
+node --version
+python3 --version
+brew list --cask claude-code
+npm list -g @github/copilot copilot-relay --depth=0
+ls -l ~/.tmux.conf ~/.copilot/settings.json ~/.claude/settings.json ~/.oh-my-zsh/custom/custom.zsh
+launchctl print "gui/$(id -u)/com.d0n9x1n.copilot-relay" | grep state
 ```
 
-### 4. Install the CLIs and proxy (Claude Code + GitHub Copilot)
-
-```bash
-# Node + npm via Homebrew (skip if already present).
-command -v node >/dev/null || brew install node
-node --version                    # check: v22+ required by copilot-relay
-
-# CLIs themselves. install.sh manages copilot-relay separately below.
-npm install -g @anthropic-ai/claude-code @github/copilot
-claude --version                  # check: prints version
-copilot --version                 # check: prints version
-
-# Re-run after Node is present: installs or updates copilot-relay, writes
-# ~/.copilot-relay/config.yaml, removes legacy proxy launchd jobs, and loads
-# the relay launchd agent.
-bash ~/Public/dot-configs/install.sh
-npm list -g copilot-relay --depth=0 # check: prints installed relay version
-```
-
-### 5. Authenticate the proxy (one-time, browser device-code flow)
+### 3. Authenticate the proxy (one-time, browser device-code flow)
 
 ```bash
 copilot-relay auth                   # opens browser; enter the device code
@@ -196,10 +172,10 @@ copilot-relay auth                   # opens browser; enter the device code
 test -f ~/.copilot-relay/github_token && echo "ok" || echo "FAIL: auth incomplete"
 ```
 
-### 6. Start the proxy daemon (must stay running for Claude Code)
+### 4. Start the proxy daemon (must stay running for Claude Code)
 
-If you ran `install.sh` after step 4, **the launchd agent is already
-loaded** and the proxy is running — skip ahead. The agent
+After `copilot-relay auth`, the launchd agent installed by `install.sh` should
+start serving the proxy. The agent
 (`com.d0n9x1n.copilot-relay`) starts on every login, restarts on crash,
 and logs to `~/Library/Logs/copilot-relay.{out,err}.log` plus
 `~/.copilot-relay/logs/copilot-relay.log`. Verify:
@@ -227,7 +203,7 @@ curl -s http://127.0.0.1:4142/healthz | head -c 100 \
   && echo "" || echo "FAIL: proxy not responding on :4142"
 ```
 
-### 7. Wire up MCP servers (optional but recommended)
+### 5. Wire up MCP servers (optional but recommended)
 
 This repo handles MCP servers in two layers:
 
@@ -266,13 +242,12 @@ bash ~/Public/dot-configs/install.sh    # re-import into ~/.claude.json
 
 Then restart Claude Code; `/mcp` should show `github ✓ ready`.
 
-### 8. Optional: WezTerm (terminal)
+### 8. WezTerm (terminal)
 
-`install.sh` installs the wezterm cask but does **not** symlink the config
-(opt-in). To enable:
+`install.sh` installs the wezterm cask and symlinks the config automatically:
 
 ```bash
-ln -sfn ~/Public/dot-configs/wezterm/wezterm.lua ~/.wezterm.lua
+ls -l ~/.wezterm.lua
 # Open WezTerm; verify Gruvbox dark hard scheme is active.
 ```
 
@@ -424,14 +399,10 @@ Implementation notes:
   `precmd` / `preexec` hooks don't keep overwriting the title.
 - Calls `command copilot ...` to bypass any shell alias of the same name.
 
-### Terminal — WezTerm (`wezterm/`, opt-in)
+### Terminal — WezTerm (`wezterm/`)
 
-The terminal config kept in-repo. **Not auto-linked** by `install.sh`; the
-`wezterm` cask is installed so the terminal is one symlink away:
-
-```bash
-ln -sfn "$(pwd)/wezterm/wezterm.lua" ~/.wezterm.lua
-```
+The terminal config is kept in-repo and auto-linked by `install.sh` to
+`~/.wezterm.lua`.
 
 Highlights of the in-repo config: `color_scheme = "Gruvbox dark, hard
 (base16)"`, Rec Mono St.Helens, custom 5-row "floating tabs" with Nerd
@@ -686,11 +657,16 @@ free-form names pass through the proxy unchanged.
 One-time setup (after running `install.sh` on a fresh box):
 
 ```bash
-npm install -g @anthropic-ai/claude-code
-bash ~/Public/dot-configs/install.sh  # installs/updates copilot-relay and starts launchd
-copilot-relay auth                    # browser device-code login (GitHub)
-claude                            # in another shell — uses Opus 4.8 1M @ xhigh effort
+copilot-relay auth  # browser device-code login (GitHub)
+claude              # in another shell — uses Opus 4.8 1M @ xhigh effort
 ```
+
+Project-specific Claude Code config is synced by committing files to each
+project repo (`.claude/settings.json`, `.claude/CLAUDE.md`, and `.mcp.json`).
+`install.sh` intentionally does **not** copy per-project state from
+`~/.claude.json`: that file is machine-local, path-keyed, and can include trust,
+OAuth, cache, and local MCP state. The only `~/.claude.json` mutation here is the
+safe user-scope MCP import from Copilot's MCP file.
 
 > **Caveat:** Claude Code rewrites `settings.json` at runtime to add fields
 > like `firstStartTime`, telemetry IDs, etc. Same atomic
@@ -700,33 +676,42 @@ claude                            # in another shell — uses Opus 4.8 1M @ xhig
 
 ## Requirements
 
-### Apps (auto-installed via Homebrew on macOS)
+### Apps and npm CLIs (auto-installed on macOS)
 
 - [WezTerm](https://wezfurlong.org/wezterm/) — terminal (cask installed
-  automatically; config is opt-in via the symlink command above)
-- [oh-my-zsh](https://ohmyz.sh/) — required only if you want the
-  `oh-my-zsh-custom/` files linked
-- [GitHub Copilot CLI](https://github.com/github/copilot) — required only if
-  you want the `copilot/` files linked
-- [Claude Code CLI](https://github.com/anthropics/claude-code) +
-  [`copilot-relay`](https://www.npmjs.com/package/copilot-relay) — required only
-  if you want the `claude/` files linked (Anthropic CLI bridged onto GitHub
-  Copilot models via a local proxy on port 4142)
+  automatically; config symlinked to `~/.wezterm.lua`)
+- [oh-my-zsh](https://ohmyz.sh/) — installed unattended if missing so
+  `oh-my-zsh-custom/` files can be linked
+- [GitHub Copilot CLI](https://github.com/github/copilot) — installed as npm
+  global `@github/copilot`
+- [Claude Code CLI](https://github.com/anthropics/claude-code) — installed via
+  Homebrew cask `claude-code`
+- [`copilot-relay`](https://www.npmjs.com/package/copilot-relay) — installed as
+  an npm global; `install.sh` configures and starts the launchd proxy on port
+  4142
 - [`gh`](https://cli.github.com/) — optional; `statusline.sh` calls
   `gh auth status` (cached 5 minutes) to render the GH segment
 
 ### Tools (auto-installed via Homebrew on macOS)
 
+- [Homebrew](https://brew.sh/) — bootstrapped by `install.sh` if missing
+- [Python 3](https://www.python.org/) — installed via Homebrew formula
+  `python`
+- [Node.js](https://nodejs.org/) / npm — installed via Homebrew for the npm
+  global CLIs
+- [`jq`](https://jqlang.github.io/jq/) — used to merge MCP config
 - [tmux](https://github.com/tmux/tmux) ≥ 3.3 (3.6a tested) — primary tab,
   split, and session manager. TPM and listed plugins bootstrap automatically
   on first launch.
-- `git` — required by TPM to clone the plugin manager and plugin repos.
+- `git` — installed via Homebrew; required by TPM and oh-my-zsh.
 
-### Fonts (installed automatically via Homebrew)
+### Fonts (installed automatically)
 
-- Recursive (Rec Mono St.Helens — part of the Rec Mono variable family) —
-  `font-recursive`
-- Recursive Mono Nerd Font — `font-recursive-mono-nerd-font`
+- Recursive base fonts — Homebrew cask `font-recursive`
+- Recursive Mono Nerd Font — Homebrew cask `font-recursive-mono-nerd-font`
+- RecMonoBaker + RecMonoSt.Helens TTFs — downloaded from
+  [`MOSconfig/recursive-code-config`](https://github.com/MOSconfig/recursive-code-config/releases)
+  latest release into `~/Library/Fonts`
 - Symbols Only Nerd Font — `font-symbols-only-nerd-font`
 - Noto Color Emoji — `font-noto-color-emoji`
 

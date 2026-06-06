@@ -76,3 +76,5 @@ fi
 if [ -n "$current_pkg" ]; then
   echo "copilot cleanup: kept ${current_pkg#${HOME}/}; removed ${removed_pkg} legacy package(s), ${removed_logs} old log(s)"
 fi
+
+exit 0

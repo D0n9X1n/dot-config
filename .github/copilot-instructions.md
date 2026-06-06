@@ -15,8 +15,12 @@ Directories and nested files are never linked.
 Adding a new config means dropping a dotfile at the repo root — `install.sh`
 picks it up automatically with no manifest to update.
 
-The install script also handles macOS dependency installation via Homebrew
-(apps and fonts). On non-macOS systems it skips installation and only links.
+The install script also handles brand-new macOS bootstrap: installs Homebrew if
+missing, installs Homebrew formulae/casks (including Claude Code via
+`claude-code`), installs npm globals for Copilot CLI + `copilot-relay`, installs
+oh-my-zsh, downloads custom RecMono fonts from `MOSconfig/recursive-code-config`,
+and then links configs. On non-macOS systems it skips installation and only
+links.
 
 ## Conventions
 

@@ -25,7 +25,7 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
 │   ├── settings.json
 │   └── statusline.sh
 ├── copilot/                     # Same shape for GitHub Copilot CLI
-├── wezterm/wezterm.lua          # opt-in symlink
+├── wezterm/wezterm.lua          # symlinked to ~/.wezterm.lua
 ├── launchd/                     # macOS launchd agent templates (rendered by install.sh)
 ├── mcp-shared.json              # secret-free MCP entries (synced)
 └── .github/, .claude/
@@ -46,6 +46,10 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
   `$HOME` at runtime) and writes the rendered file to
   `~/Library/LaunchAgents/`, then `bootout`+`bootstrap` into
   `gui/<uid>`. macOS-only; install.sh skips this step on other OSes.
+- **install.sh bootstraps a brand-new Mac.** It installs Homebrew if missing,
+  Homebrew formulae/casks (including Claude Code via `claude-code`), npm globals
+  for Copilot CLI + `copilot-relay`, oh-my-zsh, custom RecMono fonts from
+  `MOSconfig/recursive-code-config`, then links configs.
 
 ## Conventions
 
@@ -74,7 +78,7 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
 
 - **Bump version + tag**. We use semver-ish tags (`v0.X.Y`); patch for
   bugfixes, minor for new features, major for breaking changes.
-  Existing history: v0.1.0 → v0.9.1. Pushing a `v*.*.*` tag triggers
+  Existing history: v0.1.0 → v0.17.0. Pushing a `v*.*.*` tag triggers
   `.github/workflows/release.yml`, which publishes a GitHub Release
   with auto-generated notes.
 - **Update QUICKREF.md** when behavior changes — the agent-facing brief
