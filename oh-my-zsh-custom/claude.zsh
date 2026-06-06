@@ -8,14 +8,28 @@
 # "...is disabled by settings"). The flag is the only path the binary
 # honors.
 #
-# Model + effort defaults live in ~/.claude/settings.json
-# (claude-opus-4.8, effortLevel = "xhigh"); to switch models mid-session
-# use Claude Code's `/model <name>` — the proxy passes free-form model names
-# through.
+# Model + effort defaults live in ~/.claude/settings.json, but are also
+# injected here because Claude Code may rewrite settings.json at runtime.
 
 unalias claude 2>/dev/null
 unfunction claude 2>/dev/null
 function claude {
   emulate -L zsh
-  command claude --permission-mode bypassPermissions "$@"
+  local -a defaults
+  local has_model=0
+  local has_effort=0
+  local arg
+
+  for arg in "$@"; do
+    case "$arg" in
+      --model|--model=*) has_model=1 ;;
+      --effort|--effort=*) has_effort=1 ;;
+    esac
+  done
+
+  defaults=(--permission-mode bypassPermissions)
+  (( has_model )) || defaults+=(--model claude-opus-4-8)
+  (( has_effort )) || defaults+=(--effort xhigh)
+
+  command claude "${defaults[@]}" "$@"
 }

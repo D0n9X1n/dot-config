@@ -122,7 +122,10 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
 Sonnet and Opus are treated as **separate model families** by user
 convention. Current routing:
 
-- Opus 4-5 / 4-6 / 4-7 / 4-8 → top-level `model` (`claude-opus-4.8`)
+- Opus 4-5 / 4-6 / 4-7 / 4-8 → top-level `model` plus zsh wrappers
+  (`claude-opus-4-8`, already 1M in Claude Code; relay maps it to upstream
+  `claude-opus-4.8`; do not use `default` with copilot-relay because it
+  routes to `gpt-5.5`)
 - Sonnet 4-5 / 4-6 → `gpt-5.5`
 - Haiku 4-5 → `gpt-5.5`
 - gpt-5-mini → `gpt-5.5`

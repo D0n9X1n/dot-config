@@ -56,14 +56,14 @@ The `oh-my-zsh-custom/claude.zsh` wrapper launches `claude` with
   "env": {
     "ANTHROPIC_BASE_URL": "http://127.0.0.1:4142",
     "ANTHROPIC_AUTH_TOKEN": "dummy",
-    "ANTHROPIC_MODEL": "claude-opus-4.8",
+    "ANTHROPIC_MODEL": "claude-opus-4-8",
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5.5",
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-5.5",
     "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.5",
     "MODEL_REASONING_EFFORT": "xhigh"
   },
   "permissions": { "allow": ["*"], "defaultMode": "auto" },
-  "model": "default",
+  "model": "claude-opus-4-8",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
@@ -81,13 +81,13 @@ The `oh-my-zsh-custom/claude.zsh` wrapper launches `claude` with
 |---|---|
 | `env.ANTHROPIC_BASE_URL` | Points Claude Code at the local proxy instead of `api.anthropic.com`. |
 | `env.ANTHROPIC_AUTH_TOKEN` | Required by Claude Code's startup check. `dummy` is fine; real auth happens via `copilot-relay auth`. **First launch will prompt** "Use this custom API key? (y/N)" — pick **Yes**, otherwise it lands in `~/.claude.json#customApiKeyResponses.rejected` and Claude refuses to use it. |
-| `env.ANTHROPIC_MODEL` | Underlying Opus model for the relay. `claude-opus-4.8` is the Opus 4.8 1M model exposed by `copilot-relay`, so no `[1m]` / `-1m` alias is needed. |
+| `env.ANTHROPIC_MODEL` | Claude Code-facing Opus 4.8 default. `claude-opus-4-8` is recognized by Claude Code as Opus 4.8 1M; relay maps Opus requests to upstream `opusModel: claude-opus-4.8`. No `[1m]` / `-1m` alias is needed. |
 | `env.ANTHROPIC_DEFAULT_SONNET_MODEL` | Routes every Sonnet alias to `gpt-5.5`. |
 | `env.ANTHROPIC_DEFAULT_HAIKU_MODEL` | Routes current Claude Code's Haiku tier, including sub-agents and small-fast side tasks, to `gpt-5.5`. |
 | `env.ANTHROPIC_SMALL_FAST_MODEL` | Legacy small-fast alias for older Claude Code versions; pinned to `gpt-5.5`. |
 | `env.MODEL_REASONING_EFFORT` | Kept for the custom statusline; upstream thinking is controlled by `thinkEffort` in `~/.copilot-relay/config.yaml`. |
 | `effortLevel` | Claude Code's client-side reasoning budget. `low / medium / high / xhigh`. |
-| `model` | Top-level default; set to `default` so Claude Code opens on menu item 1 ("Default", currently Opus 4.8 1M). |
+| `model` | Top-level default; set to `claude-opus-4-8`. Do not use `default` with `copilot-relay`, because relay routes non-`opus` names to `gpt-5.5` (200k context). |
 
 ### Built-in `/model` menu
 
@@ -95,7 +95,7 @@ Claude Code's `/model` picker is **hard-coded** to its own lineup
 (Default / Sonnet / Sonnet-1M / Haiku / Custom). There is no setting to
 hide entries or substitute a custom list. The pragmatic workaround is the
 `ANTHROPIC_*_MODEL` env vars above: Sonnet / Haiku / small-fast picks all
-route to `gpt-5.5`, while Opus stays on `claude-opus-4.8`.
+route to `gpt-5.5`, while Opus stays on `claude-opus-4-8`.
 
 ### Relay config
 

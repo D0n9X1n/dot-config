@@ -140,11 +140,15 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     custom key; relay auth is handled by `copilot-relay auth`), and pins
     **Opus 4.8 @ xhigh effort** as the
     global default for every machine that runs `install.sh`:
-    `ANTHROPIC_MODEL=claude-opus-4.8` plus top-level `model=default` so
-    Claude Code selects menu item 1 ("Default", currently Opus 4.8 1M) on
-    launch with no `/model` toggle; `copilot-relay` exposes only
-    `claude-opus-4.8` for Opus 4.8, which is the 1M-context model, so no
-    `-1m` alias is needed),
+    `ANTHROPIC_MODEL=claude-opus-4-8` plus top-level
+    `model=claude-opus-4-8`; wrappers also inject
+    `--model claude-opus-4-8 --effort xhigh` because Claude Code can rewrite
+    `settings.json` at runtime. This is Claude Code's recognized Opus 4.8
+    name, so the UI uses the 1M context window. Do not use top-level `model=default` with
+    `copilot-relay`: relay routes non-`opus` model names to `gptModel`
+    (`gpt-5.5`), which appears as 200k context. Relay still maps Opus
+    requests to Copilot upstream `opusModel: claude-opus-4.8`; no `-1m`
+    alias is needed),
     `effortLevel="xhigh"` (deepest reasoning client-side, no
     `/effort` needed) plus `MODEL_REASONING_EFFORT=xhigh` so the
     statusline can display the pinned effort. Claude's Sonnet/Haiku/small-fast

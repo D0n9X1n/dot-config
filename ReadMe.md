@@ -600,14 +600,14 @@ proxy that translates Anthropic-format requests into Copilot ones.
   "env": {
     "ANTHROPIC_BASE_URL": "http://127.0.0.1:4142",
     "ANTHROPIC_AUTH_TOKEN": "dummy",
-    "ANTHROPIC_MODEL": "claude-opus-4.8",
+    "ANTHROPIC_MODEL": "claude-opus-4-8",
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5.5",
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-5.5",
     "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.5",
     "MODEL_REASONING_EFFORT": "xhigh"
   },
   "permissions": { "allow": ["*"], "defaultMode": "auto" },
-  "model": "default",
+  "model": "claude-opus-4-8",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
@@ -623,12 +623,13 @@ proxy that translates Anthropic-format requests into Copilot ones.
 
 Defaults pinned globally (synced across machines via this repo):
 
-- **Model: `claude-opus-4.8`** (Opus 4.8). Base `claude-opus-4.8` is natively
-  a 1M-context model on Copilot. `copilot-relay` routes Opus-family requests
-  to this upstream model, so **no `[1m]` / `-1m` alias is needed**. Top-level
-  `model: "default"` selects Claude Code's Default menu item, currently
-  Opus 4.8 1M, while `env.ANTHROPIC_MODEL` remains pinned to
-  `claude-opus-4.8`.
+- **Model: `claude-opus-4-8`** (Opus 4.8). This is Claude Code's recognized
+  Opus 4.8 name, so the UI uses the 1M context window. `copilot-relay` routes
+  Opus-family requests to Copilot upstream `opusModel: claude-opus-4.8`, so
+  **no `[1m]` / `-1m` alias is needed**. `env.ANTHROPIC_MODEL`, top-level
+  `model`, and the zsh wrappers are all pinned to `claude-opus-4-8`. Do not
+  use top-level `model: "default"` here: relay routes model names that do not
+  contain `opus` to `gptModel` (`gpt-5.5`), which appears as 200k context.
 - **Family-aware routing via env vars + relay**:
   - **`ANTHROPIC_DEFAULT_SONNET_MODEL: gpt-5.5`** — every Sonnet alias from
     Claude Code's built-in picker routes to `gpt-5.5`.
@@ -671,7 +672,7 @@ settings.json key is gated off by feature flag.
 
 Same applies to `cc <title>`: it renames the active terminal tab via
 OSC 1/2 (+ tmux + WezTerm CLI fallbacks) then launches Claude Code with
-the bypass flag. The title is prefixed with a Nerd Font glyph
+the bypass flag plus `--model claude-opus-4-8 --effort xhigh`. The title is prefixed with a Nerd Font glyph
 (`mdi-creation`, U+F0674 — sparkles) so Claude tabs are visually distinct
 from Copilot's `gg` tabs (which use `fa-github`) and from plain shells.
 

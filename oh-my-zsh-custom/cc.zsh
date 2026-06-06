@@ -6,9 +6,9 @@
 # directly so the title sticks even when nested, then runs `claude` in
 # the current shell.
 #
-# Model + effort are pinned globally in ~/.claude/settings.json
-# (claude-opus-4.8, effortLevel = "xhigh"). Permission mode
-# CANNOT be pinned via settings.json — the binary explicitly rejects
+# Model + effort are pinned globally in ~/.claude/settings.json and injected
+# here because Claude Code may rewrite settings.json at runtime.
+# Permission mode CANNOT be pinned via settings.json — the binary explicitly rejects
 # defaultMode="bypassPermissions" with "bypassPermissions mode is
 # disabled by settings". So we pass --permission-mode at the command
 # line on every invocation, which the binary does honor.
@@ -41,6 +41,6 @@ function cc {
     wezterm cli set-tab-title -- "$title" 2>/dev/null
     wezterm cli set-window-title -- "$title" 2>/dev/null
   fi
-  command claude --permission-mode bypassPermissions
+  command claude --permission-mode bypassPermissions --model claude-opus-4-8 --effort xhigh
   unset DISABLE_AUTO_TITLE
 }
