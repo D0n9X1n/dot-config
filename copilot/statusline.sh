@@ -70,6 +70,13 @@ set -u
 # break in the render loop. Empty/no-op segments collapse cleanly so
 # auto-hiding ones (worktree, stash, diff, skills, agents) take no space
 # when off.
+# Default accent lattice avoids repeating icon colors for adjacent segments
+# and for segments in the same visual column:
+#   L1: yellow, orange, green, aqua
+#   L2: aqua, purple, yellow
+#   L3: blue, green, aqua, purple, orange
+#   L4: orange
+#   L5: green, yellow, red, orange, purple
 SEGMENTS="${COPILOT_STATUSLINE_SEGMENTS:-time timer premium waka \n model effort ctx \n mcp skills agent subagents style \n path \n git branch diff stash worktree}"
 SEP=' │ '
 SUBAGENT_SEPARATOR='----------------------------------------'
@@ -132,10 +139,10 @@ ICON_SKILLS=$'\xef\x82\xae'
 ICON_EXT=$'\xef\x82\xae'
 ICON_MCP=$'\xef\x87\xa6'
 # U+F085 cogs             = EF 82 85   Mode
-# U+F015 home             = EF 80 95   Main (root) row
-# U+F135 rocket           = EF 84 B5   Active subagent row
-ICON_SUBAGENT_ROOT=$'\xef\x80\x95'
-ICON_SUBAGENT=$'\xef\x84\xb5'
+# U+F120 terminal         = EF 84 A0   Main (root) row
+# U+F0C0 users            = EF 83 80   Active subagent row
+ICON_SUBAGENT_ROOT=$'\xef\x84\xa0'
+ICON_SUBAGENT=$'\xef\x83\x80'
 ICON_MODE=$'\xef\x82\x85'
 
 # Gruvbox Dark Hard accents — match alacritty/wezterm/.tmux.conf palette.
@@ -222,8 +229,8 @@ f11c|${ICON_WAKA}|WakaTime
 f0ae|${ICON_SKILLS}|Skills
 f0ae|${ICON_EXT}|Ext
 f1e6|${ICON_MCP}|MCP
-f015|${ICON_SUBAGENT_ROOT}|Main
-f135|${ICON_SUBAGENT}|SubAgent
+f120|${ICON_SUBAGENT_ROOT}|Main
+f0c0|${ICON_SUBAGENT}|SubAgent
 TEST_ICONS_EOF
   exit 0
 fi
@@ -480,7 +487,7 @@ seg_diff() {
   local a="${lines_added:-0}" r="${lines_removed:-0}"
   is_pos_int "$a" || is_pos_int "$r" || return 0
   printf '%s%s+%d%s%s/-%d%s' \
-    "$(label "$C_GREEN" "$ICON_DIFF" 'Diff')" \
+    "$(label "$C_RED" "$ICON_DIFF" 'Diff')" \
     "$C_GREEN" "$a" "$C_RESET" \
     "$C_RED" "$r" "$C_RESET"
 }
@@ -504,7 +511,7 @@ seg_ctx() {
   else
     body="${color}${pct_int}%${C_RESET}"
   fi
-  printf '%s%s' "$(label "$C_AQUA" "$ICON_CTX" 'Context')" "$body"
+  printf '%s%s' "$(label "$C_YELLOW" "$ICON_CTX" 'Context')" "$body"
 }
 
 # Path — full cwd as its own line, matching the Claude statusline. Replace
@@ -516,7 +523,7 @@ seg_path() {
     "$HOME") p="~" ;;
     "$HOME"/*) p="~${p#$HOME}" ;;
   esac
-  printf '%s%s%s%s' "$(label "$C_BLUE" "$ICON_PATH" 'Path')" "$C_FG" "$p" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_ORANGE" "$ICON_PATH" 'Path')" "$C_FG" "$p" "$C_RESET"
 }
 
 # Vim / Style — Copilot CLI doesn't currently surface equivalent runtime
@@ -552,7 +559,7 @@ seg_agent() {
     count="$(find "$d" -mindepth 1 -maxdepth 1 -type f -name '*.md' ! -name '.*' ! -iname 'README.md' 2>/dev/null | wc -l | tr -d ' ')"
     total=$((total + count))
   done
-  printf '%s%s%d%s' "$(label "$C_PURPLE" "$ICON_AGENT" 'Agents')" "$C_FG" "$total" "$C_RESET"
+  printf '%s%s%d%s' "$(label "$C_AQUA" "$ICON_AGENT" 'Agents')" "$C_FG" "$total" "$C_RESET"
 }
 
 # Skills — count user-scope + workspace-scope skill bundles.
@@ -571,7 +578,7 @@ seg_skills() {
     count="$(find "$d" -mindepth 2 -maxdepth 2 -type f -name 'SKILL.md' 2>/dev/null | wc -l | tr -d ' ')"
     total=$((total + count))
   done
-  printf '%s%s%d%s' "$(label "$C_AQUA" "$ICON_SKILLS" 'Skills')" "$C_FG" "$total" "$C_RESET"
+  printf '%s%s%d%s' "$(label "$C_GREEN" "$ICON_SKILLS" 'Skills')" "$C_FG" "$total" "$C_RESET"
 }
 
 # Worktree — Copilot doesn't expose .workspace.git_worktree, but we can
@@ -682,7 +689,7 @@ seg_worktree() {
   load_git_state
   [ "$GIT_INSIDE" = "1" ] || return 0
   [ -n "$GIT_WORKTREE" ] || return 0
-  printf '%s%s%s%s' "$(label "$C_AQUA" "$ICON_WORKTREE" 'Worktree')" "$C_FG" "$GIT_WORKTREE" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_PURPLE" "$ICON_WORKTREE" 'Worktree')" "$C_FG" "$GIT_WORKTREE" "$C_RESET"
 }
 
 seg_repo() {
@@ -692,12 +699,12 @@ seg_repo() {
   [ "$GIT_STATE" = "dirty" ] && state_color="$C_YELLOW"
   if [ -n "$GIT_SYNC" ]; then
     printf '%s%s%s%s %s(%s)%s' \
-      "$(label "$C_AQUA" "$ICON_REPO" 'Repo')" \
+      "$(label "$C_GREEN" "$ICON_REPO" 'Repo')" \
       "$state_color" "$GIT_STATE" "$C_RESET" \
       "$C_ORANGE" "$GIT_SYNC" "$C_RESET"
   else
     printf '%s%s%s%s' \
-      "$(label "$C_AQUA" "$ICON_REPO" 'Repo')" \
+      "$(label "$C_GREEN" "$ICON_REPO" 'Repo')" \
       "$state_color" "$GIT_STATE" "$C_RESET"
   fi
 }
@@ -995,7 +1002,7 @@ format_subagent_rows() {
     *) root=1 ;;
   esac
   if [ "$root" = 1 ]; then
-    out="${C_GREEN}${ICON_SUBAGENT_ROOT}${C_RESET} ${C_FG}main${C_RESET}"
+    out="${C_BLUE}${ICON_SUBAGENT_ROOT}${C_RESET} ${C_FG}main${C_RESET}"
   fi
 
   while IFS=$'\037' read -r id name purpose elapsed; do
@@ -1016,9 +1023,9 @@ format_subagent_rows() {
     [ -n "$out" ] && out="${out}"$'\n'
     [ -n "$name" ] || name="agent"
     if [ -n "$purpose" ]; then
-      out="${out}${C_YELLOW}${ICON_SUBAGENT}${C_RESET} ${C_FG}${name}${C_RESET}${C_DIM}:${C_RESET} ${C_FG_DIM}${purpose}${C_RESET}"
+      out="${out}${C_ORANGE}${ICON_SUBAGENT}${C_RESET} ${C_FG}${name}${C_RESET}${C_DIM}:${C_RESET} ${C_FG_DIM}${purpose}${C_RESET}"
     else
-      out="${out}${C_YELLOW}${ICON_SUBAGENT}${C_RESET} ${C_FG}${name}${C_RESET}"
+      out="${out}${C_ORANGE}${ICON_SUBAGENT}${C_RESET} ${C_FG}${name}${C_RESET}"
     fi
     # Append running time when available (elapsed > 0)
     case "${elapsed:-}" in

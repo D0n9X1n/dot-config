@@ -108,7 +108,9 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     with per-segment Gruvbox accents and color-graded Context %. Renders
     `<icon> <Label> <value>` separated by `│`: L1 time/run/req/wakatime,
     L2 model/effort/context, L3 mcp/skills/agents/tasks/style, L4 cwd path,
-    L5 repo/branch/diff/stash/worktree. Copilot-only segments (`wall`,
+    L5 repo/branch/diff/stash/worktree. Default icon accent colors are arranged
+    so adjacent segments and same-column segments use different colors.
+    Copilot-only segments (`wall`,
     `api`, `cache_pct`, `last_call`, `gh_account`, `ext_count`, `venv`)
     remain available via `COPILOT_STATUSLINE_SEGMENTS`. Env overrides:
     `COPILOT_STATUSLINE_NO_ICONS=1` drops icons (keeps text labels);
@@ -141,7 +143,8 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     `seg_subagents` shows the live running-subagent count. `seg_timer`
     formats as `Nh Mm` for sessions ≥ 1h (v0.13.2).
     Active subagent rows (below L5, after a `----------------------------------------`
-    separator) show agent name, purpose, and running time from the hook-maintained
+    separator) use a terminal icon for `main` and a users icon for subagents,
+    then show agent name, purpose, and running time from the hook-maintained
     `$TMPDIR/copilot-subagents-$USER/<session>.rows` file first, then a
     signature-cached `events.jsonl` fallback if hook rows are missing. Controlled by `COPILOT_STATUSLINE_MAX_SUBAGENTS=N`
     (default 8), `COPILOT_STATUSLINE_SUBAGENT_ROOT=0` to hide the root "main"

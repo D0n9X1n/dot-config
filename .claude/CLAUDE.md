@@ -76,6 +76,8 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
 - Five-line layout: literal `\n` tokens in `SEGMENTS` introduce line
   breaks. L1 time/run/api/cost · L2 model/effort/context ·
   L3 mcp/skills/agents/style · L4 cwd path · L5 repo/branch/diff/stash/worktree.
+- Default statusline icon accents should avoid repeating colors for adjacent
+  segments and for segments in the same visual column.
 
 ## When you make changes
 

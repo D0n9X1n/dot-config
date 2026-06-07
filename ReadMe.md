@@ -555,9 +555,10 @@ Executable script — a "full mirror" of `~/.claude/statusline.sh` adapted to
 Copilot's `statusLine` JSON. Per-segment Gruvbox color accents and
 color-graded Context %. Default layout is five lines: L1 time/run/req/wakatime,
 L2 model/effort/context, L3 mcp/skills/agents/tasks/style, L4 cwd path, L5
-repo/branch/diff/stash/worktree. Copilot-only segments such as `api`,
-`cache_pct`, `last_call`, `gh_account`, `ext_count`, and `venv` remain
-available via `COPILOT_STATUSLINE_SEGMENTS`.
+repo/branch/diff/stash/worktree. The default icon accent lattice avoids using
+the same color for adjacent segments or for segments in the same visual column.
+Copilot-only segments such as `api`, `cache_pct`, `last_call`, `gh_account`,
+`ext_count`, and `venv` remain available via `COPILOT_STATUSLINE_SEGMENTS`.
 
 Environment overrides:
 
@@ -598,7 +599,8 @@ from stdin via a single `jq` call, caches git state for 5s
 > `<cwd>/.agents/skills/`) — i.e. **available definitions**, not live
 > sub-agents. `seg_subagents` shows the live running-subagent count. When
 > active subagent rows are shown below L5, they are preceded by a
-> `----------------------------------------` separator. Those rows come from
+> `----------------------------------------` separator. The root `main` row uses
+> a terminal icon, and subagent rows use a users icon. Those rows come from
 > `subagent-state.sh`'s small per-session rows file first, with a
 > signature-cached `events.jsonl` fallback if hook rows are missing.
 > `seg_timer` shows `Nh Mm` once the session crosses one hour (v0.13.2).

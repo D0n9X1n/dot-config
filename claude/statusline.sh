@@ -73,6 +73,13 @@ set -u
 #   L4: cwd path     — full directory path
 #   L5: repo + git   — repo, diff, branch, stash, worktree
 #   Bottom: separator + active subagents — root + one line per live Agent/Task
+# Default accent lattice avoids repeating icon colors for adjacent segments
+# and for segments in the same visual column:
+#   L1: yellow, orange, green, aqua
+#   L2: aqua, purple, yellow
+#   L3: blue, green, aqua, purple, orange
+#   L4: orange
+#   L5: green, yellow, red, orange, purple
 SEGMENTS="time timer cost waka \n model effort ctx \n mcp skills agent subagents style \n path \n git branch diff stash worktree"
 SEP=' │ '
 SUBAGENT_SEPARATOR='----------------------------------------'
@@ -129,8 +136,8 @@ ICON_GH=$'\xef\x82\x9b'
 ICON_WAKA=$'\xef\x84\x9c'
 ICON_SKILLS=$'\xef\x82\xae'
 ICON_MCP=$'\xef\x87\xa6'
-# U+F015 home            = EF 80 95   Main (root) row
-ICON_SUBAGENT_ROOT=$'\xef\x80\x95'
+# U+F120 terminal        = EF 84 A0   Main (root) row
+ICON_SUBAGENT_ROOT=$'\xef\x84\xa0'
 # U+F0C0 users           = EF 83 80   Running subagents
 ICON_SUBAGENT=$'\xef\x83\x80'
 
@@ -220,7 +227,8 @@ f126|${ICON_BRANCH}|Branch
 f187|${ICON_STASH}|Stash
 f1ae|${ICON_VENV}|Venv
 f09b|${ICON_GH}|GH
-f015|${ICON_SUBAGENT_ROOT}|Main
+f120|${ICON_SUBAGENT_ROOT}|Main
+f0c0|${ICON_SUBAGENT}|SubAgent
 TEST_ICONS_EOF
   exit 0
 fi
@@ -455,7 +463,7 @@ seg_diff() {
   # the session hasn't touched any code yet (both counts zero).
   local a="${lines_added:-0}" r="${lines_removed:-0}"
   is_pos_int "$a" || is_pos_int "$r" || return 0
-  label "$C_GREEN" "$ICON_DIFF" 'Diff'
+  label "$C_RED" "$ICON_DIFF" 'Diff'
   printf -v __SEG '%s%s+%d%s%s/-%d%s' "$__LBL" "$C_GREEN" "$a" "$C_RESET" "$C_RED" "$r" "$C_RESET"
 }
 
@@ -470,7 +478,7 @@ seg_path() {
     "$HOME") p="~" ;;
     "$HOME"/*) p="~${p#$HOME}" ;;
   esac
-  label "$C_BLUE" "$ICON_PATH" 'Path'
+  label "$C_ORANGE" "$ICON_PATH" 'Path'
   printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$p" "$C_RESET"
 }
 
@@ -496,7 +504,7 @@ seg_ctx() {
   else
     body="${color}${pct_int}%${C_RESET}"
   fi
-  label "$C_AQUA" "$ICON_CTX" 'Context'
+  label "$C_YELLOW" "$ICON_CTX" 'Context'
   printf -v __SEG '%s%s' "$__LBL" "$body"
 }
 
@@ -532,20 +540,20 @@ seg_agent() {
     total=$((total + count))
   done
   is_pos_int "$total" || return 0
-  label "$C_PURPLE" "$ICON_AGENT" 'Agents'
+  label "$C_AQUA" "$ICON_AGENT" 'Agents'
   printf -v __SEG '%s%s%d%s' "$__LBL" "$C_FG" "$total" "$C_RESET"
 }
 
 seg_worktree() {
   [ -n "$worktree_name" ] || return 0
-  label "$C_AQUA" "$ICON_WORKTREE" 'Worktree'
+  label "$C_PURPLE" "$ICON_WORKTREE" 'Worktree'
   printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$worktree_name" "$C_RESET"
 }
 
 seg_style() {
   [ -n "$output_style" ] || return 0
   [ "$output_style" = "default" ] && return 0
-  label "$C_PURPLE" "$ICON_STYLE" 'Style'
+  label "$C_ORANGE" "$ICON_STYLE" 'Style'
   printf -v __SEG '%s%s%s%s' "$__LBL" "$C_FG" "$output_style" "$C_RESET"
 }
 
@@ -610,7 +618,7 @@ seg_git() {
   if [ -n "$GIT_DIRTY" ]; then
     state="dirty"; state_color="$C_YELLOW"
   fi
-  label "$C_AQUA" "$ICON_REPO" 'Repo'
+  label "$C_GREEN" "$ICON_REPO" 'Repo'
   if [ -n "$GIT_SYNC" ]; then
     printf -v __SEG '%s%s%s%s %s(%s)%s' \
       "$__LBL" "$state_color" "$state" "$C_RESET" \
@@ -743,7 +751,7 @@ seg_skills() {
     total=$((total + count))
   done
   is_pos_int "$total" || return 0
-  label "$C_AQUA" "$ICON_SKILLS" 'Skills'
+  label "$C_GREEN" "$ICON_SKILLS" 'Skills'
   printf -v __SEG '%s%s%d%s' "$__LBL" "$C_FG" "$total" "$C_RESET"
 }
 
@@ -886,14 +894,14 @@ format_subagent_rows() {
     *) root=1 ;;
   esac
   if [ "$root" = 1 ]; then
-    out="${C_GREEN}${ICON_SUBAGENT_ROOT}${C_RESET} ${C_FG}main${C_RESET}"
+    out="${C_BLUE}${ICON_SUBAGENT_ROOT}${C_RESET} ${C_FG}main${C_RESET}"
   fi
 
   while IFS=$'\t' read -r name purpose; do
     [ -n "$name$purpose" ] || continue
     [ -n "$out" ] && out="${out}"$'\n'
     [ -n "$name" ] || name="agent"
-    out="${out}${C_YELLOW}○${C_RESET} ${C_FG}${name}${C_RESET}"
+    out="${out}${C_ORANGE}${ICON_SUBAGENT}${C_RESET} ${C_FG}${name}${C_RESET}"
     [ -n "$purpose" ] && out="${out}  ${C_FG_DIM}${purpose}${C_RESET}"
   done <<EOF
 $rows
