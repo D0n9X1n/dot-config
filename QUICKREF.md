@@ -332,7 +332,11 @@ cd ~/Public/dot-configs && git pull
   `MOSconfig/recursive-code-config` releases into `~/Library/Fonts`.
 - WakaTime MCP prompts in red for `~/.wakatime.cfg` `api_key` if missing,
   requiring the user to enter the key twice with hidden input before writing
-  the local config and MCP entry.
+  the local config and MCP entry. Its venv (`~/.local/share/wakatime-mcp/venv`)
+  needs Python >=3.10 (`requirements.txt` pins `mcp>=1.26`); install.sh resolves
+  a new-enough interpreter via `find_python` (probing `python3.1x` before bare
+  `python3`, since macOS's Xcode `python3` is 3.9.x) and rebuilds the venv if a
+  prior run created it with Python <3.10.
 - Copilot WakaTime upload is handled separately by
   `@geeknees/copilot-cli-wakatime` + `.github/hooks/wakatime.json`, and is
   initialized only after Copilot CLI, `wakatime-cli`, the npm hook package, and

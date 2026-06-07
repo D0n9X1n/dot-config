@@ -33,6 +33,27 @@ have_cmd() {
   command -v "$1" >/dev/null 2>&1
 }
 
+# Resolve a python interpreter satisfying a minimum version (default >=3.10).
+# Prints the resolved command path on stdout; returns non-zero if none found.
+# macOS's Xcode python3 is 3.9.x, so we probe explicit minor versions first
+# (Homebrew installs python3.1x) before falling back to bare python3/python.
+find_python() {
+  local min_major="${1:-3}"
+  local min_minor="${2:-10}"
+  local candidate
+  for candidate in \
+    python3.14 python3.13 python3.12 python3.11 python3.10 python3 python; do
+    have_cmd "$candidate" || continue
+    if "$candidate" -c \
+      "import sys; sys.exit(0 if sys.version_info[:2] >= ($min_major, $min_minor) else 1)" \
+      >/dev/null 2>&1; then
+      command -v "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
 log_command() {
   local arg
   printf '+'
@@ -816,16 +837,33 @@ if [ -d "$claude_src" ]; then
   wm_src="${src_dir}/wakatime-mcp"
   wm_dest="${HOME}/.local/share/wakatime-mcp"
   wm_cfg="${HOME}/.wakatime.cfg"
-  if [ -d "$wm_src" ] && have_cmd python3; then
-    wm_key="$(ensure_wakatime_cfg_api_key "$wm_cfg" || true)"
-    if [ -z "$wm_key" ]; then
-      echo "wakatime-mcp: no API key available — skipping registration"
+  if [ -d "$wm_src" ]; then
+    # requirements.txt pins mcp>=1.26, which needs Python >=3.10.
+    # macOS's Xcode python3 is 3.9.x, so resolve a new-enough interpreter
+    # (Homebrew python3.1x) rather than whatever bare python3 points at.
+    wm_py="$(find_python 3 10 || true)"
+    if [ -z "$wm_py" ]; then
+      echo "Warning: wakatime-mcp needs Python >=3.10 but none was found — skipping"
     else
+      wm_key="$(ensure_wakatime_cfg_api_key "$wm_cfg" || true)"
+      if [ -z "$wm_key" ]; then
+        echo "wakatime-mcp: no API key available — skipping registration"
+      else
         mkdir -p "$wm_dest"
         cp "$wm_src/server.py" "$wm_src/wakatime_client.py" "$wm_dest/"
+        # Discard a venv built with too-old a Python (e.g. a prior run that
+        # used Xcode's 3.9.6); it can't satisfy requirements.txt and pip
+        # would fail. Rebuilding is cheap and idempotent.
+        if [ -d "$wm_dest/venv" ] \
+          && ! "$wm_dest/venv/bin/python3" -c \
+               "import sys; sys.exit(0 if sys.version_info[:2] >= (3, 10) else 1)" \
+               >/dev/null 2>&1; then
+          echo "wakatime-mcp: existing venv has Python <3.10 — rebuilding"
+          rm -rf "$wm_dest/venv"
+        fi
         if [ ! -d "$wm_dest/venv" ]; then
           echo "wakatime-mcp: bootstrapping venv at $wm_dest/venv (one-time, ~30s)"
-          python3 -m venv "$wm_dest/venv" \
+          "$wm_py" -m venv "$wm_dest/venv" \
             && "$wm_dest/venv/bin/pip" install --upgrade pip \
             && "$wm_dest/venv/bin/pip" install -r "$wm_src/requirements.txt" \
             && echo "wakatime-mcp: venv ready" \
@@ -858,6 +896,7 @@ if [ -d "$claude_src" ]; then
             && echo "wakatime-mcp: registered in $copilot_mcp_pre" \
             || { rm -f "$tmp_mcp"; echo "Warning: wakatime-mcp jq registration failed"; }
         fi
+      fi
     fi
   fi
 
