@@ -233,6 +233,7 @@ install_npm_global_clis() {
   fi
 
   ensure_npm_cli_latest @github/copilot copilot || true
+  ensure_npm_cli_latest @geeknees/copilot-cli-wakatime copilot-cli-wakatime || true
   ensure_npm_cli_latest copilot-relay copilot-relay || true
 }
 
@@ -516,6 +517,38 @@ install_recursive_code_config_fonts() {
   fi
 }
 
+ensure_copilot_wakatime_hooks() {
+  local hook_file="${src_dir}/.github/hooks/wakatime.json"
+  local wm_cfg="${HOME}/.wakatime.cfg"
+  local wm_key=""
+
+  if ! have_cmd copilot; then
+    echo "copilot-cli-wakatime: copilot CLI not on PATH — skipping hook setup"
+    return 0
+  fi
+  if ! have_cmd wakatime-cli; then
+    echo "copilot-cli-wakatime: wakatime-cli not on PATH — skipping hook setup"
+    return 0
+  fi
+  if ! have_cmd copilot-cli-wakatime; then
+    echo "copilot-cli-wakatime: command not on PATH — skipping hook setup"
+    return 0
+  fi
+
+  wm_key="$(ensure_wakatime_cfg_api_key "$wm_cfg" || true)"
+  if [ -z "$wm_key" ]; then
+    echo "copilot-cli-wakatime: no WakaTime API key available — skipping hook setup"
+    return 0
+  fi
+
+  if [ -f "$hook_file" ]; then
+    echo "copilot-cli-wakatime hook config present at ${hook_file#${src_dir}/}"
+  else
+    (cd "$src_dir" && log_command copilot-cli-wakatime init) \
+      || echo "Warning: copilot-cli-wakatime init failed"
+  fi
+}
+
 configure_copilot_relay() {
   local relay_dir="${HOME}/.copilot-relay"
   local relay_config="${relay_dir}/config.yaml"
@@ -578,6 +611,7 @@ install_macos_deps() {
     node
     python
     tmux
+    wakatime-cli
     zsh-completions
     zsh-fast-syntax-highlighting
   )
@@ -826,6 +860,10 @@ if [ -d "$claude_src" ]; then
         fi
     fi
   fi
+
+  # Copilot CLI WakaTime upload hook. This must run after Copilot CLI,
+  # wakatime-cli, copilot-cli-wakatime, and ~/.wakatime.cfg are in place.
+  ensure_copilot_wakatime_hooks
 
   # Import Copilot CLI's MCP servers into Claude Code's user-scope config.
   # Claude Code reads MCP servers from ~/.claude.json (top-level

@@ -4,6 +4,11 @@ Local MCP server that exposes WakaTime read-only tools (status bar, daily
 summary, top languages/projects, durations, goals) to Claude Code and
 Copilot CLI.
 
+This is the read/query side of the integration. Copilot CLI activity upload is
+handled separately by [`@geeknees/copilot-cli-wakatime`](https://github.com/geeknees/copilot-cli-wakatime)
+through `.github/hooks/wakatime.json`; that hook sends WakaTime heartbeats with
+`wakatime-cli` after Copilot sessions/tools/end events.
+
 Vendored into this repo because there's no PyPI/GitHub upstream — `server.py`
 and `wakatime_client.py` are the entire source. install.sh bootstraps a venv
 under `~/.local/share/wakatime-mcp/venv/` on first run, then registers the
@@ -28,6 +33,10 @@ If `~/.wakatime.cfg` is missing or has no `api_key`, `install.sh` prints a red
 `ACTION REQUIRED` prompt, asks you to enter the key twice with hidden input, and
 writes the local config file with mode `600`. The key itself is never printed to
 the install log.
+
+`install.sh` asks for this key before initializing the Copilot upload hook, so
+`@geeknees/copilot-cli-wakatime` only gets enabled after WakaTime, Copilot CLI,
+and the API key are all available.
 
 ## Tools exposed
 

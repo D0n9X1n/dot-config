@@ -1,10 +1,10 @@
-# cc <title>
+# cc [title]
 #
 # Sibling of `gg` (oh-my-zsh-custom/gg.zsh) but launches Anthropic's
 # Claude Code CLI instead of GitHub Copilot CLI. Sets the active terminal
-# tab + window title to <title> via OSC 1/2, also tells tmux + WezTerm
+# tab + window title to [title] via OSC 1/2, also tells tmux + WezTerm
 # directly so the title sticks even when nested, then runs `claude` in
-# the current shell.
+# the current shell. If title is omitted, use the current directory path.
 #
 # Model + effort are pinned globally in ~/.claude/settings.json and injected
 # here because Claude Code may rewrite settings.json at runtime.
@@ -20,17 +20,14 @@ unalias cc 2>/dev/null
 unfunction cc 2>/dev/null
 function cc {
   emulate -L zsh
-  if [[ -z "$1" ]]; then
-    print -u2 "Usage: cc <tab title>"
-    return 1
-  fi
   # Prepend a Nerd Font glyph so the tab is visually distinct as a Claude
   # Code session. mdi-creation (U+F0674) renders as sparkles in any Nerd
   # Font — fits the "AI agent" vibe and reads cleanly even without color.
   # Wrap in $'...' (zsh ANSI-C quoting) so the literal codepoint sits in
   # the title bytes.
   local icon=$''
-  local title="$icon $1"
+  local title_text="${*:-$PWD}"
+  local title="$icon $title_text"
   DISABLE_AUTO_TITLE=true
   print -Pn "\e]2;${title}\a"
   print -Pn "\e]1;${title}\a"
