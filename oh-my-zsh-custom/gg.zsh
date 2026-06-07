@@ -1,8 +1,8 @@
-# gg <title>
+# gg [title]
 #
-# Set the current terminal tab + window title to <title>, then launch
-# `copilot` in the current shell. Use `gg "Tab Title"` to start a Copilot
-# session with a meaningful name on the tab.
+# Set the current terminal tab + window title to [title], then launch
+# `copilot` in the current shell. If title is omitted, use the current
+# directory path so a bare `gg` session is still identifiable.
 #
 # Notes:
 # - Uses OSC 1/2 escape sequences for the title (works in WezTerm,
@@ -23,15 +23,12 @@ unalias gg 2>/dev/null
 unfunction gg 2>/dev/null
 function gg {
   emulate -L zsh
-  if [[ -z "$1" ]]; then
-    print -u2 "Usage: gg <tab title>"
-    return 1
-  fi
   # Prepend a Nerd Font glyph so the tab is visually distinct as a
   # Copilot CLI session. fa-github (U+F09B) is the GitHub octocat — the
   # most direct "this is GitHub Copilot" signal.
   local icon=$''
-  local title="$icon $1"
+  local title_text="${*:-$PWD}"
+  local title="$icon $title_text"
   DISABLE_AUTO_TITLE=true
   print -Pn "\e]2;${title}\a"
   print -Pn "\e]1;${title}\a"

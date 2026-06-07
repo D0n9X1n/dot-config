@@ -5,6 +5,7 @@
 *.swo
 *~
 *.bak.*
+.copilot-cli.ts
 
 # Claude Code's per-project state dir lives at `.claude/`. We DO track
 # the deliberate parts (CLAUDE.md, skills/, etc.) and ignore only the

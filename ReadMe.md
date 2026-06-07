@@ -38,6 +38,7 @@ dot-configs/
 ├── themes/apollo/               # Apollo theme (wezterm/vim/nvim/vscode/wt) — reference, not auto-linked
 ├── launchd/                     # macOS launchd agent templates
 │   └── com.d0n9x1n.copilot-relay.plist  # copilot-relay proxy on login (rendered by install.sh)
+├── .github/hooks/wakatime.json  # Copilot CLI -> WakaTime upload hooks
 ├── mcp-shared.json              # secret-free MCP entries synced via git
 ├── .claude/CLAUDE.md            # agent instructions for Claude Code working in this repo
 ├── .github/copilot-instructions.md  # agent instructions for Copilot CLI
@@ -61,7 +62,7 @@ probes do not appear as errors.
    command-line tools via Homebrew (best-effort after Homebrew itself exists).
    Set `SKIP_BREW=1` to skip this step entirely (useful for CI / fake-`HOME`
    testing). Formulae: `autojump`, `eza`, `git`, `jq`, `neovim`, `node`,
-   `python` (provides `python3`), `tmux`, `zsh-completions`, and
+   `python` (provides `python3`), `tmux`, `wakatime-cli`, `zsh-completions`, and
    `zsh-fast-syntax-highlighting`. Before installing Claude Code, the installer
    removes any old global npm `@anthropic-ai/claude-code` package, then installs casks:
    `claude-code`, `wezterm`, the Recursive base/Nerd Font casks, Symbols Only
@@ -69,8 +70,10 @@ probes do not appear as errors.
    `RecMonoBaker-*.ttf` and `RecMonoSt.Helens-*.ttf` assets from
    `MOSconfig/recursive-code-config` releases into `~/Library/Fonts`.
 2. Installs/updates npm global CLIs only when they are missing or already
-   npm-managed. Existing non-npm binaries (for example cask-managed `copilot`)
-   are left in place to avoid npm `EEXIST`. Set `SKIP_NPM_GLOBALS=1` to skip.
+   npm-managed: `@github/copilot`, `@geeknees/copilot-cli-wakatime`, and
+   `copilot-relay`. Existing non-npm binaries (for example cask-managed
+   `copilot`) are left in place to avoid npm `EEXIST`. Set `SKIP_NPM_GLOBALS=1`
+   to skip.
 3. Installs oh-my-zsh unattended if missing (`RUNZSH=no`, `CHSH=no`), then
    fixes insecure zsh completion directory permissions so `compinit` does not
    block new shells. Set `SKIP_OH_MY_ZSH=1` to skip installation.
@@ -93,6 +96,9 @@ probes do not appear as errors.
    For WakaTime MCP, if `~/.wakatime.cfg` lacks `api_key`, the installer prints
    a red `ACTION REQUIRED` prompt and asks for the key twice with hidden input
    before writing the local config file.
+   Once WakaTime, Copilot CLI, `wakatime-cli`, and
+   `@geeknees/copilot-cli-wakatime` are available, it verifies the Copilot CLI
+   upload hook config at `.github/hooks/wakatime.json`.
 10. Bootstraps **TPM** (Tmux Plugin Manager): clones it under `~/.tmux/plugins/tpm`
    if missing, then runs `tpm/bin/install_plugins` to clone every plugin
    listed in `.tmux.conf`. Skipped if `tmux` isn't on PATH.
@@ -169,6 +175,7 @@ python3 --version
 brew list --cask claude-code
 copilot --version
 npm list -g copilot-relay --depth=0
+command -v copilot-cli-wakatime wakatime-cli
 ls -l ~/.tmux.conf ~/.copilot/settings.json ~/.claude/settings.json ~/.oh-my-zsh/custom/custom.zsh
 launchctl print "gui/$(id -u)/com.d0n9x1n.copilot-relay" | grep state
 ```
@@ -236,7 +243,18 @@ Confirm everything got wired:
 ```bash
 test -f ~/.config/github-copilot/mcp.json && echo "Copilot MCP file present"
 jq '.mcpServers | keys' ~/.claude.json   # should list servers
+test -f .github/hooks/wakatime.json && echo "Copilot WakaTime hook present"
 ```
+
+**WakaTime has two separate integrations.** `wakatime-mcp/` is a read-only MCP
+server so Copilot/Claude can query your WakaTime stats. `.github/hooks/wakatime.json`
+is the upload path for Copilot CLI activity: it calls
+[`@geeknees/copilot-cli-wakatime`](https://github.com/geeknees/copilot-cli-wakatime)
+on session/tool/end hooks, which sends WakaTime heartbeats through
+`wakatime-cli`. `install.sh` installs `wakatime-cli` and the npm hook package,
+then verifies the hook after the WakaTime API key and Copilot CLI are available.
+The hook creates `.copilot-cli.ts` as a virtual WakaTime entity; that file is
+ignored by git.
 
 **GitHub MCP setup (special case):** GitHub's hosted MCP at
 `https://api.githubcopilot.com/mcp/` does NOT support OAuth Dynamic
@@ -336,7 +354,7 @@ claude --print "say 'hello from devbox'" 2>&1 | head -5
 ```
 
 If all 10 steps print `ok` (or the equivalent positive signal), the box is
-fully set up. The `gg <title>` function, the statusline (5-line layout
+fully set up. The `gg [title]` function, the statusline (5-line layout
 with git/branch/cost/ctx/agents/skills segments), the dark-ansi Claude Code
 theme, and the Gruvbox-aligned tmux/wezterm chrome are all live.
 
@@ -382,10 +400,12 @@ Wraps `copilot update`: after a successful update it runs
 `~/.copilot/cleanup-legacy.sh`, so old `~/.copilot/pkg/<platform>/<version>`
 payloads left by upgrades are pruned automatically.
 
-#### `gg.zsh` — `gg <title>`
+#### `gg.zsh` — `gg [title]`
 
-Sets the current terminal tab and window title to `<title>` via OSC 1 / 2
-escape sequences (works in WezTerm, iTerm2, anything OSC-compliant).
+Sets the current terminal tab and window title to `[title]` via OSC 1 / 2
+escape sequences (works in WezTerm, iTerm2, anything OSC-compliant). If
+`title` is omitted, `gg` uses the current directory path so a bare session still
+has a useful name.
 **Inside tmux** the OSC escape doesn't propagate to the outer terminal because
 `.tmux.conf` keeps `allow-rename off` and `automatic-rename off`, so `gg` also
 calls `tmux rename-window` directly — that updates tmux's status-bar window
@@ -661,8 +681,9 @@ Bare `claude` is wrapped as a shell function that always passes
 the binary honors for non-interactive bypass — the equivalent
 settings.json key is gated off by feature flag.
 
-Same applies to `cc <title>`: it renames the active terminal tab via
-OSC 1/2 (+ tmux + WezTerm CLI fallbacks) then launches Claude Code with
+Same applies to `cc [title]`: it renames the active terminal tab via
+OSC 1/2 (+ tmux + WezTerm CLI fallbacks; default title is the current directory
+path) then launches Claude Code with
 the bypass flag plus `--model 'claude-opus-4-8[1m]' --effort xhigh`. The title is prefixed with a Nerd Font glyph
 (`mdi-creation`, U+F0674 — sparkles) so Claude tabs are visually distinct
 from Copilot's `gg` tabs (which use `fa-github`) and from plain shells.
