@@ -136,6 +136,13 @@ cd ~/Public/dot-configs && git pull
 # Re-run install.sh only if new files were added; existing symlinks need no action.
 ```
 
+## Releases
+
+Pushing a `v*.*.*` tag runs `.github/workflows/release.yml` and publishes a
+GitHub Release. The release body is generated from the commit subject list
+between the new tag and the previous reachable `v*.*.*` tag, so the release
+message stays aligned with the commits that shipped.
+
 ## Fresh-devbox runbook (agent-friendly)
 
 Step-by-step setup on a brand-new macOS box. An agent (or human) can follow

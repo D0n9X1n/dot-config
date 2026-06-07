@@ -17,10 +17,37 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Create release with auto notes
+      - name: Generate release notes from commits
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          current_tag="${GITHUB_REF_NAME}"
+          current_commit="$(git rev-list -n 1 "$current_tag")"
+          previous_tag="$(git describe --tags --abbrev=0 --match 'v*.*.*' "${current_commit}^" 2>/dev/null || true)"
+
+          if [ -n "$previous_tag" ]; then
+            range="${previous_tag}..${current_tag}"
+            heading="Changes since ${previous_tag}"
+          else
+            range="$current_tag"
+            heading="Changes"
+          fi
+
+          commit_list="$(git log --reverse --format='- %s' "$range")"
+          {
+            printf '## %s\n\n' "$heading"
+            if [ -n "$commit_list" ]; then
+              printf '%s\n' "$commit_list"
+            else
+              printf '%s\n' '- No commits.'
+            fi
+          } > release-notes.md
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          body_path: release-notes.md
           name: ${{ github.ref_name }}
           draft: false
           prerelease: false
