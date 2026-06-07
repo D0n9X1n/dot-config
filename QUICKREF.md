@@ -92,7 +92,9 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
   - `settings.json` — Copilot CLI settings (model: `gpt-5.5`,
     `contextTier: long_context` = 1M context, effort `xhigh`, theme `dark`,
     `keepAlive: busy`,
-    `continueOnAutoMode: true`, custom footer/status line). The `statusLine` block only
+    `continueOnAutoMode: true`, custom footer/status line, and
+    `subagentStart`/`subagentStop` hooks to maintain live subagent rows via
+    `~/.copilot/subagent-state.sh`). The `statusLine` block only
     takes a single `padding` field — per-side spacing is done in
     `statusline.sh` (newlines for top, leading spaces for left). Note:
     Copilot itself injects/strips a `"staff": true` field at runtime based
@@ -135,11 +137,16 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     `<cwd>/.agents/skills/`) — NOT live sub-agents. Both show `0`.
     `seg_subagents` shows the live running-subagent count. `seg_timer`
     formats as `Nh Mm` for sessions ≥ 1h (v0.13.2).
-    Active subagent rows (below L5) now show agent name, purpose, and
-    running time (elapsed since the subagent started, formatted via
-    `fmt_dhm`). Controlled by `COPILOT_STATUSLINE_MAX_SUBAGENTS=N`
-    (default 8) and `COPILOT_STATUSLINE_SUBAGENT_ROOT=0` to hide the
-    root "main" row.
+    Active subagent rows (below L5, after a `----------------------------------------`
+    separator) show agent name, purpose, and running time from the hook-maintained
+    `$TMPDIR/copilot-subagents-$USER/<session>.rows` file — no per-redraw
+    `events.jsonl` tail scan. Controlled by `COPILOT_STATUSLINE_MAX_SUBAGENTS=N`
+    (default 8), `COPILOT_STATUSLINE_SUBAGENT_ROOT=0` to hide the root "main"
+    row, and `COPILOT_STATUSLINE_SUBAGENT_STATE_DIR=dir` for tests/debugging.
+  - `subagent-state.sh` — executable Copilot hook helper. `sessionStart` and
+    `sessionEnd` reset the per-session rows file; `subagentStart` appends
+    `name/purpose/started_at`; `subagentStop` removes the oldest matching
+    agent row (Copilot hook payload has no toolCallId).
   - `cleanup-legacy.sh` — executable cleanup hook for Copilot CLI upgrades.
     Keeps only the current `~/.copilot/pkg/<platform>/<version>` payload
     (detected from `copilot --version`), removes older package versions,
@@ -199,6 +206,9 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     and `SubagentStop` to `~/.claude/hooks/subagent-counter.sh start|stop`
     so the statusline's running-subagent count is event-driven (O(1) read
     from a per-session counter file) instead of polling the transcript.
+    Active subagent rows render below L5 after a
+    `----------------------------------------` separator; the root "main" row
+    uses the home icon while Agent/Task rows keep the subagent icon.
   - `hooks/subagent-counter.sh` — maintains
     `$TMPDIR/claude-subagents-$USER/<session_id>` (single integer).
     +1 on Task/Agent `start`, -1 on `stop`. Dedupes overlapping
@@ -310,12 +320,13 @@ cd ~/Public/dot-configs && git pull
 - Apps/CLIs: WezTerm (terminal — cask auto-installed; config auto-linked to
   `~/.wezterm.lua`), oh-my-zsh (unattended install), Copilot CLI (preserve
   existing or npm fallback), Claude Code CLI
-  (Homebrew cask `claude-code`), and `copilot-relay` (npm). `copilot-relay
-  start` runs a local proxy on port 4142 that the symlinked
-  `~/.claude/settings.json` points Claude Code at.
-- Tools: Homebrew (bootstrapped if missing), python3, node/npm, jq, git, and
-  tmux ≥ 3.3 (3.6a tested) for the `.tmux.conf` features (TPM, OSC-52
-  set-clipboard, status-format extensions).
+  (Homebrew cask `claude-code`), `copilot-relay` (npm), and
+  `@geeknees/copilot-cli-wakatime` (npm). `copilot-relay start` runs a local
+  proxy on port 4142 that the symlinked `~/.claude/settings.json` points
+  Claude Code at.
+- Tools: Homebrew (bootstrapped if missing), python3, node/npm, jq, git,
+  `wakatime-cli`, and tmux ≥ 3.3 (3.6a tested) for the `.tmux.conf` features
+  (TPM, OSC-52 set-clipboard, status-format extensions).
 - Fonts (auto-installed): Recursive base/Nerd casks, Symbols Only Nerd Font,
   Noto Color Emoji, plus RecMonoBaker/RecMonoSt.Helens TTFs downloaded from
   `MOSconfig/recursive-code-config` releases into `~/Library/Fonts`.

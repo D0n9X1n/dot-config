@@ -72,9 +72,10 @@ set -u
 #   L3: integrations — mcp, skills, agents, style
 #   L4: cwd path     — full directory path
 #   L5: repo + git   — repo, diff, branch, stash, worktree
-#   Bottom: active subagents — root + one line per live Agent/Task
+#   Bottom: separator + active subagents — root + one line per live Agent/Task
 SEGMENTS="time timer cost waka \n model effort ctx \n mcp skills agent subagents style \n path \n git branch diff stash worktree"
 SEP=' │ '
+SUBAGENT_SEPARATOR='----------------------------------------'
 
 ICONS_ON=1
 [ -n "${CLAUDE_STATUSLINE_NO_ICONS:-}" ] && ICONS_ON=0
@@ -128,6 +129,8 @@ ICON_GH=$'\xef\x82\x9b'
 ICON_WAKA=$'\xef\x84\x9c'
 ICON_SKILLS=$'\xef\x82\xae'
 ICON_MCP=$'\xef\x87\xa6'
+# U+F015 home            = EF 80 95   Main (root) row
+ICON_SUBAGENT_ROOT=$'\xef\x80\x95'
 # U+F0C0 users           = EF 83 80   Running subagents
 ICON_SUBAGENT=$'\xef\x83\x80'
 
@@ -217,6 +220,7 @@ f126|${ICON_BRANCH}|Branch
 f187|${ICON_STASH}|Stash
 f1ae|${ICON_VENV}|Venv
 f09b|${ICON_GH}|GH
+f015|${ICON_SUBAGENT_ROOT}|Main
 TEST_ICONS_EOF
   exit 0
 fi
@@ -882,7 +886,7 @@ format_subagent_rows() {
     *) root=1 ;;
   esac
   if [ "$root" = 1 ]; then
-    out="${C_GREEN}●${C_RESET} ${C_FG}main${C_RESET}"
+    out="${C_GREEN}${ICON_SUBAGENT_ROOT}${C_RESET} ${C_FG}main${C_RESET}"
   fi
 
   while IFS=$'\t' read -r name purpose; do
@@ -934,7 +938,7 @@ render_subagents() {
       ($c.content | tostring | contains("Async agent launched successfully"));
 
     reduce inputs as $o ({agents:{}, order:[]};
-      (text_content($o)) as $txt
+      ($o | text_content) as $txt
       | (if ($txt | contains("<task-notification>") and contains("<tool-use-id>")) then
           ($txt | capture("<tool-use-id>(?<id>[^<]+)</tool-use-id>")? // {}) as $m
           | if (($m.id // "") != "" and ($txt | test("<status>(completed|failed|cancelled)</status>"))) then
@@ -1002,7 +1006,7 @@ for s in $SEGMENTS; do
 done
 
 __SUBAGENTS="$(render_subagents 2>/dev/null || true)"
-[ -n "$__SUBAGENTS" ] && out="${out}"$'\n'"${__SUBAGENTS}"
+[ -n "$__SUBAGENTS" ] && out="${out}"$'\n'"${C_DIM}${SUBAGENT_SEPARATOR}${C_RESET}"$'\n'"${__SUBAGENTS}"
 
 i=0
 while [ "$i" -lt "$PAD_TOP" ]; do

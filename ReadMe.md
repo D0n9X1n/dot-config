@@ -28,6 +28,7 @@ dot-configs/
 ├── copilot/                     # contents -> ~/.copilot/
 │   ├── settings.json            # Copilot CLI settings
 │   ├── statusline.sh            # statusline (bash 3.2+)
+│   ├── subagent-state.sh        # hook-maintained live subagent rows
 │   ├── cleanup-legacy.sh        # prune stale Copilot CLI upgrade payloads
 │   └── copilot-instructions.md  # global agent instructions
 ├── claude/                      # contents -> ~/.claude/
@@ -515,9 +516,9 @@ Plugins (managed by **TPM** — bootstrap is automatic on first run, both via
 
 ### Copilot CLI (`copilot/`)
 
-Files in `copilot/` are linked into `~/.copilot/`. `install.sh` skips this
-step (with a warning) if `~/.copilot/` does not exist (Copilot CLI not
-installed).
+Files in `copilot/` are linked into `~/.copilot/`. `install.sh` creates the
+destination directory when missing, preserves executable bits on shell scripts,
+and then runs `cleanup-legacy.sh` when the Copilot CLI is available.
 
 #### `settings.json`
 
@@ -525,7 +526,10 @@ Copilot CLI configuration. Pinned model `gpt-5.5`,
 `contextTier: long_context` (1M context), `effortLevel: xhigh`, theme `dark`,
 `keepAlive: busy`,
 `continueOnAutoMode: true`, custom footer, and a custom status line provided
-by `statusline.sh`.
+by `statusline.sh`. The `hooks` block wires `sessionStart`, `sessionEnd`,
+`subagentStart`, and `subagentStop` to `~/.copilot/subagent-state.sh` so live
+subagent rows are maintained without scanning the session event log on every
+statusline redraw.
 
 > **Caveat:** Copilot CLI rewrites `settings.json` at runtime to inject /
 > strip a `staff` field and to toggle UI defaults — edit it via atomic
@@ -553,6 +557,8 @@ Environment overrides:
   override per-side padding (defaults: top = 0, left = 0, right = 0).
 - `COPILOT_STATUSLINE_SEGMENTS="…"` — override the segment list and order
   (e.g. add `diff`, drop `cache_pct`, reorder freely).
+- `COPILOT_STATUSLINE_SUBAGENT_STATE_DIR=dir` — override the hook-maintained
+  subagent rows directory (defaults to `$TMPDIR/copilot-subagents-$USER`).
 
 Run `~/.copilot/statusline.sh --test` to verify each codepoint renders in
 your terminal (uses `fc-list` if installed). Parses Copilot's session JSON
@@ -579,10 +585,22 @@ from stdin via a single `jq` call, caches git state for 5s
 > skill bundles (`SKILL.md` under `~/.copilot/skills/`, `~/.agents/skills/`,
 > `<cwd>/.github/skills/`, `<cwd>/.claude/skills/`, and
 > `<cwd>/.agents/skills/`) — i.e. **available definitions**, not live
-> sub-agents. `seg_subagents` shows the live running-subagent count.
-> `seg_timer` shows `Nh Mm` once the session crosses one hour (v0.13.2).
+> sub-agents. `seg_subagents` shows the live running-subagent count. When
+> active subagent rows are shown below L5, they are preceded by a
+> `----------------------------------------` separator. Those rows come from
+> `subagent-state.sh`'s small per-session rows file, not a per-redraw
+> `events.jsonl` tail scan. `seg_timer` shows `Nh Mm` once the session crosses
+> one hour (v0.13.2).
 > Override per-shell via
 > `COPILOT_STATUSLINE_SEGMENTS`.
+
+#### `subagent-state.sh`
+
+Executable Copilot hook helper. `sessionStart` / `sessionEnd` reset the
+per-session rows file; `subagentStart` appends `agentDisplayName`, purpose, and
+start time; `subagentStop` removes the oldest matching agent row. Copilot's hook
+payload does not include `toolCallId`, so matching is FIFO by agent name/display
+name.
 
 #### `cleanup-legacy.sh`
 
@@ -680,6 +698,14 @@ Defaults pinned globally (synced across machines via this repo):
   (so it tracks the WezTerm Gruvbox scheme rather than hard-coding its
   own colors).
 
+#### `statusline.sh`
+
+Executable Claude Code statusline with the same five-line layout as the Copilot
+statusline. Active subagent rows render below L5 after a
+`----------------------------------------` separator; the root row uses the
+home icon, and live Agent/Task rows continue to come from Claude's
+hook-maintained per-session counter/transcript fallback path.
+
 #### Wrappers (`oh-my-zsh-custom/claude.zsh`, `cc.zsh`)
 
 Bare `claude` is wrapped as a shell function that always passes
@@ -733,6 +759,9 @@ safe user-scope MCP import from Copilot's MCP file.
 - [`copilot-relay`](https://www.npmjs.com/package/copilot-relay) — installed as
   an npm global; `install.sh` configures and starts the launchd proxy on port
   4142
+- [`@geeknees/copilot-cli-wakatime`](https://github.com/geeknees/copilot-cli-wakatime)
+  — installed as an npm global; handles Copilot CLI activity upload through
+  `.github/hooks/wakatime.json`
 - [`gh`](https://cli.github.com/) — optional; `statusline.sh` calls
   `gh auth status` (cached 5 minutes) to render the GH segment
 
@@ -744,6 +773,8 @@ safe user-scope MCP import from Copilot's MCP file.
 - [Node.js](https://nodejs.org/) / npm — installed via Homebrew for the npm
   global CLIs
 - [`jq`](https://jqlang.github.io/jq/) — used to merge MCP config
+- [`wakatime-cli`](https://wakatime.com/wakatime-cli) — installed via Homebrew;
+  used by the statusline WakaTime segment and Copilot CLI upload hook
 - [tmux](https://github.com/tmux/tmux) ≥ 3.3 (3.6a tested) — primary tab,
   split, and session manager. TPM and listed plugins bootstrap automatically
   on first launch.

@@ -37,7 +37,7 @@
 #   L3: integrations — mcp, skills, agents, style
 #   L4: cwd path     — full directory path
 #   L5: repo + git   — repo, branch, diff, stash, worktree
-#   Bottom: active subagents — root + one line per live task subagent
+#   Bottom: separator + active subagents — root + one line per live task subagent
 #           each row shows: agent name, purpose, and running time
 #
 # Additional Copilot-only segments remain available via
@@ -55,6 +55,7 @@
 #   COPILOT_STATUSLINE_SEGMENTS="…" override the segment list (and order)
 #   COPILOT_STATUSLINE_MAX_SUBAGENTS=N max active subagent rows (default 8)
 #   COPILOT_STATUSLINE_SUBAGENT_ROOT=0 hide the "main" root row
+#   COPILOT_STATUSLINE_SUBAGENT_STATE_DIR=dir override hook state dir
 #
 # Quick check that all icons render in your terminal:
 #     ~/.copilot/statusline.sh --test
@@ -71,6 +72,7 @@ set -u
 # when off.
 SEGMENTS="${COPILOT_STATUSLINE_SEGMENTS:-time timer premium waka \n model effort ctx \n mcp skills agent subagents style \n path \n git branch diff stash worktree}"
 SEP=' │ '
+SUBAGENT_SEPARATOR='----------------------------------------'
 
 ICONS_ON=1
 [ -n "${COPILOT_STATUSLINE_NO_ICONS:-}" ] && ICONS_ON=0
@@ -130,9 +132,9 @@ ICON_SKILLS=$'\xef\x82\xae'
 ICON_EXT=$'\xef\x82\xae'
 ICON_MCP=$'\xef\x87\xa6'
 # U+F085 cogs             = EF 82 85   Mode
-# U+F111 circle           = EF 84 91   Main (root) row
+# U+F015 home             = EF 80 95   Main (root) row
 # U+F135 rocket           = EF 84 B5   Active subagent row
-ICON_SUBAGENT_ROOT=$'\xef\x84\x91'
+ICON_SUBAGENT_ROOT=$'\xef\x80\x95'
 ICON_SUBAGENT=$'\xef\x84\xb5'
 ICON_MODE=$'\xef\x82\x85'
 
@@ -220,7 +222,7 @@ f11c|${ICON_WAKA}|WakaTime
 f0ae|${ICON_SKILLS}|Skills
 f0ae|${ICON_EXT}|Ext
 f1e6|${ICON_MCP}|MCP
-f111|${ICON_SUBAGENT_ROOT}|Main
+f015|${ICON_SUBAGENT_ROOT}|Main
 f135|${ICON_SUBAGENT}|SubAgent
 TEST_ICONS_EOF
   exit 0
@@ -1020,118 +1022,38 @@ EOF
 }
 
 render_subagents() {
-  [ -n "$transcript_path" ] || return 0
-  [ -f "$transcript_path" ] || return 0
-  command -v jq >/dev/null 2>&1 || return 0
+  [ -n "$session_id" ] || return 0
 
-  local max tail_lines key cf sig cached_sig rows block cached_block cached_line
+  local max state_dir key state_file now rows block name purpose started elapsed count us
   max="$(statusline_int_or_default "${COPILOT_STATUSLINE_MAX_SUBAGENTS:-${STATUSLINE_MAX_SUBAGENTS:-8}}" 8)"
   [ "$max" -gt 0 ] 2>/dev/null || return 0
-  tail_lines="$(statusline_int_or_default "${COPILOT_STATUSLINE_SUBAGENT_TAIL:-${STATUSLINE_SUBAGENT_TAIL:-4000}}" 4000)"
-  if [ -n "$session_id" ]; then
-    key="$session_id"
-  else
-    key="$(printf '%s' "$transcript_path" | cksum)"
-    key="${key%% *}"
-  fi
-  cf="$CACHE_DIR/subagents-${key}"
-  sig="$(statusline_file_sig "$transcript_path")"
 
-  if [ -f "$cf" ]; then
-    {
-      IFS= read -r cached_sig || cached_sig=""
-      if [ "$cached_sig" = "$sig" ]; then
-        cached_block=""
-        while IFS= read -r cached_line; do
-          [ -n "$cached_block" ] && cached_block="${cached_block}"$'\n'
-          cached_block="${cached_block}${cached_line}"
-        done
-        printf '%s' "$cached_block"
-        return 0
-      fi
-    } <"$cf" 2>/dev/null || true
-  fi
+  state_dir="${COPILOT_STATUSLINE_SUBAGENT_STATE_DIR:-${TMPDIR:-/tmp}/copilot-subagents-${USER:-default}}"
+  key="$(printf '%s' "$session_id" | cksum)"
+  key="${key%% *}"
+  state_file="${state_dir}/${key}.rows"
+  [ -r "$state_file" ] || return 0
 
-  rows="$(tail -n "$tail_lines" "$transcript_path" 2>/dev/null | jq -n -r --argjson max "$max" '
-    def clean:
-      tostring
-      | gsub("[\r\n\t]+"; " ")
-      | gsub("  +"; " ")
-      | sub("^ +"; "")
-      | sub(" +$"; "")
-      | .[0:140];
-    def argobj($v):
-      if ($v | type) == "object" then $v
-      elif ($v | type) == "string" then ($v | fromjson? // {})
-      else {} end;
-    def remember($id; $name; $purpose; $started; $ts):
-      if ($id // "") == "" then .
-      else
-        .agents[$id] = ((.agents[$id] // {name:"agent", purpose:"", started:false, done:false, started_at:null, has_subagent:false}) + {
-          name: (if (($name // "") | clean) == "" then ((.agents[$id].name // "agent") | clean) else (($name // "") | clean) end),
-          purpose: (if (($purpose // "") | clean) == "" then ((.agents[$id].purpose // "") | clean) else (($purpose // "") | clean) end),
-          started: (((.agents[$id].started // false) or $started) // false),
-          started_at: (if .agents[$id].started_at then .agents[$id].started_at elif ($ts // "") != "" then $ts else null end)
-        })
-        | if (.order | index($id)) then . else .order += [$id] end
-      end;
-    def done($id):
-      if (($id // "") != "" and .agents[$id]) then .agents[$id].done = true else . end;
+  now="$(date +%s 2>/dev/null || printf '0')"
+  rows=""
+  count=0
+  us=$'\037'
+  while IFS=$'\037' read -r name purpose started; do
+    [ -n "$name$purpose" ] || continue
+    case "${started:-}" in
+      '' | *[!0-9]*) elapsed=0 ;;
+      *)
+        elapsed=$((now - started))
+        [ "$elapsed" -lt 0 ] && elapsed=0
+        ;;
+    esac
+    [ -n "$rows" ] && rows="${rows}"$'\n'
+    rows="${rows}${name}${us}${purpose}${us}${elapsed}"
+    count=$((count + 1))
+    [ "$count" -ge "$max" ] && break
+  done <"$state_file"
 
-    reduce inputs as $o ({agents:{}, order:[]};
-      ($o.timestamp // $o.ts // $o.data.timestamp // "") as $evt_ts
-      | reduce (($o.data.toolRequests? // [])[]) as $r (.;
-        if ($r.name == "task") then
-          (argobj($r.arguments)) as $a
-          | remember(
-              ($r.id // $r.toolCallId // $r.tool_call_id // "");
-              ($a.agent_type // $a.agentType // $a.name // "agent");
-              ($a.description // "");
-              true;
-              $evt_ts
-            )
-        else . end
-      )
-      | if ($o.type == "tool.execution_start" and $o.data.toolName == "task") then
-          (argobj($o.data.arguments)) as $a
-          | remember(
-              ($o.data.toolCallId // "");
-              ($a.agent_type // $a.agentType // $a.name // "agent");
-              ($a.description // "");
-              true;
-              $evt_ts
-            )
-        elif ($o.type == "subagent.started") then
-          ($o.data.toolCallId // "") as $id
-          | remember(
-              $id;
-              ($o.data.agentName // $o.data.agentDisplayName // "agent");
-              (.agents[$id].purpose // $o.data.agentDescription // "");
-              true;
-              $evt_ts
-            )
-          | .agents[$id].has_subagent = true
-        elif ($o.type | test("^subagent\\.(completed|failed|cancelled)$")) then
-          done($o.data.toolCallId // "")
-        elif ($o.type == "tool.execution_complete") then
-          # For task tools, tool.execution_complete fires immediately (before
-          # subagent.started even arrives) and just means "tool call returned".
-          # The real lifecycle is tracked by subagent.completed/failed/cancelled
-          # above, so we skip tool.execution_complete for any agent we track.
-          .
-        else . end
-    )
-    | [ .order[] as $id | .agents[$id] | select(. != null and (.started // false) and (.done | not)) ]
-    | .[:$max][]
-    | (if .started_at then
-        (.started_at | sub("\\.[0-9]+"; "") | try fromdate catch 0) as $ts
-        | if $ts > 0 then ((now - $ts) | floor | if . < 0 then 0 else . end) else 0 end
-       else 0 end) as $elapsed
-    | [.name, .purpose, ($elapsed | tostring)]
-    | join("\u001f")
-  ' 2>/dev/null)"
   block="$(format_subagent_rows "$rows")"
-  { printf '%s\n' "$sig"; printf '%s' "$block"; } >"$cf" 2>/dev/null || true
   printf '%s' "$block"
 }
 
@@ -1141,10 +1063,8 @@ render_subagents() {
 # segment re-reading the git cache in its own subshell.
 load_git_state
 
-# Pre-compute subagent data so seg_subagents (inline count) and the bottom
-# rows share a single jq pass. render_subagents runs in a subshell, so we
-# can't rely on it setting globals. Instead, call it, then count the output
-# lines (minus the "main" root line).
+# Pre-compute hook-maintained subagent rows so seg_subagents (inline count)
+# and the bottom rows agree without scanning the session event log.
 __SUBAGENT_BLOCK="$(render_subagents 2>/dev/null || true)"
 __SUBAGENT_COUNT=0
 if [ -n "$__SUBAGENT_BLOCK" ]; then
@@ -1179,7 +1099,7 @@ for s in $SEGMENTS; do
   fi
 done
 
-[ -n "$__SUBAGENT_BLOCK" ] && out="${out}"$'\n'"${__SUBAGENT_BLOCK}"
+[ -n "$__SUBAGENT_BLOCK" ] && out="${out}"$'\n'"${C_DIM}${SUBAGENT_SEPARATOR}${C_RESET}"$'\n'"${__SUBAGENT_BLOCK}"
 
 # Emit top padding via dedicated printfs — $(...) command substitution
 # strips trailing newlines, which would silently drop PAD_TOP entirely.

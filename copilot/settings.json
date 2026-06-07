@@ -30,6 +30,36 @@
     "type": "command",
     "command": "~/.copilot/statusline.sh"
   },
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "~/.copilot/subagent-state.sh reset",
+        "timeoutSec": 2
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "bash": "~/.copilot/subagent-state.sh reset",
+        "timeoutSec": 2
+      }
+    ],
+    "subagentStart": [
+      {
+        "type": "command",
+        "bash": "~/.copilot/subagent-state.sh start",
+        "timeoutSec": 2
+      }
+    ],
+    "subagentStop": [
+      {
+        "type": "command",
+        "bash": "~/.copilot/subagent-state.sh stop",
+        "timeoutSec": 2
+      }
+    ]
+  },
   "ide": {
     "autoConnect": true,
     "openDiffOnEdit": true
