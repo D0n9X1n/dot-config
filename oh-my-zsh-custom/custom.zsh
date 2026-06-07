@@ -84,7 +84,10 @@ if type brew &>/dev/null; then
     local -a insecure_dirs
 
     autoload -Uz compaudit
-    insecure_dirs=("${(@f)$(compaudit 2>/dev/null)}")
+    insecure_dirs=()
+    while IFS= read -r dir; do
+      insecure_dirs+=("$dir")
+    done < <(compaudit 2>/dev/null)
     for dir in "${insecure_dirs[@]}"; do
       [[ -n "$dir" && -e "$dir" ]] || continue
       chmod go-w "$dir" 2>/dev/null || true
