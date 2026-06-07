@@ -837,44 +837,43 @@ if [ -d "$claude_src" ]; then
   wm_src="${src_dir}/wakatime-mcp"
   wm_dest="${HOME}/.local/share/wakatime-mcp"
   wm_cfg="${HOME}/.wakatime.cfg"
-  if [ -d "$wm_src" ] && have_cmd python3; then
-    wm_key="$(ensure_wakatime_cfg_api_key "$wm_cfg" || true)"
-    if [ -z "$wm_key" ]; then
-      echo "wakatime-mcp: no API key available — skipping registration"
+  if [ -d "$wm_src" ]; then
+    # requirements.txt pins mcp>=1.26, which needs Python >=3.10.
+    # macOS's Xcode python3 is 3.9.x, so resolve a new-enough interpreter
+    # (Homebrew python3.1x) rather than whatever bare python3 points at.
+    wm_py="$(find_python 3 10 || true)"
+    if [ -z "$wm_py" ]; then
+      echo "Warning: wakatime-mcp needs Python >=3.10 but none was found — skipping"
     else
-        # requirements.txt pins mcp>=1.26, which needs Python >=3.10.
-        # macOS's Xcode python3 is 3.9.x, so resolve a new-enough interpreter
-        # (Homebrew python3.1x) rather than whatever bare python3 points at.
-        wm_py="$(find_python 3 10 || true)"
-        if [ -z "$wm_py" ]; then
-          echo "Warning: wakatime-mcp needs Python >=3.10 but none was found — skipping"
+      wm_key="$(ensure_wakatime_cfg_api_key "$wm_cfg" || true)"
+      if [ -z "$wm_key" ]; then
+        echo "wakatime-mcp: no API key available — skipping registration"
+      else
+        mkdir -p "$wm_dest"
+        cp "$wm_src/server.py" "$wm_src/wakatime_client.py" "$wm_dest/"
+        # Discard a venv built with too-old a Python (e.g. a prior run that
+        # used Xcode's 3.9.6); it can't satisfy requirements.txt and pip
+        # would fail. Rebuilding is cheap and idempotent.
+        if [ -d "$wm_dest/venv" ] \
+          && ! "$wm_dest/venv/bin/python3" -c \
+               "import sys; sys.exit(0 if sys.version_info[:2] >= (3, 10) else 1)" \
+               >/dev/null 2>&1; then
+          echo "wakatime-mcp: existing venv has Python <3.10 — rebuilding"
+          rm -rf "$wm_dest/venv"
+        fi
+        if [ ! -d "$wm_dest/venv" ]; then
+          echo "wakatime-mcp: bootstrapping venv at $wm_dest/venv (one-time, ~30s)"
+          "$wm_py" -m venv "$wm_dest/venv" \
+            && "$wm_dest/venv/bin/pip" install --upgrade pip \
+            && "$wm_dest/venv/bin/pip" install -r "$wm_src/requirements.txt" \
+            && echo "wakatime-mcp: venv ready" \
+            || echo "Warning: wakatime-mcp venv bootstrap failed"
         else
-          mkdir -p "$wm_dest"
-          cp "$wm_src/server.py" "$wm_src/wakatime_client.py" "$wm_dest/"
-          # Discard a venv built with too-old a Python (e.g. a prior run that
-          # used Xcode's 3.9.6); it can't satisfy requirements.txt and pip
-          # would fail. Rebuilding is cheap and idempotent.
-          if [ -d "$wm_dest/venv" ] \
-            && ! "$wm_dest/venv/bin/python3" -c \
-                 "import sys; sys.exit(0 if sys.version_info[:2] >= (3, 10) else 1)" \
-                 >/dev/null 2>&1; then
-            echo "wakatime-mcp: existing venv has Python <3.10 — rebuilding"
-            rm -rf "$wm_dest/venv"
-          fi
-          if [ ! -d "$wm_dest/venv" ]; then
-            echo "wakatime-mcp: bootstrapping venv at $wm_dest/venv (one-time, ~30s)"
-            "$wm_py" -m venv "$wm_dest/venv" \
-              && "$wm_dest/venv/bin/pip" install --upgrade pip \
-              && "$wm_dest/venv/bin/pip" install -r "$wm_src/requirements.txt" \
-              && echo "wakatime-mcp: venv ready" \
-              || echo "Warning: wakatime-mcp venv bootstrap failed"
-          else
-            # Refresh deps quietly only if requirements.txt is newer than
-            # the venv's marker. Cheap mtime check; pip itself is idempotent.
-            if [ "$wm_src/requirements.txt" -nt "$wm_dest/venv/pyvenv.cfg" ]; then
-              "$wm_dest/venv/bin/pip" install -r "$wm_src/requirements.txt" \
-                && touch "$wm_dest/venv/pyvenv.cfg"
-            fi
+          # Refresh deps quietly only if requirements.txt is newer than
+          # the venv's marker. Cheap mtime check; pip itself is idempotent.
+          if [ "$wm_src/requirements.txt" -nt "$wm_dest/venv/pyvenv.cfg" ]; then
+            "$wm_dest/venv/bin/pip" install -r "$wm_src/requirements.txt" \
+              && touch "$wm_dest/venv/pyvenv.cfg"
           fi
         fi
         # Register the MCP entry into the user's per-machine mcp.json so
@@ -897,6 +896,7 @@ if [ -d "$claude_src" ]; then
             && echo "wakatime-mcp: registered in $copilot_mcp_pre" \
             || { rm -f "$tmp_mcp"; echo "Warning: wakatime-mcp jq registration failed"; }
         fi
+      fi
     fi
   fi
 
