@@ -81,23 +81,20 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
 
 - **Bump version + tag**. We use semver-ish tags (`v0.X.Y`); patch for
   bugfixes, minor for new features, major for breaking changes.
-  Existing history: v0.1.0 → v0.17.0. Pushing a `v*.*.*` tag triggers
-  `.github/workflows/release.yml`, which publishes a GitHub Release
-  with auto-generated notes.
+  Pushing a `v*.*.*` tag triggers `.github/workflows/release.yml`, which
+  publishes a GitHub Release whose body is the commit-subject list between
+  the new tag and the previous reachable `v*.*.*` tag.
 - **Update QUICKREF.md** when behavior changes — the agent-facing brief
   must stay accurate.
 - **Update ReadMe.md** when user-visible details change.
-- **Run smoke tests on macOS** (the supported target):
+- **Run local/CI parity checks**:
 
   ```bash
-  bash -n install.sh
-  echo '{}' | ~/.claude/statusline.sh
-  echo '{"model":{"display_name":"Claude (xhigh)"}}' | ~/.copilot/statusline.sh
+  scripts/check.sh all
   ```
 
-  All three should succeed silently / print colored output. CI
-  (`.github/workflows/ci.yml`) runs the same checks on macOS plus
-  `shellcheck -S error` on Ubuntu for every push/PR.
+  CI runs the same script: macOS uses `scripts/check.sh smoke`; Ubuntu
+  installs ShellCheck and runs `scripts/check.sh shellcheck`.
 
 ## Things that have bitten us
 

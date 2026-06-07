@@ -9,8 +9,9 @@ details change.
 ## Architecture
 
 This is a dotfiles repository using a symlink-based linker pattern. `install.sh`
-symlinks every **top-level dotfile** (files starting with `.`) into `$HOME`.
-Directories and nested files are never linked.
+symlinks every **top-level non-ignored dotfile** (files starting with `.`) into
+`$HOME`. Directories, nested files, and gitignored generated files are never
+linked.
 
 Adding a new config means dropping a dotfile at the repo root — `install.sh`
 picks it up automatically with no manifest to update.
@@ -40,7 +41,9 @@ links.
 
 There is no automated test suite. To verify:
 
-- **install.sh**: Run `bash -n install.sh` for syntax checking, then test in a
-  throwaway directory with `HOME=/tmp/test-home ./install.sh`.
+- **Shell/install/statusline changes**: Run `scripts/check.sh all`.
+- **install.sh behavior**: After `scripts/check.sh all`, test in a throwaway
+  directory with `HOME=/tmp/test-home ./install.sh` when the change affects
+  linking/bootstrap behavior.
 - **.wezterm.lua**: Open WezTerm — it live-reloads on save. Check the debug
   overlay (`Ctrl+Shift+L`) for Lua errors.

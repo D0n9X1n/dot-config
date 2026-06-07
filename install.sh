@@ -146,7 +146,8 @@ fix_zsh_compaudit_permissions() {
     return 0
   fi
 
-  insecure_dirs="$(zsh -fc '
+  run_zsh_compaudit() {
+    zsh -fc '
     if command -v brew >/dev/null 2>&1; then
       brew_prefix="$(brew --prefix 2>/dev/null || true)"
       if [ -n "$brew_prefix" ] && [ -d "$brew_prefix/share/zsh-completions" ]; then
@@ -155,7 +156,10 @@ fix_zsh_compaudit_permissions() {
     fi
     autoload -Uz compaudit
     compaudit 2>/dev/null
-  ' || true)"
+    ' || true
+  }
+
+  insecure_dirs="$(run_zsh_compaudit)"
 
   if [ -z "$insecure_dirs" ]; then
     echo "zsh compaudit: completion directories are secure."
@@ -179,16 +183,7 @@ fix_zsh_compaudit_permissions() {
 $insecure_dirs
 EOF
 
-  remaining="$(zsh -fc '
-    if command -v brew >/dev/null 2>&1; then
-      brew_prefix="$(brew --prefix 2>/dev/null || true)"
-      if [ -n "$brew_prefix" ] && [ -d "$brew_prefix/share/zsh-completions" ]; then
-        fpath=("$brew_prefix/share/zsh-completions" $fpath)
-      fi
-    fi
-    autoload -Uz compaudit
-    compaudit 2>/dev/null
-  ' || true)"
+  remaining="$(run_zsh_compaudit)"
   if [ -n "$remaining" ]; then
     echo "Warning: zsh compaudit still reports insecure directories:"
     printf '%s\n' "$remaining"
@@ -570,6 +565,85 @@ ensure_copilot_wakatime_hooks() {
   fi
 }
 
+setup_wakatime_mcp() {
+  local wm_src="${src_dir}/wakatime-mcp"
+  local wm_dest="${HOME}/.local/share/wakatime-mcp"
+  local wm_cfg="${HOME}/.wakatime.cfg"
+  local copilot_mcp_pre="${HOME}/.config/github-copilot/mcp.json"
+  local wm_py=""
+  local wm_key=""
+  local tmp_mcp=""
+
+  [ -d "$wm_src" ] || return 0
+  if ! have_cmd jq; then
+    echo "Warning: wakatime-mcp registration needs jq — skipping"
+    return 0
+  fi
+
+  # requirements.txt pins mcp>=1.26, which needs Python >=3.10.
+  # macOS's Xcode python3 is 3.9.x, so resolve a new-enough interpreter
+  # (Homebrew python3.1x) rather than whatever bare python3 points at.
+  wm_py="$(find_python 3 10 || true)"
+  if [ -z "$wm_py" ]; then
+    echo "Warning: wakatime-mcp needs Python >=3.10 but none was found — skipping"
+    return 0
+  fi
+
+  wm_key="$(ensure_wakatime_cfg_api_key "$wm_cfg" || true)"
+  if [ -z "$wm_key" ]; then
+    echo "wakatime-mcp: no API key available — skipping registration"
+    return 0
+  fi
+
+  mkdir -p "$wm_dest"
+  cp "$wm_src/server.py" "$wm_src/wakatime_client.py" "$wm_dest/"
+
+  # Discard a venv built with too-old a Python (e.g. a prior run that
+  # used Xcode's 3.9.6); it can't satisfy requirements.txt and pip
+  # would fail. Rebuilding is cheap and idempotent.
+  if [ -d "$wm_dest/venv" ] \
+    && ! "$wm_dest/venv/bin/python3" -c \
+         "import sys; sys.exit(0 if sys.version_info[:2] >= (3, 10) else 1)" \
+         >/dev/null 2>&1; then
+    echo "wakatime-mcp: existing venv has Python <3.10 — rebuilding"
+    rm -rf "$wm_dest/venv"
+  fi
+
+  if [ ! -d "$wm_dest/venv" ]; then
+    echo "wakatime-mcp: bootstrapping venv at $wm_dest/venv (one-time, ~30s)"
+    "$wm_py" -m venv "$wm_dest/venv" \
+      && "$wm_dest/venv/bin/pip" install --upgrade pip \
+      && "$wm_dest/venv/bin/pip" install -r "$wm_src/requirements.txt" \
+      && echo "wakatime-mcp: venv ready" \
+      || echo "Warning: wakatime-mcp venv bootstrap failed"
+  elif [ "$wm_src/requirements.txt" -nt "$wm_dest/venv/pyvenv.cfg" ]; then
+    # Refresh deps quietly only if requirements.txt is newer than the venv's
+    # marker. Cheap mtime check; pip itself is idempotent.
+    "$wm_dest/venv/bin/pip" install -r "$wm_src/requirements.txt" \
+      && touch "$wm_dest/venv/pyvenv.cfg"
+  fi
+
+  [ -d "$wm_dest/venv" ] || return 0
+
+  mkdir -p "$(dirname "$copilot_mcp_pre")"
+  [ -f "$copilot_mcp_pre" ] || printf '{"mcpServers":{}}\n' >"$copilot_mcp_pre"
+
+  tmp_mcp="$(mktemp)"
+  jq --arg cmd "$wm_dest/venv/bin/python3" \
+     --arg srv "$wm_dest/server.py" \
+     --arg key "$wm_key" \
+     --arg pp  "$wm_dest" \
+    '.mcpServers.wakatime = {
+        type: "stdio",
+        command: $cmd,
+        args: [$srv],
+        env: { WAKATIME_API_KEY: $key, PYTHONPATH: $pp }
+      }' "$copilot_mcp_pre" >"$tmp_mcp" \
+    && mv "$tmp_mcp" "$copilot_mcp_pre" \
+    && echo "wakatime-mcp: registered in $copilot_mcp_pre" \
+    || { rm -f "$tmp_mcp"; echo "Warning: wakatime-mcp jq registration failed"; }
+}
+
 configure_copilot_relay() {
   local relay_dir="${HOME}/.copilot-relay"
   local relay_config="${relay_dir}/config.yaml"
@@ -679,6 +753,60 @@ link_file() {
   ln -s "$src" "$dest"
 }
 
+should_link_dotfile() {
+  local src="$1"
+  local rel="${src#${src_dir}/}"
+
+  if have_cmd git && [ -d "${src_dir}/.git" ] && git -C "$src_dir" check-ignore -q -- "$rel"; then
+    echo "Skipping ignored top-level dotfile: $rel"
+    return 1
+  fi
+  return 0
+}
+
+render_launchd_template() {
+  local template="$1"
+  local dest="$2"
+
+  mkdir -p "$(dirname "$dest")"
+  mkdir -p "${HOME}/Library/Logs"
+  sed -e "s|__HOME__|${HOME}|g" -e "s|__SRC_DIR__|${src_dir}|g" "$template" >"$dest"
+  echo "Wrote $dest"
+}
+
+bootstrap_launchd_agent() {
+  local uid="$1"
+  local label="$2"
+  local plist="$3"
+  local restart_suffix="${4:-}"
+  local attempt loaded=0
+
+  if launchctl print "gui/${uid}/${label}" >/dev/null 2>&1; then
+    echo "Restarting launchd agent ${label}${restart_suffix}."
+  else
+    echo "Starting launchd agent ${label}."
+  fi
+
+  launchctl bootout "gui/${uid}/${label}" 2>/dev/null || true
+  for attempt in 1 2 3 4 5; do
+    if ! launchctl print "gui/${uid}/${label}" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+  done
+
+  for attempt in 1 2 3 4 5; do
+    if log_command launchctl bootstrap "gui/${uid}" "$plist"; then
+      loaded=1
+      break
+    fi
+    echo "Warning: launchctl bootstrap attempt ${attempt}/5 failed for ${label}"
+    sleep 1
+  done
+
+  [ "$loaded" = "1" ]
+}
+
 if is_macos; then
   if [ "${SKIP_BREW:-0}" = "1" ]; then
     echo "Skipping Homebrew step (SKIP_BREW=1)."
@@ -703,6 +831,7 @@ fi
 # Top-level dotfiles (.tmux.conf etc.).
 while IFS= read -r -d '' entry; do
   base="$(basename "$entry")"
+  should_link_dotfile "$entry" || continue
   link_file "$entry" "${dest_dir}/${base}"
 done < <(find "$src_dir" -maxdepth 1 -mindepth 1 -name ".*" -type f -print0)
 
@@ -825,80 +954,9 @@ if [ -d "$claude_src" ]; then
     fi
   fi
 
-  # wakatime-mcp: vendored Python MCP server (server.py + wakatime_client.py
-  # under wakatime-mcp/ in this repo). Bootstrap a venv at the canonical
-  # ~/.local/share/wakatime-mcp location and register an mcpServers entry
-  # pointing at it. Idempotent — venv is reused if already present;
-  # requirements.txt drives pip install (no-op when nothing changed).
-  #
-  # If ~/.wakatime.cfg has no api_key, prompt twice on /dev/tty and write it
-  # locally. The key is never printed; only the per-machine MCP config receives
-  # it as WAKATIME_API_KEY.
-  wm_src="${src_dir}/wakatime-mcp"
-  wm_dest="${HOME}/.local/share/wakatime-mcp"
-  wm_cfg="${HOME}/.wakatime.cfg"
-  if [ -d "$wm_src" ]; then
-    # requirements.txt pins mcp>=1.26, which needs Python >=3.10.
-    # macOS's Xcode python3 is 3.9.x, so resolve a new-enough interpreter
-    # (Homebrew python3.1x) rather than whatever bare python3 points at.
-    wm_py="$(find_python 3 10 || true)"
-    if [ -z "$wm_py" ]; then
-      echo "Warning: wakatime-mcp needs Python >=3.10 but none was found — skipping"
-    else
-      wm_key="$(ensure_wakatime_cfg_api_key "$wm_cfg" || true)"
-      if [ -z "$wm_key" ]; then
-        echo "wakatime-mcp: no API key available — skipping registration"
-      else
-        mkdir -p "$wm_dest"
-        cp "$wm_src/server.py" "$wm_src/wakatime_client.py" "$wm_dest/"
-        # Discard a venv built with too-old a Python (e.g. a prior run that
-        # used Xcode's 3.9.6); it can't satisfy requirements.txt and pip
-        # would fail. Rebuilding is cheap and idempotent.
-        if [ -d "$wm_dest/venv" ] \
-          && ! "$wm_dest/venv/bin/python3" -c \
-               "import sys; sys.exit(0 if sys.version_info[:2] >= (3, 10) else 1)" \
-               >/dev/null 2>&1; then
-          echo "wakatime-mcp: existing venv has Python <3.10 — rebuilding"
-          rm -rf "$wm_dest/venv"
-        fi
-        if [ ! -d "$wm_dest/venv" ]; then
-          echo "wakatime-mcp: bootstrapping venv at $wm_dest/venv (one-time, ~30s)"
-          "$wm_py" -m venv "$wm_dest/venv" \
-            && "$wm_dest/venv/bin/pip" install --upgrade pip \
-            && "$wm_dest/venv/bin/pip" install -r "$wm_src/requirements.txt" \
-            && echo "wakatime-mcp: venv ready" \
-            || echo "Warning: wakatime-mcp venv bootstrap failed"
-        else
-          # Refresh deps quietly only if requirements.txt is newer than
-          # the venv's marker. Cheap mtime check; pip itself is idempotent.
-          if [ "$wm_src/requirements.txt" -nt "$wm_dest/venv/pyvenv.cfg" ]; then
-            "$wm_dest/venv/bin/pip" install -r "$wm_src/requirements.txt" \
-              && touch "$wm_dest/venv/pyvenv.cfg"
-          fi
-        fi
-        # Register the MCP entry into the user's per-machine mcp.json so
-        # the existing copilot->claude pipeline lifts it into ~/.claude.json.
-        # We write directly here (not via mcp-shared.json) because the
-        # entry carries the WAKATIME_API_KEY secret.
-        if [ -d "$wm_dest/venv" ]; then
-          tmp_mcp="$(mktemp)"
-          jq --arg cmd "$wm_dest/venv/bin/python3" \
-             --arg srv "$wm_dest/server.py" \
-             --arg key "$wm_key" \
-             --arg pp  "$wm_dest" \
-            '.mcpServers.wakatime = {
-                type: "stdio",
-                command: $cmd,
-                args: [$srv],
-                env: { WAKATIME_API_KEY: $key, PYTHONPATH: $pp }
-              }' "$copilot_mcp_pre" >"$tmp_mcp" \
-            && mv "$tmp_mcp" "$copilot_mcp_pre" \
-            && echo "wakatime-mcp: registered in $copilot_mcp_pre" \
-            || { rm -f "$tmp_mcp"; echo "Warning: wakatime-mcp jq registration failed"; }
-        fi
-      fi
-    fi
-  fi
+  # Bootstrap/register the vendored WakaTime MCP server. The helper writes
+  # only to per-machine config because the MCP entry carries WAKATIME_API_KEY.
+  setup_wakatime_mcp
 
   # Copilot CLI WakaTime upload hook. This must run after Copilot CLI,
   # wakatime-cli, copilot-cli-wakatime, and ~/.wakatime.cfg are in place.
@@ -1000,13 +1058,7 @@ if is_macos; then
         echo "Warning: copilot-relay not on PATH — skipping agent install (fix npm/global CLI install, then re-run install.sh)"
       fi
     else
-      mkdir -p "$(dirname "$launchd_dest")"
-      mkdir -p "${HOME}/Library/Logs"
-      # Render template — substitutes __HOME__ -> $HOME and __SRC_DIR__ ->
-      # this repo's absolute path. `|` is a safe sed delimiter (neither path
-      # contains it). Plain redirect (not `sed -i`) for BSD/GNU portability.
-      sed -e "s|__HOME__|${HOME}|g" -e "s|__SRC_DIR__|${src_dir}|g" "$launchd_src" > "$launchd_dest"
-      echo "Wrote $launchd_dest"
+      render_launchd_template "$launchd_src" "$launchd_dest"
 
       if [ ! -f "${HOME}/.copilot-relay/github_token" ]; then
         if launchctl print "gui/${uid}/com.d0n9x1n.copilot-relay" >/dev/null 2>&1; then
@@ -1018,39 +1070,18 @@ if is_macos; then
         # Bootstrap into the GUI domain of the current user. bootout first
         # so a content change actually replaces the running agent (load is
         # a no-op when the label already exists).
-        if launchctl print "gui/${uid}/com.d0n9x1n.copilot-relay" >/dev/null 2>&1; then
-          echo "Restarting launchd agent com.d0n9x1n.copilot-relay with the latest copilot-relay."
-        else
-          echo "Starting launchd agent com.d0n9x1n.copilot-relay."
-        fi
-        launchctl bootout "gui/${uid}/com.d0n9x1n.copilot-relay" 2>/dev/null || true
-        for attempt in 1 2 3 4 5; do
-          if ! launchctl print "gui/${uid}/com.d0n9x1n.copilot-relay" >/dev/null 2>&1; then
-            break
-          fi
-          sleep 1
-        done
-
-        loaded=0
-        for attempt in 1 2 3 4 5; do
-          if log_command launchctl bootstrap "gui/${uid}" "$launchd_dest"; then
-            loaded=1
-            break
-          fi
-          echo "Warning: launchctl bootstrap attempt ${attempt}/5 failed for com.d0n9x1n.copilot-relay"
-          sleep 1
-        done
-
-        if [ "$loaded" = "1" ]; then
+        if bootstrap_launchd_agent "$uid" "com.d0n9x1n.copilot-relay" "$launchd_dest" " with the latest copilot-relay"; then
           log_command launchctl kickstart -k "gui/${uid}/com.d0n9x1n.copilot-relay" || true
           if have_cmd curl; then
             relay_ready=0
-            for attempt in 1 2 3 4 5; do
+            attempt=1
+            while [ "$attempt" -le 20 ]; do
               if curl -sS -o /dev/null --connect-timeout 1 http://127.0.0.1:4142/ 2>/dev/null; then
                 relay_ready=1
                 break
               fi
               sleep 1
+              attempt=$((attempt + 1))
             done
             if [ "$relay_ready" = "1" ]; then
               echo "copilot-relay is running at http://127.0.0.1:4142"
@@ -1081,37 +1112,10 @@ if is_macos; then
   npmclean_script="${src_dir}/launchd/clean-npm-caches.sh"
 
   if [ -f "$npmclean_src" ] && [ -f "$npmclean_script" ]; then
-    mkdir -p "$(dirname "$npmclean_dest")"
-    mkdir -p "${HOME}/Library/Logs"
     chmod +x "$npmclean_script" 2>/dev/null || true
+    render_launchd_template "$npmclean_src" "$npmclean_dest"
 
-    sed -e "s|__HOME__|${HOME}|g" -e "s|__SRC_DIR__|${src_dir}|g" "$npmclean_src" > "$npmclean_dest"
-    echo "Wrote $npmclean_dest"
-
-    if launchctl print "gui/${uid}/com.d0n9x1n.npm-cache-clean" >/dev/null 2>&1; then
-      echo "Restarting launchd agent com.d0n9x1n.npm-cache-clean."
-    else
-      echo "Starting launchd agent com.d0n9x1n.npm-cache-clean."
-    fi
-    launchctl bootout "gui/${uid}/com.d0n9x1n.npm-cache-clean" 2>/dev/null || true
-    for attempt in 1 2 3 4 5; do
-      if ! launchctl print "gui/${uid}/com.d0n9x1n.npm-cache-clean" >/dev/null 2>&1; then
-        break
-      fi
-      sleep 1
-    done
-
-    npmclean_loaded=0
-    for attempt in 1 2 3 4 5; do
-      if log_command launchctl bootstrap "gui/${uid}" "$npmclean_dest"; then
-        npmclean_loaded=1
-        break
-      fi
-      echo "Warning: launchctl bootstrap attempt ${attempt}/5 failed for com.d0n9x1n.npm-cache-clean"
-      sleep 1
-    done
-
-    if [ "$npmclean_loaded" = "1" ]; then
+    if bootstrap_launchd_agent "$uid" "com.d0n9x1n.npm-cache-clean" "$npmclean_dest"; then
       echo "Loaded launchd agent com.d0n9x1n.npm-cache-clean (weekly Sun 03:17; logs: ~/Library/Logs/npm-cache-clean.log)"
     else
       echo "Warning: launchctl bootstrap failed for com.d0n9x1n.npm-cache-clean"

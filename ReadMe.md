@@ -43,15 +43,13 @@ dot-configs/
 │   └── clean-npm-caches.sh                 # the cleaner script the agent runs
 ├── .github/hooks/wakatime.json  # Copilot CLI -> WakaTime upload hooks
 ├── mcp-shared.json              # secret-free MCP entries synced via git
+├── scripts/check.sh             # local/CI parity checks
 ├── .claude/CLAUDE.md            # agent instructions for Claude Code working in this repo
 ├── .github/copilot-instructions.md  # agent instructions for Copilot CLI
 ├── LICENSE
 ├── ReadMe.md                    # this file
 └── QUICKREF.md                  # condensed reference (agent-friendly)
 ```
-
-`install.sh` is the only entry point (macOS-only). It uses symlinks so
-the live config tracks repo edits, and is idempotent.
 
 `install.sh` is the only entry point. It:
 
@@ -80,9 +78,9 @@ probes do not appear as errors.
 3. Installs oh-my-zsh unattended if missing (`RUNZSH=no`, `CHSH=no`), then
    fixes insecure zsh completion directory permissions so `compinit` does not
    block new shells. Set `SKIP_OH_MY_ZSH=1` to skip installation.
-4. Symlinks every **top-level** dotfile in this repo (files starting with `.`)
-   into `$HOME` (currently `.tmux.conf`, plus the existing `.gitignore` /
-   `.DS_Store` pass-through which has been there since v0.1).
+4. Symlinks every **top-level non-ignored** dotfile in this repo (files starting
+   with `.`) into `$HOME` (currently `.tmux.conf` plus `.gitignore`; ignored
+   generated files such as `.copilot-cli.ts` are skipped).
 5. Symlinks every file in `oh-my-zsh-custom/` into `~/.oh-my-zsh/custom/`.
 6. Symlinks every file in `copilot/` into `~/.copilot/`. Creates the
    destination directory if missing. Preserves the executable bit on `*.sh`
@@ -135,6 +133,12 @@ Subsequent updates on a machine:
 cd ~/Public/dot-configs && git pull
 # Re-run install.sh only if new files were added; existing symlinks need no action.
 ```
+
+## Checks
+
+Run `scripts/check.sh all` before pushing shell/statusline/install changes. CI
+uses the same script: macOS runs `scripts/check.sh smoke`, while Ubuntu installs
+ShellCheck and runs `scripts/check.sh shellcheck`.
 
 ## Releases
 
@@ -595,19 +599,18 @@ from stdin via a single `jq` call, caches git state for 5s
 > sub-agents. `seg_subagents` shows the live running-subagent count. When
 > active subagent rows are shown below L5, they are preceded by a
 > `----------------------------------------` separator. Those rows come from
-> `subagent-state.sh`'s small per-session rows file, not a per-redraw
-> `events.jsonl` tail scan. `seg_timer` shows `Nh Mm` once the session crosses
-> one hour (v0.13.2).
+> `subagent-state.sh`'s small per-session rows file first, with a
+> signature-cached `events.jsonl` fallback if hook rows are missing.
+> `seg_timer` shows `Nh Mm` once the session crosses one hour (v0.13.2).
 > Override per-shell via
 > `COPILOT_STATUSLINE_SEGMENTS`.
 
 #### `subagent-state.sh`
 
 Executable Copilot hook helper. `sessionStart` / `sessionEnd` reset the
-per-session rows file; `subagentStart` appends `agentDisplayName`, purpose, and
-start time; `subagentStop` removes the oldest matching agent row. Copilot's hook
-payload does not include `toolCallId`, so matching is FIFO by agent name/display
-name.
+per-session rows file; `subagentStart` appends `toolCallId`, `agentDisplayName`,
+purpose, and start time; `subagentStop` removes by `toolCallId` first, then
+falls back to FIFO by agent name/display name.
 
 #### `cleanup-legacy.sh`
 

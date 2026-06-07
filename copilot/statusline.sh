@@ -272,9 +272,9 @@ if [ -n "$session_json" ] && command -v jq >/dev/null 2>&1; then
     IFS= read -r ctx_size      || ctx_size=""
     IFS= read -r json_mode     || json_mode=""
   } < <(printf '%s' "$session_json" | jq -r '
-        (.session_id // ""),
+        (.session_id // .sessionId // .sessionID // .session.id // ""),
         (.session_name // ""),
-        (.transcript_path // ""),
+        (.transcript_path // .transcriptPath // ""),
         ((.model.display_name // .model.id) // ""),
         ((.workspace.current_dir // .cwd) // ""),
         (.cost.total_premium_requests // 0),
@@ -985,7 +985,7 @@ statusline_file_sig() {
 }
 
 format_subagent_rows() {
-  local rows="$1" out="" name purpose elapsed root
+  local rows="$1" out="" id name purpose elapsed root
   [ -n "$rows" ] || return 0
 
   root="${STATUSLINE_SUBAGENT_ROOT:-1}"
@@ -998,7 +998,20 @@ format_subagent_rows() {
     out="${C_GREEN}${ICON_SUBAGENT_ROOT}${C_RESET} ${C_FG}main${C_RESET}"
   fi
 
-  while IFS=$'\037' read -r name purpose elapsed; do
+  while IFS=$'\037' read -r id name purpose elapsed; do
+    # Backward compatibility for rows written before toolCallId was included:
+    # name<US>purpose<US>elapsed.
+    if [ -z "${elapsed:-}" ]; then
+      case "${purpose:-}" in
+        '' | *[!0-9]*) ;;
+        *)
+          elapsed="$purpose"
+          purpose="$name"
+          name="$id"
+          id=""
+          ;;
+      esac
+    fi
     [ -n "$name$purpose" ] || continue
     [ -n "$out" ] && out="${out}"$'\n'
     [ -n "$name" ] || name="agent"
@@ -1021,12 +1034,10 @@ EOF
   printf '%s' "$out"
 }
 
-render_subagents() {
+render_subagents_from_state() {
   [ -n "$session_id" ] || return 0
 
-  local max state_dir key state_file now rows block name purpose started elapsed count us
-  max="$(statusline_int_or_default "${COPILOT_STATUSLINE_MAX_SUBAGENTS:-${STATUSLINE_MAX_SUBAGENTS:-8}}" 8)"
-  [ "$max" -gt 0 ] 2>/dev/null || return 0
+  local max="$1" state_dir key state_file now rows block id name purpose started elapsed count us
 
   state_dir="${COPILOT_STATUSLINE_SUBAGENT_STATE_DIR:-${TMPDIR:-/tmp}/copilot-subagents-${USER:-default}}"
   key="$(printf '%s' "$session_id" | cksum)"
@@ -1038,7 +1049,18 @@ render_subagents() {
   rows=""
   count=0
   us=$'\037'
-  while IFS=$'\037' read -r name purpose started; do
+  while IFS=$'\037' read -r id name purpose started; do
+    if [ -z "${started:-}" ]; then
+      case "${purpose:-}" in
+        '' | *[!0-9]*) ;;
+        *)
+          started="$purpose"
+          purpose="$name"
+          name="$id"
+          id=""
+          ;;
+      esac
+    fi
     [ -n "$name$purpose" ] || continue
     case "${started:-}" in
       '' | *[!0-9]*) elapsed=0 ;;
@@ -1048,12 +1070,91 @@ render_subagents() {
         ;;
     esac
     [ -n "$rows" ] && rows="${rows}"$'\n'
-    rows="${rows}${name}${us}${purpose}${us}${elapsed}"
+    rows="${rows}${id}${us}${name}${us}${purpose}${us}${elapsed}"
     count=$((count + 1))
     [ "$count" -ge "$max" ] && break
   done <"$state_file"
 
   block="$(format_subagent_rows "$rows")"
+  printf '%s' "$block"
+}
+
+render_subagents_from_transcript() {
+  [ -n "$transcript_path" ] || return 0
+  [ -f "$transcript_path" ] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+
+  local max="$1" tail_lines key cf sig cached_sig rows block
+  tail_lines="$(statusline_int_or_default "${COPILOT_STATUSLINE_SUBAGENT_TAIL:-${STATUSLINE_SUBAGENT_TAIL:-4000}}" 4000)"
+  key="$(printf '%s' "$transcript_path" | cksum)"
+  key="${key%% *}"
+  cf="$CACHE_DIR/subagents-transcript-${key}"
+  sig="$(statusline_file_sig "$transcript_path")"
+
+  if [ -f "$cf" ]; then
+    IFS= read -r cached_sig <"$cf" 2>/dev/null || cached_sig=""
+    if [ "$cached_sig" = "$sig" ]; then
+      sed '1d' "$cf" 2>/dev/null || true
+      return 0
+    fi
+  fi
+
+  rows="$(tail -n "$tail_lines" "$transcript_path" 2>/dev/null | jq -n -r --argjson max "$max" '
+    def clean:
+      tostring
+      | gsub("[\r\n\t\u001f]+"; " ")
+      | gsub("  +"; " ")
+      | sub("^ +"; "")
+      | sub(" +$"; "")
+      | .[0:140];
+    def tool_id: (.data.toolCallId // .data.tool_call_id // .data.toolUseId // .data.tool_use_id // "");
+    def ts_epoch:
+      ((.timestamp // .ts // .data.timestamp // "")
+       | sub("\\.[0-9]+Z$"; "Z")
+       | try fromdateiso8601 catch 0);
+
+    reduce inputs as $o ({agents:{}, order:[]};
+      ($o.type // "") as $type
+      | if $type == "subagent.started" then
+          ($o | tool_id) as $id
+          | if $id == "" then .
+            else
+              .agents[$id] = {
+                id: $id,
+                name: (($o.data.agentDisplayName // $o.data.agentName // $o.data.agent_display_name // $o.data.agent_name // "agent") | clean),
+                purpose: (($o.data.agentDescription // $o.data.agent_description // "") | clean),
+                started: ($o | ts_epoch),
+                done: false
+              }
+              | if (.order | index($id)) then . else .order += [$id] end
+            end
+        elif ($type | test("^subagent\\.(completed|failed|cancelled|stopped)$")) then
+          ($o | tool_id) as $id
+          | if ($id != "" and .agents[$id]) then .agents[$id].done = true else . end
+        else .
+        end
+    )
+    | [ .order[] as $id | .agents[$id] | select(. != null and (.done | not)) ]
+    | .[:$max][]
+    | (.started // 0) as $started
+    | (if $started > 0 then ((now - $started) | floor | if . < 0 then 0 else . end) else 0 end) as $elapsed
+    | [.id, .name, .purpose, ($elapsed | tostring)]
+    | join("\u001f")
+  ' 2>/dev/null)"
+  block="$(format_subagent_rows "$rows")"
+  { printf '%s\n' "$sig"; printf '%s' "$block"; } >"$cf" 2>/dev/null || true
+  printf '%s' "$block"
+}
+
+render_subagents() {
+  local max block
+  max="$(statusline_int_or_default "${COPILOT_STATUSLINE_MAX_SUBAGENTS:-${STATUSLINE_MAX_SUBAGENTS:-8}}" 8)"
+  [ "$max" -gt 0 ] 2>/dev/null || return 0
+
+  block="$(render_subagents_from_state "$max" 2>/dev/null || true)"
+  if [ -z "$block" ]; then
+    block="$(render_subagents_from_transcript "$max" 2>/dev/null || true)"
+  fi
   printf '%s' "$block"
 }
 

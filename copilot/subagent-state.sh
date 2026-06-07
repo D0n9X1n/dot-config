@@ -6,8 +6,8 @@
 #   subagentStop  -> stop
 #   sessionStart/sessionEnd -> reset
 #
-# The statusline reads the tiny rows file written here instead of scanning
-# events.jsonl on every redraw.
+# The statusline reads the tiny rows file written here first; if a hook payload
+# is missed, it can fall back to a signature-cached events.jsonl scan.
 
 set -u
 
@@ -23,14 +23,19 @@ if [ ! -t 0 ]; then
 fi
 
 json_get() {
-  local expr="$1" key="$2"
+  local expr="$1"
+  shift
+  local key
   if [ -n "$payload" ] && command -v jq >/dev/null 2>&1; then
     printf '%s' "$payload" | jq -r "$expr // \"\"" 2>/dev/null
     return 0
   fi
-  if [[ "$payload" =~ \"$key\"[[:space:]]*:[[:space:]]*\"([^\"]*)\" ]]; then
-    printf '%s' "${BASH_REMATCH[1]}"
-  fi
+  for key in "$@"; do
+    if [[ "$payload" =~ \"$key\"[[:space:]]*:[[:space:]]*\"([^\"]*)\" ]]; then
+      printf '%s' "${BASH_REMATCH[1]}"
+      return 0
+    fi
+  done
 }
 
 clean_field() {
@@ -43,7 +48,7 @@ clean_field() {
   printf '%s' "$value" | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//; s/^(.{0,140}).*$/\1/'
 }
 
-session_id="$(json_get '.sessionId // .session_id' 'sessionId')"
+session_id="$(json_get '.sessionId // .session_id // .session.id // .sessionID' sessionId session_id sessionID)"
 [ -n "$session_id" ] || exit 0
 
 dir="${COPILOT_STATUSLINE_SUBAGENT_STATE_DIR:-${TMPDIR:-/tmp}/copilot-subagents-${USER:-default}}"
@@ -66,24 +71,32 @@ case "$mode" in
     rm -f "$rows" 2>/dev/null || true
     ;;
   start)
-    agent_name="$(clean_field "$(json_get '.agentName // .agent_name' 'agentName')")"
-    agent_display="$(clean_field "$(json_get '.agentDisplayName // .agent_display_name' 'agentDisplayName')")"
-    agent_description="$(clean_field "$(json_get '.agentDescription // .agent_description' 'agentDescription')")"
+    agent_name="$(clean_field "$(json_get '.agentName // .agent_name' agentName agent_name)")"
+    agent_display="$(clean_field "$(json_get '.agentDisplayName // .agent_display_name' agentDisplayName agent_display_name)")"
+    agent_description="$(clean_field "$(json_get '.agentDescription // .agent_description' agentDescription agent_description)")"
+    tool_call_id="$(clean_field "$(json_get '.toolCallId // .tool_call_id // .toolUseId // .tool_use_id' toolCallId tool_call_id toolUseId tool_use_id)")"
     display_name="${agent_display:-$agent_name}"
     [ -n "$display_name" ] || display_name="agent"
     started_at="$(date +%s 2>/dev/null || printf '0')"
-    printf '%s%s%s%s%s\n' "$display_name" "$us" "$agent_description" "$us" "$started_at" >>"$rows" 2>/dev/null || true
+    printf '%s%s%s%s%s%s%s\n' "$tool_call_id" "$us" "$display_name" "$us" "$agent_description" "$us" "$started_at" >>"$rows" 2>/dev/null || true
     ;;
   stop)
     [ -f "$rows" ] || exit 0
-    agent_name="$(clean_field "$(json_get '.agentName // .agent_name' 'agentName')")"
-    agent_display="$(clean_field "$(json_get '.agentDisplayName // .agent_display_name' 'agentDisplayName')")"
+    agent_name="$(clean_field "$(json_get '.agentName // .agent_name' agentName agent_name)")"
+    agent_display="$(clean_field "$(json_get '.agentDisplayName // .agent_display_name' agentDisplayName agent_display_name)")"
+    tool_call_id="$(clean_field "$(json_get '.toolCallId // .tool_call_id // .toolUseId // .tool_use_id' toolCallId tool_call_id toolUseId tool_use_id)")"
     tmp="${rows}.$$"
-    awk -v us="$us" -v name="$agent_name" -v display="$agent_display" '
+    awk -v us="$us" -v id="$tool_call_id" -v name="$agent_name" -v display="$agent_display" '
       BEGIN { FS = us; OFS = us; removed = 0 }
       {
-        row_name = $1
-        if (!removed && ((name != "" && row_name == name) || (display != "" && row_name == display) || (name == "" && display == ""))) {
+        row_id = $1
+        row_name = $2
+        # Backward compatibility for the old 3-field rows: name, purpose, started.
+        if (NF == 3) {
+          row_id = ""
+          row_name = $1
+        }
+        if (!removed && ((id != "" && row_id == id) || (id == "" && name != "" && row_name == name) || (id == "" && display != "" && row_name == display) || (id == "" && name == "" && display == ""))) {
           removed = 1
           next
         }
