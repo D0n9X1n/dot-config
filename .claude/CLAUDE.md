@@ -43,9 +43,12 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
   change to the sibling.
 - **launchd plists in `launchd/` are templates, not symlinks.**
   install.sh substitutes `__HOME__` -> `$HOME` (launchd doesn't expand
-  `$HOME` at runtime) and writes the rendered file to
-  `~/Library/LaunchAgents/`, then `bootout`+`bootstrap` into
+  `$HOME` at runtime) and `__SRC_DIR__` -> this repo's absolute path (for
+  agents that exec a tracked script, e.g. `clean-npm-caches.sh`), writes the
+  rendered file to `~/Library/LaunchAgents/`, then `bootout`+`bootstrap` into
   `gui/<uid>`. macOS-only; install.sh skips this step on other OSes.
+  Current agents: `com.d0n9x1n.copilot-relay` (relay proxy, on login) and
+  `com.d0n9x1n.npm-cache-clean` (weekly npm/npx cache prune, Sun 03:17).
 - **install.sh bootstraps a brand-new Mac.** It installs Homebrew if missing,
   Homebrew formulae/casks (including Claude Code via `claude-code`), npm globals
   for Copilot CLI + `copilot-relay`, oh-my-zsh, custom RecMono fonts from

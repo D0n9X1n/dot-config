@@ -35,6 +35,16 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
   updates the npm package first, writes `~/.copilot-relay/config.yaml`
   with `claudeSetup: false`, unloads/removes legacy proxy launchd jobs, and
   restarts the relay agent so it runs the latest installed version.
+- `launchd/com.d0n9x1n.npm-cache-clean.plist` + `launchd/clean-npm-caches.sh`
+  — macOS launchd agent **template** + its tracked script. install.sh renders
+  `__HOME__` -> `$HOME` and `__SRC_DIR__` -> repo path into
+  `~/Library/LaunchAgents/`, then `bootout`+`bootstrap` into `gui/<uid>`.
+  Runs **weekly (Sun 03:17)**, not at load: `npm cache clean --force` (empties
+  `~/.npm/_cacache`) + prunes `~/.npm/_npx` copies older than 14 days (by dir
+  mtime — macOS has no atime). **Never touches** `~/Library/Caches/ms-playwright`
+  (downloaded browser binaries). Logs to `~/Library/Logs/npm-cache-clean.log`
+  (capped 500 lines) + `.{out,err}.log`. Run now:
+  `launchctl kickstart -k gui/$(id -u)/com.d0n9x1n.npm-cache-clean`.
 - `.claude/CLAUDE.md` — agent instructions for Claude Code working in
   this repo. Mirrors `.github/copilot-instructions.md`.
 - `<repo>/.<name>` — root dotfiles linked to `$HOME/.<name>`. Currently:
@@ -260,9 +270,11 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
 10. Configures the `copilot-relay` launchd agent. If unauthenticated, prints a
     red `ACTION REQUIRED` log telling the user to run `npx copilot-relay auth`
     first; after auth, re-run `install.sh` to start launchd.
-11. Existing destination files/links that don't match are renamed to
+11. Loads the `npm-cache-clean` launchd agent (macOS): renders the template +
+    `bootout`/`bootstrap`. Runs weekly (Sun 03:17), no auth needed.
+12. Existing destination files/links that don't match are renamed to
    `<name>.bak.YYYYMMDDHHMMSS` before linking.
-12. Correct symlinks are left alone (no-op).
+13. Correct symlinks are left alone (no-op).
 
 ## Adding a new config
 - New `~/.something` dotfile: drop `.something` at repo root, run `install.sh`.

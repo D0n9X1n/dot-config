@@ -963,9 +963,10 @@ if is_macos; then
     else
       mkdir -p "$(dirname "$launchd_dest")"
       mkdir -p "${HOME}/Library/Logs"
-      # Render template — only touches __HOME__ tokens. Use sed -i'' for
-      # BSD-sed compatibility on macOS (GNU-style `sed -i` would fail).
-      sed "s|__HOME__|${HOME}|g" "$launchd_src" > "$launchd_dest"
+      # Render template — substitutes __HOME__ -> $HOME and __SRC_DIR__ ->
+      # this repo's absolute path. `|` is a safe sed delimiter (neither path
+      # contains it). Plain redirect (not `sed -i`) for BSD/GNU portability.
+      sed -e "s|__HOME__|${HOME}|g" -e "s|__SRC_DIR__|${src_dir}|g" "$launchd_src" > "$launchd_dest"
       echo "Wrote $launchd_dest"
 
       if [ ! -f "${HOME}/.copilot-relay/github_token" ]; then
@@ -1024,6 +1025,57 @@ if is_macos; then
           echo "Warning: launchctl bootstrap failed for com.d0n9x1n.copilot-relay"
         fi
       fi
+    fi
+  fi
+fi
+
+# launchd agent: weekly npm/npx cache cleaner (macOS only). Renders the
+# template (substituting __HOME__ and __SRC_DIR__) into ~/Library/LaunchAgents
+# and bootstraps it. Unlike copilot-relay this has no auth/PATH gating — the
+# tracked script is always present in this repo, and it runs on a schedule
+# (Sun 03:17), not at load. Idempotent: bootout+bootstrap is a no-op restart
+# when content is unchanged, and replaces the agent when it differs.
+if is_macos; then
+  uid="$(id -u)"
+  npmclean_src="${src_dir}/launchd/com.d0n9x1n.npm-cache-clean.plist"
+  npmclean_dest="${HOME}/Library/LaunchAgents/com.d0n9x1n.npm-cache-clean.plist"
+  npmclean_script="${src_dir}/launchd/clean-npm-caches.sh"
+
+  if [ -f "$npmclean_src" ] && [ -f "$npmclean_script" ]; then
+    mkdir -p "$(dirname "$npmclean_dest")"
+    mkdir -p "${HOME}/Library/Logs"
+    chmod +x "$npmclean_script" 2>/dev/null || true
+
+    sed -e "s|__HOME__|${HOME}|g" -e "s|__SRC_DIR__|${src_dir}|g" "$npmclean_src" > "$npmclean_dest"
+    echo "Wrote $npmclean_dest"
+
+    if launchctl print "gui/${uid}/com.d0n9x1n.npm-cache-clean" >/dev/null 2>&1; then
+      echo "Restarting launchd agent com.d0n9x1n.npm-cache-clean."
+    else
+      echo "Starting launchd agent com.d0n9x1n.npm-cache-clean."
+    fi
+    launchctl bootout "gui/${uid}/com.d0n9x1n.npm-cache-clean" 2>/dev/null || true
+    for attempt in 1 2 3 4 5; do
+      if ! launchctl print "gui/${uid}/com.d0n9x1n.npm-cache-clean" >/dev/null 2>&1; then
+        break
+      fi
+      sleep 1
+    done
+
+    npmclean_loaded=0
+    for attempt in 1 2 3 4 5; do
+      if log_command launchctl bootstrap "gui/${uid}" "$npmclean_dest"; then
+        npmclean_loaded=1
+        break
+      fi
+      echo "Warning: launchctl bootstrap attempt ${attempt}/5 failed for com.d0n9x1n.npm-cache-clean"
+      sleep 1
+    done
+
+    if [ "$npmclean_loaded" = "1" ]; then
+      echo "Loaded launchd agent com.d0n9x1n.npm-cache-clean (weekly Sun 03:17; logs: ~/Library/Logs/npm-cache-clean.log)"
+    else
+      echo "Warning: launchctl bootstrap failed for com.d0n9x1n.npm-cache-clean"
     fi
   fi
 fi

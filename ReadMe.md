@@ -37,7 +37,9 @@ dot-configs/
 │   └── wezterm.lua              # WezTerm config
 ├── themes/apollo/               # Apollo theme (wezterm/vim/nvim/vscode/wt) — reference, not auto-linked
 ├── launchd/                     # macOS launchd agent templates
-│   └── com.d0n9x1n.copilot-relay.plist  # copilot-relay proxy on login (rendered by install.sh)
+│   ├── com.d0n9x1n.copilot-relay.plist     # copilot-relay proxy on login (rendered by install.sh)
+│   ├── com.d0n9x1n.npm-cache-clean.plist   # weekly npm/npx cache cleaner (rendered by install.sh)
+│   └── clean-npm-caches.sh                 # the cleaner script the agent runs
 ├── .github/hooks/wakatime.json  # Copilot CLI -> WakaTime upload hooks
 ├── mcp-shared.json              # secret-free MCP entries synced via git
 ├── .claude/CLAUDE.md            # agent instructions for Claude Code working in this repo
@@ -106,9 +108,13 @@ probes do not appear as errors.
    and writes the per-user launchd agent. If relay is not authenticated, the
    installer prints a red `ACTION REQUIRED` message to run
    `npx copilot-relay auth` first; after auth, re-run `install.sh` to start it.
-12. Backs up any existing destination file or symlink that doesn't already point
+12. Writes the `npm-cache-clean` launchd agent (macOS): a weekly job (Sun 03:17)
+   that runs `npm cache clean --force` and prunes `~/.npm/_npx` copies older than
+   14 days, keeping the cache from growing unbounded. Needs no auth; never touches
+   the Playwright browser cache (`~/Library/Caches/ms-playwright`).
+13. Backs up any existing destination file or symlink that doesn't already point
    at the repo as `<name>.bak.YYYYMMDDHHMMSS` before linking.
-13. Leaves correctly-pointing symlinks alone (no-op).
+14. Leaves correctly-pointing symlinks alone (no-op).
 
 Safe to re-run at any time. Pulling new commits automatically takes effect on
 all machines because every config file is a symlink into this repo.

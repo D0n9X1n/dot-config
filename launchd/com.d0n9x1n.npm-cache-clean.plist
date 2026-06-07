@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  TEMPLATE — weekly npm/npx cache cleaner as a per-user launchd agent.
+
+  This file is consumed by install.sh; do NOT symlink it directly.
+  install.sh substitutes:
+    __HOME__    -> $HOME       (launchd doesn't expand $HOME at runtime)
+    __SRC_DIR__ -> repo path   (absolute path to this dot-configs checkout)
+  and writes the rendered plist to
+  ~/Library/LaunchAgents/com.d0n9x1n.npm-cache-clean.plist, then runs
+  launchctl bootout + bootstrap.
+
+  What the agent does once loaded:
+    - Runs launchd/clean-npm-caches.sh every Sunday at 03:17 local time.
+    - That script: `npm cache clean --force` (empties ~/.npm/_cacache) and
+      prunes ~/.npm/_npx copies older than 14 days. It never touches
+      ~/Library/Caches/ms-playwright (the downloaded browser binaries).
+    - RunAtLoad is false: installing/logging in does NOT trigger a clean,
+      only the weekly schedule does.
+
+  Logs:
+    stdout -> ~/Library/Logs/npm-cache-clean.out.log
+    stderr -> ~/Library/Logs/npm-cache-clean.err.log
+    script log -> ~/Library/Logs/npm-cache-clean.log (capped to 500 lines)
+
+  Manage with:
+    launchctl bootstrap   gui/$(id -u) ~/Library/LaunchAgents/com.d0n9x1n.npm-cache-clean.plist
+    launchctl bootout     gui/$(id -u) ~/Library/LaunchAgents/com.d0n9x1n.npm-cache-clean.plist
+    launchctl kickstart -k gui/$(id -u)/com.d0n9x1n.npm-cache-clean   # run now
+    launchctl print       gui/$(id -u)/com.d0n9x1n.npm-cache-clean
+
+  Notes:
+    - launchd plists don't expand $HOME at runtime, so absolute paths are
+      required. install.sh templates them per machine.
+    - PATH covers Apple Silicon (/opt/homebrew/bin) and Intel
+      (/usr/local/bin) Homebrew prefixes so the same plist works on both
+      archs; the script re-exports the same PATH defensively.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.d0n9x1n.npm-cache-clean</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>__SRC_DIR__/launchd/clean-npm-caches.sh</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>0</integer>
+        <key>Hour</key>
+        <integer>3</integer>
+        <key>Minute</key>
+        <integer>17</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>__HOME__/Library/Logs/npm-cache-clean.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>__HOME__/Library/Logs/npm-cache-clean.err.log</string>
+
+    <key>WorkingDirectory</key>
+    <string>__HOME__</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>
