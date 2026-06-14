@@ -1,0 +1,37 @@
+# copilot-relay configuration
+#
+# This file is hot-reloaded while copilot-relay is running.
+
+# Local host for the Claude Code-compatible HTTP server.
+host: 127.0.0.1
+
+# Local port for the HTTP server.
+port: 4142
+
+# GitHub Copilot API base URL.
+copilotBaseUrl: https://api.githubcopilot.com
+
+# Update ~/.claude/settings.json on start.
+claudeSetup: false
+
+# Log verbosity:
+#   error - startup/preflight/request failures only
+#   info  - error logs plus startup status, preflight status, and local HTTP
+#           status codes
+#   debug - info logs plus model routing summaries, Copilot upstream timings,
+#           and request payloads
+logLevel: info
+
+# Number of days to keep files in ~/.copilot-relay/logs.
+logRetentionDays: 3
+
+# Default upstream thinking/reasoning effort: none, low, medium, high, xhigh.
+thinkEffort: xhigh
+
+# Model routing: requests containing "opus" use opusModel; all others use gptModel.
+
+# Upstream Copilot model used for non-Opus requests.
+gptModel: gpt-5.5
+
+# Upstream Copilot model used for requests containing "opus".
+opusModel: claude-opus-4.8

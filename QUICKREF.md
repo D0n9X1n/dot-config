@@ -35,9 +35,9 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
   `gui/<uid>`). Starts `copilot-relay` on login, restarts on crash,
   logs to `~/Library/Logs/copilot-relay.{out,err}.log` and
   `~/.copilot-relay/logs/copilot-relay.log`. `install.sh` installs or
-  updates the npm package first, writes `~/.copilot-relay/config.yaml`
-  with `claudeSetup: false`, unloads/removes legacy proxy launchd jobs, and
-  restarts the relay agent so it runs the latest installed version.
+  updates the npm package first, links tracked `.copilot-relay/config.yaml`
+  into `~/.copilot-relay/config.yaml`, unloads/removes legacy proxy launchd
+  jobs, and restarts the relay agent so it runs the latest installed version.
 - `launchd/com.d0n9x1n.npm-cache-clean.plist` + `launchd/clean-npm-caches.sh`
   — macOS launchd agent **template** + its tracked script. install.sh renders
   `__HOME__` -> `$HOME` and `__SRC_DIR__` -> repo path into
@@ -83,6 +83,18 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
   Hard `#1d2021`), `inactive_pane_hsb = {1,1,1}` (no inactive-pane
   dimming), and the custom tab-bar `BAR_BG` derived from the active
   background so the tab strip auto-aligns when the bg changes.
+- `<repo>/.sonicterm/` — SonicTerm terminal config, auto-linked by
+  `install.sh` into `~/.sonicterm/`. This is **not** a whole-directory symlink:
+  only `sonicterm.toml`, `keymaps/*.toml`, and `themes/*.toml` are linked so
+  runtime `logs/` and backup files remain machine-local.
+  Current config pins theme `wezterm`, keymap `sonicterm-macos`, Rec Mono
+  St.Helens 13.5, Gruvbox/WezTerm-aligned theme colors, and WezTerm-compatible
+  macOS/Linux/Windows keymaps.
+- `<repo>/.copilot-relay/config.yaml` — secret-free relay config linked by
+  `install.sh` to `~/.copilot-relay/config.yaml`. Pins `claudeSetup: false`,
+  local server `127.0.0.1:4142`, `thinkEffort: xhigh`, `gptModel: gpt-5.5`,
+  and `opusModel: claude-opus-4.8`. Do **not** commit
+  `~/.copilot-relay/github_token`, `copilot_token.json`, or `logs/`.
 - `<repo>/themes/apollo/` — **reference theme files; NOT auto-linked**.
   Apollo = Gruvbox hard + Material warm-beige ANSI 7 + `#141617` canvas.
   Ships matched colorschemes for WezTerm (`apollo.lua`), Vim
@@ -143,8 +155,8 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     `seg_subagents` shows the live running-subagent count. `seg_timer`
     formats as `Nh Mm` for sessions ≥ 1h (v0.13.2).
     Active subagent rows (below L5, after a `----------------------------------------`
-    separator) use a terminal icon for `main` and a users icon for subagents,
-    then show agent name, purpose, and running time from the hook-maintained
+    separator) use a terminal icon for `main` and a magic-wand icon (U+F0D0) for
+    subagents, then show agent name, purpose, and running time from the hook-maintained
     `$TMPDIR/copilot-subagents-$USER/<session>.rows` file first, then a
     signature-cached `events.jsonl` fallback if hook rows are missing. Controlled by `COPILOT_STATUSLINE_MAX_SUBAGENTS=N`
     (default 8), `COPILOT_STATUSLINE_SUBAGENT_ROOT=0` to hide the root "main"
@@ -209,21 +221,21 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     repo (`.claude/settings.json`, `.claude/CLAUDE.md`, `.mcp.json`);
     `~/.claude.json.projects` is machine-local/path-keyed and is not copied.
     The `hooks` block wires `PreToolUse|PostToolUse` (matcher `Task|Agent`)
-    and `SubagentStop` to `~/.claude/hooks/subagent-counter.sh start|stop`
-    so the statusline's running-subagent count is event-driven (O(1) read
-    from a per-session counter file) instead of polling the transcript.
-    Active subagent rows render below L5 after a
-    `----------------------------------------` separator; the root "main" row
-    uses the home icon while Agent/Task rows keep the subagent icon.
+    and `SubagentStop` to `~/.claude/hooks/subagent-counter.sh start|stop`,
+    maintaining an event-driven per-session running-subagent counter file.
+    The hooks stay installed, but the statusline **no longer reads or renders**
+    subagents — Claude Code ships its own native subagent UI, so Claude's
+    statusline has neither the inline count nor a live-agent tree below L5
+    (intentional divergence from the Copilot sibling, which keeps both).
   - `hooks/subagent-counter.sh` — maintains
     `$TMPDIR/claude-subagents-$USER/<session_id>` (single integer).
     +1 on Task/Agent `start`, -1 on `stop`. Dedupes overlapping
     `PostToolUse` + `SubagentStop` events via a `.seen` sidecar keyed by
     `tool_use_id`. Uses `mkdir` lock for concurrency safety, falls back
     to bash regex if `jq` is absent, always exits 0 so a hook bug never
-    blocks Claude. `seg_subagents` in the statusline reads this file
-    directly; if missing (legacy sessions started before the hooks were
-    installed) it falls back to a signature-cached transcript scan.
+    blocks Claude. The counter file is retained for potential external
+    consumers, but the statusline itself no longer reads it (Claude Code's
+    native subagent UI replaced the old `seg_subagents` segment).
 - `<repo>/oh-my-zsh-custom/<file>` — files linked to
   `$HOME/.oh-my-zsh/custom/<file>`. Currently:
   - `custom.zsh` — aliases, proxy helpers (`enable_proxy`/`disable_proxy`),
@@ -278,19 +290,22 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
    destination directory if missing** (Claude Code only creates `~/.claude/`
    on first launch).
 8. Symlinks `wezterm/wezterm.lua` to `~/.wezterm.lua`.
-9. Bootstraps TPM (Tmux Plugin Manager) if `tmux` is on PATH and `~/.tmux.conf`
+9. Symlinks tracked `.sonicterm` TOML files into `~/.sonicterm/` while leaving
+   logs/backups local.
+10. Bootstraps TPM (Tmux Plugin Manager) if `tmux` is on PATH and `~/.tmux.conf`
    is present: clones `~/.tmux/plugins/tpm` if missing, then runs
    `tpm/bin/install_plugins` which spins up the default tmux server, loads
    `.tmux.conf` (which exports `TMUX_PLUGIN_MANAGER_PATH` via the tpm init
    line), and clones the plugins listed in `.tmux.conf`. Idempotent.
-10. Configures the `copilot-relay` launchd agent. If unauthenticated, prints a
+11. Links tracked `.copilot-relay/config.yaml`, then configures the
+    `copilot-relay` launchd agent. If unauthenticated, prints a
     red `ACTION REQUIRED` log telling the user to run `npx copilot-relay auth`
     first; after auth, re-run `install.sh` to start launchd.
-11. Loads the `npm-cache-clean` launchd agent (macOS): renders the template +
+12. Loads the `npm-cache-clean` launchd agent (macOS): renders the template +
     `bootout`/`bootstrap`. Runs weekly (Sun 03:17), no auth needed.
-12. Existing destination files/links that don't match are renamed to
+13. Existing destination files/links that don't match are renamed to
    `<name>.bak.YYYYMMDDHHMMSS` before linking.
-13. Correct symlinks are left alone (no-op).
+14. Correct symlinks are left alone (no-op).
 
 ## Adding a new config
 - New `~/.something` dotfile: drop `.something` at repo root, run `install.sh`.
@@ -300,6 +315,12 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
   Note: `mcp-config.json` is excluded (contains secrets) — manage it manually.
 - New Claude Code config: add a file to `claude/`, run `install.sh`.
   The destination directory is created automatically.
+- New SonicTerm config: add TOML under `.sonicterm/`, `.sonicterm/keymaps/`,
+  or `.sonicterm/themes/`, run `install.sh`. Do not commit `~/.sonicterm/logs/`
+  or runtime backup files.
+- copilot-relay config: edit `.copilot-relay/config.yaml`, run `install.sh` (or
+  rely on the existing symlink). Secrets/tokens/logs under `~/.copilot-relay/`
+  stay machine-local.
 - New synced MCP server (secret-free): add to `mcp-shared.json`,
   run `install.sh`. Merged into the local Copilot mcp.json (shared
   wins on collision), then imported into `~/.claude.json` so both tools
@@ -324,7 +345,8 @@ cd ~/Public/dot-configs && git pull
 
 ## Requirements (from configs)
 - Apps/CLIs: WezTerm (terminal — cask auto-installed; config auto-linked to
-  `~/.wezterm.lua`), oh-my-zsh (unattended install), Copilot CLI (preserve
+  `~/.wezterm.lua`), SonicTerm (terminal config linked to `~/.sonicterm/` when
+  present), oh-my-zsh (unattended install), Copilot CLI (preserve
   existing or npm fallback), Claude Code CLI
   (Homebrew cask `claude-code`), `copilot-relay` (npm), and
   `@geeknees/copilot-cli-wakatime` (npm). `copilot-relay start` runs a local

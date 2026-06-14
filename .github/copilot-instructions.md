@@ -11,10 +11,16 @@ details change.
 This is a dotfiles repository using a symlink-based linker pattern. `install.sh`
 symlinks every **top-level non-ignored dotfile** (files starting with `.`) into
 `$HOME`. Directories, nested files, and gitignored generated files are never
-linked.
+linked, with one explicit exception: `.sonicterm/` is tracked as an app config
+directory, and `install.sh` links only its TOML config/keymap/theme files into
+`~/.sonicterm/` so logs and runtime backups stay machine-local.
+`.copilot-relay/config.yaml` is another explicit app-config file; only that
+secret-free file is linked into `~/.copilot-relay/`, while relay tokens and logs
+remain local and must not be committed.
 
 Adding a new config means dropping a dotfile at the repo root — `install.sh`
-picks it up automatically with no manifest to update.
+picks it up automatically with no manifest to update. For SonicTerm, add TOML
+under `.sonicterm/`, `.sonicterm/keymaps/`, or `.sonicterm/themes/`.
 
 The install script also handles brand-new macOS bootstrap: installs Homebrew if
 missing, installs Homebrew formulae/casks (including Claude Code via

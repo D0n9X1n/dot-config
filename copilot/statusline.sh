@@ -140,9 +140,9 @@ ICON_EXT=$'\xef\x82\xae'
 ICON_MCP=$'\xef\x87\xa6'
 # U+F085 cogs             = EF 82 85   Mode
 # U+F120 terminal         = EF 84 A0   Main (root) row
-# U+F0C0 users            = EF 83 80   Active subagent row
+# U+F0D0 magic-wand       = EF 83 90   Active subagent row
 ICON_SUBAGENT_ROOT=$'\xef\x84\xa0'
-ICON_SUBAGENT=$'\xef\x83\x80'
+ICON_SUBAGENT=$'\xef\x83\x90'
 ICON_MODE=$'\xef\x82\x85'
 
 # Gruvbox Dark Hard accents — match alacritty/wezterm/.tmux.conf palette.
@@ -230,7 +230,7 @@ f0ae|${ICON_SKILLS}|Skills
 f0ae|${ICON_EXT}|Ext
 f1e6|${ICON_MCP}|MCP
 f120|${ICON_SUBAGENT_ROOT}|Main
-f0c0|${ICON_SUBAGENT}|SubAgent
+f0d0|${ICON_SUBAGENT}|SubAgent
 TEST_ICONS_EOF
   exit 0
 fi

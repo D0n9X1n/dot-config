@@ -1,0 +1,56 @@
+# SonicTerm default: WezTerm's Gruvbox dark hard palette with a custom
+# near-black background tuned for SonicTerm chrome.
+name = "Modified Gruvbox Dark Hard"
+appearance = "dark"
+
+[colors]
+background    = "#141617"
+foreground    = "#cfbc97"
+cursor        = "#fabd2f"
+cursor_text   = "#141617"
+# Selection: gruvbox bg2 (#3c3836) — matches WezTerm's subtle grey-brown
+# overlay for the Gruvbox dark hard scheme. The renderer paints this as a
+# translucent quad so text underneath keeps its original color (no fg
+# override applied), mirroring WezTerm's default selection behavior.
+selection_bg  = "#3c3836"
+selection_fg  = "#d5c4a1"
+
+# ANSI palette mirrors WezTerm's built-in "Gruvbox dark, hard (base16)"
+# color scheme, which is what the user selects via
+#   config.color_scheme = "Gruvbox dark, hard (base16)"
+# in their wezterm.lua. Values pinned for exact parity.
+#
+# Sourced from the canonical tinted-theming/schemes base16 definition for
+# "Gruvbox dark, hard" (palette.base00..base0F) and passed through WezTerm's
+# base16 -> ANSI mapping in lua-api-crates/color-funcs/src/schemes/base16.rs:
+#   ansi    = [base00, base08, base0B, base0A, base0D, base0E, base0C, base05]
+#   brights = [base03, base08, base0B, base0A, base0D, base0E, base0C, base07]
+[colors.ansi]
+black   = "#1d2021"  # base00
+red     = "#fb4934"  # base08
+green   = "#b8bb26"  # base0B
+yellow  = "#fabd2f"  # base0A
+blue    = "#83a598"  # base0D
+magenta = "#d3869b"  # base0E
+cyan    = "#8ec07c"  # base0C
+white   = "#d5c4a1"  # base05
+
+[colors.bright]
+black   = "#665c54"  # base03
+red     = "#fb4934"  # base08
+green   = "#b8bb26"  # base0B
+yellow  = "#fabd2f"  # base0A
+blue    = "#83a598"  # base0D
+magenta = "#d3869b"  # base0E
+cyan    = "#8ec07c"  # base0C
+white   = "#fbf1c7"  # base07
+
+[colors.tab]
+bar_bg          = "#141617"
+active_bg       = "#141617"
+active_fg       = "#fabd2f"
+inactive_bg     = "#141617"
+inactive_fg     = "#928374"
+hover_bg        = "#1c1f20"
+hover_fg        = "#d5c4a1"
+close_button_fg = "#ff5555"

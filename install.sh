@@ -647,9 +647,16 @@ setup_wakatime_mcp() {
 configure_copilot_relay() {
   local relay_dir="${HOME}/.copilot-relay"
   local relay_config="${relay_dir}/config.yaml"
+  local tracked_relay_config="${src_dir}/.copilot-relay/config.yaml"
   local tmp_config
 
   mkdir -p "$relay_dir"
+  if [ -f "$tracked_relay_config" ]; then
+    link_file "$tracked_relay_config" "$relay_config"
+    echo "Linked copilot-relay config to $relay_config"
+    return 0
+  fi
+
   if [ -f "$relay_config" ]; then
     tmp_config="$(mktemp)"
     if grep -Eq '^[[:space:]]*claudeSetup[[:space:]]*:' "$relay_config"; then
@@ -882,6 +889,30 @@ wezterm_dest="${HOME}/.wezterm.lua"
 if [ -f "$wezterm_src" ]; then
   link_file "$wezterm_src" "$wezterm_dest"
   echo "Linked WezTerm config to $wezterm_dest"
+fi
+
+# Link SonicTerm config without taking over runtime state. SonicTerm stores logs
+# and backups under ~/.sonicterm too, so keep ~/.sonicterm as a real directory
+# and symlink only the tracked TOML config/keymap/theme files into it.
+sonicterm_src="${src_dir}/.sonicterm"
+sonicterm_dest="${HOME}/.sonicterm"
+if [ -d "$sonicterm_src" ]; then
+  mkdir -p "$sonicterm_dest"
+  while IFS= read -r -d '' entry; do
+    base="$(basename "$entry")"
+    link_file "$entry" "${sonicterm_dest}/${base}"
+  done < <(find "$sonicterm_src" -maxdepth 1 -mindepth 1 -type f -name '*.toml' -print0)
+
+  for subdir in keymaps themes; do
+    if [ -d "${sonicterm_src}/${subdir}" ]; then
+      mkdir -p "${sonicterm_dest}/${subdir}"
+      while IFS= read -r -d '' entry; do
+        base="$(basename "$entry")"
+        link_file "$entry" "${sonicterm_dest}/${subdir}/${base}"
+      done < <(find "${sonicterm_src}/${subdir}" -maxdepth 1 -mindepth 1 -type f -name '*.toml' -print0)
+    fi
+  done
+  echo "Linked SonicTerm config files to $sonicterm_dest"
 fi
 
 # Link Claude Code config files (claude/* -> ~/.claude/*). Claude Code

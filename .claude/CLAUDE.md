@@ -26,6 +26,8 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
 │   └── statusline.sh
 ├── copilot/                     # Same shape for GitHub Copilot CLI
 ├── wezterm/wezterm.lua          # symlinked to ~/.wezterm.lua
+├── .sonicterm/                  # SonicTerm TOML config linked into ~/.sonicterm/
+├── .copilot-relay/config.yaml   # secret-free relay config linked into ~/.copilot-relay/
 ├── launchd/                     # macOS launchd agent templates (rendered by install.sh)
 ├── mcp-shared.json              # secret-free MCP entries (synced)
 └── .github/, .claude/
@@ -40,7 +42,13 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
 - **`claude/statusline.sh` and `copilot/statusline.sh` must stay
   functionally aligned.** Same segments, same output shape, same Gruvbox
   palette, same per-cwd 5s git cache. When you change one, port the
-  change to the sibling.
+  change to the sibling. **Known intentional divergence (do not "re-align"
+  away):** Claude's statusline has NO live-subagent renderings — neither the
+  inline `subagents`/`Tasks` count nor the bottom live-agent tree — because
+  Claude Code ships its own native subagent UI. Copilot keeps both, and its
+  subagent glyph is the magic-wand (U+F0D0) while Claude has no subagent glyph
+  at all. (Claude's `subagent-counter.sh` hooks stay installed; the statusline
+  just no longer reads the counter.)
 - **launchd plists in `launchd/` are templates, not symlinks.**
   install.sh substitutes `__HOME__` -> `$HOME` (launchd doesn't expand
   `$HOME` at runtime) and `__SRC_DIR__` -> this repo's absolute path (for
@@ -53,6 +61,13 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
   Homebrew formulae/casks (including Claude Code via `claude-code`), npm globals
   for Copilot CLI + `copilot-relay`, oh-my-zsh, custom RecMono fonts from
   `MOSconfig/recursive-code-config`, then links configs.
+- **`.sonicterm/` is tracked config, not runtime state.** `install.sh` links only
+  `.sonicterm/*.toml`, `.sonicterm/keymaps/*.toml`, and
+  `.sonicterm/themes/*.toml` into `~/.sonicterm/`; do not commit SonicTerm
+  `logs/` or runtime backup files.
+- **`.copilot-relay/config.yaml` is tracked config, not auth state.**
+  `install.sh` links only that file into `~/.copilot-relay/`; never commit
+  `github_token`, `copilot_token.json`, or relay logs.
 
 ## Conventions
 
