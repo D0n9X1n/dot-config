@@ -33,27 +33,6 @@ have_cmd() {
   command -v "$1" >/dev/null 2>&1
 }
 
-# Resolve a python interpreter satisfying a minimum version (default >=3.10).
-# Prints the resolved command path on stdout; returns non-zero if none found.
-# macOS's Xcode python3 is 3.9.x, so we probe explicit minor versions first
-# (Homebrew installs python3.1x) before falling back to bare python3/python.
-find_python() {
-  local min_major="${1:-3}"
-  local min_minor="${2:-10}"
-  local candidate
-  for candidate in \
-    python3.14 python3.13 python3.12 python3.11 python3.10 python3 python; do
-    have_cmd "$candidate" || continue
-    if "$candidate" -c \
-      "import sys; sys.exit(0 if sys.version_info[:2] >= ($min_major, $min_minor) else 1)" \
-      >/dev/null 2>&1; then
-      command -v "$candidate"
-      return 0
-    fi
-  done
-  return 1
-}
-
 log_command() {
   local arg
   printf '+'
@@ -249,7 +228,6 @@ install_npm_global_clis() {
   fi
 
   ensure_npm_cli_latest @github/copilot copilot || true
-  ensure_npm_cli_latest @geeknees/copilot-cli-wakatime copilot-cli-wakatime || true
   ensure_npm_cli_latest copilot-relay copilot-relay || true
 }
 
@@ -418,7 +396,7 @@ ensure_wakatime_cfg_api_key() {
   fi
   mv "$tmp_cfg" "$cfg"
   chmod 600 "$cfg"
-  echo "wakatime-mcp: wrote API key to $cfg (secret not printed)" >&2
+  echo "WakaTime: wrote API key to $cfg (secret not printed)" >&2
   printf '%s' "$key"
 }
 
@@ -533,115 +511,65 @@ install_recursive_code_config_fonts() {
   fi
 }
 
-ensure_copilot_wakatime_hooks() {
-  local hook_file="${src_dir}/.github/hooks/wakatime.json"
+ensure_copilot_wakatime_plugin() {
   local wm_cfg="${HOME}/.wakatime.cfg"
   local wm_key=""
+  local plugins=""
 
   if ! have_cmd copilot; then
-    echo "copilot-cli-wakatime: copilot CLI not on PATH — skipping hook setup"
-    return 0
-  fi
-  if ! have_cmd wakatime-cli; then
-    echo "copilot-cli-wakatime: wakatime-cli not on PATH — skipping hook setup"
-    return 0
-  fi
-  if ! have_cmd copilot-cli-wakatime; then
-    echo "copilot-cli-wakatime: command not on PATH — skipping hook setup"
+    echo "copilot-cli-wakatime plugin: copilot CLI not on PATH — skipping plugin setup"
     return 0
   fi
 
   wm_key="$(ensure_wakatime_cfg_api_key "$wm_cfg" || true)"
   if [ -z "$wm_key" ]; then
-    echo "copilot-cli-wakatime: no WakaTime API key available — skipping hook setup"
+    echo "copilot-cli-wakatime plugin: no WakaTime API key available — skipping plugin setup"
     return 0
   fi
 
-  if [ -f "$hook_file" ]; then
-    echo "copilot-cli-wakatime hook config present at ${hook_file#${src_dir}/}"
+  uninstall_npm_package_if_installed @geeknees/copilot-cli-wakatime
+
+  plugins="$(copilot plugin list 2>/dev/null || true)"
+  if printf '%s\n' "$plugins" | grep -Eq '(^|[[:space:]])copilot-cli-wakatime([[:space:]@]|$)'; then
+    log_command copilot plugin update copilot-cli-wakatime \
+      || echo "Warning: copilot-cli-wakatime plugin update failed"
   else
-    (cd "$src_dir" && log_command copilot-cli-wakatime init) \
-      || echo "Warning: copilot-cli-wakatime init failed"
+    log_command copilot plugin install wakatime/copilot-cli-wakatime \
+      || echo "Warning: copilot-cli-wakatime plugin install failed"
   fi
 }
 
-setup_wakatime_mcp() {
-  local wm_src="${src_dir}/wakatime-mcp"
+cleanup_legacy_wakatime_mcp() {
   local wm_dest="${HOME}/.local/share/wakatime-mcp"
-  local wm_cfg="${HOME}/.wakatime.cfg"
   local copilot_mcp_pre="${HOME}/.config/github-copilot/mcp.json"
-  local wm_py=""
-  local wm_key=""
-  local tmp_mcp=""
+  local claude_user_json="${HOME}/.claude.json"
+  local tmp_json=""
 
-  [ -d "$wm_src" ] || return 0
+  if [ -d "$wm_dest" ]; then
+    rm -rf "$wm_dest"
+    echo "Removed legacy WakaTime MCP runtime at $wm_dest"
+  fi
+
   if ! have_cmd jq; then
-    echo "Warning: wakatime-mcp registration needs jq — skipping"
+    echo "Warning: jq not found; cannot remove legacy WakaTime MCP entries"
     return 0
   fi
 
-  # requirements.txt pins mcp>=1.26, which needs Python >=3.10.
-  # macOS's Xcode python3 is 3.9.x, so resolve a new-enough interpreter
-  # (Homebrew python3.1x) rather than whatever bare python3 points at.
-  wm_py="$(find_python 3 10 || true)"
-  if [ -z "$wm_py" ]; then
-    echo "Warning: wakatime-mcp needs Python >=3.10 but none was found — skipping"
-    return 0
+  if [ -f "$copilot_mcp_pre" ] && jq -e '.mcpServers.wakatime? != null' "$copilot_mcp_pre" >/dev/null 2>&1; then
+    tmp_json="$(mktemp)"
+    jq 'del(.mcpServers.wakatime)' "$copilot_mcp_pre" >"$tmp_json" \
+      && mv "$tmp_json" "$copilot_mcp_pre" \
+      && echo "Removed legacy WakaTime MCP from $copilot_mcp_pre" \
+      || { rm -f "$tmp_json"; echo "Warning: failed to remove WakaTime MCP from $copilot_mcp_pre"; }
   fi
 
-  wm_key="$(ensure_wakatime_cfg_api_key "$wm_cfg" || true)"
-  if [ -z "$wm_key" ]; then
-    echo "wakatime-mcp: no API key available — skipping registration"
-    return 0
+  if [ -f "$claude_user_json" ] && jq -e '.mcpServers.wakatime? != null' "$claude_user_json" >/dev/null 2>&1; then
+    tmp_json="$(mktemp)"
+    jq 'del(.mcpServers.wakatime)' "$claude_user_json" >"$tmp_json" \
+      && mv "$tmp_json" "$claude_user_json" \
+      && echo "Removed legacy WakaTime MCP from $claude_user_json" \
+      || { rm -f "$tmp_json"; echo "Warning: failed to remove WakaTime MCP from $claude_user_json"; }
   fi
-
-  mkdir -p "$wm_dest"
-  cp "$wm_src/server.py" "$wm_src/wakatime_client.py" "$wm_dest/"
-
-  # Discard a venv built with too-old a Python (e.g. a prior run that
-  # used Xcode's 3.9.6); it can't satisfy requirements.txt and pip
-  # would fail. Rebuilding is cheap and idempotent.
-  if [ -d "$wm_dest/venv" ] \
-    && ! "$wm_dest/venv/bin/python3" -c \
-         "import sys; sys.exit(0 if sys.version_info[:2] >= (3, 10) else 1)" \
-         >/dev/null 2>&1; then
-    echo "wakatime-mcp: existing venv has Python <3.10 — rebuilding"
-    rm -rf "$wm_dest/venv"
-  fi
-
-  if [ ! -d "$wm_dest/venv" ]; then
-    echo "wakatime-mcp: bootstrapping venv at $wm_dest/venv (one-time, ~30s)"
-    "$wm_py" -m venv "$wm_dest/venv" \
-      && "$wm_dest/venv/bin/pip" install --upgrade pip \
-      && "$wm_dest/venv/bin/pip" install -r "$wm_src/requirements.txt" \
-      && echo "wakatime-mcp: venv ready" \
-      || echo "Warning: wakatime-mcp venv bootstrap failed"
-  elif [ "$wm_src/requirements.txt" -nt "$wm_dest/venv/pyvenv.cfg" ]; then
-    # Refresh deps quietly only if requirements.txt is newer than the venv's
-    # marker. Cheap mtime check; pip itself is idempotent.
-    "$wm_dest/venv/bin/pip" install -r "$wm_src/requirements.txt" \
-      && touch "$wm_dest/venv/pyvenv.cfg"
-  fi
-
-  [ -d "$wm_dest/venv" ] || return 0
-
-  mkdir -p "$(dirname "$copilot_mcp_pre")"
-  [ -f "$copilot_mcp_pre" ] || printf '{"mcpServers":{}}\n' >"$copilot_mcp_pre"
-
-  tmp_mcp="$(mktemp)"
-  jq --arg cmd "$wm_dest/venv/bin/python3" \
-     --arg srv "$wm_dest/server.py" \
-     --arg key "$wm_key" \
-     --arg pp  "$wm_dest" \
-    '.mcpServers.wakatime = {
-        type: "stdio",
-        command: $cmd,
-        args: [$srv],
-        env: { WAKATIME_API_KEY: $key, PYTHONPATH: $pp }
-      }' "$copilot_mcp_pre" >"$tmp_mcp" \
-    && mv "$tmp_mcp" "$copilot_mcp_pre" \
-    && echo "wakatime-mcp: registered in $copilot_mcp_pre" \
-    || { rm -f "$tmp_mcp"; echo "Warning: wakatime-mcp jq registration failed"; }
 }
 
 configure_copilot_relay() {
@@ -711,9 +639,7 @@ install_macos_deps() {
     jq
     neovim
     node
-    python
     tmux
-    wakatime-cli
     zsh-completions
     zsh-fast-syntax-highlighting
   )
@@ -726,6 +652,11 @@ install_macos_deps() {
     fi
     log_command brew install "$formula" || echo "Warning: failed to install formula '$formula' (skipping)"
   done
+
+  if brew list --formula wakatime-cli >/dev/null 2>&1; then
+    echo "Removing legacy Homebrew wakatime-cli; the Copilot WakaTime plugin manages its own CLI."
+    log_command brew uninstall wakatime-cli || echo "Warning: failed to uninstall legacy wakatime-cli formula"
+  fi
 
   uninstall_npm_package_if_installed @anthropic-ai/claude-code
 
@@ -985,13 +916,13 @@ if [ -d "$claude_src" ]; then
     fi
   fi
 
-  # Bootstrap/register the vendored WakaTime MCP server. The helper writes
-  # only to per-machine config because the MCP entry carries WAKATIME_API_KEY.
-  setup_wakatime_mcp
+  # The official Copilot plugin supersedes the old vendored WakaTime MCP.
+  cleanup_legacy_wakatime_mcp
 
-  # Copilot CLI WakaTime upload hook. This must run after Copilot CLI,
-  # wakatime-cli, copilot-cli-wakatime, and ~/.wakatime.cfg are in place.
-  ensure_copilot_wakatime_hooks
+  # Copilot CLI WakaTime upload plugin. This must run after Copilot CLI and
+  # ~/.wakatime.cfg are in place. The plugin installs/updates its own
+  # ~/.wakatime/wakatime-cli binary on Copilot session start.
+  ensure_copilot_wakatime_plugin
 
   # Import Copilot CLI's MCP servers into Claude Code's user-scope config.
   # Claude Code reads MCP servers from ~/.claude.json (top-level

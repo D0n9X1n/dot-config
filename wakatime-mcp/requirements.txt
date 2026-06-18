@@ -1,7 +1,0 @@
-# wakatime-mcp dependencies. Pinned to the versions known to work with
-# server.py / wakatime_client.py. install.sh creates a venv and installs
-# these on first run; it's a no-op on subsequent runs unless this file
-# changes.
-mcp>=1.26
-fastmcp>=3.1
-httpx>=0.28

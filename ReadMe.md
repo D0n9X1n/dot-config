@@ -47,7 +47,6 @@ dot-configs/
 │   ├── com.d0n9x1n.copilot-relay.plist     # copilot-relay proxy on login (rendered by install.sh)
 │   ├── com.d0n9x1n.npm-cache-clean.plist   # weekly npm/npx cache cleaner (rendered by install.sh)
 │   └── clean-npm-caches.sh                 # the cleaner script the agent runs
-├── .github/hooks/wakatime.json  # Copilot CLI -> WakaTime upload hooks
 ├── mcp-shared.json              # secret-free MCP entries synced via git
 ├── scripts/check.sh             # local/CI parity checks
 ├── .claude/CLAUDE.md            # agent instructions for Claude Code working in this repo
@@ -68,19 +67,17 @@ probes do not appear as errors.
 1. Installs Homebrew if missing, then installs required macOS apps, fonts, and
    command-line tools via Homebrew (best-effort after Homebrew itself exists).
    Set `SKIP_BREW=1` to skip this step entirely (useful for CI / fake-`HOME`
-   testing). Formulae: `autojump`, `eza`, `git`, `jq`, `neovim`, `node`,
-   `python` (provides `python3`), `tmux`, `wakatime-cli`, `zsh-completions`, and
-   `zsh-fast-syntax-highlighting`. Before installing Claude Code, the installer
+   testing). Formulae: `autojump`, `eza`, `git`, `jq`, `neovim`, `node`, `tmux`,
+   `zsh-completions`, and `zsh-fast-syntax-highlighting`. Before installing Claude Code, the installer
    removes any old global npm `@anthropic-ai/claude-code` package, then installs casks:
    `claude-code`, `wezterm`, the Recursive base/Nerd Font casks, Symbols Only
    Nerd Font, and Noto Color Emoji. It also downloads the latest
    `RecMonoBaker-*.ttf` and `RecMonoSt.Helens-*.ttf` assets from
    `MOSconfig/recursive-code-config` releases into `~/Library/Fonts`.
 2. Installs/updates npm global CLIs only when they are missing or already
-   npm-managed: `@github/copilot`, `@geeknees/copilot-cli-wakatime`, and
-   `copilot-relay`. Existing non-npm binaries (for example cask-managed
-   `copilot`) are left in place to avoid npm `EEXIST`. Set `SKIP_NPM_GLOBALS=1`
-   to skip.
+   npm-managed: `@github/copilot` and `copilot-relay`. Existing non-npm
+   binaries (for example cask-managed `copilot`) are left in place to avoid npm
+   `EEXIST`. Set `SKIP_NPM_GLOBALS=1` to skip.
 3. Installs oh-my-zsh unattended if missing (`RUNZSH=no`, `CHSH=no`), then
    fixes insecure zsh completion directory permissions so `compinit` does not
    block new shells. Set `SKIP_OH_MY_ZSH=1` to skip installation.
@@ -103,12 +100,13 @@ probes do not appear as errors.
 10. Merges tracked, secret-free MCP servers into
    `~/.config/github-copilot/mcp.json`, then imports Copilot's MCP servers into
    Claude Code's `~/.claude.json` when `jq` and the MCP file are available.
-   For WakaTime MCP, if `~/.wakatime.cfg` lacks `api_key`, the installer prints
-   a red `ACTION REQUIRED` prompt and asks for the key twice with hidden input
-   before writing the local config file.
-   Once WakaTime, Copilot CLI, `wakatime-cli`, and
-   `@geeknees/copilot-cli-wakatime` are available, it verifies the Copilot CLI
-   upload hook config at `.github/hooks/wakatime.json`.
+   Removes the legacy Homebrew `wakatime-cli` formula and vendored WakaTime MCP
+   runtime/entries. For Copilot WakaTime upload, if `~/.wakatime.cfg` lacks
+   `api_key`, the installer prints a red `ACTION REQUIRED` prompt and asks for
+   the key twice with hidden input before writing the local config file. Once
+   WakaTime and Copilot CLI are available, it installs or updates the WakaTime-owned
+   `wakatime/copilot-cli-wakatime` Copilot plugin. The plugin installs/updates
+   its own `~/.wakatime/wakatime-cli` binary on Copilot session start.
 11. Bootstraps **TPM** (Tmux Plugin Manager): clones it under `~/.tmux/plugins/tpm`
    if missing, then runs `tpm/bin/install_plugins` to clone every plugin
    listed in `.tmux.conf`. Skipped if `tmux` isn't on PATH.
@@ -198,11 +196,10 @@ Verify bootstrap and symlinks landed:
 ```bash
 brew --version
 node --version
-python3 --version
 brew list --cask claude-code
 copilot --version
 npm list -g copilot-relay --depth=0
-command -v copilot-cli-wakatime wakatime-cli
+copilot plugin list | grep -q copilot-cli-wakatime && echo "WakaTime plugin ok"
 ls -l ~/.tmux.conf ~/.copilot/settings.json ~/.claude/settings.json ~/.oh-my-zsh/custom/custom.zsh
 launchctl print "gui/$(id -u)/com.d0n9x1n.copilot-relay" | grep state
 ```
@@ -270,18 +267,19 @@ Confirm everything got wired:
 ```bash
 test -f ~/.config/github-copilot/mcp.json && echo "Copilot MCP file present"
 jq '.mcpServers | keys' ~/.claude.json   # should list servers
-test -f .github/hooks/wakatime.json && echo "Copilot WakaTime hook present"
+copilot plugin list | grep -q copilot-cli-wakatime && echo "Copilot WakaTime plugin present"
 ```
 
-**WakaTime has two separate integrations.** `wakatime-mcp/` is a read-only MCP
-server so Copilot/Claude can query your WakaTime stats. `.github/hooks/wakatime.json`
-is the upload path for Copilot CLI activity: it calls
-[`@geeknees/copilot-cli-wakatime`](https://github.com/geeknees/copilot-cli-wakatime)
-on session/tool/end hooks, which sends WakaTime heartbeats through
-`wakatime-cli`. `install.sh` installs `wakatime-cli` and the npm hook package,
-then verifies the hook after the WakaTime API key and Copilot CLI are available.
-The hook creates `.copilot-cli.ts` as a virtual WakaTime entity; that file is
-ignored by git.
+**WakaTime is plugin-only.** This repo no longer vendors a WakaTime MCP server
+or installs Homebrew `wakatime-cli`. Copilot CLI activity upload is handled by
+the official
+[`wakatime/copilot-cli-wakatime`](https://github.com/wakatime/copilot-cli-wakatime)
+plugin, which sends AI heartbeats after user prompts and file-edit tool events.
+`install.sh` installs or updates the plugin after the WakaTime API key and
+Copilot CLI are available, removes the legacy WakaTime MCP runtime/entries,
+removes the legacy Homebrew `wakatime-cli` formula, and removes the legacy
+`@geeknees/copilot-cli-wakatime` npm package if present. The plugin installs and
+updates its own `~/.wakatime/wakatime-cli` binary on Copilot session start.
 
 **GitHub MCP setup (special case):** GitHub's hosted MCP at
 `https://api.githubcopilot.com/mcp/` does NOT support OAuth Dynamic
@@ -805,22 +803,18 @@ safe user-scope MCP import from Copilot's MCP file.
 - [`copilot-relay`](https://www.npmjs.com/package/copilot-relay) — installed as
   an npm global; `install.sh` configures and starts the launchd proxy on port
   4142
-- [`@geeknees/copilot-cli-wakatime`](https://github.com/geeknees/copilot-cli-wakatime)
-  — installed as an npm global; handles Copilot CLI activity upload through
-  `.github/hooks/wakatime.json`
+- [`wakatime/copilot-cli-wakatime`](https://github.com/wakatime/copilot-cli-wakatime)
+  — installed as a Copilot plugin; handles Copilot CLI activity upload
 - [`gh`](https://cli.github.com/) — optional; `statusline.sh` calls
   `gh auth status` (cached 5 minutes) to render the GH segment
 
 ### Tools (auto-installed via Homebrew on macOS)
 
 - [Homebrew](https://brew.sh/) — bootstrapped by `install.sh` if missing
-- [Python 3](https://www.python.org/) — installed via Homebrew formula
-  `python`
 - [Node.js](https://nodejs.org/) / npm — installed via Homebrew for the npm
   global CLIs
-- [`jq`](https://jqlang.github.io/jq/) — used to merge MCP config
-- [`wakatime-cli`](https://wakatime.com/wakatime-cli) — installed via Homebrew;
-  used by the statusline WakaTime segment and Copilot CLI upload hook
+- [`jq`](https://jqlang.github.io/jq/) — used to merge MCP config and remove
+  legacy WakaTime MCP entries
 - [tmux](https://github.com/tmux/tmux) ≥ 3.3 (3.6a tested) — primary tab,
   split, and session manager. TPM and listed plugins bootstrap automatically
   on first launch.
