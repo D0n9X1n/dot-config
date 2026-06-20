@@ -745,6 +745,18 @@ bootstrap_launchd_agent() {
   [ "$loaded" = "1" ]
 }
 
+copilot_relay_health_ok() {
+  local code
+  have_cmd curl || return 1
+  code="$(curl -sS -o /dev/null \
+    --connect-timeout 1 \
+    --max-time 3 \
+    -w '%{http_code}' \
+    http://127.0.0.1:4142/healthz \
+    2>/dev/null || true)"
+  [ "$code" = "200" ]
+}
+
 if is_macos; then
   if [ "${SKIP_BREW:-0}" = "1" ]; then
     echo "Skipping Homebrew step (SKIP_BREW=1)."
@@ -1029,32 +1041,49 @@ if is_macos; then
         action_required "copilot-relay is installed but not authenticated."
         action_required "Run 'npx copilot-relay auth', then re-run install.sh to start the launchd agent."
       else
-        # Bootstrap into the GUI domain of the current user. bootout first
-        # so a content change actually replaces the running agent (load is
-        # a no-op when the label already exists).
-        if bootstrap_launchd_agent "$uid" "com.d0n9x1n.copilot-relay" "$launchd_dest" " with the latest copilot-relay"; then
+        if copilot_relay_health_ok; then
+          echo "copilot-relay /healthz is healthy; leaving the running process untouched."
+        elif bootstrap_launchd_agent "$uid" "com.d0n9x1n.copilot-relay" "$launchd_dest" " after failed /healthz"; then
           log_command launchctl kickstart -k "gui/${uid}/com.d0n9x1n.copilot-relay" || true
-          if have_cmd curl; then
-            relay_ready=0
-            attempt=1
-            while [ "$attempt" -le 20 ]; do
-              if curl -sS -o /dev/null --connect-timeout 1 http://127.0.0.1:4142/ 2>/dev/null; then
-                relay_ready=1
-                break
-              fi
-              sleep 1
-              attempt=$((attempt + 1))
-            done
-            if [ "$relay_ready" = "1" ]; then
-              echo "copilot-relay is running at http://127.0.0.1:4142"
-            else
-              echo "Warning: copilot-relay launchd agent loaded, but port 4142 is not accepting connections yet"
-              echo "If authentication expired, run 'npx copilot-relay auth', then re-run install.sh."
+          relay_ready=0
+          attempt=1
+          while [ "$attempt" -le 20 ]; do
+            if copilot_relay_health_ok; then
+              relay_ready=1
+              break
             fi
+            sleep 1
+            attempt=$((attempt + 1))
+          done
+          if [ "$relay_ready" = "1" ]; then
+            echo "copilot-relay is healthy at http://127.0.0.1:4142/healthz"
+          else
+            echo "Warning: copilot-relay launchd agent loaded, but /healthz is not healthy yet"
+            echo "If authentication expired, run 'npx copilot-relay auth', then re-run install.sh."
           fi
           echo "Loaded launchd agent com.d0n9x1n.copilot-relay (logs: ~/Library/Logs/copilot-relay.{out,err}.log, ~/.copilot-relay/logs/copilot-relay.log)"
         else
           echo "Warning: launchctl bootstrap failed for com.d0n9x1n.copilot-relay"
+        fi
+      fi
+
+      relay_health_src="${src_dir}/launchd/com.d0n9x1n.copilot-relay-healthcheck.plist"
+      relay_health_dest="${HOME}/Library/LaunchAgents/com.d0n9x1n.copilot-relay-healthcheck.plist"
+      relay_health_script="${src_dir}/launchd/copilot-relay-healthcheck.sh"
+      if [ -f "$relay_health_src" ] && [ -f "$relay_health_script" ]; then
+        chmod +x "$relay_health_script" 2>/dev/null || true
+        render_launchd_template "$relay_health_src" "$relay_health_dest"
+
+        if [ ! -f "${HOME}/.copilot-relay/github_token" ]; then
+          if launchctl print "gui/${uid}/com.d0n9x1n.copilot-relay-healthcheck" >/dev/null 2>&1; then
+            launchctl bootout "gui/${uid}/com.d0n9x1n.copilot-relay-healthcheck" 2>/dev/null || true
+          fi
+          echo "Skipping copilot-relay healthcheck agent until copilot-relay auth is complete."
+        elif bootstrap_launchd_agent "$uid" "com.d0n9x1n.copilot-relay-healthcheck" "$relay_health_dest"; then
+          log_command launchctl kickstart -k "gui/${uid}/com.d0n9x1n.copilot-relay-healthcheck" || true
+          echo "Loaded launchd agent com.d0n9x1n.copilot-relay-healthcheck (GET /healthz every 60s; logs: ~/Library/Logs/copilot-relay-healthcheck.log)"
+        else
+          echo "Warning: launchctl bootstrap failed for com.d0n9x1n.copilot-relay-healthcheck"
         fi
       fi
     fi

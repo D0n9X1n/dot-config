@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  TEMPLATE — copilot-relay HTTP health watchdog as a per-user launchd agent.
+
+  This file is consumed by install.sh; do NOT symlink it directly.
+  install.sh substitutes:
+    __HOME__    -> $HOME
+    __SRC_DIR__ -> repo path
+  and writes the rendered plist to
+  ~/Library/LaunchAgents/com.d0n9x1n.copilot-relay-healthcheck.plist.
+
+  What the agent does once loaded:
+    - Runs launchd/copilot-relay-healthcheck.sh at load and every 60 seconds.
+    - The script calls GET http://127.0.0.1:4142/healthz.
+    - HTTP 200 means healthy; anything else triggers
+      launchctl kickstart -k gui/<uid>/com.d0n9x1n.copilot-relay.
+
+  Logs:
+    stdout -> ~/Library/Logs/copilot-relay-healthcheck.out.log
+    stderr -> ~/Library/Logs/copilot-relay-healthcheck.err.log
+    script log -> ~/Library/Logs/copilot-relay-healthcheck.log (capped)
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.d0n9x1n.copilot-relay-healthcheck</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>__SRC_DIR__/launchd/copilot-relay-healthcheck.sh</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <key>StartInterval</key>
+    <integer>60</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>__HOME__/Library/Logs/copilot-relay-healthcheck.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>__HOME__/Library/Logs/copilot-relay-healthcheck.err.log</string>
+
+    <key>WorkingDirectory</key>
+    <string>__HOME__</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

@@ -38,6 +38,12 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
   updates the npm package first, links tracked `.copilot-relay/config.yaml`
   into `~/.copilot-relay/config.yaml`, unloads/removes legacy proxy launchd
   jobs, and restarts the relay agent so it runs the latest installed version.
+- `launchd/com.d0n9x1n.copilot-relay-healthcheck.plist` +
+  `launchd/copilot-relay-healthcheck.sh` — macOS launchd watchdog. Runs at load
+  and every 60s, calls `GET http://127.0.0.1:4142/healthz`, and
+  `launchctl kickstart -k`s `com.d0n9x1n.copilot-relay` if the status is not
+  200. Healthy status is a no-op. Logs restart events to
+  `~/Library/Logs/copilot-relay-healthcheck.log`.
 - `launchd/com.d0n9x1n.npm-cache-clean.plist` + `launchd/clean-npm-caches.sh`
   — macOS launchd agent **template** + its tracked script. install.sh renders
   `__HOME__` -> `$HOME` and `__SRC_DIR__` -> repo path into
@@ -298,8 +304,10 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
    `.tmux.conf` (which exports `TMUX_PLUGIN_MANAGER_PATH` via the tpm init
    line), and clones the plugins listed in `.tmux.conf`. Idempotent.
 11. Links tracked `.copilot-relay/config.yaml`, then configures the
-    `copilot-relay` launchd agent. If unauthenticated, prints a
-    red `ACTION REQUIRED` log telling the user to run `npx copilot-relay auth`
+    `copilot-relay` launchd agent and its `/healthz` watchdog. If `/healthz`
+    already returns 200, leaves the running relay untouched; otherwise starts or
+    restarts the launchd agent. If unauthenticated, prints a red
+    `ACTION REQUIRED` log telling the user to run `npx copilot-relay auth`
     first; after auth, re-run `install.sh` to start launchd.
 12. Loads the `npm-cache-clean` launchd agent (macOS): renders the template +
     `bootout`/`bootstrap`. Runs weekly (Sun 03:17), no auth needed.

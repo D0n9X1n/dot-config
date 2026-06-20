@@ -138,7 +138,7 @@ opusModel: claude-opus-4.8
 ## Maintenance
 
 - Stop/restart the proxy: `launchctl kickstart -k "gui/$(id -u)/com.d0n9x1n.copilot-relay"`.
-- Inspect listener: `curl -sS -o /dev/null --connect-timeout 1 http://127.0.0.1:4142/ && echo "listening"`.
+- Inspect listener: `curl -sS -o /dev/null --connect-timeout 1 http://127.0.0.1:4142/healthz && echo "healthy"`.
 - Refresh GitHub token: `npx copilot-relay auth` again, then re-run `install.sh`.
 - Switch default model: edit top-level `model` in `settings.json`, plus
   `env.ANTHROPIC_MODEL` and `opusModel` / `gptModel` in

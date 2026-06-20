@@ -28,6 +28,9 @@ logRetentionDays: 3
 # Default upstream thinking/reasoning effort: none, low, medium, high, xhigh.
 thinkEffort: xhigh
 
+# Copilot model used for bridge-managed Claude WebSearch. Empty uses gptModel.
+webSearchBackend: 
+
 # Model routing: requests containing "opus" use opusModel; all others use gptModel.
 
 # Upstream Copilot model used for non-Opus requests.

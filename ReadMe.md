@@ -45,6 +45,8 @@ dot-configs/
 ├── themes/apollo/               # Apollo theme (wezterm/vim/nvim/vscode/wt) — reference, not auto-linked
 ├── launchd/                     # macOS launchd agent templates
 │   ├── com.d0n9x1n.copilot-relay.plist     # copilot-relay proxy on login (rendered by install.sh)
+│   ├── com.d0n9x1n.copilot-relay-healthcheck.plist  # /healthz watchdog
+│   ├── copilot-relay-healthcheck.sh        # restarts relay when /healthz is not 200
 │   ├── com.d0n9x1n.npm-cache-clean.plist   # weekly npm/npx cache cleaner (rendered by install.sh)
 │   └── clean-npm-caches.sh                 # the cleaner script the agent runs
 ├── mcp-shared.json              # secret-free MCP entries synced via git
@@ -111,9 +113,14 @@ probes do not appear as errors.
    if missing, then runs `tpm/bin/install_plugins` to clone every plugin
    listed in `.tmux.conf`. Skipped if `tmux` isn't on PATH.
 12. Links `.copilot-relay/config.yaml` to `~/.copilot-relay/config.yaml`, removes
-   legacy proxy launchd jobs, and writes the per-user launchd agent. If relay
-   is not authenticated, the installer prints a red `ACTION REQUIRED` message to run
-   `npx copilot-relay auth` first; after auth, re-run `install.sh` to start it.
+   legacy proxy launchd jobs, and writes the per-user launchd agent plus a
+   `/healthz` watchdog. The watchdog runs at load and every 60 seconds; if
+   `GET http://127.0.0.1:4142/healthz` does not return 200, it restarts
+   `com.d0n9x1n.copilot-relay` with `launchctl kickstart -k`; healthy status is
+   a no-op. The installer uses the same rule: if `/healthz` is already 200, it
+   leaves the running relay untouched. If relay is not authenticated, the
+   installer prints a red `ACTION REQUIRED` message to run `npx copilot-relay auth`
+   first; after auth, re-run `install.sh` to start it.
 13. Writes the `npm-cache-clean` launchd agent (macOS): a weekly job (Sun 03:17)
    that runs `npm cache clean --force` and prunes `~/.npm/_npx` copies older than
    14 days, keeping the cache from growing unbounded. Needs no auth; never touches
@@ -215,14 +222,19 @@ test -f ~/.copilot-relay/github_token && echo "ok" || echo "FAIL: auth incomplet
 ### 4. Start the proxy daemon (must stay running for Claude Code)
 
 After `npx copilot-relay auth`, re-run `install.sh`; the launchd agent should
-start serving the proxy. The agent
-(`com.d0n9x1n.copilot-relay`) starts on every login, restarts on crash,
-and logs to `~/Library/Logs/copilot-relay.{out,err}.log` plus
-`~/.copilot-relay/logs/copilot-relay.log`. Verify:
+start serving the proxy. The agent (`com.d0n9x1n.copilot-relay`) starts on every
+login and restarts on crash. A sibling watchdog
+(`com.d0n9x1n.copilot-relay-healthcheck`) calls `GET /healthz` at load and every
+60 seconds; 200 is a no-op, and a non-200 response triggers
+`launchctl kickstart -k` for the relay.
+Relay logs go to `~/Library/Logs/copilot-relay.{out,err}.log` plus
+`~/.copilot-relay/logs/copilot-relay.log`; watchdog restart logs go to
+`~/Library/Logs/copilot-relay-healthcheck.log`. Verify:
 
 ```bash
 launchctl print "gui/$(id -u)/com.d0n9x1n.copilot-relay" | grep state
-curl -sS -o /dev/null --connect-timeout 1 http://127.0.0.1:4142/ && echo "listening"
+launchctl print "gui/$(id -u)/com.d0n9x1n.copilot-relay-healthcheck" | grep state
+curl -sS -o /dev/null --connect-timeout 1 http://127.0.0.1:4142/healthz && echo "healthy"
 ```
 
 If the agent is loaded but port 4142 is not listening after auth, restart it:
@@ -237,7 +249,7 @@ If you want to manage the agent manually:
 launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.d0n9x1n.copilot-relay.plist
 launchctl bootout   "gui/$(id -u)" ~/Library/LaunchAgents/com.d0n9x1n.copilot-relay.plist
 launchctl kickstart -k "gui/$(id -u)/com.d0n9x1n.copilot-relay"   # restart in place
-tail -f ~/Library/Logs/copilot-relay.{out,err}.log ~/.copilot-relay/logs/copilot-relay.log
+tail -f ~/Library/Logs/copilot-relay.{out,err}.log ~/.copilot-relay/logs/copilot-relay.log ~/Library/Logs/copilot-relay-healthcheck.log
 ```
 
 For a one-off foreground run (debugging, no auto-restart):
