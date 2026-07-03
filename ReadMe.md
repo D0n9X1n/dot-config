@@ -126,7 +126,8 @@ probes do not appear as errors.
    14 days, keeping the cache from growing unbounded. Needs no auth; never touches
    the Playwright browser cache (`~/Library/Caches/ms-playwright`).
 14. Backs up any existing destination file or symlink that doesn't already point
-   at the repo as `<name>.bak.YYYYMMDDHHMMSS` before linking.
+   at the repo as `<name>.bak.YYYYMMDDHHMMSS` before linking, and keeps only
+   the newest backup for each destination.
 15. Leaves correctly-pointing symlinks alone (no-op).
 
 Safe to re-run at any time. Pulling new commits automatically takes effect on
@@ -495,8 +496,9 @@ the tracked TOML files (`sonicterm.toml`, `keymaps/*.toml`, `themes/*.toml`) so
 SonicTerm's `logs/` directory and runtime backup files remain local.
 
 The tracked config uses the `wezterm` theme, `sonicterm-macos` keymap, Rec Mono
-St.Helens 13.5, opaque Gruvbox Dark Hard chrome, and WezTerm-compatible keymaps
-for macOS/Linux/Windows.
+St.Helens 14 with line-height 1.2, `TERM_PROGRAM=WezTerm`, 1000-line scrollback,
+no cursor blink, opaque Gruvbox Dark Hard chrome, software render mode auto, and
+WezTerm-compatible keymaps for macOS/Linux/Windows.
 
 ### copilot-relay (`.copilot-relay/`)
 

@@ -676,12 +676,35 @@ backup_path() {
   local path="$1"
   if [ -e "$path" ] || [ -L "$path" ]; then
     mv "$path" "${path}.bak.${timestamp}"
+    prune_old_backups "$path" 1
   fi
+}
+
+prune_old_backups() {
+  local path="$1"
+  local keep="${2:-1}"
+  local dir
+  local base
+  local backup
+  local count=0
+
+  dir="$(dirname "$path")"
+  base="$(basename "$path")"
+  [ -d "$dir" ] || return 0
+
+  while IFS= read -r backup; do
+    count=$((count + 1))
+    if [ "$count" -gt "$keep" ]; then
+      rm -rf -- "$backup"
+    fi
+  done < <(find "$dir" -maxdepth 1 -name "${base}.bak.[0-9]*" -print | sort -r)
 }
 
 link_file() {
   local src="$1"
   local dest="$2"
+
+  prune_old_backups "$dest" 1
 
   if [ -L "$dest" ] && [ "$(readlink "$dest")" = "$src" ]; then
     return 0

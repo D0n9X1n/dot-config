@@ -94,8 +94,9 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
   only `sonicterm.toml`, `keymaps/*.toml`, and `themes/*.toml` are linked so
   runtime `logs/` and backup files remain machine-local.
   Current config pins theme `wezterm`, keymap `sonicterm-macos`, Rec Mono
-  St.Helens 13.5, Gruvbox/WezTerm-aligned theme colors, and WezTerm-compatible
-  macOS/Linux/Windows keymaps.
+  St.Helens 14 / line-height 1.2, `TERM_PROGRAM=WezTerm`, 1000-line scrollback,
+  no cursor blink, software render mode auto, Gruvbox/WezTerm-aligned theme
+  colors, and WezTerm-compatible macOS/Linux/Windows keymaps.
 - `<repo>/.copilot-relay/config.yaml` — secret-free relay config linked by
   `install.sh` to `~/.copilot-relay/config.yaml`. Pins `claudeSetup: false`,
   local server `127.0.0.1:4142`, `thinkEffort: xhigh`, `gptModel: gpt-5.5`,
@@ -312,7 +313,8 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
 12. Loads the `npm-cache-clean` launchd agent (macOS): renders the template +
     `bootout`/`bootstrap`. Runs weekly (Sun 03:17), no auth needed.
 13. Existing destination files/links that don't match are renamed to
-   `<name>.bak.YYYYMMDDHHMMSS` before linking.
+   `<name>.bak.YYYYMMDDHHMMSS` before linking; only the newest backup for each
+   destination is kept.
 14. Correct symlinks are left alone (no-op).
 
 ## Adding a new config

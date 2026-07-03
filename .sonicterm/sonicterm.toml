@@ -26,19 +26,24 @@ locale = ""
 # alive so a new window can be opened from the dock/taskbar/menu.
 quit_on_last_window_close = true
 
+# Maximum width of a single tab, in logical pixels, when the tab bar has room.
+# Tabs grow up to this width so long titles stay readable; with many tabs they
+# shrink to share the bar evenly. Default 240.
+tab_max_width = 240
+
 [font]
 # Font family and metrics. SonicTerm ships "Rec Mono St.Helens" by default.
 family = "Rec Mono St.Helens"
 # Font size in logical pixels.
-size = 13.5
+size = 14
 # Line-height multiplier. 1.1 is close to WezTerm's default terminal spacing.
-line_height = 1.1
+line_height = 1.2
 
 [window]
 # Default terminal grid size for NEW windows. These are character cells, not px.
 # The first window is roughly:
 #   width  = cols * cell_width  + padding_left + padding_right
-#   height = rows * cell_height + padding_top + padding_bottom + tab/title UI
+#   height = rows * cell_height + padding_top  + padding_bottom + tab/title UI
 #
 # Window layout (terminal content):
 #
@@ -58,10 +63,10 @@ rows = 30
 
 # Padding around the terminal text area, in physical pixels. This affects the
 # distance between terminal content and the window/pane edge.
-padding_left = 8
-padding_right = 8
+padding_left = 12
+padding_right = 12
 padding_top = 8
-padding_bottom = 2
+padding_bottom = 4
 
 # Native OS window decorations. Changing this usually requires restart.
 decorations = true
@@ -73,16 +78,32 @@ opacity = 1.0
 # Legacy macOS blur knob. Prefer [appearance].backdrop for new config.
 blur = false
 
+# Hidden pre-created child windows kept warm for instant tab tear-out.
+# SonicTerm keeps at least one spare after consuming one; values above 5 are clamped.
+warm_window_pool = 2
+
 [terminal]
+# Shell to spawn. Leave commented to auto-detect (Windows: PowerShell 7
+# `pwsh.exe`, including the Microsoft Store install, falling back to Windows
+# PowerShell then cmd.exe; macOS/Linux: $SHELL). Set an explicit path/name to
+# override, e.g. shell = "pwsh.exe" or shell = "powershell.exe".
+# shell = "pwsh.exe"
+
+# TERM_PROGRAM passed to child PTYs. Some tools, such as Copilot, do not
+# recognize SonicTerm yet; setting term_program = "WezTerm" can bypass their
+# terminal checks and enable their WezTerm/new terminal UI path.
+term_program = "WezTerm"
+
 # Scrollback line limit per pane.
-scrollback = 10000
+scrollback = 1000
 
 # Cursor behavior. Shape: "block", "bar", or "underline".
-cursor_blink = true
+cursor_blink = false
 cursor_shape = "block"
 
 [logging]
 # Logs are written to ~/.sonicterm/logs/sonicterm.log.
+# Levels: error, warn, info, debug. Debug includes performance/render timing.
 # SonicTerm automatically removes logs and crash dumps older than 2 days.
 level = "warn"
 max_file_size_mb = 10
@@ -94,10 +115,9 @@ max_crash_age_days = 2
 [appearance]
 # Window/backdrop/compositor appearance. This is separate from [window] padding:
 # - [window].padding_* controls terminal text margins.
-# - panel_padding controls the inside padding of pop-up panels (command palette,
-#   cheatsheet, etc.).
+# - panel_padding controls the inside padding of pop-up panels (command palette).
 #
-# Panel layout (for command palette / cheatsheet):
+# Panel layout (for command palette):
 #
 #   +---------------- floating panel ----------------+
 #   | panel_padding                                  |
@@ -110,7 +130,11 @@ backdrop = "opaque"
 opacity = 1.0
 scrollbar = "auto"
 panel_padding = 2
-software_render_mode = "off"
+# No-GPU handling. When wgpu falls back to a CPU rasterizer (WARP / llvmpipe,
+# common over RDP / in VMs), every frame is drawn on the CPU. "auto" detects
+# this and lowers the frame cap + disables per-frame fade animation to stay
+# usable; "force" always degrades; "off" never does.
+software_render_mode = "auto"
 
 [render]
 # Renderer behavior switches. Keep "v2" unless bisecting a rendering regression.
