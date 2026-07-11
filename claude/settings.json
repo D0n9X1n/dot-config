@@ -2,10 +2,10 @@
   "env": {
     "ANTHROPIC_BASE_URL": "http://127.0.0.1:4142",
     "ANTHROPIC_AUTH_TOKEN": "dummy",
-    "ANTHROPIC_MODEL": "gpt-5.6[1m]",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5.6[1m]",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-5.6[1m]",
-    "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.6[1m]",
+    "ANTHROPIC_MODEL": "gpt-5.6-sol[1m]",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5.6-sol[1m]",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-5.6-sol[1m]",
+    "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.6-sol[1m]",
     "MODEL_REASONING_EFFORT": "max"
   },
   "permissions": {
@@ -65,6 +65,7 @@
       }
     }
   },
+  "model": "gpt-5.6-sol[1m]",
   "effortLevel": "max",
   "skipDangerousModePermissionPrompt": true,
   "theme": "dark-ansi",

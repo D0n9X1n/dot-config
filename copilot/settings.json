@@ -1,5 +1,5 @@
 {
-  "model": "gpt-5.5",
+  "model": "gpt-5.6-sol",
   "contextTier": "long_context",
   "theme": "dark",
   "renderMarkdown": true,
@@ -64,7 +64,7 @@
     "autoConnect": true,
     "openDiffOnEdit": true
   },
-  "effortLevel": "xhigh",
+  "effortLevel": "max",
   "sessionSync": [
     {
       "origin": "D0n9X1n/nvim-config",

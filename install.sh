@@ -610,8 +610,8 @@ configure_copilot_relay() {
       printf 'claudeSetup: false\n'
       printf 'logLevel: info\n'
       printf 'logRetentionDays: 3\n'
-      printf 'thinkEffort: xhigh\n'
-      printf 'gptModel: gpt-5.5\n'
+      printf 'thinkEffort: max\n'
+      printf 'gptModel: gpt-5.6-sol\n'
       printf 'opusModel: claude-opus-4.8\n'
     } >"$relay_config"
   fi

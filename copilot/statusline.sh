@@ -26,7 +26,7 @@
 #          total_input_tokens, total_cache_read_tokens,
 #          last_call_input_tokens, last_call_output_tokens, ...}
 # NOT exposed by Copilot (so the matching segment silently no-ops):
-#   .effort.level (we instead parse the trailing "(xhigh)" / "(high)"
+#   .effort.level (we instead parse the trailing "(max)" / "(xhigh)"
 #                  tag baked into .model.display_name)
 #   .vim.mode, .agent.name, .workspace.git_worktree, .output_style.name,
 #   .cost.total_cost_usd
@@ -318,12 +318,13 @@ if [ -n "$cwd" ] && [ -d "$cwd" ]; then
 fi
 
 # Effort is not a top-level JSON field in Copilot — it's appended to
-# .model.display_name as " (low)" / " (medium)" / " (high)" / " (xhigh)".
+# .model.display_name as " (low)" / " (medium)" / " (high)" / " (xhigh)" / " (max)".
 # Extract the *last* parenthesized token whose contents matches a known
 # effort word so we don't accidentally pick up "(1M context)" etc.
 effort_level=""
 if [ -n "$model_name" ]; then
   case "$model_name" in
+    *'(max)'*)    effort_level="max" ;;
     *'(xhigh)'*)  effort_level="xhigh" ;;
     *'(high)'*)   effort_level="high" ;;
     *'(medium)'*) effort_level="medium" ;;
@@ -407,7 +408,7 @@ seg_model() {
   #   "Claude Opus 4.7 (1M context)(Internal only) (10x) (xhigh)"
   #   -> "Opus 4.7 (1M)"
   # Drop the leading vendor word ("Claude "), strip "(Internal only)" /
-  # "(10x)" / "(low|medium|high|xhigh)" no matter how they're spaced, and
+  # "(10x)" / "(low|medium|high|xhigh|max)" no matter how they're spaced, and
   # squash "(1M context)" -> "(1M)". Single sed pipe for portability —
   # bash 3.2's parameter expansion can't match optional leading spaces.
   local short="$model_name"
@@ -415,7 +416,7 @@ seg_model() {
   short="$(printf '%s' "$short" | sed -E '
         s/ ?\(Internal only\)//g
         s/ ?\([0-9]+x\)//g
-        s/ ?\((xhigh|high|medium|low)\)//g
+        s/ ?\((max|xhigh|high|medium|low)\)//g
         s/\(([0-9.]+[KMG]?) context\)/(\1)/g
         s/  +/ /g
         s/ +$//
