@@ -25,8 +25,8 @@ logLevel: info
 # Number of days to keep files in ~/.copilot-relay/logs.
 logRetentionDays: 3
 
-# Default upstream thinking/reasoning effort: none, low, medium, high, xhigh.
-thinkEffort: xhigh
+# Default upstream thinking/reasoning effort: none, low, medium, high, xhigh, max.
+thinkEffort: max
 
 # Max seconds to wait for a single Claude request's upstream Copilot calls.
 upstreamTimeoutSeconds: 180
@@ -37,7 +37,7 @@ webSearchBackend:
 # Model routing: requests containing "opus" use opusModel; all others use gptModel.
 
 # Upstream Copilot model used for non-Opus requests.
-gptModel: gpt-5.5
+gptModel: gpt-5.6-sol
 
 # Upstream Copilot model used for requests containing "opus".
 opusModel: claude-opus-4.8

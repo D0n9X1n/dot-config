@@ -505,7 +505,7 @@ WezTerm-compatible keymaps for macOS/Linux/Windows.
 The relay config is kept in-repo and auto-linked by `install.sh` to
 `~/.copilot-relay/config.yaml`. It is intentionally limited to secret-free
 settings: local bind address/port, logging retention, `claudeSetup: false`,
-`thinkEffort: xhigh`, `gptModel: gpt-5.5`, and
+`thinkEffort: max`, `gptModel: gpt-5.6-sol`, and
 `opusModel: claude-opus-4.8`.
 
 Do not commit the rest of `~/.copilot-relay/`: `github_token`,
@@ -688,21 +688,21 @@ proxy that translates Anthropic-format requests into Copilot ones.
   "env": {
     "ANTHROPIC_BASE_URL": "http://127.0.0.1:4142",
     "ANTHROPIC_AUTH_TOKEN": "dummy",
-    "ANTHROPIC_MODEL": "claude-opus-4-8[1m]",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5.5[1m]",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-5.5[1m]",
-    "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.5[1m]",
-    "MODEL_REASONING_EFFORT": "xhigh"
+    "ANTHROPIC_MODEL": "gpt-5.6[1m]",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5.6[1m]",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-5.6[1m]",
+    "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.6[1m]",
+    "MODEL_REASONING_EFFORT": "max"
   },
   "permissions": { "allow": ["*"], "defaultMode": "auto" },
-  "model": "claude-opus-4-8[1m]",
+  "model": "gpt-5.6[1m]",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
     "padding": 0,
     "refreshInterval": 100
   },
-  "effortLevel": "xhigh",
+  "effortLevel": "max",
   "theme": "dark-ansi",
   "skipAutoPermissionPrompt": true,
   "skipDangerousModePermissionPrompt": true
@@ -711,36 +711,40 @@ proxy that translates Anthropic-format requests into Copilot ones.
 
 Defaults pinned globally (synced across machines via this repo):
 
-- **Model: `claude-opus-4-8[1m]`** (Opus 4.8, 1M window). The `[1m]` suffix
-  is the explicit opt-in for Claude Code's 1M context — it matches the in-app
-  "Opus 1M" picker entry and the binary's `Xx3` gate (model name must contain
-  both `opus` and `[1m]`). `copilot-relay` matches on the `opus` substring and
-  ignores the suffix, mapping the request to Copilot upstream
-  `opusModel: claude-opus-4.8`. `env.ANTHROPIC_MODEL`, top-level
-  `model`, and the zsh wrappers are all pinned to `claude-opus-4-8[1m]`. Do not
-  use top-level `model: "default"` here: relay routes model names that do not
-  contain `opus` to `gptModel` (`gpt-5.5`), which appears as 200k context.
+- **Model: `gpt-5.6[1m]`** (default). The `[1m]` suffix keeps Claude Code's
+  1M-context accounting for the custom GPT route — a bare custom name would
+  be treated as 200k. `copilot-relay` routes every model name that does **not**
+  contain `opus` to `gptModel` (currently `gpt-5.6-sol`), so the Claude-facing
+  `5.6` label is cosmetic relay-side: the upstream model is whatever `gptModel`
+  points at. `env.ANTHROPIC_MODEL`, top-level `model`, and the zsh wrappers are
+  all pinned to `gpt-5.6[1m]`.
+- **Opus is no longer the default.** It stays reachable via `/model` or
+  `--model 'claude-opus-4-8[1m]'`. The `[1m]` suffix is the explicit opt-in for
+  Claude Code's 1M window (it matches the in-app "Opus 1M" picker entry and the
+  binary's `Xx3` gate — the name must contain both `opus` and `[1m]`).
+  `copilot-relay` matches on the `opus` substring and ignores the suffix,
+  mapping the request to Copilot upstream `opusModel: claude-opus-4.8`.
 - **Family-aware routing via env vars + relay**:
-  - **`ANTHROPIC_DEFAULT_SONNET_MODEL: gpt-5.5[1m]`** — every Sonnet alias
+  - **`ANTHROPIC_DEFAULT_SONNET_MODEL: gpt-5.6[1m]`** — every Sonnet alias
     from Claude Code's built-in picker uses the GPT route while preserving
     Claude-side 1M context accounting.
-  - **`ANTHROPIC_DEFAULT_HAIKU_MODEL: gpt-5.5[1m]`** — Haiku tier for current
+  - **`ANTHROPIC_DEFAULT_HAIKU_MODEL: gpt-5.6[1m]`** — Haiku tier for current
     Claude Code versions, including sub-agents and small-fast side tasks.
-  - **`ANTHROPIC_SMALL_FAST_MODEL: gpt-5.5[1m]`** — legacy alias for older
+  - **`ANTHROPIC_SMALL_FAST_MODEL: gpt-5.6[1m]`** — legacy alias for older
     Claude Code versions.
-  - `copilot-relay` also has `gptModel: gpt-5.5` and
-    `opusModel: claude-opus-4.8`, so Claude-facing `gpt-5.5[1m]` is still
-    routed to upstream `gpt-5.5`. Plain `gpt-5.5` works, but Claude Code
-    treats unknown custom model names as 200k.
-- **Effort: `xhigh`** — applied two ways:
-  `effortLevel: "xhigh"` (Claude Code's client-side reasoning budget,
-  applied to every session) and `thinkEffort: xhigh` in
+  - `copilot-relay` routes the `gpt-5.6[1m]` default and every alias to the
+    same upstream `gptModel` (`gpt-5.6-sol`), so the Claude-facing label only
+    affects Claude-side display/accounting. Plain unsuffixed names work too,
+    but Claude Code treats unknown custom model names as 200k.
+- **Effort: `max`** — applied two ways:
+  `effortLevel: "max"` (Claude Code's client-side reasoning budget,
+  applied to every session) and `thinkEffort: max` in
   `~/.copilot-relay/config.yaml` (linked by `install.sh`, hot-reloaded by
   the relay, and forwarded to Copilot upstream). `MODEL_REASONING_EFFORT`
   remains in `settings.json` so the statusline can display the pinned effort.
 - `ANTHROPIC_BASE_URL` — the local `copilot-relay` proxy on port 4142.
   All model names above are Copilot-side identifiers the proxy knows how
-  to route. Claude Code itself doesn't know about `gpt-5.5`; the proxy
+  to route. Claude Code itself doesn't know about `gpt-5.6-sol`; the proxy
   translates every request and replies with Anthropic-shaped JSON.
 - `ANTHROPIC_AUTH_TOKEN` — required by Claude Code's startup check.
   `dummy` is fine; real auth happens in `npx copilot-relay auth`.
@@ -774,7 +778,7 @@ settings.json key is gated off by feature flag.
 Same applies to `cc [title]`: it renames the active terminal tab via
 OSC 1/2 (+ tmux + WezTerm CLI fallbacks; default title is the current directory
 path) then launches Claude Code with
-the bypass flag plus `--model 'claude-opus-4-8[1m]' --effort xhigh`. The title is prefixed with a Nerd Font glyph
+the bypass flag plus `--model 'gpt-5.6[1m]' --effort max`. The title is prefixed with a Nerd Font glyph
 (`mdi-creation`, U+F0674 — sparkles) so Claude tabs are visually distinct
 from Copilot's `gg` tabs (which use `fa-github`) and from plain shells.
 
@@ -785,7 +789,7 @@ One-time setup (after running `install.sh` on a fresh box):
 
 ```bash
 npx copilot-relay auth  # browser device-code login (GitHub)
-claude              # in another shell — uses Opus 4.8 1M @ xhigh effort
+claude              # in another shell — uses gpt-5.6 1M @ max effort
 ```
 
 Project-specific Claude Code config is synced by committing files to each

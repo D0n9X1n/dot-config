@@ -28,8 +28,8 @@ function claude {
   done
 
   defaults=(--permission-mode bypassPermissions)
-  (( has_model )) || defaults+=(--model 'claude-opus-4-8[1m]')
-  (( has_effort )) || defaults+=(--effort xhigh)
+  (( has_model )) || defaults+=(--model 'gpt-5.6[1m]')
+  (( has_effort )) || defaults+=(--effort max)
 
   command claude "${defaults[@]}" "$@"
 }

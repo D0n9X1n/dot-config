@@ -58,21 +58,21 @@ The `oh-my-zsh-custom/claude.zsh` wrapper launches `claude` with
   "env": {
     "ANTHROPIC_BASE_URL": "http://127.0.0.1:4142",
     "ANTHROPIC_AUTH_TOKEN": "dummy",
-    "ANTHROPIC_MODEL": "claude-opus-4-8[1m]",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5.5[1m]",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-5.5[1m]",
-    "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.5[1m]",
-    "MODEL_REASONING_EFFORT": "xhigh"
+    "ANTHROPIC_MODEL": "gpt-5.6[1m]",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5.6[1m]",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-5.6[1m]",
+    "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.6[1m]",
+    "MODEL_REASONING_EFFORT": "max"
   },
   "permissions": { "allow": ["*"], "defaultMode": "auto" },
-  "model": "claude-opus-4-8[1m]",
+  "model": "gpt-5.6[1m]",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
     "padding": 0,
     "refreshInterval": 100
   },
-  "effortLevel": "xhigh",
+  "effortLevel": "max",
   "theme": "dark-ansi",
   "skipAutoPermissionPrompt": true,
   "skipDangerousModePermissionPrompt": true
@@ -83,13 +83,13 @@ The `oh-my-zsh-custom/claude.zsh` wrapper launches `claude` with
 |---|---|
 | `env.ANTHROPIC_BASE_URL` | Points Claude Code at the local proxy instead of `api.anthropic.com`. |
 | `env.ANTHROPIC_AUTH_TOKEN` | Required by Claude Code's startup check. `dummy` is fine; real auth happens via `npx copilot-relay auth`. **First launch will prompt** "Use this custom API key? (y/N)" — pick **Yes**, otherwise it lands in `~/.claude.json#customApiKeyResponses.rejected` and Claude refuses to use it. |
-| `env.ANTHROPIC_MODEL` | Claude Code-facing Opus 4.8 default. The `[1m]` suffix is the explicit 1M opt-in (matches the in-app "Opus 1M" picker / binary `Xx3` gate, which keys on the name containing both `opus` and `[1m]`). Relay matches on the `opus` substring, so `claude-opus-4-8[1m]` still maps to upstream `opusModel: claude-opus-4.8` (the `[1m]` suffix is ignored relay-side). |
-| `env.ANTHROPIC_DEFAULT_SONNET_MODEL` | Routes every Sonnet alias through Claude-facing `gpt-5.5[1m]`; relay maps it to upstream `gpt-5.5`. |
-| `env.ANTHROPIC_DEFAULT_HAIKU_MODEL` | Routes current Claude Code's Haiku tier, including sub-agents and small-fast side tasks, through `gpt-5.5[1m]`. |
-| `env.ANTHROPIC_SMALL_FAST_MODEL` | Legacy small-fast alias for older Claude Code versions; pinned to `gpt-5.5[1m]`. |
+| `env.ANTHROPIC_MODEL` | Claude Code-facing default, `gpt-5.6[1m]`. The `[1m]` suffix keeps Claude Code's 1M-context accounting for the custom GPT route (a bare custom name is treated as 200k). Relay routes every non-`opus` name to `gptModel` (currently `gpt-5.6-sol`), so the `5.6` label is cosmetic relay-side. Opus is reachable but no longer the default — pick it via `/model` or `--model 'claude-opus-4-8[1m]'`. |
+| `env.ANTHROPIC_DEFAULT_SONNET_MODEL` | Routes every Sonnet alias through Claude-facing `gpt-5.6[1m]`; relay maps it to upstream `gptModel`. |
+| `env.ANTHROPIC_DEFAULT_HAIKU_MODEL` | Routes current Claude Code's Haiku tier, including sub-agents and small-fast side tasks, through `gpt-5.6[1m]`. |
+| `env.ANTHROPIC_SMALL_FAST_MODEL` | Legacy small-fast alias for older Claude Code versions; pinned to `gpt-5.6[1m]`. |
 | `env.MODEL_REASONING_EFFORT` | Kept for the custom statusline; upstream thinking is controlled by `thinkEffort` in `~/.copilot-relay/config.yaml`. |
-| `effortLevel` | Claude Code's client-side reasoning budget. `low / medium / high / xhigh`. |
-| `model` | Top-level default; set to `claude-opus-4-8[1m]`. Do not use `default` with `copilot-relay`, because relay routes non-`opus` names to `gpt-5.5` (200k context). |
+| `effortLevel` | Claude Code's client-side reasoning budget. `low / medium / high / xhigh / max`. |
+| `model` | Top-level default; set to `gpt-5.6[1m]`. Do not use `default` with `copilot-relay`, because relay routes non-`opus` names to `gptModel` — the `[1m]` suffix is what keeps Claude Code's 1M accounting (bare custom names are 200k). |
 
 ### Built-in `/model` menu
 
@@ -97,7 +97,8 @@ Claude Code's `/model` picker is **hard-coded** to its own lineup
 (Default / Sonnet / Sonnet-1M / Haiku / Custom). There is no setting to
 hide entries or substitute a custom list. The pragmatic workaround is the
 `ANTHROPIC_*_MODEL` env vars above: Sonnet / Haiku / small-fast picks all
-route to `gpt-5.5[1m]`, while Opus stays on `claude-opus-4-8[1m]`.
+route to `gpt-5.6[1m]`, the default is `gpt-5.6[1m]`, and Opus is reachable
+via `--model 'claude-opus-4-8[1m]'`.
 
 ### Relay config
 
@@ -110,16 +111,18 @@ copilotBaseUrl: https://api.githubcopilot.com
 claudeSetup: false
 logLevel: info
 logRetentionDays: 3
-thinkEffort: xhigh
-gptModel: gpt-5.5
+thinkEffort: max
+gptModel: gpt-5.6-sol
 opusModel: claude-opus-4.8
 ```
 
-> **xhigh + 1M context.** `claude-opus-4.8` is natively 1M-context on Copilot,
-> and `thinkEffort: xhigh` asks the relay to forward max reasoning per
-> request. The bracketed `[1m]` suffix lives on the *Claude-facing* name
-> (`claude-opus-4-8[1m]`) to engage Claude Code's 1M window; relay ignores
-> the suffix and maps to this upstream model unchanged.
+> **max + 1M context.** The default route is the Claude-facing `gpt-5.6[1m]`;
+> relay sends every non-`opus` request to `gptModel` (`gpt-5.6-sol`), and
+> `thinkEffort: max` asks the relay to forward max reasoning per request. The
+> bracketed `[1m]` suffix lives on the *Claude-facing* name to engage Claude
+> Code's 1M window; relay ignores the suffix. Opus (`opusModel:
+> claude-opus-4.8`, natively 1M on Copilot) is still reachable via
+> `--model 'claude-opus-4-8[1m]'` but is no longer the default.
 
 ---
 
@@ -129,7 +132,7 @@ opusModel: claude-opus-4.8
 |---|---|---|
 | `claude` shows the onboarding wizard / OAuth login every launch | `hasCompletedOnboarding` missing in `~/.claude.json` | Set `"hasCompletedOnboarding": true` in `~/.claude.json` (one-time, per machine — `~/.claude.json` is **not** synced via dot-configs because it carries per-machine state like `userID` and project list). |
 | Claude refuses to start ("This API key is not approved") | First-launch prompt was answered "No"; `dummy` is in `~/.claude.json#customApiKeyResponses.rejected` | Move `"dummy"` from `rejected` to `approved` in `~/.claude.json#customApiKeyResponses`. |
-| `400 model_not_supported` mid-session ("do you have status line?", title generation) | Claude defaults the small-fast model to a model Copilot doesn't expose, or relay routing is bypassed | Keep `ANTHROPIC_DEFAULT_HAIKU_MODEL` and `ANTHROPIC_SMALL_FAST_MODEL` pinned to `gpt-5.5[1m]`, and confirm `ANTHROPIC_BASE_URL` points to `http://127.0.0.1:4142`. |
+| `400 model_not_supported` mid-session ("do you have status line?", title generation) | Claude defaults the small-fast model to a model Copilot doesn't expose, or relay routing is bypassed | Keep `ANTHROPIC_DEFAULT_HAIKU_MODEL` and `ANTHROPIC_SMALL_FAST_MODEL` pinned to `gpt-5.6[1m]`, and confirm `ANTHROPIC_BASE_URL` points to `http://127.0.0.1:4142`. |
 | `copilot-relay` rewrites `~/.claude/settings.json` | `claudeSetup` is true in `~/.copilot-relay/config.yaml` | Re-run `install.sh`; it sets `claudeSetup: false` and restarts the launchd agent. |
 | `settings.json` shows working-tree drift after running `claude` | Claude Code rewrites the file on first launch to inject `theme`, `effortLevel`, etc. | Same caveat as Copilot CLI — selectively `git checkout` runtime-injected fields you don't want to commit. The committed shape is canonical. |
 

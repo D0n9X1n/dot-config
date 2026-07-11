@@ -99,7 +99,7 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
   colors, and WezTerm-compatible macOS/Linux/Windows keymaps.
 - `<repo>/.copilot-relay/config.yaml` — secret-free relay config linked by
   `install.sh` to `~/.copilot-relay/config.yaml`. Pins `claudeSetup: false`,
-  local server `127.0.0.1:4142`, `thinkEffort: xhigh`, `gptModel: gpt-5.5`,
+  local server `127.0.0.1:4142`, `thinkEffort: max`, `gptModel: gpt-5.6-sol`,
   and `opusModel: claude-opus-4.8`. Do **not** commit
   `~/.copilot-relay/github_token`, `copilot_token.json`, or `logs/`.
 - `<repo>/themes/apollo/` — **reference theme files; NOT auto-linked**.
@@ -184,29 +184,27 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     Sets `ANTHROPIC_BASE_URL=http://127.0.0.1:4142`,
     `ANTHROPIC_AUTH_TOKEN=dummy` (Claude Code requires a token-shaped
     custom key; relay auth is handled by `npx copilot-relay auth`), and pins
-    **Opus 4.8 @ xhigh effort** as the
+    **gpt-5.6 @ max effort** as the
     global default for every machine that runs `install.sh`:
-    `ANTHROPIC_MODEL=claude-opus-4-8[1m]`; wrappers also inject
-    `--model 'claude-opus-4-8[1m]' --effort xhigh` because Claude Code can rewrite
-    `settings.json` at runtime. The `[1m]` suffix is the **explicit opt-in**
-    for the 1M window — it matches the in-app "Opus 1M" picker entry and the
-    `Xx3` gate in the binary (name must contain both `opus` and `[1m]`); it
-    removes any ambiguity about the bare name's default, which has varied
-    across Claude Code versions. Verified live: `claude-opus-4-8[1m]` is
-    accepted by the relay and returns normally (no `opus_1m_unavailable`).
-    Do not use top-level `model=default` with
-    `copilot-relay`: relay routes non-`opus` model names to `gptModel`
-    (`gpt-5.5`), which appears as 200k context. Relay matches on the `opus`
-    substring, so `claude-opus-4-8[1m]` still maps to Copilot upstream
-    `opusModel: claude-opus-4.8` (the `[1m]` suffix is ignored relay-side),
-    `effortLevel="xhigh"` (deepest reasoning client-side, no
-    `/effort` needed) plus `MODEL_REASONING_EFFORT=xhigh` so the
+    `ANTHROPIC_MODEL=gpt-5.6[1m]`; wrappers also inject
+    `--model 'gpt-5.6[1m]' --effort max` because Claude Code can rewrite
+    `settings.json` at runtime. The `[1m]` suffix keeps Claude Code's
+    **1M-context accounting** for the custom GPT route instead of falling
+    back to 200k (bare custom names default to 200k). `copilot-relay` routes
+    every non-`opus` model name to `gptModel` (currently `gpt-5.6-sol`), so
+    the Claude-facing `5.6` label is cosmetic relay-side — upstream is
+    whatever `gptModel` points at. Opus is still reachable but is **no
+    longer the default**: pick it via `/model` or `--model
+    'claude-opus-4-8[1m]'` (relay matches on the `opus` substring, mapping it
+    to Copilot upstream `opusModel: claude-opus-4.8`, ignoring the suffix),
+    `effortLevel="max"` (deepest reasoning client-side, no
+    `/effort` needed) plus `MODEL_REASONING_EFFORT=max` so the
     statusline can display the pinned effort. Claude's Sonnet/Haiku/small-fast
-    env overrides are all pinned to Claude-facing `gpt-5.5[1m]` so Claude
+    env overrides remain pinned to Claude-facing `gpt-5.6[1m]` so Claude
     Code treats the custom GPT route as 1M instead of falling back to 200k;
-    relay still maps those non-Opus requests to upstream `gptModel: gpt-5.5`.
+    relay likewise maps those non-Opus requests to `gptModel`.
     Relay-side thinking is pinned by `~/.copilot-relay/config.yaml` as
-    `thinkEffort: xhigh`.
+    `thinkEffort: max`.
     Autonomous mode is enabled via
     `skipAutoPermissionPrompt=true` + `skipDangerousModePermissionPrompt=true` +
     `permissions.defaultMode="auto"`.
