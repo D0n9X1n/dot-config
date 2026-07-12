@@ -225,22 +225,29 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     Project-specific Claude config syncs only when committed in each project
     repo (`.claude/settings.json`, `.claude/CLAUDE.md`, `.mcp.json`);
     `~/.claude.json.projects` is machine-local/path-keyed and is not copied.
-    The `hooks` block wires `PreToolUse|PostToolUse` (matcher `Task|Agent`)
-    and `SubagentStop` to `~/.claude/hooks/subagent-counter.sh start|stop`,
-    maintaining an event-driven per-session running-subagent counter file.
+    The `hooks` block wires `PreToolUse`, `PostToolUse`, and
+    `PostToolUseFailure` (matcher `Task|Agent`) plus `SubagentStop` to
+    `~/.claude/hooks/subagent-counter.sh`. Since v1.8.0, `PreToolUse`
+    atomically enforces a hard **10-running-subagent cap per session** and
+    returns Claude Code's `permissionDecision: "deny"` for excess launches.
     The hooks stay installed, but the statusline **no longer reads or renders**
     subagents — Claude Code ships its own native subagent UI, so Claude's
     statusline has neither the inline count nor a live-agent tree below L5
     (intentional divergence from the Copilot sibling, which keeps both).
-  - `hooks/subagent-counter.sh` — maintains
-    `$TMPDIR/claude-subagents-$USER/<session_id>` (single integer).
-    +1 on Task/Agent `start`, -1 on `stop`. Dedupes overlapping
-    `PostToolUse` + `SubagentStop` events via a `.seen` sidecar keyed by
-    `tool_use_id`. Uses `mkdir` lock for concurrency safety, falls back
-    to bash regex if `jq` is absent, always exits 0 so a hook bug never
-    blocks Claude. The counter file is retained for potential external
-    consumers, but the statusline itself no longer reads it (Claude Code's
-    native subagent UI replaced the old `seg_subagents` segment).
+  - `hooks/subagent-counter.sh` — race-safe, fail-closed admission guard.
+    Authoritative state is
+    `$TMPDIR/claude-subagents-$USER/<session_id>.state`; the sibling integer
+    remains compatibility/display data only. `PreToolUse` reserves by
+    `tool_use_id`; background `PostToolUse` binds the reservation to `agentId`;
+    `SubagentStop` releases it at actual completion; foreground completion and
+    `PostToolUseFailure` release directly. Stop-before-response ordering is
+    reconciled with tombstones, and duplicate lifecycle events are idempotent.
+    An unreadable/corrupt state, malformed admission payload, missing `jq`, or
+    lock timeout denies new launches rather than risking an 11th agent. A
+    release-side failure conservatively leaks a slot. Start a new Claude Code
+    session after upgrading from the legacy count-only hook. The statusline
+    itself does not read this state (Claude Code's native agent UI replaced the
+    old `seg_subagents` segment).
 - `<repo>/oh-my-zsh-custom/<file>` — files linked to
   `$HOME/.oh-my-zsh/custom/<file>`. Currently:
   - `custom.zsh` — aliases, proxy helpers (`enable_proxy`/`disable_proxy`),

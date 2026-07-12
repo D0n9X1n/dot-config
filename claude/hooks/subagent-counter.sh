@@ -1,134 +1,401 @@
 #!/usr/bin/env bash
-# Per-session running-subagent counter, driven by Claude Code hooks.
+# Per-session Claude Code subagent admission guard.
 #
-# Wired up in ~/.claude/settings.json under three events:
-#   - PreToolUse  matcher=Task  -> mode=start
-#   - PostToolUse matcher=Task  -> mode=stop
-#   - SubagentStop              -> mode=stop  (covers background agents
-#                                              whose PostToolUse fires
-#                                              before the agent actually
-#                                              finishes)
+# Modes are wired from ~/.claude/settings.json:
+#   reserve  PreToolUse         Atomically reserve one of 10 slots.
+#   complete PostToolUse        Release foreground runs or bind background
+#                               tool_use_id -> agentId for SubagentStop.
+#   fail     PostToolUseFailure Release a failed launch reservation.
+#   stop     SubagentStop       Release by agent_id at actual completion.
 #
-# Each hook invocation receives a JSON payload on stdin (we only need
-# .session_id and .tool_use_id) and is passed the mode as $1. We maintain
-# one counter file per session at:
-#   $TMPDIR/claude-subagents-<session_id>
-# containing a single integer (current count of running subagents).
+# State lives under $TMPDIR/claude-subagents-$USER. The .state file is the
+# authority; the integer file is retained for external readers. Records are:
+#   R<TAB>tool_use_id                 reserved, launch response pending
+#   A<TAB>tool_use_id<TAB>agent_id    launched and still running
+#   S<TAB>agent_id                    stop observed; reconciles a late response
 #
-# A sibling `seen` file (`<counter>.seen`) records tool_use_ids we've
-# already counted, so duplicate events (PostToolUse + SubagentStop firing
-# for the same id) don't double-decrement.
+# Every read-modify-write is serialized with an atomic mkdir lock. Admission
+# fails closed if input, state, locking, or persistence cannot be trusted.
+# Release failures leak a slot rather than risk admitting an 11th subagent.
 #
-# Output is suppressed; hook stdout/stderr never reach the user UI in
-# normal operation, but we explicitly `>/dev/null` to avoid any risk of
-# polluting Claude Code's pane.
-#
-# Bash 3.2-compatible (macOS default). Exits 0 unconditionally so a
-# transient failure (e.g. disk full, jq missing) never blocks Claude.
+# Bash 3.2-compatible (macOS default).
 
-set -u
+set -euo pipefail
+umask 077
 
+limit=10
 mode="${1:-}"
 case "$mode" in
-  start | stop) ;;
+  reserve | complete | fail | stop) ;;
   *) exit 0 ;;
 esac
 
+state_dir=""
+counter=""
+state=""
+seen=""
+lock=""
+tmp_state=""
+lock_held=0
+
+cleanup() {
+  if [ -n "$tmp_state" ]; then
+    rm -f "$tmp_state" 2>/dev/null || true
+  fi
+  if [ "$lock_held" -eq 1 ]; then
+    rmdir "$lock" 2>/dev/null || true
+  fi
+  return 0
+}
+trap cleanup EXIT
+
+deny_limit() {
+  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Claude Code subagent safety limit reached (10 running). Wait for an existing subagent to finish before starting another."}}'
+  exit 0
+}
+
+deny_unavailable() {
+  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Subagent launch blocked because the 10-agent safety counter could not be verified. Restart Claude Code if the counter remains unavailable."}}'
+  exit 0
+}
+
+safe_exit() {
+  if [ "$mode" = "reserve" ]; then
+    deny_unavailable
+  fi
+  exit 0
+}
+
+# Unexpected top-level failures during admission must deny, not silently allow.
+# ERR is intentionally not inherited by command-substitution subshells: their
+# statuses are checked explicitly so denial JSON cannot contaminate parsed data.
+on_error() {
+  set +e
+  safe_exit
+}
+trap on_error ERR
+
+on_signal() {
+  set +e
+  safe_exit
+}
+trap on_signal HUP INT TERM
+
+valid_id() {
+  case "$1" in
+    '' | . | .. | *[!A-Za-z0-9_.:-]*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
 payload=""
 if [ ! -t 0 ]; then
-  payload="$(cat 2>/dev/null || true)"
-fi
-
-# Extract session_id and tool_use_id. Prefer jq when available; fall back
-# to a bash regex so the counter still works without jq on PATH.
-session_id=""
-tool_use_id=""
-if [ -n "$payload" ]; then
-  if command -v jq >/dev/null 2>&1; then
-    session_id="$(printf '%s' "$payload" | jq -r '.session_id // ""' 2>/dev/null)"
-    tool_use_id="$(printf '%s' "$payload" | jq -r '
-      .tool_use_id //
-      .tool_input.tool_use_id //
-      .tool_response.tool_use_id //
-      .tool_call_id //
-      ""
-    ' 2>/dev/null)"
-  else
-    if [[ "$payload" =~ \"session_id\"[[:space:]]*:[[:space:]]*\"([^\"]+)\" ]]; then
-      session_id="${BASH_REMATCH[1]}"
-    fi
-    if [[ "$payload" =~ \"tool_use_id\"[[:space:]]*:[[:space:]]*\"([^\"]+)\" ]]; then
-      tool_use_id="${BASH_REMATCH[1]}"
-    fi
+  if ! payload="$(cat 2>/dev/null)"; then
+    safe_exit
   fi
 fi
 
-# Without a session_id we can't isolate this run's counter. Bail quietly.
-[ -n "$session_id" ] || exit 0
-
-dir="${TMPDIR:-/tmp}/claude-subagents-${USER:-default}"
-mkdir -p "$dir" 2>/dev/null || exit 0
-counter="$dir/$session_id"
-seen="$counter.seen"
-lock="$counter.lock"
-
-# Acquire a short lock (mkdir is atomic on POSIX). Spin briefly; bail
-# rather than hang if something is wedged.
-i=0
-while ! mkdir "$lock" 2>/dev/null; do
-  i=$((i + 1))
-  [ "$i" -gt 50 ] && exit 0
-  sleep 0.01 2>/dev/null || true
-done
-trap 'rmdir "$lock" 2>/dev/null || true' EXIT
-
-# Stale-lock cleanup: if the dir is older than 5s, kill it next round.
-# (Not done here since we already hold it; the next caller will if needed.)
-
-cur=0
-if [ -f "$counter" ]; then
-  read -r cur <"$counter" 2>/dev/null || cur=0
+# jq validates the complete JSON document. A regex fallback could extract IDs
+# from malformed input and would therefore violate fail-closed admission.
+if ! command -v jq >/dev/null 2>&1; then
+  safe_exit
 fi
-case "$cur" in '' | *[!0-9-]*) cur=0 ;; esac
+separator=$'\037'
+if ! parsed="$(printf '%s' "$payload" | jq -er '
+  [
+    (.session_id // ""),
+    (.hook_event_name // ""),
+    (.tool_name // ""),
+    (.tool_use_id // ""),
+    (.tool_response.status // ""),
+    (.tool_response.agentId // .tool_response.agent_id // ""),
+    (if ((.tool_input | type) == "object" and (.tool_input | has("run_in_background")))
+      then (.tool_input.run_in_background | tostring)
+      else "missing"
+    end),
+    (.agent_id // ""),
+    "END"
+  ]
+  | map(if type == "string" then . else tostring end)
+  | join("")
+' 2>/dev/null)"; then
+  safe_exit
+fi
+
+session_id=""
+event_name=""
+tool_name=""
+tool_use_id=""
+response_status=""
+response_agent_id=""
+background_mode=""
+agent_id=""
+end_marker=""
+IFS="$separator" read -r session_id event_name tool_name tool_use_id \
+  response_status response_agent_id background_mode agent_id end_marker <<EOF
+$parsed
+EOF
+
+[ "$end_marker" = "END" ] || safe_exit
+valid_id "$session_id" || safe_exit
 
 case "$mode" in
-  start)
-    if [ -n "$tool_use_id" ]; then
-      # Dedup: if we've already counted this tool_use_id, no-op.
-      if [ -f "$seen" ] && grep -Fxq "start:$tool_use_id" "$seen" 2>/dev/null; then
-        :
-      else
-        cur=$((cur + 1))
-        printf 'start:%s\n' "$tool_use_id" >>"$seen"
-      fi
-    else
-      # No id available; count it anyway (rare path).
-      cur=$((cur + 1))
+  reserve)
+    [ "$event_name" = "PreToolUse" ] || safe_exit
+    case "$tool_name" in Agent | Task) ;; *) safe_exit ;; esac
+    valid_id "$tool_use_id" || safe_exit
+    ;;
+  complete)
+    [ "$event_name" = "PostToolUse" ] || exit 0
+    case "$tool_name" in Agent | Task) ;; *) exit 0 ;; esac
+    valid_id "$tool_use_id" || exit 0
+    if [ -n "$response_agent_id" ]; then
+      valid_id "$response_agent_id" || exit 0
     fi
     ;;
+  fail)
+    [ "$event_name" = "PostToolUseFailure" ] || exit 0
+    case "$tool_name" in Agent | Task) ;; *) exit 0 ;; esac
+    valid_id "$tool_use_id" || exit 0
+    ;;
   stop)
-    if [ -n "$tool_use_id" ]; then
-      # Only decrement if we previously counted a start for this id AND
-      # haven't already counted a stop for it.
-      if grep -Fxq "start:$tool_use_id" "$seen" 2>/dev/null \
-         && ! grep -Fxq "stop:$tool_use_id" "$seen" 2>/dev/null; then
-        cur=$((cur - 1))
-        printf 'stop:%s\n' "$tool_use_id" >>"$seen"
-      fi
-    else
-      # No id (e.g. SubagentStop without tool_use_id in some Claude
-      # versions): conservative decrement, clamped at 0 below.
-      cur=$((cur - 1))
-    fi
+    [ "$event_name" = "SubagentStop" ] || exit 0
+    valid_id "$agent_id" || exit 0
     ;;
 esac
 
-[ "$cur" -lt 0 ] && cur=0
-printf '%s\n' "$cur" >"$counter" 2>/dev/null || true
-
-# Trim seen file when counter hits 0 to prevent unbounded growth.
-if [ "$cur" -eq 0 ] && [ -f "$seen" ]; then
-  : >"$seen" 2>/dev/null || true
+if [ -n "${CLAUDE_SUBAGENT_STATE_DIR:-}" ]; then
+  state_dir="$CLAUDE_SUBAGENT_STATE_DIR"
+else
+  state_dir="${TMPDIR:-/tmp}/claude-subagents-${USER:-default}"
 fi
+if ! mkdir -p "$state_dir" 2>/dev/null || ! chmod 700 "$state_dir" 2>/dev/null; then
+  safe_exit
+fi
+
+counter="$state_dir/$session_id"
+state="$counter.state"
+seen="$counter.seen"
+lock="$counter.lock"
+
+i=0
+while ! mkdir "$lock" 2>/dev/null; do
+  i=$((i + 1))
+  if [ "$i" -gt 50 ]; then
+    safe_exit
+  fi
+  if ! sleep 0.01; then
+    safe_exit
+  fi
+done
+lock_held=1
+
+validate_state() {
+  awk -F '\t' '
+    BEGIN { count = 0; bad = 0 }
+    function valid(value) {
+      return value ~ /^[A-Za-z0-9_.:-]+$/ && value != "." && value != ".."
+    }
+    $1 == "R" && NF == 2 && valid($2) {
+      if (tools[$2]++) bad = 1
+      count++
+      next
+    }
+    $1 == "A" && NF == 3 && valid($2) && valid($3) {
+      if (tools[$2]++ || agents[$3]++) bad = 1
+      count++
+      next
+    }
+    $1 == "S" && NF == 2 && valid($2) {
+      if (agents[$2]++) bad = 1
+      next
+    }
+    { bad = 1 }
+    END {
+      if (bad) exit 1
+      print count
+    }
+  ' "$1"
+}
+
+# A nonzero legacy counter cannot be correlated safely after upgrading from the
+# old count-only format. Keep the session closed until restart rather than
+# forgetting potentially live agents. A zero counter migrates to empty state.
+if [ ! -e "$state" ]; then
+  if [ -s "$seen" ]; then
+    safe_exit
+  fi
+  if [ -e "$counter" ]; then
+    legacy_count=""
+    if [ ! -f "$counter" ] || [ -L "$counter" ] \
+       || ! read -r legacy_count <"$counter"; then
+      safe_exit
+    fi
+    case "$legacy_count" in '' | *[!0-9]*) safe_exit ;; esac
+    [ "$legacy_count" -eq 0 ] || safe_exit
+  fi
+  if ! tmp_state="$(mktemp "$state.tmp.XXXXXX")"; then
+    safe_exit
+  fi
+  if ! mv -f "$tmp_state" "$state"; then
+    safe_exit
+  fi
+  tmp_state=""
+fi
+
+if [ ! -f "$state" ] || [ -L "$state" ]; then
+  safe_exit
+fi
+if ! active_count="$(validate_state "$state")"; then
+  safe_exit
+fi
+
+has_tool() {
+  awk -F '\t' -v id="$1" '
+    ($1 == "R" || $1 == "A") && $2 == id { found = 1; exit }
+    END { exit(found ? 0 : 1) }
+  ' "$state"
+}
+
+has_agent_mapping() {
+  awk -F '\t' -v id="$1" '
+    $1 == "A" && $3 == id { found = 1; exit }
+    END { exit(found ? 0 : 1) }
+  ' "$state"
+}
+
+has_tombstone() {
+  awk -F '\t' -v id="$1" '
+    $1 == "S" && $2 == id { found = 1; exit }
+    END { exit(found ? 0 : 1) }
+  ' "$state"
+}
+
+
+new_state() {
+  tmp_state="$(mktemp "$state.tmp.XXXXXX")" || return 1
+}
+
+commit_state() {
+  local next_count count_tmp
+  if ! next_count="$(validate_state "$tmp_state")"; then
+    return 1
+  fi
+
+  # With no active reservations, no future response can need a tombstone.
+  # Clearing them bounds state growth from duplicate/late stop events.
+  if [ "$next_count" -eq 0 ]; then
+    : >"$tmp_state" || return 1
+  fi
+
+  mv -f "$tmp_state" "$state" || return 1
+  tmp_state=""
+
+  # The integer counter is compatibility/display data. Admission always derives
+  # its count from the validated state file above, so this update is best-effort.
+  count_tmp="$(mktemp "$counter.tmp.XXXXXX")" || return 0
+  if ! printf '%s\n' "$next_count" >"$count_tmp" \
+     || ! mv -f "$count_tmp" "$counter"; then
+    rm -f "$count_tmp" 2>/dev/null || true
+  fi
+  if [ "$next_count" -eq 0 ]; then
+    rm -f "$seen" 2>/dev/null || true
+  fi
+  return 0
+}
+
+remove_tool() {
+  local id="$1" stopped_id="${2:-}"
+  new_state || return 1
+  awk -F '\t' -v OFS='\t' -v tool="$id" -v stopped="$stopped_id" '
+    ($1 == "R" || $1 == "A") && $2 == tool { next }
+    stopped != "" && $1 == "S" && $2 == stopped { next }
+    { print }
+  ' "$state" >"$tmp_state" || return 1
+  commit_state
+}
+
+bind_or_reconcile() {
+  local tool="$1" launched_agent="$2"
+  new_state || return 1
+  if has_tombstone "$launched_agent"; then
+    awk -F '\t' -v OFS='\t' -v tool="$tool" -v agent="$launched_agent" '
+      ($1 == "R" || $1 == "A") && $2 == tool { next }
+      $1 == "S" && $2 == agent { next }
+      { print }
+    ' "$state" >"$tmp_state" || return 1
+  else
+    awk -F '\t' -v OFS='\t' -v tool="$tool" -v agent="$launched_agent" '
+      $1 == "R" && $2 == tool { print "A", tool, agent; next }
+      $1 == "A" && $2 == tool && $3 == agent { print; next }
+      { print }
+    ' "$state" >"$tmp_state" || return 1
+  fi
+  commit_state
+}
+
+case "$mode" in
+  reserve)
+    # Re-running PreToolUse for the same tool call is idempotent and does not
+    # consume a second slot, even when all 10 slots are occupied.
+    if has_tool "$tool_use_id"; then
+      exit 0
+    fi
+    if [ "$active_count" -ge "$limit" ]; then
+      deny_limit
+    fi
+    if ! new_state || ! cp "$state" "$tmp_state" \
+       || ! printf 'R\t%s\n' "$tool_use_id" >>"$tmp_state" \
+       || ! commit_state; then
+      deny_unavailable
+    fi
+    ;;
+
+  complete)
+    if ! has_tool "$tool_use_id"; then
+      exit 0
+    fi
+
+    if [ "$response_status" = "completed" ]; then
+      # Foreground Agent calls reach PostToolUse only after actual completion.
+      remove_tool "$tool_use_id" "$response_agent_id" || exit 0
+    elif [ -n "$response_agent_id" ]; then
+      # Background launch responses carry agentId. Bind it to the reservation;
+      # if SubagentStop won the race, its tombstone releases the slot now.
+      bind_or_reconcile "$tool_use_id" "$response_agent_id" || exit 0
+    elif [ "$background_mode" = "false" ]; then
+      # Compatibility path for older synchronous Task responses without IDs.
+      remove_tool "$tool_use_id" || exit 0
+    fi
+    # Unknown successful launch responses deliberately retain their reservation.
+    # A leaked slot is safer than admitting an 11th live agent.
+    ;;
+
+  fail)
+    if has_tool "$tool_use_id"; then
+      remove_tool "$tool_use_id" || exit 0
+    fi
+    ;;
+
+  stop)
+    if has_agent_mapping "$agent_id"; then
+      new_state || exit 0
+      awk -F '\t' -v OFS='\t' -v agent="$agent_id" '
+        $1 == "A" && $3 == agent { next }
+        { print }
+      ' "$state" >"$tmp_state" || exit 0
+      # Retain one stop marker while other reservations remain so a duplicate
+      # SubagentStop cannot be mistaken for a new out-of-order completion.
+      printf 'S\t%s\n' "$agent_id" >>"$tmp_state" || exit 0
+      commit_state || exit 0
+    elif ! has_tombstone "$agent_id"; then
+      # PostToolUse for a background launch may still be in flight.
+      new_state || exit 0
+      cp "$state" "$tmp_state" || exit 0
+      printf 'S\t%s\n' "$agent_id" >>"$tmp_state" || exit 0
+      commit_state || exit 0
+    fi
+    ;;
+esac
 
 exit 0
