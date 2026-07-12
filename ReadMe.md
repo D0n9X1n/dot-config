@@ -759,14 +759,30 @@ Defaults pinned globally (synced across machines via this repo):
   (so it tracks the WezTerm Gruvbox scheme rather than hard-coding its
   own colors).
 
+#### Subagent safety limit (v1.8.0)
+
+Claude Code is capped at **10 concurrently running subagents per session**.
+`PreToolUse` reserves a slot before each `Agent`/legacy `Task` call and denies
+an excess launch before it executes. Foreground completion and failed launches
+release directly; background launch responses map the tool call to Claude
+Code's `agentId`, then `SubagentStop` releases the slot when that agent actually
+finishes. The hook handles duplicate and out-of-order lifecycle events under an
+atomic per-session lock.
+
+Admission fails closed: malformed input, missing `jq`, corrupt/unreadable state,
+or lock timeout blocks the new agent rather than risking an 11th. A cleanup
+failure may conservatively leave a slot occupied until the session restarts.
+After pulling an upgrade from the old count-only hook, **start a new Claude Code
+session** so no legacy in-flight agents are forgotten. `scripts/check.sh smoke`
+races 24 admissions and verifies that exactly 10 succeed.
+
 #### `statusline.sh`
 
 Executable Claude Code statusline with the same five-line layout as the Copilot
 statusline. Unlike the Copilot sibling, it renders **no** subagent rows — Claude
 Code ships its own native subagent UI, so the inline `subagents` count and the
-live-agent tree below L5 were removed (intentional divergence). The
-`subagent-counter.sh` hooks stay installed but the statusline no longer reads
-the counter.
+live-agent tree below L5 were removed (intentional divergence). The subagent
+admission hooks stay installed, but the statusline does not read their state.
 
 #### Wrappers (`oh-my-zsh-custom/claude.zsh`, `cc.zsh`)
 

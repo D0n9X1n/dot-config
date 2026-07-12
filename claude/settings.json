@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/subagent-counter.sh start"
+            "command": "~/.claude/hooks/subagent-counter.sh reserve"
           }
         ]
       }
@@ -30,7 +30,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/subagent-counter.sh stop"
+            "command": "~/.claude/hooks/subagent-counter.sh complete"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Task|Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/subagent-counter.sh fail"
           }
         ]
       }

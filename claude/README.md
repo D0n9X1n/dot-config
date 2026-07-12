@@ -91,6 +91,23 @@ The `oh-my-zsh-custom/claude.zsh` wrapper launches `claude` with
 | `effortLevel` | Claude Code's client-side reasoning budget. `low / medium / high / xhigh / max`. |
 | `model` | Top-level default; set to `gpt-5.6-sol[1m]`. Do not use `default` with `copilot-relay`, because relay routes non-`opus` names to `gptModel` — the `[1m]` suffix is what keeps Claude Code's 1M accounting (bare custom names are 200k). |
 
+### Subagent admission guard
+
+The hook chain hard-limits each Claude Code session to **10 concurrently
+running subagents**:
+
+- `PreToolUse` reserves a slot for `Agent`/legacy `Task` and denies call 11.
+- `PostToolUse` releases completed foreground agents or maps a background
+  launch's `tool_use_id` to its returned `agentId`.
+- `SubagentStop` releases mapped background agents at actual completion.
+- `PostToolUseFailure` releases reservations for failed launches.
+
+State changes use an atomic `mkdir` lock and validated state records. Admission
+fails closed on malformed input, missing `jq`, corrupt state, persistence
+failure, or lock timeout. Stop-before-launch-response races and duplicate events
+are reconciled idempotently. State is per session, not machine-wide. Start a
+fresh Claude Code session after upgrading from a pre-v1.8.0 count-only hook.
+
 ### Built-in `/model` menu
 
 Claude Code's `/model` picker is **hard-coded** to its own lineup

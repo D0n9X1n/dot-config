@@ -49,6 +49,13 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
   subagent glyph is the magic-wand (U+F0D0) while Claude has no subagent glyph
   at all. (Claude's `subagent-counter.sh` hooks stay installed; the statusline
   just no longer reads the counter.)
+- **Claude Code subagent launches are hard-capped at 10 per session.**
+  `claude/hooks/subagent-counter.sh` reserves at `PreToolUse`, correlates
+  background `PostToolUse` responses to `SubagentStop`, and fails closed when
+  admission state cannot be verified. Keep `PreToolUse`, `PostToolUse`,
+  `PostToolUseFailure`, and `SubagentStop` wiring aligned in
+  `claude/settings.json`; never replace the guard with a count-only hook or an
+  early release at background `PostToolUse`.
 - **launchd plists in `launchd/` are templates, not symlinks.**
   install.sh substitutes `__HOME__` -> `$HOME` (launchd doesn't expand
   `$HOME` at runtime) and `__SRC_DIR__` -> this repo's absolute path (for

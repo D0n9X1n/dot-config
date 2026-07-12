@@ -33,6 +33,11 @@ links.
 
 - **Shell scripts** use `set -euo pipefail` strict mode and POSIX-compatible
   patterns where possible.
+- **Claude Code subagent launches are hard-capped at 10 per session.** Keep
+  `claude/hooks/subagent-counter.sh` and its `PreToolUse`, `PostToolUse`,
+  `PostToolUseFailure`, and `SubagentStop` wiring in `claude/settings.json`
+  aligned. Admission must remain atomic and fail closed; background agents are
+  released only at `SubagentStop`, never at their early `PostToolUse` response.
 - **WezTerm config** (`.wezterm.lua`) is Lua. It uses `wezterm.config_builder()`
   and adapts font weight and FreeType hinting at runtime based on display DPI
   (Retina vs non-Retina) via `window-config-reloaded` / `window-resized` events.
