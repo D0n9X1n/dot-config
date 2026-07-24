@@ -6,56 +6,12 @@
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5.6-sol[1m]",
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-5.6-sol[1m]",
     "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.6-sol[1m]",
-    "MODEL_REASONING_EFFORT": "max"
+    "MODEL_REASONING_EFFORT": "max",
+    "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": "16"
   },
   "permissions": {
     "allow": [],
     "defaultMode": "auto"
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Task|Agent",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/subagent-counter.sh reserve"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Task|Agent",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/subagent-counter.sh complete"
-          }
-        ]
-      }
-    ],
-    "PostToolUseFailure": [
-      {
-        "matcher": "Task|Agent",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/subagent-counter.sh fail"
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/subagent-counter.sh stop"
-          }
-        ]
-      }
-    ]
   },
   "statusLine": {
     "type": "command",

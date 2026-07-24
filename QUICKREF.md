@@ -225,29 +225,17 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
     Project-specific Claude config syncs only when committed in each project
     repo (`.claude/settings.json`, `.claude/CLAUDE.md`, `.mcp.json`);
     `~/.claude.json.projects` is machine-local/path-keyed and is not copied.
-    The `hooks` block wires `PreToolUse`, `PostToolUse`, and
-    `PostToolUseFailure` (matcher `Task|Agent`) plus `SubagentStop` to
-    `~/.claude/hooks/subagent-counter.sh`. Since v1.8.0, `PreToolUse`
-    atomically enforces a hard **10-running-subagent cap per session** and
-    returns Claude Code's `permissionDecision: "deny"` for excess launches.
-    The hooks stay installed, but the statusline **no longer reads or renders**
-    subagents — Claude Code ships its own native subagent UI, so Claude's
-    statusline has neither the inline count nor a live-agent tree below L5
-    (intentional divergence from the Copilot sibling, which keeps both).
-  - `hooks/subagent-counter.sh` — race-safe, fail-closed admission guard.
-    Authoritative state is
-    `$TMPDIR/claude-subagents-$USER/<session_id>.state`; the sibling integer
-    remains compatibility/display data only. `PreToolUse` reserves by
-    `tool_use_id`; background `PostToolUse` binds the reservation to `agentId`;
-    `SubagentStop` releases it at actual completion; foreground completion and
-    `PostToolUseFailure` release directly. Stop-before-response ordering is
-    reconciled with tombstones, and duplicate lifecycle events are idempotent.
-    An unreadable/corrupt state, malformed admission payload, missing `jq`, or
-    lock timeout denies new launches rather than risking an 11th agent. A
-    release-side failure conservatively leaks a slot. Start a new Claude Code
-    session after upgrading from the legacy count-only hook. The statusline
-    itself does not read this state (Claude Code's native agent UI replaced the
-    old `seg_subagents` segment).
+    `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=16` uses Claude Code's native
+    concurrent-subagent admission limit (requires v2.1.217+). At 16 running
+    subagents, another Claude-spawned `Agent` call fails until a slot reopens.
+    Native exceptions are intentional: `/subtask` occupies a slot but is not
+    blocked, resumes can exceed the configured count, ultracode is exempt, and
+    workflow/agent-team workers use separate limits. `install.sh` verifies the
+    active CLI first, uses the Homebrew cask only when needed, and removes the obsolete
+    repo-managed counter symlink without touching user hooks. Claude's
+    statusline **does not read or render** subagents — Claude Code ships its own
+    native subagent UI, so it has neither the inline count nor a live-agent tree
+    below L5 (intentional divergence from the Copilot sibling, which keeps both).
 - `<repo>/oh-my-zsh-custom/<file>` — files linked to
   `$HOME/.oh-my-zsh/custom/<file>`. Currently:
   - `custom.zsh` — aliases, proxy helpers (`enable_proxy`/`disable_proxy`),
@@ -275,12 +263,15 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
 `DOT_CONFIGS_INSTALL_LOG=/path/to/log`).
 
 1. macOS only: bootstraps Homebrew if missing, then installs deps via
-   Homebrew (best-effort after brew exists). Set `SKIP_BREW=1` to skip
+   Homebrew (best-effort after brew exists, except the required Claude Code
+   version). Set `SKIP_BREW=1` to skip
    (useful for CI / fake-`HOME` testing). Formulae: `autojump`, `eza`, `git`,
    `jq`, `neovim`, `node`, `tmux`, `zsh-completions`,
    `zsh-fast-syntax-highlighting`. Then removes old npm global
-   `@anthropic-ai/claude-code` if present and installs casks: `claude-code`,
-   `wezterm`, `font-recursive`, `font-recursive-mono-nerd-font`,
+   `@anthropic-ai/claude-code` if present, ensures the active Claude Code is at
+   least v2.1.217 (using the Homebrew cask only when needed), and installs casks:
+   `wezterm`,
+   `font-recursive`, `font-recursive-mono-nerd-font`,
    `font-symbols-only-nerd-font`, `font-noto-color-emoji`. It also downloads
    `RecMonoBaker-*.ttf` and `RecMonoSt.Helens-*.ttf` from the latest
    `MOSconfig/recursive-code-config` release into `~/Library/Fonts`.
@@ -298,9 +289,10 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
 6. Symlinks every file in `copilot/` to `~/.copilot/`, creating the
    destination directory if missing, then runs `cleanup-legacy.sh` to prune
    stale Copilot CLI package versions/logs.
-7. Symlinks every file in `claude/` to `~/.claude/`. **Creates the
-   destination directory if missing** (Claude Code only creates `~/.claude/`
-   on first launch).
+7. Symlinks every top-level config file in `claude/` to `~/.claude/`.
+   **Creates the destination directory if missing** (Claude Code only creates
+   `~/.claude/` on first launch), and removes the obsolete repo-managed
+   `~/.claude/hooks/subagent-counter.sh` symlink while preserving user hooks.
 8. Symlinks `wezterm/wezterm.lua` to `~/.wezterm.lua`.
 9. Symlinks tracked `.sonicterm` TOML files into `~/.sonicterm/` while leaving
    logs/backups local.

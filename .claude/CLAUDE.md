@@ -47,15 +47,14 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
   inline `subagents`/`Tasks` count nor the bottom live-agent tree — because
   Claude Code ships its own native subagent UI. Copilot keeps both, and its
   subagent glyph is the magic-wand (U+F0D0) while Claude has no subagent glyph
-  at all. (Claude's `subagent-counter.sh` hooks stay installed; the statusline
-  just no longer reads the counter.)
-- **Claude Code subagent launches are hard-capped at 10 per session.**
-  `claude/hooks/subagent-counter.sh` reserves at `PreToolUse`, correlates
-  background `PostToolUse` responses to `SubagentStop`, and fails closed when
-  admission state cannot be verified. Keep `PreToolUse`, `PostToolUse`,
-  `PostToolUseFailure`, and `SubagentStop` wiring aligned in
-  `claude/settings.json`; never replace the guard with a count-only hook or an
-  early release at background `PostToolUse`.
+  at all. Claude Code handles concurrent admission natively; the statusline has
+  no counter state to read.
+- **Claude Code's native concurrent-subagent limit is set to 16.** Keep
+  `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS="16"` in `claude/settings.json` and
+  require Claude Code v2.1.217+. Do not describe it as an absolute ceiling:
+  `/subtask` and resumed agents can pass the admission boundary, ultracode is
+  exempt, and workflows/agent teams use separate limits. Do not restore the
+  obsolete lifecycle counter hook.
 - **launchd plists in `launchd/` are templates, not symlinks.**
   install.sh substitutes `__HOME__` -> `$HOME` (launchd doesn't expand
   `$HOME` at runtime) and `__SRC_DIR__` -> this repo's absolute path (for

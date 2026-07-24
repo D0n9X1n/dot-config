@@ -33,11 +33,12 @@ links.
 
 - **Shell scripts** use `set -euo pipefail` strict mode and POSIX-compatible
   patterns where possible.
-- **Claude Code subagent launches are hard-capped at 10 per session.** Keep
-  `claude/hooks/subagent-counter.sh` and its `PreToolUse`, `PostToolUse`,
-  `PostToolUseFailure`, and `SubagentStop` wiring in `claude/settings.json`
-  aligned. Admission must remain atomic and fail closed; background agents are
-  released only at `SubagentStop`, never at their early `PostToolUse` response.
+- **Claude Code's native concurrent-subagent limit is set to 16.** Keep
+  `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS="16"` in `claude/settings.json` and
+  require Claude Code v2.1.217+. Do not describe it as an absolute ceiling:
+  `/subtask` and resumed agents can pass the admission boundary, ultracode is
+  exempt, and workflows/agent teams use separate limits. Do not restore the
+  obsolete lifecycle counter hook.
 - **WezTerm config** (`.wezterm.lua`) is Lua. It uses `wezterm.config_builder()`
   and adapts font weight and FreeType hinting at runtime based on display DPI
   (Retina vs non-Retina) via `window-config-reloaded` / `window-resized` events.

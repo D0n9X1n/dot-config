@@ -67,13 +67,17 @@ with their full output; existence checks stay quiet so expected "not installed"
 probes do not appear as errors.
 
 1. Installs Homebrew if missing, then installs required macOS apps, fonts, and
-   command-line tools via Homebrew (best-effort after Homebrew itself exists).
+   command-line tools via Homebrew (best-effort after Homebrew itself exists,
+   except Claude Code must satisfy the minimum version below).
    Set `SKIP_BREW=1` to skip this step entirely (useful for CI / fake-`HOME`
    testing). Formulae: `autojump`, `eza`, `git`, `jq`, `neovim`, `node`, `tmux`,
    `zsh-completions`, and `zsh-fast-syntax-highlighting`. Before installing Claude Code, the installer
-   removes any old global npm `@anthropic-ai/claude-code` package, then installs casks:
-   `claude-code`, `wezterm`, the Recursive base/Nerd Font casks, Symbols Only
-   Nerd Font, and Noto Color Emoji. It also downloads the latest
+   removes any old global npm `@anthropic-ai/claude-code` package, then ensures
+   the active Claude Code is at least v2.1.217 (required by the native
+   concurrent-subagent limit), installing or upgrading the Homebrew cask only
+   when needed. It also installs casks for `wezterm`, the
+   Recursive base/Nerd Fonts, Symbols Only Nerd Font, and Noto Color Emoji, and
+   downloads the latest
    `RecMonoBaker-*.ttf` and `RecMonoSt.Helens-*.ttf` assets from
    `MOSconfig/recursive-code-config` releases into `~/Library/Fonts`.
 2. Installs/updates npm global CLIs only when they are missing or already
@@ -91,10 +95,12 @@ probes do not appear as errors.
    destination directory if missing. Preserves the executable bit on `*.sh`
    files (so `statusline.sh` runs without re-chmod), then runs
    `cleanup-legacy.sh` to prune stale Copilot CLI package versions/logs.
-7. Symlinks every file in `claude/` into `~/.claude/`. **Creates the
-   destination directory if missing** (Claude Code only creates `~/.claude/`
-   on first launch; mkdir-p so install.sh wires things up on a fresh box), and
-   links `claude/hooks/*.sh` into `~/.claude/hooks/`.
+7. Symlinks every top-level config file in `claude/` into `~/.claude/`.
+   **Creates the destination directory if missing** (Claude Code only creates
+   `~/.claude/` on first launch; mkdir-p so install.sh wires things up on a
+   fresh box). During migration it removes the obsolete
+   `~/.claude/hooks/subagent-counter.sh` only when that path is still a symlink
+   to this repository; user-owned hooks are preserved.
 8. Symlinks `wezterm/wezterm.lua` into `~/.wezterm.lua`.
 9. Symlinks tracked SonicTerm TOML files into `~/.sonicterm/`:
    `sonicterm.toml`, `keymaps/*.toml`, and `themes/*.toml`. Logs and runtime
@@ -759,30 +765,31 @@ Defaults pinned globally (synced across machines via this repo):
   (so it tracks the WezTerm Gruvbox scheme rather than hard-coding its
   own colors).
 
-#### Subagent safety limit (v1.8.0)
+#### Native concurrent-subagent limit
 
-Claude Code is capped at **10 concurrently running subagents per session**.
-`PreToolUse` reserves a slot before each `Agent`/legacy `Task` call and denies
-an excess launch before it executes. Foreground completion and failed launches
-release directly; background launch responses map the tool call to Claude
-Code's `agentId`, then `SubagentStop` releases the slot when that agent actually
-finishes. The hook handles duplicate and out-of-order lifecycle events under an
-atomic per-session lock.
+`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=16` configures Claude Code's built-in
+per-session limit (v2.1.217+). When 16 subagents are running, another Claude-
+spawned `Agent` call fails with `Concurrent subagent limit reached`; admission
+reopens when the running count drops. `install.sh` accepts an already-current
+CLI, uses the Homebrew cask only when necessary, and refuses to complete the
+Homebrew setup path if
+the installed CLI still cannot satisfy v2.1.217.
 
-Admission fails closed: malformed input, missing `jq`, corrupt/unreadable state,
-or lock timeout blocks the new agent rather than risking an 11th. A cleanup
-failure may conservatively leave a slot occupied until the session restarts.
-After pulling an upgrade from the old count-only hook, **start a new Claude Code
-session** so no legacy in-flight agents are forgotten. `scripts/check.sh smoke`
-races 24 admissions and verifies that exactly 10 succeed.
+This adopts Claude Code's documented native semantics rather than preserving an
+absolute fail-closed hook. A user-started `/subtask` occupies a slot but is not
+blocked, resuming a finished subagent can push the count above 16, and ultracode
+sessions are exempt. Workflow agents and agent-team teammates follow their own
+limits. The former `PreToolUse`/`PostToolUse`/`SubagentStop` hook chain, `jq`
+payload parsing, locks, and per-session state files have been removed.
 
 #### `statusline.sh`
 
 Executable Claude Code statusline with the same five-line layout as the Copilot
 statusline. Unlike the Copilot sibling, it renders **no** subagent rows — Claude
 Code ships its own native subagent UI, so the inline `subagents` count and the
-live-agent tree below L5 were removed (intentional divergence). The subagent
-admission hooks stay installed, but the statusline does not read their state.
+live-agent tree below L5 were removed (intentional divergence). Concurrent
+admission is handled natively by Claude Code; the statusline needs no hook
+state.
 
 #### Wrappers (`oh-my-zsh-custom/claude.zsh`, `cc.zsh`)
 

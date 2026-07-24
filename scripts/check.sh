@@ -5,12 +5,12 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 CHECK_STATE_DIR=""
 CHECK_EVENTS=""
-CHECK_CLAUDE_AGENT_STATE_DIR=""
 
 run_bash_syntax() {
   local fail=0
   local file
   while IFS= read -r file; do
+    [ -f "$file" ] || continue
     echo "bash -n $file"
     bash -n "$file" || fail=1
   done < <(git ls-files '*.sh' | sort -u)
@@ -108,116 +108,67 @@ JSON
 }
 
 run_claude_subagent_limit_smoke() {
-  local hook state_dir session denied out i admitted state_count
-  local tool_1 tool_2 tool_3 tool_4
-  local pids=""
-  hook="claude/hooks/subagent-counter.sh"
-  state_dir="$(mktemp -d)"
-  CHECK_CLAUDE_AGENT_STATE_DIR="$state_dir"
-  session="limit-session"
-  trap 'rm -rf "${CHECK_STATE_DIR:-}" "${CHECK_EVENTS:-}" "${CHECK_CLAUDE_AGENT_STATE_DIR:-}"' EXIT
+  jq -e '
+    .env.CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS == "16" and
+    ((.hooks // {}) | tostring | contains("subagent-counter.sh") | not)
+  ' claude/settings.json >/dev/null
+  [ ! -e claude/hooks/subagent-counter.sh ]
 
-  reserve() {
-    local id="$1"
-    printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Agent","tool_use_id":"%s","tool_input":{}}' "$session" "$id" |
-      CLAUDE_SUBAGENT_STATE_DIR="$state_dir" bash "$hook" reserve
-  }
+  (
+    local test_root test_home test_repo fake_bin
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    version_at_least 2.1.217 2.1.217
+    version_at_least 2.1.218 2.1.217
+    version_at_least 2.10.0 2.9.999
+    if version_at_least 2.1.216 2.1.217; then
+      echo "version check admitted a below-minimum release" >&2
+      exit 1
+    fi
+    if version_at_least 2.1 2.1.217; then
+      echo "version check admitted a truncated release" >&2
+      exit 1
+    fi
+    if version_at_least bad 2.1.217; then
+      echo "version check admitted a malformed release" >&2
+      exit 1
+    fi
 
-  complete_background() {
-    local tool_id="$1" agent_id="$2"
-    printf '{"session_id":"%s","hook_event_name":"PostToolUse","tool_name":"Agent","tool_use_id":"%s","tool_input":{"run_in_background":true},"tool_response":{"status":"async_launched","agentId":"%s"}}' "$session" "$tool_id" "$agent_id" |
-      CLAUDE_SUBAGENT_STATE_DIR="$state_dir" bash "$hook" complete
-  }
+    test_root="$(mktemp -d)"
+    trap 'rm -rf "$test_root"' EXIT
+    test_home="$test_root/home"
+    test_repo="$test_root/repo"
+    fake_bin="$test_root/bin"
+    mkdir -p "$test_home/.claude/hooks" "$test_repo/claude/hooks" "$fake_bin"
+    cat >"$fake_bin/claude" <<'SH'
+#!/usr/bin/env bash
+printf '2.1.218 (Claude Code)\n'
+SH
+    cat >"$fake_bin/brew" <<'SH'
+#!/usr/bin/env bash
+: >"$BREW_CALLED"
+exit 1
+SH
+    chmod +x "$fake_bin/claude" "$fake_bin/brew"
+    [ "$(PATH="$fake_bin:$PATH" claude_code_version)" = "2.1.218" ]
+    PATH="$fake_bin:$PATH" BREW_CALLED="$test_root/brew-called" \
+      ensure_claude_code_min_version 2.1.217 >/dev/null
+    [ ! -e "$test_root/brew-called" ]
 
-  stop_agent() {
-    local agent_id="$1"
-    printf '{"session_id":"%s","hook_event_name":"SubagentStop","agent_id":"%s"}' "$session" "$agent_id" |
-      CLAUDE_SUBAGENT_STATE_DIR="$state_dir" bash "$hook" stop
-  }
+    HOME="$test_home"
+    src_dir="$test_repo"
+    ln -s "$test_repo/claude/hooks/subagent-counter.sh" \
+      "$test_home/.claude/hooks/subagent-counter.sh"
+    printf 'keep\n' >"$test_home/.claude/hooks/user-hook.sh"
+    remove_legacy_claude_subagent_hook >/dev/null
+    [ ! -e "$test_home/.claude/hooks/subagent-counter.sh" ]
+    [ -f "$test_home/.claude/hooks/user-hook.sh" ]
 
-  # More than 10 simultaneous PreToolUse events must still reserve exactly 10.
-  i=1
-  while [ "$i" -le 24 ]; do
-    (reserve "race_$i" >"$state_dir/out.$i") &
-    pids="$pids $!"
-    i=$((i + 1))
-  done
-  for i in $pids; do
-    wait "$i"
-  done
-  admitted="$(awk -F '\t' '$1 == "R" || $1 == "A" { count++ } END { print count + 0 }' "$state_dir/$session.state")"
-  [ "$admitted" -eq 10 ]
-  [ "$(cat "$state_dir/$session")" -eq 10 ]
-  denied="$(grep -l 'permissionDecision.*deny' "$state_dir"/out.* | wc -l | tr -d ' ')"
-  [ "$denied" -eq 14 ]
-  tool_1="$(awk -F '\t' '($1 == "R" || $1 == "A") && ++count == 1 { print $2; exit }' "$state_dir/$session.state")"
-  tool_2="$(awk -F '\t' '($1 == "R" || $1 == "A") && ++count == 2 { print $2; exit }' "$state_dir/$session.state")"
-  tool_3="$(awk -F '\t' '($1 == "R" || $1 == "A") && ++count == 3 { print $2; exit }' "$state_dir/$session.state")"
-  tool_4="$(awk -F '\t' '($1 == "R" || $1 == "A") && ++count == 4 { print $2; exit }' "$state_dir/$session.state")"
-  [ -n "$tool_1" ] && [ -n "$tool_2" ] && [ -n "$tool_3" ] && [ -n "$tool_4" ]
-
-  # A duplicate PreToolUse event is idempotent even when the cap is full.
-  out="$(reserve "$tool_1")"
-  [ -z "$out" ]
-  state_count="$(awk -F '\t' '$1 == "R" || $1 == "A" { count++ } END { print count + 0 }' "$state_dir/$session.state")"
-  [ "$state_count" -eq 10 ]
-
-  # The 11th distinct call is denied with Claude Code's current hook schema.
-  out="$(reserve overflow)"
-  printf '%s' "$out" | jq -e '
-    .hookSpecificOutput.hookEventName == "PreToolUse" and
-    .hookSpecificOutput.permissionDecision == "deny" and
-    (.hookSpecificOutput.permissionDecisionReason | contains("10"))
-  ' >/dev/null
-
-  # An async launch remains counted until SubagentStop, then a slot reopens.
-  complete_background "$tool_1" agent_1
-  grep -F "$(printf 'A\t%s\tagent_1' "$tool_1")" "$state_dir/$session.state" >/dev/null
-  [ "$(cat "$state_dir/$session")" -eq 10 ]
-  stop_agent agent_1
-  stop_agent agent_1
-  [ "$(cat "$state_dir/$session")" -eq 9 ]
-  out="$(reserve replacement)"
-  [ -z "$out" ]
-  [ "$(cat "$state_dir/$session")" -eq 10 ]
-
-  # SubagentStop may win the race with PostToolUse; the tombstone reconciles it.
-  stop_agent agent_2
-  complete_background "$tool_2" agent_2
-  ! grep -Fq "$(printf 'R\t%s' "$tool_2")" "$state_dir/$session.state"
-  ! grep -Fq "$(printf 'A\t%s\tagent_2' "$tool_2")" "$state_dir/$session.state"
-  ! grep -Fq $'S\tagent_2' "$state_dir/$session.state"
-  [ "$(cat "$state_dir/$session")" -eq 9 ]
-
-  # A failed launch and a completed foreground call each release exactly once.
-  printf '{"session_id":"%s","hook_event_name":"PostToolUseFailure","tool_name":"Agent","tool_use_id":"%s","tool_input":{},"error":"launch failed"}' "$session" "$tool_3" |
-    CLAUDE_SUBAGENT_STATE_DIR="$state_dir" bash "$hook" fail
-  [ "$(cat "$state_dir/$session")" -eq 8 ]
-  printf '{"session_id":"%s","hook_event_name":"PostToolUse","tool_name":"Agent","tool_use_id":"%s","tool_input":{"run_in_background":false},"tool_response":{"status":"completed","agentId":"agent_4"}}' "$session" "$tool_4" |
-    CLAUDE_SUBAGENT_STATE_DIR="$state_dir" bash "$hook" complete
-  [ "$(cat "$state_dir/$session")" -eq 7 ]
-
-  # Admission fails closed for malformed/missing IDs, corrupt state, state-dir
-  # failure, or lock timeout.
-  out="$(printf '{bad json' | CLAUDE_SUBAGENT_STATE_DIR="$state_dir" bash "$hook" reserve)"
-  printf '%s' "$out" | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null
-  out="$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Agent","tool_input":{}}' "$session" |
-    CLAUDE_SUBAGENT_STATE_DIR="$state_dir" bash "$hook" reserve)"
-  printf '%s' "$out" | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null
-  printf 'invalid\n' >"$state_dir/$session.state"
-  out="$(reserve corrupt_call)"
-  printf '%s' "$out" | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null
-  : >"$state_dir/not-a-directory"
-  out="$(printf '{"session_id":"storage-session","hook_event_name":"PreToolUse","tool_name":"Agent","tool_use_id":"storage_call","tool_input":{}}' |
-    CLAUDE_SUBAGENT_STATE_DIR="$state_dir/not-a-directory" bash "$hook" reserve)"
-  printf '%s' "$out" | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null
-
-  session="locked-session"
-  mkdir "$state_dir/$session.lock"
-  out="$(reserve locked_call)"
-  printf '%s' "$out" | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null
-
-  echo "claude subagent limit ok: 10 admitted, 14 denied"
+    ln -s "$test_root/other-hook.sh" "$test_home/.claude/hooks/subagent-counter.sh"
+    remove_legacy_claude_subagent_hook >/dev/null
+    [ -L "$test_home/.claude/hooks/subagent-counter.sh" ]
+    [ -f "$test_home/.claude/hooks/user-hook.sh" ]
+  )
+  echo "claude native subagent limit config ok: 16 (requires v2.1.217+)"
 }
 
 run_smoke() {

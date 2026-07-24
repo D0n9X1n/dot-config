@@ -23,7 +23,9 @@ setup_logging() {
   fi
 }
 
-setup_logging
+if [ "${DOT_CONFIGS_INSTALL_LIB_ONLY:-0}" != "1" ]; then
+  setup_logging
+fi
 
 is_macos() {
   [ "$(uname -s)" = "Darwin" ]
@@ -45,6 +47,58 @@ log_command() {
 
 action_required() {
   printf '%s%sACTION REQUIRED:%s %s\n' "$RED" "$BOLD" "$RESET" "$*" >&2
+}
+
+version_at_least() {
+  awk -v current="$1" -v required="$2" '
+    BEGIN {
+      if (split(current, have, "[.]") != 3 || split(required, need, "[.]") != 3) exit 1
+      for (i = 1; i <= 3; i++) {
+        if (have[i] !~ /^[0-9]+$/ || need[i] !~ /^[0-9]+$/) exit 1
+        if ((have[i] + 0) > (need[i] + 0)) exit 0
+        if ((have[i] + 0) < (need[i] + 0)) exit 1
+      }
+      exit 0
+    }
+  '
+}
+
+claude_code_version() {
+  local output=""
+
+  have_cmd claude || return 1
+  output="$(command claude --version 2>/dev/null || true)"
+  printf '%s\n' "$output" | sed -nE 's/^([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' | sed -n '1p'
+}
+
+ensure_claude_code_min_version() {
+  local required="$1"
+  local current=""
+
+  current="$(claude_code_version || true)"
+  if [ -n "$current" ] && version_at_least "$current" "$required"; then
+    echo "Claude Code $current satisfies the required minimum v$required."
+    return 0
+  fi
+
+  if brew list --cask claude-code >/dev/null 2>&1; then
+    echo "Claude Code ${current:-unknown} is below required v$required; upgrading the Homebrew cask."
+    if ! log_command brew upgrade --cask claude-code; then
+      echo "Warning: Homebrew could not upgrade the claude-code cask."
+    fi
+  else
+    if ! log_command brew install --cask claude-code; then
+      echo "Warning: Homebrew could not install the claude-code cask."
+    fi
+  fi
+  hash -r 2>/dev/null || true
+
+  current="$(claude_code_version || true)"
+  if [ -z "$current" ] || ! version_at_least "$current" "$required"; then
+    action_required "Claude Code v$required or later is required for the native concurrent-subagent limit; found ${current:-no usable claude binary}."
+    return 1
+  fi
+  echo "Claude Code $current satisfies the required minimum v$required."
 }
 
 prepend_path_dir() {
@@ -622,8 +676,8 @@ configure_copilot_relay() {
 install_macos_deps() {
   ensure_homebrew || exit 1
 
+  local claude_min_version="2.1.217"
   local app_casks=(
-    claude-code
     wezterm
   )
   local font_casks=(
@@ -659,6 +713,7 @@ install_macos_deps() {
   fi
 
   uninstall_npm_package_if_installed @anthropic-ai/claude-code
+  ensure_claude_code_min_version "$claude_min_version" || exit 1
 
   local cask
   for cask in "${app_casks[@]}" "${font_casks[@]}"; do
@@ -712,6 +767,25 @@ link_file() {
 
   backup_path "$dest"
   ln -s "$src" "$dest"
+}
+
+remove_legacy_claude_subagent_hook() {
+  local hook="${HOME}/.claude/hooks/subagent-counter.sh"
+  local hooks_dir="${HOME}/.claude/hooks"
+  local former_target="${src_dir}/claude/hooks/subagent-counter.sh"
+  local target=""
+
+  if [ -L "$hook" ]; then
+    target="$(readlink "$hook")"
+    if [ "$target" = "$former_target" ]; then
+      rm -f "$hook"
+      echo "Migration: removed obsolete Claude Code subagent-counter hook symlink."
+    fi
+  fi
+
+  if [ -d "$hooks_dir" ]; then
+    rmdir "$hooks_dir" 2>/dev/null || true
+  fi
 }
 
 should_link_dotfile() {
@@ -779,6 +853,10 @@ copilot_relay_health_ok() {
     2>/dev/null || true)"
   [ "$code" = "200" ]
 }
+
+if [ "${DOT_CONFIGS_INSTALL_LIB_ONLY:-0}" = "1" ]; then
+  return 0 2>/dev/null || exit 0
+fi
 
 if is_macos; then
   if [ "${SKIP_BREW:-0}" = "1" ]; then
@@ -906,20 +984,9 @@ if [ -d "$claude_src" ]; then
   done < <(find "$claude_src" -maxdepth 1 -mindepth 1 -type f -print0)
   echo "Linked Claude Code config files to $claude_dest"
 
-  # Link the hooks/ subdirectory (claude/hooks/*.sh -> ~/.claude/hooks/*).
-  # These are invoked by Claude Code's hook system (PreToolUse,
-  # PostToolUse, SubagentStop, …) per ~/.claude/settings.json.
-  if [ -d "${claude_src}/hooks" ]; then
-    mkdir -p "${claude_dest}/hooks"
-    while IFS= read -r -d '' entry; do
-      base="$(basename "$entry")"
-      link_file "$entry" "${claude_dest}/hooks/${base}"
-      case "$base" in
-        *.sh) chmod +x "$entry" ;;
-      esac
-    done < <(find "${claude_src}/hooks" -maxdepth 1 -mindepth 1 -type f -print0)
-    echo "Linked Claude Code hooks to ${claude_dest}/hooks"
-  fi
+  # Claude Code v2.1.217 added a native concurrent-subagent limit. Remove only
+  # the obsolete repo-managed hook symlink; preserve user-owned hooks/files.
+  remove_legacy_claude_subagent_hook
 
   # Merge tracked, secret-free MCP servers from this repo into the user's
   # Copilot MCP config. mcp-shared.json carries entries that are safe to

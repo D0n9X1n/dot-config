@@ -62,7 +62,8 @@ The `oh-my-zsh-custom/claude.zsh` wrapper launches `claude` with
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5.6-sol[1m]",
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-5.6-sol[1m]",
     "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.6-sol[1m]",
-    "MODEL_REASONING_EFFORT": "max"
+    "MODEL_REASONING_EFFORT": "max",
+    "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": "16"
   },
   "permissions": { "allow": ["*"], "defaultMode": "auto" },
   "model": "gpt-5.6-sol[1m]",
@@ -88,25 +89,23 @@ The `oh-my-zsh-custom/claude.zsh` wrapper launches `claude` with
 | `env.ANTHROPIC_DEFAULT_HAIKU_MODEL` | Routes current Claude Code's Haiku tier, including sub-agents and small-fast side tasks, through `gpt-5.6-sol[1m]`. |
 | `env.ANTHROPIC_SMALL_FAST_MODEL` | Legacy small-fast alias for older Claude Code versions; pinned to `gpt-5.6-sol[1m]`. |
 | `env.MODEL_REASONING_EFFORT` | Kept for the custom statusline; upstream thinking is controlled by `thinkEffort` in `~/.copilot-relay/config.yaml`. |
+| `env.CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | Claude Code's native concurrent-subagent limit, explicitly set to `16` (requires Claude Code v2.1.217+). |
 | `effortLevel` | Claude Code's client-side reasoning budget. `low / medium / high / xhigh / max`. |
 | `model` | Top-level default; set to `gpt-5.6-sol[1m]`. Do not use `default` with `copilot-relay`, because relay routes non-`opus` names to `gptModel` — the `[1m]` suffix is what keeps Claude Code's 1M accounting (bare custom names are 200k). |
 
-### Subagent admission guard
+### Native concurrent-subagent limit
 
-The hook chain hard-limits each Claude Code session to **10 concurrently
-running subagents**:
+`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=16` uses Claude Code's built-in
+per-session admission limit. When 16 subagents are running, another Claude-
+spawned `Agent` call fails with `Concurrent subagent limit reached`; launches
+work again after the running count drops below 16. `install.sh` requires Claude
+Code v2.1.217 or later so this setting cannot be silently ignored.
 
-- `PreToolUse` reserves a slot for `Agent`/legacy `Task` and denies call 11.
-- `PostToolUse` releases completed foreground agents or maps a background
-  launch's `tool_use_id` to its returned `agentId`.
-- `SubagentStop` releases mapped background agents at actual completion.
-- `PostToolUseFailure` releases reservations for failed launches.
-
-State changes use an atomic `mkdir` lock and validated state records. Admission
-fails closed on malformed input, missing `jq`, corrupt state, persistence
-failure, or lock timeout. Stop-before-launch-response races and duplicate events
-are reconciled idempotently. State is per session, not machine-wide. Start a
-fresh Claude Code session after upgrading from a pre-v1.8.0 count-only hook.
+The native limit is intentionally not described as an absolute ceiling. A
+user-started `/subtask` occupies a slot but is not blocked, resuming a finished
+subagent can exceed the limit, and ultracode sessions are exempt. Workflow
+agents and agent-team teammates use separate limits. The former lifecycle hook,
+`jq`-parsed state, and lock files are no longer needed.
 
 ### Built-in `/model` menu
 
