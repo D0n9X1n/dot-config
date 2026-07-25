@@ -33,7 +33,9 @@ dot-configs/
 │   └── copilot-instructions.md  # global agent instructions
 ├── claude/                      # contents -> ~/.claude/
 │   ├── settings.json            # Claude Code settings
-│   └── statusline.sh            # statusline
+│   ├── statusline.sh            # statusline
+│   └── skills/                  # skills -> ~/.claude/skills/ (load in every project)
+│       └── update-settings/     # edit any config here correctly, then apply it
 ├── wezterm/                     # terminal config -> ~/.wezterm.lua
 │   └── wezterm.lua              # WezTerm config
 ├── .sonicterm/                  # tracked TOML config -> ~/.sonicterm/
@@ -100,7 +102,10 @@ probes do not appear as errors.
    `~/.claude/` on first launch; mkdir-p so install.sh wires things up on a
    fresh box). During migration it removes the obsolete
    `~/.claude/hooks/subagent-counter.sh` only when that path is still a symlink
-   to this repository; user-owned hooks are preserved.
+   to this repository; user-owned hooks are preserved. Skills live one directory
+   deeper (`claude/skills/<name>/SKILL.md`), so they get their own pass that
+   links each skill's files into `~/.claude/skills/<name>/` — global, meaning
+   they load in every project on the machine, not just this repo.
 8. Symlinks `wezterm/wezterm.lua` into `~/.wezterm.lua`.
 9. Symlinks tracked SonicTerm TOML files into `~/.sonicterm/`:
    `sonicterm.toml`, `keymaps/*.toml`, and `themes/*.toml`. Logs and runtime

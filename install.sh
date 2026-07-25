@@ -984,6 +984,24 @@ if [ -d "$claude_src" ]; then
   done < <(find "$claude_src" -maxdepth 1 -mindepth 1 -type f -print0)
   echo "Linked Claude Code config files to $claude_dest"
 
+  # Skills live one directory deep (claude/skills/<name>/SKILL.md), so the
+  # -type f loop above does not see them. Link each skill directory's files
+  # individually — same approach as the SonicTerm subdirectory pass — so a
+  # skill can ship supporting files alongside SKILL.md later.
+  claude_skills_src="${claude_src}/skills"
+  if [ -d "$claude_skills_src" ]; then
+    mkdir -p "${claude_dest}/skills"
+    while IFS= read -r -d '' skill_dir; do
+      skill_name="$(basename "$skill_dir")"
+      mkdir -p "${claude_dest}/skills/${skill_name}"
+      while IFS= read -r -d '' entry; do
+        base="$(basename "$entry")"
+        link_file "$entry" "${claude_dest}/skills/${skill_name}/${base}"
+      done < <(find "$skill_dir" -maxdepth 1 -mindepth 1 -type f -print0)
+    done < <(find "$claude_skills_src" -maxdepth 1 -mindepth 1 -type d -print0)
+    echo "Linked Claude Code skills to ${claude_dest}/skills"
+  fi
+
   # Claude Code v2.1.217 added a native concurrent-subagent limit. Remove only
   # the obsolete repo-managed hook symlink; preserve user-owned hooks/files.
   remove_legacy_claude_subagent_hook
