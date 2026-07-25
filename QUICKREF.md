@@ -39,11 +39,20 @@ creates symlinks into `$HOME` (and `~/.oh-my-zsh/custom/`).
   into `~/.copilot-relay/config.yaml`, unloads/removes legacy proxy launchd
   jobs, and restarts the relay agent so it runs the latest installed version.
 - `launchd/com.d0n9x1n.copilot-relay-healthcheck.plist` +
-  `launchd/copilot-relay-healthcheck.sh` — macOS launchd watchdog. Runs at load
-  and every 60s, calls `GET http://127.0.0.1:4142/healthz`, and
-  `launchctl kickstart -k`s `com.d0n9x1n.copilot-relay` if the status is not
-  200. Healthy status is a no-op. Logs restart events to
-  `~/Library/Logs/copilot-relay-healthcheck.log`.
+  `launchd/copilot-relay-healthcheck.sh` — macOS launchd watchdog, **two tiers**.
+  Runs at load and every 60s. **Tier 1 (every run, free):** `GET
+  http://127.0.0.1:4142/healthz`; not-200 means the process is gone, so
+  `launchctl kickstart -k` the relay. `/healthz` is a static handler that never
+  contacts Copilot, so 200 proves only that a socket is listening. **Tier 2
+  (time-gated, every 900s):** `copilot-relay status --deep` sends a real request
+  through Copilot — the only check that catches a relay that is listening but
+  whose token expired. Exit `1` (not running) and `2` (listening, cannot reach
+  Copilot — usually expired auth, where the fix is `copilot-relay auth`, not a
+  restart) are logged distinctly. Needs `copilot-relay >= 0.2.6`. Healthy is a
+  no-op at both tiers. Tune with `COPILOT_RELAY_DEEP_INTERVAL` (0 disables) and
+  `COPILOT_RELAY_DEEP_MAX_TIME`. Logs to
+  `~/Library/Logs/copilot-relay-healthcheck.log`; deep-check timestamp in
+  `~/Library/Caches/copilot-relay-healthcheck.deep`.
 - `launchd/com.d0n9x1n.npm-cache-clean.plist` + `launchd/clean-npm-caches.sh`
   — macOS launchd agent **template** + its tracked script. install.sh renders
   `__HOME__` -> `$HOME` and `__SRC_DIR__` -> repo path into
