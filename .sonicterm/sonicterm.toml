@@ -38,6 +38,8 @@ family = "Rec Mono St.Helens"
 size = 14
 # Line-height multiplier. 1.1 is close to WezTerm's default terminal spacing.
 line_height = 1.2
+# Weight-scale multiplier. 1.0 is the actual weight of current font. 1.0-2.0 
+weight_scale = 2.0
 
 [window]
 # Default terminal grid size for NEW windows. These are character cells, not px.
