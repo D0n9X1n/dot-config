@@ -39,6 +39,6 @@ function gg {
     wezterm cli set-tab-title -- "$title" 2>/dev/null
     wezterm cli set-window-title -- "$title" 2>/dev/null
   fi
-  command copilot --allow-all-tools --allow-all-paths --model gpt-5.6-sol --effort max
+  command copilot --allow-all-tools --allow-all-paths --model claude-opus-5 --context long_context --effort max
   unset DISABLE_AUTO_TITLE
 }

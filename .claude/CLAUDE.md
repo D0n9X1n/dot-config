@@ -149,16 +149,20 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
 Sonnet and Opus are treated as **separate model families** by user
 convention. Current routing:
 
-- **Default** (`ANTHROPIC_MODEL` + zsh wrappers) → `gpt-5.6-sol[1m]`. Relay routes
-  every non-`opus` name to `gptModel` (currently `gpt-5.6-sol`), so the
-  Claude-facing label is cosmetic relay-side; the `[1m]` suffix keeps
-  Claude Code's 1M-context accounting (bare custom names fall back to 200k).
-- Opus 4-5 / 4-6 / 4-7 / 4-8 → `claude-opus-4-8[1m]` — **no longer the
-  default**; reach it via `/model` or `--model 'claude-opus-4-8[1m]'`. Relay
-  matches the `opus` substring and maps it to upstream `claude-opus-4.8`.
+- **Default** (`ANTHROPIC_MODEL` + zsh wrappers) → `claude-opus-5[1m]`. Relay
+  matches the `opus` substring and maps it to upstream `claude-opus-5`,
+  ignoring the suffix; the `[1m]` suffix keeps Claude Code's 1M-context
+  accounting (bare custom names fall back to 200k).
+- Opus 4-5 / 4-6 / 4-7 / 4-8 / 5 → `claude-opus-5[1m]` — the **startup
+  default**. Any Claude-facing label containing `opus` routes to
+  upstream `opusModel: claude-opus-5`.
 - Sonnet 4-5 / 4-6 → Claude-facing `gpt-5.6-sol[1m]` (relay upstream = `gptModel`)
 - Haiku 4-5 → `gpt-5.6-sol[1m]`
 - gpt-5-mini → `gpt-5.6-sol[1m]`
+
+The GPT route stays fully configured at max effort + 1M context and is
+reachable via `/model` or `--model 'gpt-5.6-sol[1m]'`; Claude's
+Sonnet/Haiku/small-fast side-task tiers still use it.
 
 When asked to "use the same model for the family", apply within Opus or
 within Sonnet — never both. When adding a new alias, default to the

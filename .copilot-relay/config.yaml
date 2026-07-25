@@ -40,4 +40,4 @@ webSearchBackend:
 gptModel: gpt-5.6-sol
 
 # Upstream Copilot model used for requests containing "opus".
-opusModel: claude-opus-4.8
+opusModel: claude-opus-5

@@ -666,7 +666,7 @@ configure_copilot_relay() {
       printf 'logRetentionDays: 3\n'
       printf 'thinkEffort: max\n'
       printf 'gptModel: gpt-5.6-sol\n'
-      printf 'opusModel: claude-opus-4.8\n'
+      printf 'opusModel: claude-opus-5\n'
     } >"$relay_config"
   fi
   chmod 600 "$relay_config"

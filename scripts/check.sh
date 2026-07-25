@@ -171,6 +171,45 @@ SH
   echo "claude native subagent limit config ok: 16 (requires v2.1.217+)"
 }
 
+run_model_default_smoke() {
+  # Claude Code: Opus 5 is the startup default (Claude-facing "[1m]" label keeps
+  # 1M-context accounting); Sonnet/Haiku/small-fast stay on the GPT route.
+  jq -e '
+    .env.ANTHROPIC_MODEL == "claude-opus-5[1m]" and
+    .model == "claude-opus-5[1m]" and
+    .effortLevel == "max" and
+    .env.MODEL_REASONING_EFFORT == "max" and
+    .env.ANTHROPIC_DEFAULT_SONNET_MODEL == "gpt-5.6-sol[1m]" and
+    .env.ANTHROPIC_DEFAULT_HAIKU_MODEL == "gpt-5.6-sol[1m]" and
+    .env.ANTHROPIC_SMALL_FAST_MODEL == "gpt-5.6-sol[1m]"
+  ' claude/settings.json >/dev/null
+
+  # Copilot CLI: Opus 5 at the 1M context tier and max effort.
+  jq -e '
+    .model == "claude-opus-5" and
+    .contextTier == "long_context" and
+    .effortLevel == "max"
+  ' copilot/settings.json >/dev/null
+
+  # Relay: Opus route -> claude-opus-5, GPT route stays gpt-5.6-sol, max effort.
+  grep -Eq '^opusModel:[[:space:]]*claude-opus-5$' .copilot-relay/config.yaml
+  grep -Eq '^gptModel:[[:space:]]*gpt-5\.6-sol$' .copilot-relay/config.yaml
+  grep -Eq '^thinkEffort:[[:space:]]*max$' .copilot-relay/config.yaml
+
+  # Fresh-box fallback in install.sh must match the tracked relay config.
+  grep -Fq "printf 'opusModel: claude-opus-5\\n'" install.sh
+  grep -Fq "printf 'gptModel: gpt-5.6-sol\\n'" install.sh
+  grep -Fq "printf 'thinkEffort: max\\n'" install.sh
+
+  # Launcher wrappers inject the same defaults (settings.json can be rewritten
+  # at runtime, so the flags are the authoritative per-launch pin).
+  grep -Fq -- "--model 'claude-opus-5[1m]'" oh-my-zsh-custom/claude.zsh
+  grep -Fq -- "--model 'claude-opus-5[1m]' --effort max" oh-my-zsh-custom/cc.zsh
+  grep -Fq -- "--model claude-opus-5 --context long_context --effort max" oh-my-zsh-custom/gg.zsh
+
+  echo "model defaults ok: claude-opus-5 @ max effort, 1M context (GPT route: gpt-5.6-sol)"
+}
+
 run_smoke() {
   run_bash_syntax
   run_statusline_smoke
@@ -178,6 +217,7 @@ run_smoke() {
   run_zsh_syntax
   run_subagent_smoke
   run_claude_subagent_limit_smoke
+  run_model_default_smoke
 }
 
 case "${1:-all}" in
