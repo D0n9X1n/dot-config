@@ -45,8 +45,8 @@ dot-configs/
 ├── themes/apollo/               # Apollo theme (wezterm/vim/nvim/vscode/wt) — reference, not auto-linked
 ├── launchd/                     # macOS launchd agent templates
 │   ├── com.d0n9x1n.copilot-relay.plist     # copilot-relay proxy on login (rendered by install.sh)
-│   ├── com.d0n9x1n.copilot-relay-healthcheck.plist  # /healthz watchdog
-│   ├── copilot-relay-healthcheck.sh        # restarts relay when /healthz is not 200
+│   ├── com.d0n9x1n.copilot-relay-healthcheck.plist  # relay watchdog (liveness + deep)
+│   ├── copilot-relay-healthcheck.sh        # /healthz every 60s; status --deep every 900s
 │   ├── com.d0n9x1n.npm-cache-clean.plist   # weekly npm/npx cache cleaner (rendered by install.sh)
 │   └── clean-npm-caches.sh                 # the cleaner script the agent runs
 ├── mcp-shared.json              # secret-free MCP entries synced via git
@@ -119,14 +119,20 @@ probes do not appear as errors.
    if missing, then runs `tpm/bin/install_plugins` to clone every plugin
    listed in `.tmux.conf`. Skipped if `tmux` isn't on PATH.
 12. Links `.copilot-relay/config.yaml` to `~/.copilot-relay/config.yaml`, removes
-   legacy proxy launchd jobs, and writes the per-user launchd agent plus a
-   `/healthz` watchdog. The watchdog runs at load and every 60 seconds; if
-   `GET http://127.0.0.1:4142/healthz` does not return 200, it restarts
-   `com.d0n9x1n.copilot-relay` with `launchctl kickstart -k`; healthy status is
-   a no-op. The installer uses the same rule: if `/healthz` is already 200, it
-   leaves the running relay untouched. If relay is not authenticated, the
-   installer prints a red `ACTION REQUIRED` message to run `npx copilot-relay auth`
-   first; after auth, re-run `install.sh` to start it.
+   legacy proxy launchd jobs, and writes the per-user launchd agent plus its
+   watchdog. The watchdog runs at load and every 60 seconds, in two tiers.
+   **Liveness (every run, free):** if `GET http://127.0.0.1:4142/healthz` does
+   not return 200 the relay process is gone, so it restarts
+   `com.d0n9x1n.copilot-relay` with `launchctl kickstart -k`. **Deep (every 900
+   seconds):** `copilot-relay status --deep` sends a real request through
+   Copilot, catching a relay that is listening but cannot reach Copilot — the
+   case `/healthz` cannot see, since it never contacts Copilot. `not running`
+   and `listening but unusable` are logged distinctly; the latter is usually
+   expired auth, where the fix is `copilot-relay auth` rather than a restart.
+   Healthy is a no-op at both tiers. The installer uses the liveness rule: if
+   `/healthz` is already 200, it leaves the running relay untouched. If relay is
+   not authenticated, the installer prints a red `ACTION REQUIRED` message to run
+   `npx copilot-relay auth` first; after auth, re-run `install.sh` to start it.
 13. Writes the `npm-cache-clean` launchd agent (macOS): a weekly job (Sun 03:17)
    that runs `npm cache clean --force` and prunes `~/.npm/_npx` copies older than
    14 days, keeping the cache from growing unbounded. Needs no auth; never touches
@@ -231,17 +237,26 @@ test -f ~/.copilot-relay/github_token && echo "ok" || echo "FAIL: auth incomplet
 After `npx copilot-relay auth`, re-run `install.sh`; the launchd agent should
 start serving the proxy. The agent (`com.d0n9x1n.copilot-relay`) starts on every
 login and restarts on crash. A sibling watchdog
-(`com.d0n9x1n.copilot-relay-healthcheck`) calls `GET /healthz` at load and every
-60 seconds; 200 is a no-op, and a non-200 response triggers
-`launchctl kickstart -k` for the relay.
+(`com.d0n9x1n.copilot-relay-healthcheck`) runs at load and every 60 seconds, in
+two tiers: it calls `GET /healthz` on every run (200 is a no-op; anything else
+means the process is gone, so it `launchctl kickstart -k`s the relay), and every
+900 seconds it also runs `copilot-relay status --deep`, which sends a real
+request through Copilot. The deep tier is what catches a relay that is listening
+but whose Copilot token expired — `/healthz` returns 200 in that state because it
+never contacts Copilot.
 Relay logs go to `~/Library/Logs/copilot-relay.{out,err}.log` plus
-`~/.copilot-relay/logs/copilot-relay.log`; watchdog restart logs go to
-`~/Library/Logs/copilot-relay-healthcheck.log`. Verify:
+`~/.copilot-relay/logs/copilot-relay.log`; watchdog restart logs (both tiers) go
+to `~/Library/Logs/copilot-relay-healthcheck.log`, and the deep-check timestamp
+lives at `~/Library/Caches/copilot-relay-healthcheck.deep`. Verify:
 
 ```bash
 launchctl print "gui/$(id -u)/com.d0n9x1n.copilot-relay" | grep state
 launchctl print "gui/$(id -u)/com.d0n9x1n.copilot-relay-healthcheck" | grep state
 curl -sS -o /dev/null --connect-timeout 1 http://127.0.0.1:4142/healthz && echo "healthy"
+
+# Run the deep tier on demand (spends a few tokens).
+# Exit 0 = reachable, 1 = not running, 2 = listening but cannot reach Copilot.
+copilot-relay status --deep; echo "exit=$?"
 ```
 
 If the agent is loaded but port 4142 is not listening after auth, restart it:

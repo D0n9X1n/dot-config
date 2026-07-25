@@ -12,14 +12,24 @@
 
   What the agent does once loaded:
     - Runs launchd/copilot-relay-healthcheck.sh at load and every 60 seconds.
-    - The script calls GET http://127.0.0.1:4142/healthz.
-    - HTTP 200 means healthy; anything else triggers
-      launchctl kickstart -k gui/<uid>/com.d0n9x1n.copilot-relay.
+    - Tier 1, every run: GET http://127.0.0.1:4142/healthz. Anything but 200
+      triggers launchctl kickstart -k gui/<uid>/com.d0n9x1n.copilot-relay.
+      /healthz is a static handler in copilot-relay that never contacts
+      Copilot, so 200 proves only that a socket is listening.
+    - Tier 2, time-gated to every 900s: copilot-relay status --deep, which
+      sends a real request through Copilot. This is the tier that catches a
+      relay that is up but whose Copilot token expired. Exit 1 (not running)
+      and exit 2 (listening but unusable — usually expired auth, fixed by
+      `copilot-relay auth` rather than a restart) are logged distinctly.
+      Requires copilot-relay >= 0.2.6.
+    - Tune via COPILOT_RELAY_DEEP_INTERVAL (0 disables the deep tier) and
+      COPILOT_RELAY_DEEP_MAX_TIME.
 
   Logs:
     stdout -> ~/Library/Logs/copilot-relay-healthcheck.out.log
     stderr -> ~/Library/Logs/copilot-relay-healthcheck.err.log
     script log -> ~/Library/Logs/copilot-relay-healthcheck.log (capped)
+    deep-check timestamp -> ~/Library/Caches/copilot-relay-healthcheck.deep
 -->
 <plist version="1.0">
 <dict>
