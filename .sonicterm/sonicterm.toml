@@ -96,10 +96,10 @@ warm_window_pool = 2
 # override, e.g. shell = "pwsh.exe" or shell = "powershell.exe".
 # shell = "pwsh.exe"
 
-# TERM_PROGRAM passed to child PTYs. Some tools, such as Copilot, do not
-# recognize SonicTerm yet; setting term_program = "WezTerm" can bypass their
-# terminal checks and enable their WezTerm/new terminal UI path.
-term_program = "WezTerm"
+# TERM_PROGRAM passed to child PTYs. Keep SonicTerm's real identity so shell
+# startup can reliably distinguish this outer terminal. Copilot receives its
+# WezTerm-compatible identity only in the process-scoped launcher wrappers.
+term_program = "SonicTerm"
 
 # Scrollback line limit per pane.
 scrollback = 1000

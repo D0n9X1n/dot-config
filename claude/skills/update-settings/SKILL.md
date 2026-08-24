@@ -66,8 +66,13 @@ context accounting.
 
 **RMUX.** `.rmux.conf` is native RMUX config even though it uses tmux command
 syntax. Preserve `TERM_PROGRAM=rmux`, validate on a unique named socket, and do
-not add TPM/plugin bootstrap or a global tmux shim. `rmux claude` uses a private,
-process-scoped shim for teammate mode.
+not add TPM/plugin bootstrap or a global tmux shim. SonicTerm must advertise
+`TERM_PROGRAM=SonicTerm`; Copilot's WezTerm identity remains process-scoped.
+Last-loaded `oh-my-zsh-custom/zz-rmux.zsh` defines explicit helpers only:
+`rr <session>` attaches when present and creates only when absent,
+`rd <session>` deletes, and `rl` lists sessions. It must never auto-attach a new
+tab. Inside RMUX, `exit`, `logout`, and empty-prompt Ctrl+D must detach; `rd`
+remains the destructive path. `rmux claude` uses its own private shim.
 
 **Global publishing instructions.** Keep reusable Wiki and commit-derived
 release guidance aligned between `claude/CLAUDE.md` and `copilot/AGENTS.md`,
@@ -150,6 +155,11 @@ repo_root="$(git rev-parse --show-toplevel)"
 # agents loaded
 launchctl print "gui/$(id -u)/com.d0n9x1n.copilot-relay" | grep state
 launchctl print "gui/$(id -u)/com.d0n9x1n.copilot-relay-healthcheck" | grep state
+
+# RMUX helper wiring
+zsh -n ~/.oh-my-zsh/custom/zz-rmux.zsh
+grep -Fq 'term_program = "SonicTerm"' ~/.sonicterm/sonicterm.toml
+zsh -ic 'type rr rd rl'
 
 # relay reachable end to end (spends a few tokens)
 copilot-relay status --deep; echo "exit=$?"

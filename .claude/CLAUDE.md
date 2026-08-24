@@ -66,7 +66,14 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
   process-scoped WezTerm/truecolor identity through its zsh launchers.
   `archive/tmux/` and
   `archive/wezterm/` are inert reference files. SonicTerm is the managed outer
-  terminal; neither tmux nor WezTerm is installed by this repository.
+  terminal and must advertise `TERM_PROGRAM=SonicTerm`; Copilot's WezTerm
+  compatibility stays process-scoped in its launchers. The last-loaded
+  `oh-my-zsh-custom/zz-rmux.zsh` defines explicit `rr <session>` (attach when
+  present, create only when absent), `rd <session>` delete, and `rl` list
+  helpers; it must never auto-attach new tabs. Inside RMUX, `exit`, `logout`,
+  and empty-prompt Ctrl+D must detach rather than exit the pane; `rd` remains
+  the intentional destructive action. Neither tmux nor WezTerm is installed by
+  this repository.
 - **Global publishing guidance is coupled.** `claude/CLAUDE.md` is linked to
   `~/.claude/CLAUDE.md`. `copilot/AGENTS.md` carries equivalent generic Wiki and
   release guidance; `copilot/copilot-instructions.md` remains Copilot's native

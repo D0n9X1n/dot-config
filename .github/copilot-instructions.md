@@ -48,6 +48,12 @@ links.
 - **RMUX config** (`.rmux.conf`) uses tmux command syntax but must be tested
   against RMUX itself. Preserve `TERM_PROGRAM=rmux`, use a unique `-L` socket
   for checks, and do not add TPM/plugin bootstrap or a global tmux shim.
+  SonicTerm advertises `TERM_PROGRAM=SonicTerm`; last-loaded `zz-rmux.zsh`
+  provides explicit `rr <session>` attach-or-create, `rd <session>` delete, and
+  `rl` list helpers. `rr` must attach when present and create only when absent.
+  New tabs remain plain shells. Inside RMUX, `exit`, `logout`, empty-prompt
+  Ctrl+D, and closing the client detach; only `rd` should delete a session.
+  Copilot's WezTerm identity remains child-scoped.
 - **Archives are inert.** `archive/tmux/.tmux.conf` and
   `archive/wezterm/wezterm.lua` are historical references, never active config.
   SonicTerm is the managed outer terminal; this repository installs neither

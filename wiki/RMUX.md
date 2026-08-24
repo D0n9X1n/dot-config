@@ -58,7 +58,25 @@ The profile is adapted from RMUX's v0.10.0 human-friendly example and selected c
 
 The config clears stale `TERMINFO`, `TERMINFO_DIRS`, and `TERMCAP` inherited by a long-lived daemon, then sets `COLORTERM=truecolor` and `FORCE_COLOR=3`. It does not clear RMUX's own `TERM_PROGRAM` identity.
 
+## Session helpers and resume
+
+New SonicTerm tabs open normal shells. The late-loading `zz-rmux.zsh` file provides explicit helpers:
+
+```sh
+rr main       # create or resume main
+rl            # list all sessions
+rd main       # delete main
+```
+
+`rr <name>` checks whether the session exists, runs `attach-session` when it does, and runs `new-session` only when it is absent. It prints which path it chose. `rd <name>` runs `kill-session`, so it permanently ends that session. SonicTerm advertises its real `TERM_PROGRAM=SonicTerm`; only Copilot child processes receive the WezTerm compatibility identity.
+
+Inside RMUX, the zsh helpers turn `exit`, `logout`, and Ctrl+D at an empty prompt into `detach-client`. Ctrl+D with text in the edit buffer keeps its normal delete/list behavior. `prefix + d` and closing the SonicTerm tab also disconnect the client while leaving panes running. Run `rr main` later to reconnect.
+
+Use `rd <name>` for intentional session deletion. Persistence is still in memory only: `rd`, `kill-server`, daemon loss, or reboot destroys the session; there is no resurrect-style disk restore.
+
 ### Keybindings
+
+The [complete RMUX keymap](RMUX-Keymap.md) lists all 278 effective bindings across the prefix, active Vi copy-mode, retained Emacs copy-mode, and root mouse tables.
 
 | Action | Binding |
 |---|---|

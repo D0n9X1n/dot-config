@@ -2,6 +2,7 @@
 
 - [Home](README.md)
 - [RMUX](RMUX.md)
+- [RMUX keymap](RMUX-Keymap.md)
 - [Archived tmux](Archive-Tmux.md)
 - [Archived WezTerm](Archive-WezTerm.md)
 
@@ -9,5 +10,6 @@
 
 - [首页](Home-zh-CN.md)
 - [RMUX](RMUX-zh-CN.md)
+- [RMUX 按键表](RMUX-Keymap-zh-CN.md)
 - [已归档的 tmux](Archive-Tmux-zh-CN.md)
 - [已归档的 WezTerm](Archive-WezTerm-zh-CN.md)

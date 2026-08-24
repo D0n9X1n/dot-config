@@ -58,7 +58,25 @@ RMUX 使用 tmux 命令语法，不是 JSON、YAML 或 TOML。配置可以执行
 
 配置会清除守护进程可能继承的陈旧 `TERMINFO`、`TERMINFO_DIRS` 和 `TERMCAP`，然后设置 `COLORTERM=truecolor` 与 `FORCE_COLOR=3`。它不会清除 RMUX 自己的 `TERM_PROGRAM` 身份。
 
+## 会话助手与恢复
+
+新的 SonicTerm 标签页会打开普通 shell。最后加载的 `zz-rmux.zsh` 提供显式助手：
+
+```sh
+rr main       # 创建或恢复 main
+rl            # 列出所有会话
+rd main       # 删除 main
+```
+
+`rr <名称>` 会先检查会话是否存在：存在时执行 `attach-session`，只有不存在时才执行 `new-session`，并打印所选择的路径。`rd <名称>` 执行 `kill-session`，因此会永久结束该会话。SonicTerm 使用真实的 `TERM_PROGRAM=SonicTerm`；只有 Copilot 子进程会收到 WezTerm 兼容身份。
+
+在 RMUX 中，zsh 助手会把 `exit`、`logout` 以及空提示符上的 Ctrl+D 转换为 `detach-client`。编辑缓冲区中有文字时，Ctrl+D 仍保持正常的删除 / 列表行为。`prefix + d` 和关闭 SonicTerm 标签页也只会断开客户端，窗格会继续运行。之后执行 `rr main` 即可重新连接。
+
+需要主动删除会话时使用 `rd <名称>`。持久性仍然只存在于内存中：执行 `rd` 或 `kill-server`、守护进程丢失或系统重启都会销毁会话；没有类似 resurrect 的磁盘恢复。
+
 ### 快捷键
+
+[完整 RMUX 按键表](RMUX-Keymap-zh-CN.md)列出了 prefix、当前 Vi 复制模式、保留的 Emacs 复制模式以及 root 鼠标表中的全部 278 个生效绑定。
 
 | 操作 | 快捷键 |
 |---|---|

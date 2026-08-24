@@ -68,8 +68,11 @@ run_shellcheck() {
 }
 
 run_zsh_syntax() {
+  local file
   command -v zsh >/dev/null 2>&1 || return 0
-  zsh -n oh-my-zsh-custom/custom.zsh
+  while IFS= read -r file; do
+    zsh -n "$file"
+  done < <(find oh-my-zsh-custom -maxdepth 1 -type f -name '*.zsh' -print | sort)
 }
 
 run_subagent_smoke() {
@@ -321,6 +324,8 @@ run_wiki_smoke() {
     wiki/Home-zh-CN.md
     wiki/RMUX.md
     wiki/RMUX-zh-CN.md
+    wiki/RMUX-Keymap.md
+    wiki/RMUX-Keymap-zh-CN.md
     wiki/Archive-Tmux.md
     wiki/Archive-Tmux-zh-CN.md
     wiki/Archive-WezTerm.md
@@ -444,6 +449,126 @@ run_wiki_smoke() {
   echo "Wiki source and transformed bilingual link graph ok"
 }
 
+run_rmux_helpers_smoke() {
+  (
+    local test_root fake_bin capture exit_status
+    test_root="$(mktemp -d)"
+    trap 'rm -rf "$test_root"' EXIT
+    fake_bin="$test_root/bin"
+    capture="$test_root/capture"
+    mkdir -p "$fake_bin"
+
+    cat >"$fake_bin/rmux" <<'SH'
+#!/bin/sh
+printf '%s\n' "$*" >>"$RMUX_CAPTURE"
+if [ "$1" = "has-session" ]; then
+  [ "${RMUX_SESSION_EXISTS:-0}" = "1" ]
+fi
+SH
+    chmod +x "$fake_bin/rmux"
+
+    PATH="$fake_bin:/usr/bin:/bin" RMUX_CAPTURE="$capture" zsh -f -c '
+      source oh-my-zsh-custom/zz-rmux.zsh
+      rr new >/dev/null
+    '
+    [ "$(sed -n '1p' "$capture")" = "has-session -t new" ]
+    [ "$(sed -n '2p' "$capture")" = "new-session -s new" ]
+
+    RMUX_SESSION_EXISTS=1 PATH="$fake_bin:/usr/bin:/bin" RMUX_CAPTURE="$capture" zsh -f -c '
+      source oh-my-zsh-custom/zz-rmux.zsh
+      rr main >/dev/null
+      rd main
+      rl
+      RMUX=socket exit
+      RMUX=socket logout
+      bindkey -M emacs "^D"
+      bindkey -M viins "^D"
+    '
+    [ "$(sed -n '3p' "$capture")" = "has-session -t main" ]
+    [ "$(sed -n '4p' "$capture")" = "attach-session -t main" ]
+    [ "$(sed -n '5p' "$capture")" = "kill-session -t main" ]
+    [ "$(sed -n '6p' "$capture")" = "list-sessions" ]
+    [ "$(sed -n '7p' "$capture")" = "detach-client" ]
+    [ "$(sed -n '8p' "$capture")" = "detach-client" ]
+    [ "$(wc -l <"$capture" | tr -d ' ')" = "8" ]
+
+    exit_status=0
+    PATH="$fake_bin:/usr/bin:/bin" RMUX_CAPTURE="$capture" zsh -f -c '
+      source oh-my-zsh-custom/zz-rmux.zsh
+      exit 7
+    ' || exit_status=$?
+    [ "$exit_status" = "7" ]
+
+    PATH="$fake_bin:/usr/bin:/bin" RMUX_CAPTURE="$capture" zsh -f -c '
+      source oh-my-zsh-custom/zz-rmux.zsh
+      rr >/dev/null 2>&1; [[ $? = 2 ]]
+      rr one two >/dev/null 2>&1; [[ $? = 2 ]]
+      rd >/dev/null 2>&1; [[ $? = 2 ]]
+      rl extra >/dev/null 2>&1; [[ $? = 2 ]]
+    '
+
+    PATH="/usr/bin:/bin" zsh -f -c '
+      source oh-my-zsh-custom/zz-rmux.zsh
+      rr main >/dev/null 2>&1; [[ $? = 127 ]]
+      rd main >/dev/null 2>&1; [[ $? = 127 ]]
+      rl >/dev/null 2>&1; [[ $? = 127 ]]
+    '
+  )
+
+  grep -Fq 'command rmux has-session -t "$1"' oh-my-zsh-custom/zz-rmux.zsh
+  grep -Fq 'command rmux attach-session -t "$1"' oh-my-zsh-custom/zz-rmux.zsh
+  grep -Fq 'command rmux new-session -s "$1"' oh-my-zsh-custom/zz-rmux.zsh
+  grep -Fq 'command rmux kill-session -t "$1"' oh-my-zsh-custom/zz-rmux.zsh
+  grep -Fq 'command rmux list-sessions' oh-my-zsh-custom/zz-rmux.zsh
+  [ "$(grep -Fc 'command rmux detach-client' oh-my-zsh-custom/zz-rmux.zsh)" = "3" ]
+  grep -Fq "bindkey -M emacs '^D' _rmux_detach_or_delete_char" oh-my-zsh-custom/zz-rmux.zsh
+  grep -Fq "bindkey -M viins '^D' _rmux_detach_or_delete_char" oh-my-zsh-custom/zz-rmux.zsh
+  echo "RMUX helpers ok: rr/rd/rl and exit/logout/Ctrl-D detach protection"
+}
+
+run_rmux_keymap_docs_smoke() {
+  if ! command -v rmux >/dev/null 2>&1; then
+    echo "rmux not found; skipping keymap snapshot runtime check"
+    return 0
+  fi
+
+  (
+    local socket test_root table page block effective count
+    socket="dot-configs-keymap-$$"
+    test_root="$(mktemp -d)"
+    trap 'rmux -L "$socket" kill-server >/dev/null 2>&1 || true; rm -rf "$test_root"' EXIT INT TERM
+
+    rmux -L "$socket" -f "$repo_root/.rmux.conf" new-session -d -s keymap-audit -x 160 -y 48
+    for table in prefix copy-mode-vi copy-mode root; do
+      effective="$test_root/$table.effective"
+      rmux -L "$socket" list-keys -T "$table" |
+        sed "s|$HOME/.rmux.conf|~/.rmux.conf|g" >"$effective"
+      case "$table" in
+        prefix) count=90 ;;
+        copy-mode-vi) count=89 ;;
+        copy-mode) count=75 ;;
+        root) count=24 ;;
+      esac
+      [ "$(wc -l <"$effective" | tr -d ' ')" = "$count" ]
+
+      for page in wiki/RMUX-Keymap.md wiki/RMUX-Keymap-zh-CN.md; do
+        block="$test_root/$(basename "$page").$table"
+        sed -n "/<!-- BEGIN GENERATED $table -->/,/<!-- END GENERATED $table -->/p" "$page" |
+          sed '1,2d;$d' | sed '$d' >"$block"
+        cmp -s "$effective" "$block" || {
+          echo "$page key table '$table' is out of date" >&2
+          diff -u "$effective" "$block" >&2 || true
+          return 1
+        }
+      done
+    done
+  )
+
+  grep -Fq '`exit`, `logout`, and Ctrl+D at an empty prompt are protected' wiki/RMUX-Keymap.md
+  grep -Fq '`exit`、`logout` 以及空提示符上的 Ctrl+D 都有保护' wiki/RMUX-Keymap-zh-CN.md
+  echo "RMUX keymap docs ok: 278 effective bindings in English and Chinese"
+}
+
 run_retired_config_migration_smoke() {
   (
     local test_root exact other regular
@@ -488,9 +613,10 @@ run_rmux_smoke() {
   fi
 
   (
-    local socket keys
+    local socket keys test_root first_session first_pane second_session second_pane client_pid
     socket="dot-configs-check-$$"
-    trap 'rmux -L "$socket" kill-server >/dev/null 2>&1 || true' EXIT INT TERM
+    test_root="$(mktemp -d)"
+    trap 'rmux -L "$socket" kill-server >/dev/null 2>&1 || true; rm -rf "$test_root"' EXIT INT TERM
 
     rmux -L "$socket" -f /dev/null new-session -d -s validate -x 160 -y 48
     rmux -L "$socket" source-file -n -v .rmux.conf >/dev/null
@@ -509,9 +635,55 @@ run_rmux_smoke() {
     printf '%s\n' "$keys" | grep -Fq 'source-file'
     ! grep -Eq '(^|[[:space:]])(@plugin|run-shell|run |if-shell.*git clone)' .rmux.conf
     ! grep -Eq 'set-environment.*TERM_PROGRAM' .rmux.conf
+
+    rmux -L "$socket" kill-session -t validate
+    /usr/bin/script -q "$test_root/first" /bin/sh -c \
+      "rmux -L '$socket' -f '$repo_root/.rmux.conf' new-session -A -s main" \
+      >/dev/null 2>&1 &
+    client_pid=$!
+    for _ in 1 2 3 4 5; do
+      rmux -L "$socket" has-session -t main >/dev/null 2>&1 && break
+      sleep 1
+    done
+    first_session="$(rmux -L "$socket" list-sessions -F '#{session_name}|#{session_id}|#{session_attached}')"
+    first_pane="$(rmux -L "$socket" list-panes -t main -F '#{pane_id}')"
+    printf '%s\n' "$first_session" | grep -Eq '^main\|[^|]+\|1$'
+    rmux -L "$socket" detach-client -s main
+    wait "$client_pid" || true
+    [ "$(rmux -L "$socket" list-sessions -F '#{session_name}|#{session_attached}')" = "main|0" ]
+
+    /usr/bin/script -q "$test_root/second" /bin/sh -c \
+      "rmux -L '$socket' new-session -A -s main" >/dev/null 2>&1 &
+    client_pid=$!
+    for _ in 1 2 3 4 5; do
+      [ "$(rmux -L "$socket" list-sessions -F '#{session_attached}')" = "1" ] && break
+      sleep 1
+    done
+    second_session="$(rmux -L "$socket" list-sessions -F '#{session_name}|#{session_id}|#{session_attached}')"
+    second_pane="$(rmux -L "$socket" list-panes -t main -F '#{pane_id}')"
+    [ "${first_session%|1}" = "${second_session%|1}" ]
+    [ "$first_pane" = "$second_pane" ]
+    [ "$(rmux -L "$socket" list-sessions -F '#{session_name}' | grep -c '^main$')" -eq 1 ]
+    rmux -L "$socket" detach-client -s main
+    wait "$client_pid" || true
+    rmux -L "$socket" has-session -t main
+
+    /usr/bin/script -q "$test_root/closed-tab" /bin/sh -c \
+      "rmux -L '$socket' attach-session -t main" >/dev/null 2>&1 &
+    client_pid=$!
+    for _ in 1 2 3 4 5; do
+      [ "$(rmux -L "$socket" list-sessions -F '#{session_attached}')" = "1" ] && break
+      sleep 1
+    done
+    kill "$client_pid" 2>/dev/null || true
+    wait "$client_pid" 2>/dev/null || true
+    sleep 1
+    rmux -L "$socket" has-session -t main
+    [ "$(rmux -L "$socket" list-sessions -F '#{session_name}|#{session_id}|#{session_attached}')" = "${first_session%|1}|0" ]
+    [ "$(rmux -L "$socket" list-panes -t main -F '#{pane_id}')" = "$first_pane" ]
   )
 
-  echo "RMUX config ok: C-q, one-based panes, Gruvbox top status, isolated socket"
+  echo "RMUX config/resume ok: C-q profile and stable main session across detach"
 }
 
 run_smoke() {
@@ -525,6 +697,8 @@ run_smoke() {
   run_copilot_terminal_smoke
   run_global_instructions_smoke
   run_wiki_smoke
+  run_rmux_helpers_smoke
+  run_rmux_keymap_docs_smoke
   run_retired_config_migration_smoke
   run_rmux_smoke
 }
@@ -532,8 +706,8 @@ run_smoke() {
 case "${1:-all}" in
   smoke) run_smoke ;;
   instructions) run_global_instructions_smoke ;;
-  wiki) run_wiki_smoke ;;
-  rmux) run_retired_config_migration_smoke; run_rmux_smoke ;;
+  wiki) run_wiki_smoke; run_rmux_keymap_docs_smoke ;;
+  rmux) run_rmux_helpers_smoke; run_rmux_keymap_docs_smoke; run_retired_config_migration_smoke; run_rmux_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;
   *)
