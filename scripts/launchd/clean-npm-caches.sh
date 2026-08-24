@@ -5,7 +5,7 @@ set -euo pipefail
 #
 # Consumed by the launchd agent com.d0n9x1n.npm-cache-clean (see the sibling
 # com.d0n9x1n.npm-cache-clean.plist template), but also safe to run by hand:
-#   bash launchd/clean-npm-caches.sh
+#   bash scripts/launchd/clean-npm-caches.sh
 #
 # What it does:
 #   1. `npm cache clean --force` — empties ~/.npm/_cacache (npm rebuilds it on

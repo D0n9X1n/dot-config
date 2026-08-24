@@ -2,7 +2,7 @@
 
 English | [简体中文](RMUX-Keymap-zh-CN.md)
 
-This is the complete effective keymap for RMUX with this repository's `.rmux.conf`. It includes custom bindings and every retained RMUX default reported by `rmux list-keys`.
+This is the complete effective keymap for RMUX with this repository's `config/rmux/rmux.conf`. It includes custom bindings and every retained RMUX default reported by `rmux list-keys`.
 
 > Inside RMUX, `exit`, `logout`, and Ctrl+D at an empty prompt are protected: they detach the client instead of ending the pane. `prefix + d` and closing the SonicTerm tab also detach. Use `rd <name>` only when you intentionally want to delete a session.
 
@@ -30,7 +30,7 @@ This is the complete effective keymap for RMUX with this repository's `.rmux.con
 - `prefix` is `Ctrl+q`.
 - `C-` means Ctrl; `M-` means Option/Alt.
 - `PPage` and `NPage` mean Page Up and Page Down.
-- Bindings marked `-r` by RMUX repeat while the key is held.
+- A binding marked `-r` lets later key presses repeat without the prefix during RMUX's `repeat-time` window. The default window is 500 ms.
 - `copy-mode-vi` is active because the profile sets `mode-keys vi`.
 - `copy-mode` remains available if the mode is changed to Emacs.
 - `root` contains mouse actions that do not require the prefix.
@@ -40,7 +40,7 @@ There are 278 effective bindings across four tables. Refresh the snapshot with a
 ```sh
 socket="keymap-audit-$$"
 trap 'rmux -L "$socket" kill-server >/dev/null 2>&1 || true' EXIT
-rmux -L "$socket" -f .rmux.conf new-session -d -s audit
+rmux -L "$socket" -f config/rmux/rmux.conf new-session -d -s audit
 rmux -L "$socket" list-keys -T prefix
 rmux -L "$socket" list-keys -T copy-mode-vi
 rmux -L "$socket" list-keys -T copy-mode

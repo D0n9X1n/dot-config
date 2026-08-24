@@ -1,204 +1,59 @@
 # CLAUDE.md
 
-> Agent-facing instructions for Claude Code (and similar Anthropic agents)
-> working on this repository. Mirrors `.github/copilot-instructions.md`,
-> with Claude-Code-specific guidance added.
+Read `wiki/README.md` first.
 
-## Read these first
+The Wiki is the full source of truth for this repo. Do not copy its full help into this file.
 
-1. **`QUICKREF.md`** — single source of truth for how this repo works.
-   Update it when behavior changes.
-2. **`ReadMe.md`** — human-facing README. Update separately when
-   user-visible details change.
+## Repo map
 
-## Repo summary
+- `config/` has config used now.
+- `archive/` has old files. Never link it.
+- `scripts/` has code that runs.
+- `themes/` has color files.
+- `wiki/` has all full help.
+- `install.sh` stays at the root.
 
-Personal dotfiles, synced across machines via git + symlinks. macOS-only;
-`install.sh` is the single installer.
+`config/manifest.tsv` is the install list. A new managed file needs a manifest row.
 
+Tool-required files stay at their fixed paths:
+
+- `.claude/CLAUDE.md`
+- `.github/copilot-instructions.md`
+- `.github/workflows/*.yml`
+- `.gitignore`
+
+## Before an edit
+
+Read the matching Wiki page:
+
+- config and links: `wiki/Repository-Operations.md`
+- Claude: `wiki/Claude-Code.md`
+- Copilot: `wiki/Copilot-CLI.md`
+- RMUX: `wiki/RMUX.md`
+- terminal and zsh: `wiki/SonicTerm-and-Shell.md`
+- services: `wiki/Services-and-Automation.md`
+- checks and release: `wiki/Development-and-Releases.md`
+
+Keep English and `-zh-CN` Wiki pages together.
+
+Keep the status-line layout and cache aligned. Preserve the documented provider metrics and live-subagent differences.
+
+Keep Sonnet and Opus model families separate.
+
+Launchd files under `config/launchd/` are templates. Run `install.sh` to render them.
+
+## Check
+
+```sh
+scripts/check.sh all
 ```
-.
-├── install.sh                   # idempotent linker (macOS only)
-├── .rmux.conf                   # symlinked to ~/.rmux.conf
-├── archive/                     # inert retired tmux/WezTerm configs
-├── wiki/                        # flat English + zh-CN Wiki source
-├── oh-my-zsh-custom/            # zsh customs
-├── claude/                      # Claude Code config + global instructions
-│   ├── CLAUDE.md
-│   ├── settings.json
-│   └── statusline.sh
-├── copilot/                     # Copilot config + global instructions
-│   ├── AGENTS.md
-│   └── copilot-instructions.md
-├── .sonicterm/                  # SonicTerm TOML config linked into ~/.sonicterm/
-├── .copilot-relay/config.yaml   # secret-free relay config linked into ~/.copilot-relay/
-├── launchd/                     # macOS launchd agent templates (rendered by install.sh)
-├── mcp-shared.json              # secret-free MCP entries (synced)
-└── .github/, .claude/
-```
 
-## Architecture rules
+For a config change, run `./install.sh` twice after checks pass. Then verify the links and launchd jobs named in the Wiki.
 
-- **`mcp-shared.json` is for non-secret MCP entries only.** Anything
-  needing a token/key goes in the gitignored
-  `~/.config/github-copilot/mcp.json` per device — install.sh's merge
-  step preserves it.
-- **`claude/statusline.sh` and `copilot/statusline.sh` must stay
-  functionally aligned.** Same segments, same output shape, same Gruvbox
-  palette, same per-cwd 5s git cache. When you change one, port the
-  change to the sibling. **Known intentional divergence (do not "re-align"
-  away):** Claude's statusline has NO live-subagent renderings — neither the
-  inline `subagents`/`Tasks` count nor the bottom live-agent tree — because
-  Claude Code ships its own native subagent UI. Copilot keeps both, and its
-  subagent glyph is the magic-wand (U+F0D0) while Claude has no subagent glyph
-  at all. Claude Code handles concurrent admission natively; the statusline has
-  no counter state to read.
-- **Claude Code's native concurrent-subagent limit is set to 16.** Keep
-  `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS="16"` in `claude/settings.json` and
-  require Claude Code v2.1.217+. Do not describe it as an absolute ceiling:
-  `/subtask` and resumed agents can pass the admission boundary, ultracode is
-  exempt, and workflows/agent teams use separate limits. Do not restore the
-  obsolete lifecycle counter hook.
-- **`.rmux.conf` is the active multiplexer config.** RMUX is its own daemon-backed
-  multiplexer, not a tmux wrapper or terminal emulator. Keep the `C-q` profile,
-  test with an isolated named socket, preserve `TERM_PROGRAM=rmux`, and never add
-  TPM/plugin bootstrap or a global tmux shim. Copilot alone receives a
-  process-scoped WezTerm/truecolor identity through its zsh launchers.
-  `archive/tmux/` and
-  `archive/wezterm/` are inert reference files. SonicTerm is the managed outer
-  terminal and must advertise `TERM_PROGRAM=SonicTerm`; Copilot's WezTerm
-  compatibility stays process-scoped in its launchers. The last-loaded
-  `oh-my-zsh-custom/zz-rmux.zsh` defines explicit `rr <session>` (attach when
-  present, create only when absent), `rd <session>` delete, and `rl` list
-  helpers; it must never auto-attach new tabs. Inside RMUX, `exit`, `logout`,
-  and empty-prompt Ctrl+D must detach rather than exit the pane; `rd` remains
-  the intentional destructive action. Neither tmux nor WezTerm is installed by
-  this repository.
-- **Global publishing guidance is coupled.** `claude/CLAUDE.md` is linked to
-  `~/.claude/CLAUDE.md`. `copilot/AGENTS.md` carries equivalent generic Wiki and
-  release guidance; `copilot/copilot-instructions.md` remains Copilot's native
-  global entry point. `oh-my-zsh-custom/custom.zsh` must keep `~/.copilot` in
-  `COPILOT_CUSTOM_INSTRUCTIONS_DIRS` so Copilot discovers `AGENTS.md`. Update
-  both workflow guides together while retaining tool-specific framing.
-- **`wiki/` is the GitHub Wiki source of truth.** Keep it flat; pair every English
-  page with a `-zh-CN` page; use `README.md` as the source landing page and
-  `.md` internal links; update `_Sidebar.md`; never use cross-page `.md#anchor`
-  links. Browser edits are overwritten by `.github/workflows/publish-wiki.yml`.
-- **launchd plists in `launchd/` are templates, not symlinks.**
-  install.sh substitutes `__HOME__` -> `$HOME` (launchd doesn't expand
-  `$HOME` at runtime) and `__SRC_DIR__` -> this repo's absolute path (for
-  agents that exec a tracked script, e.g. `clean-npm-caches.sh`), writes the
-  rendered file to `~/Library/LaunchAgents/`, then `bootout`+`bootstrap` into
-  `gui/<uid>`. macOS-only; install.sh skips this step on other OSes.
-  Current agents: `com.d0n9x1n.copilot-relay` (relay proxy, on login) and
-  `com.d0n9x1n.npm-cache-clean` (weekly npm/npx cache prune, Sun 03:17).
-- **install.sh bootstraps a brand-new Mac.** It installs Homebrew if missing,
-  Homebrew formulae/casks (including Claude Code via `claude-code`), npm globals
-  for Copilot CLI + `copilot-relay`, oh-my-zsh, custom RecMono fonts from
-  `MOSconfig/recursive-code-config`, then links configs.
-- **`.sonicterm/` is tracked config, not runtime state.** `install.sh` links only
-  `.sonicterm/*.toml`, `.sonicterm/keymaps/*.toml`, and
-  `.sonicterm/themes/*.toml` into `~/.sonicterm/`; do not commit SonicTerm
-  `logs/` or runtime backup files.
-- **`.copilot-relay/config.yaml` is tracked config, not auth state.**
-  `install.sh` links only that file into `~/.copilot-relay/`; never commit
-  `github_token`, `copilot_token.json`, or relay logs.
+## Safety
 
-## Conventions
+This repo is public.
 
-### Shell scripts (.sh)
+Do not commit tokens, keys, auth files, logs, runtime state, SonicTerm save locks, or `.claude/worktrees/`.
 
-- `set -euo pipefail` strict mode.
-- Bash 3.2 compatible (macOS default). Avoid `${arr[@]}` quirks,
-  `\u` escapes, associative arrays, `printf '%(...)T'`.
-- POSIX-portable utilities: `awk`, `sed`, `grep`, `find -print0`,
-  `stat -f %m || stat -c %Y` fallback (Darwin vs GNU).
-- Statusline scripts use `printf -v __SEG` instead of `$(seg_$s)`
-  capture — saves one fork per segment.
-
-### Config files
-
-- Color scheme: **Gruvbox dark hard (base16)** across RMUX, SonicTerm, and the
-  statuslines; the archived WezTerm/tmux files preserve their historical match.
-- Statusline label icons are **FontAwesome** glyphs (U+F0xx–F2xx),
-  rendered via raw UTF-8 bytes in bash (since bash 3.2 doesn't support
-  `\u`).
-- Five-line layout: literal `\n` tokens in `SEGMENTS` introduce line
-  breaks. L1 time/run/api/cost · L2 model/effort/context ·
-  L3 mcp/skills/agents/style · L4 cwd path · L5 repo/branch/diff/stash/worktree.
-- Default statusline icon accents should avoid repeating colors for adjacent
-  segments and for segments in the same visual column.
-
-## When you make changes
-
-- **Bump version + tag**. We use semver-ish tags (`vX.Y.Z`); patch for
-  bugfixes, minor for new features, major for breaking changes.
-  Pushing a `v*.*.*` tag triggers `.github/workflows/release.yml`, which
-  publishes a GitHub Release whose body is the commit-subject list between
-  the new tag and the previous reachable `v*.*.*` tag.
-- **Update QUICKREF.md** when behavior changes — the agent-facing brief
-  must stay accurate.
-- **Update ReadMe.md** when user-visible details change.
-- **Run local/CI parity checks**:
-
-  ```bash
-  scripts/check.sh all
-  ```
-
-  CI runs the same script: macOS uses `scripts/check.sh smoke`; Ubuntu
-  installs ShellCheck and runs `scripts/check.sh shellcheck`.
-
-## Things that have bitten us
-
-- `~/.claude/settings.json` and `~/.claude.json` are **different files**
-  with different responsibilities. Settings: behavior. `.claude.json`
-  (top level): MCP servers + state.
-- `refreshInterval` is **nested inside `statusLine`**, not top-level.
-  Trust the binary's strings table over documentation.
-- `permissions.defaultMode: "bypassPermissions"` is **silently rejected**
-  by Claude Code's binary ("bypassPermissions mode is disabled by
-  settings"). The CLI flag `--permission-mode bypassPermissions` IS
-  honored. Wrap launchers (oh-my-zsh-custom/claude.zsh,
-  oh-my-zsh-custom/cc.zsh) to inject the flag.
-- `skipDangerousModePermissionPrompt` is dead config (only meaningful
-  when bypass mode is active, which is gated off in settings). Claude
-  Code's runtime sometimes re-adds it on its own writes; treat as noise.
-- RMUX loads `~/.tmux.conf` as a best-effort fallback only when no native config
-  is found. The archived tmux config contains executable TPM commands, so keep
-  the native `~/.rmux.conf` link present and never validate via fallback.
-- RMUX's process-scoped `tmux` shim is useful for `rmux claude`; a global shim is
-  deliberately not installed because it can redirect unrelated tmux callers.
-- GitHub's hosted MCP doesn't support OAuth Dynamic Client Registration
-  with Anthropic's SDK. Use Bearer-PAT auth in HTTP headers (per
-  github/github-mcp-server's official Claude Code guide).
-
-## Model-routing convention (claude/settings.json)
-
-Sonnet and Opus are treated as **separate model families** by user
-convention. Current routing:
-
-- **Default** (`ANTHROPIC_MODEL` + top-level `model` + zsh wrappers) →
-  Claude-facing `claude-sonnet-5[1m]` at max effort. The pinned Sonnet `_NAME`
-  and `_DESCRIPTION` variables make `/model` show **Sonnet 5** and disclose the
-  relay destination. The `[1m]` suffix keeps Claude Code's 1M accounting.
-- The relay sends any name without `opus` to `gptModel`, so the Sonnet-facing
-  startup default actually runs upstream `gpt-5.6-sol`.
-- Opus 4-5 / 4-6 / 4-7 / 4-8 / 5 → `claude-opus-5[1m]`; any Claude-facing
-  label containing `opus` routes to upstream `opusModel: claude-opus-5`.
-- Haiku 4-5 / small-fast → `gpt-5.6-sol[1m]`.
-- gpt-5-mini → `gpt-5.6-sol[1m]`.
-
-Real Opus 5 remains reachable via `/model claude-opus-5[1m]`; the default
-Sonnet picker row and Haiku/small-fast tiers use the GPT relay lane.
-
-When asked to "use the same model for the family", apply within Opus or
-within Sonnet — never both. When adding a new alias, default to the
-family rule above.
-
-## Don't do
-
-- Don't commit secrets. The repo is public on github.com/D0n9X1n/dot-config.
-- Don't add an active config path outside the existing linker conventions without
-  updating `install.sh`. `archive/` is never linked; `wiki/` is publication-only.
-- macOS-only. The repo is not regression-tested on other platforms.
-- Don't `--no-verify` git commits unless the user explicitly asks.
+Do not force-push. Do not use `--no-verify` unless the user asks.

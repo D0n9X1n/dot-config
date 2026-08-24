@@ -6,7 +6,7 @@ The former `.tmux.conf` is preserved at `archive/tmux/.tmux.conf` for reference 
 
 ## What moved to RMUX
 
-The active `.rmux.conf` retains the `C-q` prefix, Gruvbox top status bar, one-based indices, current-directory splits and windows, vim pane navigation and resizing, vi copy mode, truecolor handling, persistent titles, and explicit `prefix + Tab` behavior.
+The active `config/rmux/rmux.conf` retains the `C-q` prefix, Gruvbox top status bar, one-based indices, current-directory splits and windows, vim pane navigation and resizing, vi copy mode, truecolor handling, persistent titles, and explicit `prefix + Tab` behavior.
 
 ## What did not move
 

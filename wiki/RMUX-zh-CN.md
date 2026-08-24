@@ -2,7 +2,7 @@
 
 [English](RMUX.md) | 简体中文
 
-本仓库使用 RMUX 0.10.x 作为终端复用器。受管源文件是 `.rmux.conf`；`install.sh` 会把它链接到 `~/.rmux.conf`，并在新 Mac 上安装 Homebrew `rmux` formula。
+本仓库使用 RMUX 0.10.x 作为终端复用器。受管源文件是 `config/rmux/rmux.conf`；`install.sh` 会把它链接到 `~/.rmux.conf`，并在新 Mac 上安装 Homebrew `rmux` formula。
 
 ## RMUX 是什么
 
@@ -155,8 +155,8 @@ ls -l ~/.rmux.conf
 socket="rmux-check-$$"
 trap 'rmux -L "$socket" kill-server >/dev/null 2>&1 || true' EXIT
 rmux -L "$socket" -f /dev/null new-session -d -s validate
-rmux -L "$socket" source-file -n -v .rmux.conf
-rmux -L "$socket" source-file .rmux.conf
+rmux -L "$socket" source-file -n -v config/rmux/rmux.conf
+rmux -L "$socket" source-file config/rmux/rmux.conf
 ```
 
 在已连接会话中检查 `C-q`、分割、目录继承、复制模式、鼠标切换、真彩色、undercurl、标题和 Gruvbox 状态栏。

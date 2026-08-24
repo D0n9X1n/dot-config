@@ -5,14 +5,14 @@
 
   This file is consumed by install.sh; do NOT symlink it directly.
   install.sh substitutes:
-    __HOME__    -> $HOME       (launchd doesn't expand $HOME at runtime)
-    __SRC_DIR__ -> repo path   (absolute path to this dot-configs checkout)
+    __HOME__      -> $HOME       (launchd doesn't expand $HOME at runtime)
+    __REPO_ROOT__ -> repo path   (absolute path to this dot-configs checkout)
   and writes the rendered plist to
   ~/Library/LaunchAgents/com.d0n9x1n.npm-cache-clean.plist, then runs
   launchctl bootout + bootstrap.
 
   What the agent does once loaded:
-    - Runs launchd/clean-npm-caches.sh every Sunday at 03:17 local time.
+    - Runs scripts/launchd/clean-npm-caches.sh every Sunday at 03:17 local time.
     - That script: `npm cache clean --force` (empties ~/.npm/_cacache) and
       prunes ~/.npm/_npx copies older than 14 days. It never touches
       ~/Library/Caches/ms-playwright (the downloaded browser binaries).
@@ -45,7 +45,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>__SRC_DIR__/launchd/clean-npm-caches.sh</string>
+        <string>__REPO_ROOT__/scripts/launchd/clean-npm-caches.sh</string>
     </array>
 
     <key>EnvironmentVariables</key>

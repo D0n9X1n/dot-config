@@ -2,7 +2,7 @@
 
 [English](RMUX-Keymap.md) | 简体中文
 
-这是本仓库 `.rmux.conf` 生效后的完整 RMUX 按键表，包含自定义绑定以及 `rmux list-keys` 报告的全部保留默认绑定。
+这是本仓库 `config/rmux/rmux.conf` 生效后的完整 RMUX 按键表，包含自定义绑定以及 `rmux list-keys` 报告的全部保留默认绑定。
 
 > 在 RMUX 中，`exit`、`logout` 以及空提示符上的 Ctrl+D 都有保护：它们会分离客户端，而不是结束窗格。`prefix + d` 和关闭 SonicTerm 标签页也会分离。只有确实要删除会话时才使用 `rd <名称>`。
 
@@ -30,7 +30,7 @@
 - `prefix` 是 `Ctrl+q`。
 - `C-` 表示 Ctrl；`M-` 表示 Option/Alt。
 - `PPage` 和 `NPage` 分别表示 Page Up 和 Page Down。
-- RMUX 输出中带 `-r` 的按键可以按住连续触发。
+- RMUX 输出中带 `-r` 的绑定，可以在 `repeat-time` 时间窗口内不再按 prefix，直接重复后续按键。默认窗口是 500 ms。
 - 配置设置了 `mode-keys vi`，因此当前使用 `copy-mode-vi`。
 - 如果切换为 Emacs 模式，保留的 `copy-mode` 表会生效。
 - `root` 包含不需要 prefix 的鼠标操作。
@@ -40,7 +40,7 @@
 ```sh
 socket="keymap-audit-$$"
 trap 'rmux -L "$socket" kill-server >/dev/null 2>&1 || true' EXIT
-rmux -L "$socket" -f .rmux.conf new-session -d -s audit
+rmux -L "$socket" -f config/rmux/rmux.conf new-session -d -s audit
 rmux -L "$socket" list-keys -T prefix
 rmux -L "$socket" list-keys -T copy-mode-vi
 rmux -L "$socket" list-keys -T copy-mode

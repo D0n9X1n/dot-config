@@ -2,28 +2,56 @@
 
 [English](README.md) | 简体中文
 
-本 Wiki 记录 [D0n9X1n/dot-config](https://github.com/D0n9X1n/dot-config) 中的 macOS dotfiles。仓库内的 `wiki/` 目录是唯一可信来源；下一次从 `main` 分支发布时，会覆盖在 GitHub Wiki 网页中直接进行的编辑。
+本 Wiki 是本仓库的完整说明。
 
-## 从这里开始
+源文件在扁平的 `wiki/` 文件夹中。GitHub Actions 会把它发布到 GitHub Wiki。网页中的直接修改，会在下一次从 `main` 发布时被替换。
 
-- [RMUX](RMUX-zh-CN.md) — 终端复用器架构、配置、快捷键、Claude teammate mode、安全注意事项和验证方法。
-- [已归档的 tmux 配置](Archive-Tmux-zh-CN.md) — 已停用的 TPM 配置及回滚说明。
-- [已归档的 WezTerm 配置](Archive-WezTerm-zh-CN.md) — 已停用的 Lua 配置及仍保留兼容名称的原因。
+## 开始
 
-## 仓库管理方式
+- [开始使用](Getting-Started-zh-CN.md) — 安装文件并运行常用工具。
+- [仓库操作](Repository-Operations-zh-CN.md) — 了解文件夹、清单、链接和安全更新流程。
 
-- `install.sh` 用于初始化 macOS，并把受管配置以符号链接安装到用户目录。
-- `.rmux.conf` 是当前使用的复用器配置，安装到 `~/.rmux.conf`。
-- SonicTerm 是当前受管的外层终端；本仓库不再安装 tmux 或 WezTerm。
-- `archive/` 只保存历史配置，不会被安装脚本链接。
-- `QUICKREF.md` 仍是面向 agent 的运行规则来源；`ReadMe.md` 是完整的人类可读指南。
+## 工具
+
+- [Claude Code](Claude-Code-zh-CN.md) — relay、模型、设置、agents 和问题处理。
+- [Copilot CLI](Copilot-CLI-zh-CN.md) — 默认模型、全局规则、状态栏和 WakaTime。
+- [RMUX](RMUX-zh-CN.md) — 会话、窗格、恢复、剪贴板和 Claude teams。
+- [RMUX 按键表](RMUX-Keymap-zh-CN.md) — 全部 278 个生效按键。
+- [SonicTerm 与 Shell](SonicTerm-and-Shell-zh-CN.md) — 终端文件、zsh 助手和启动器。
+
+## 维护
+
+- [服务与自动化](Services-and-Automation-zh-CN.md) — 安装任务、relay 健康检查、MCP、WakaTime 和缓存清理。
+- [开发与发布](Development-and-Releases-zh-CN.md) — 检查、Wiki 发布、issues、tags 和 releases。
+- [Apollo 主题](Apollo-Theme-zh-CN.md) — 颜色数据和手动编辑器设置。
+
+## 旧文件
+
+- [已归档的 tmux](Archive-Tmux-zh-CN.md) — 旧 TPM 设置和回滚说明。
+- [已归档的 WezTerm](Archive-WezTerm-zh-CN.md) — 旧 Lua 配置和兼容名称。
+
+## 主要文件夹
+
+| 文件夹 | 含义 |
+|---|---|
+| `config/` | 现在使用的配置 |
+| `archive/` | 旧配置；永远不会安装 |
+| `scripts/` | 会运行的代码 |
+| `themes/` | 颜色文件 |
+| `wiki/` | 完整说明 |
+
+`install.sh` 保留在根目录。它读取 `config/manifest.tsv`，只安装清单中的文件。
 
 ## 快速开始
 
 ```sh
 git clone git@github.com:D0n9X1n/dot-config.git ~/Public/dot-configs
-bash ~/Public/dot-configs/install.sh
-rmux
+cd ~/Public/dot-configs
+./install.sh
+npx copilot-relay auth
+./install.sh
 ```
 
-提交变更前运行 `scripts/check.sh all`。认证及各应用的详细安装步骤请参阅仓库 README。
+推送前运行 `scripts/check.sh all`。
+
+这是公开仓库。不要添加 token、key、认证文件、日志或运行状态。

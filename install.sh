@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-src_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-dest_dir="${HOME}"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+src_dir="$repo_root"
+config_root="${repo_root}/config"
+scripts_root="${repo_root}/scripts"
+manifest="${config_root}/manifest.tsv"
 timestamp="$(date +"%Y%m%d%H%M%S")"
 install_log="${DOT_CONFIGS_INSTALL_LOG:-${HOME}/Library/Logs/dot-configs-install.log}"
 RED="$(printf '\033[31m')"
@@ -626,53 +629,6 @@ cleanup_legacy_wakatime_mcp() {
   fi
 }
 
-configure_copilot_relay() {
-  local relay_dir="${HOME}/.copilot-relay"
-  local relay_config="${relay_dir}/config.yaml"
-  local tracked_relay_config="${src_dir}/.copilot-relay/config.yaml"
-  local tmp_config
-
-  mkdir -p "$relay_dir"
-  if [ -f "$tracked_relay_config" ]; then
-    link_file "$tracked_relay_config" "$relay_config"
-    echo "Linked copilot-relay config to $relay_config"
-    return 0
-  fi
-
-  if [ -f "$relay_config" ]; then
-    tmp_config="$(mktemp)"
-    if grep -Eq '^[[:space:]]*claudeSetup[[:space:]]*:' "$relay_config"; then
-      sed -E 's/^[[:space:]]*claudeSetup[[:space:]]*:.*/claudeSetup: false/' "$relay_config" >"$tmp_config"
-    elif grep -Eq '^[[:space:]]*claude_setup[[:space:]]*:' "$relay_config"; then
-      sed -E 's/^[[:space:]]*claude_setup[[:space:]]*:.*/claudeSetup: false/' "$relay_config" >"$tmp_config"
-    else
-      cp "$relay_config" "$tmp_config"
-      {
-        printf '\n'
-        printf '# Managed by dot-configs: ~/.claude/settings.json is symlinked from this repo.\n'
-        printf 'claudeSetup: false\n'
-      } >>"$tmp_config"
-    fi
-    mv "$tmp_config" "$relay_config"
-  else
-    {
-      printf '# copilot-relay configuration\n'
-      printf '# Managed by dot-configs; copilot-relay hot-reloads this file.\n'
-      printf 'host: 127.0.0.1\n'
-      printf 'port: 4142\n'
-      printf 'copilotBaseUrl: https://api.githubcopilot.com\n'
-      printf 'claudeSetup: false\n'
-      printf 'logLevel: info\n'
-      printf 'logRetentionDays: 3\n'
-      printf 'thinkEffort: max\n'
-      printf 'gptModel: gpt-5.6-sol\n'
-      printf 'opusModel: claude-opus-5\n'
-    } >"$relay_config"
-  fi
-  chmod 600 "$relay_config"
-  echo "Configured copilot-relay at $relay_config (claudeSetup=false)"
-}
-
 install_macos_deps() {
   ensure_homebrew || exit 1
 
@@ -691,6 +647,7 @@ install_macos_deps() {
     neovim
     node
     rmux
+    shellcheck
     zsh-completions
     zsh-fast-syntax-highlighting
   )
@@ -763,7 +720,106 @@ link_file() {
   fi
 
   backup_path "$dest"
+  mkdir -p "$(dirname "$dest")"
   ln -s "$src" "$dest"
+}
+
+old_source_for_destination() {
+  case "$1" in
+    .rmux.conf) printf '%s\n' "${repo_root}/.rmux.conf" ;;
+    .sonicterm/*) printf '%s\n' "${repo_root}/$1" ;;
+    .claude/*) printf '%s\n' "${repo_root}/claude/${1#.claude/}" ;;
+    .copilot/cleanup-legacy.sh) printf '%s\n' "${repo_root}/copilot/cleanup-legacy.sh" ;;
+    .copilot/*) printf '%s\n' "${repo_root}/copilot/${1#.copilot/}" ;;
+    .oh-my-zsh/custom/*) printf '%s\n' "${repo_root}/oh-my-zsh-custom/${1#.oh-my-zsh/custom/}" ;;
+    .copilot-relay/config.yaml) printf '%s\n' "${repo_root}/.copilot-relay/config.yaml" ;;
+  esac
+}
+
+migrate_managed_link() {
+  local dest_rel="$1"
+  local dest="${HOME}/${dest_rel}"
+  local old_src=""
+  local target=""
+
+  old_src="$(old_source_for_destination "$dest_rel")"
+  if [ -n "$old_src" ] && [ -L "$dest" ]; then
+    target="$(readlink "$dest")"
+    if [ "$target" = "$old_src" ]; then
+      rm -f "$dest"
+      echo "Migration: removed old managed link $dest"
+    fi
+  fi
+}
+
+validate_manifest() {
+  local type source destination extra
+  local seen_destinations=""
+
+  [ -f "$manifest" ] || {
+    echo "Error: missing config manifest: $manifest" >&2
+    return 1
+  }
+
+  while IFS=$'\t' read -r type source destination extra; do
+    case "$type" in
+      ''|'#'*) continue ;;
+      link|merge|render) ;;
+      *) echo "Error: unknown manifest type '$type'" >&2; return 1 ;;
+    esac
+    [ -z "$extra" ] || {
+      echo "Error: manifest row has more than three fields: $source" >&2
+      return 1
+    }
+    [ -n "$source" ] && [ -n "$destination" ] || {
+      echo "Error: incomplete manifest row" >&2
+      return 1
+    }
+    case "$source" in
+      /*|*'..'*) echo "Error: unsafe manifest source: $source" >&2; return 1 ;;
+      config/*|scripts/*) ;;
+      *) echo "Error: manifest source must be under config/ or scripts/: $source" >&2; return 1 ;;
+    esac
+    case "$destination" in
+      /*|*'..'*) echo "Error: unsafe manifest destination: $destination" >&2; return 1 ;;
+    esac
+    [ -f "${repo_root}/${source}" ] || {
+      echo "Error: missing manifest source: $source" >&2
+      return 1
+    }
+    case $'\n'"${seen_destinations}"$'\n' in
+      *$'\n'"${destination}"$'\n'*) echo "Error: duplicate manifest destination: $destination" >&2; return 1 ;;
+    esac
+    seen_destinations="${seen_destinations}${seen_destinations:+$'\n'}${destination}"
+  done <"$manifest"
+}
+
+manifest_source_for_destination() {
+  local expected_type="$1"
+  local expected_destination="$2"
+  local type source destination
+
+  while IFS=$'\t' read -r type source destination; do
+    if [ "$type" = "$expected_type" ] && [ "$destination" = "$expected_destination" ]; then
+      printf '%s\n' "${repo_root}/${source}"
+      return 0
+    fi
+  done <"$manifest"
+
+  echo "Error: manifest has no $expected_type entry for $expected_destination" >&2
+  return 1
+}
+
+link_manifest_files() {
+  local type source destination
+  while IFS=$'\t' read -r type source destination; do
+    [ "$type" = "link" ] || continue
+    migrate_managed_link "$destination"
+    link_file "${repo_root}/${source}" "${HOME}/${destination}"
+    case "$source" in
+      *.sh) chmod +x "${repo_root}/${source}" ;;
+    esac
+  done <"$manifest"
 }
 
 remove_legacy_claude_subagent_hook() {
@@ -800,24 +856,32 @@ remove_repo_symlink() {
   fi
 }
 
-should_link_dotfile() {
-  local src="$1"
-  local rel="${src#${src_dir}/}"
+xml_escape() {
+  printf '%s' "$1" | sed \
+    -e 's/&/\&amp;/g' \
+    -e 's/</\&lt;/g' \
+    -e 's/>/\&gt;/g' \
+    -e 's/"/\&quot;/g' \
+    -e "s/'/\&apos;/g"
+}
 
-  if have_cmd git && [ -d "${src_dir}/.git" ] && git -C "$src_dir" check-ignore -q -- "$rel"; then
-    echo "Skipping ignored top-level dotfile: $rel"
-    return 1
-  fi
-  return 0
+sed_replacement_escape() {
+  sed 's/[\\&|]/\\&/g'
 }
 
 render_launchd_template() {
   local template="$1"
   local dest="$2"
+  local escaped_home=""
+  local escaped_repo=""
 
+  escaped_home="$(xml_escape "$HOME" | sed_replacement_escape)"
+  escaped_repo="$(xml_escape "$repo_root" | sed_replacement_escape)"
   mkdir -p "$(dirname "$dest")"
   mkdir -p "${HOME}/Library/Logs"
-  sed -e "s|__HOME__|${HOME}|g" -e "s|__SRC_DIR__|${src_dir}|g" "$template" >"$dest"
+  sed -e "s|__HOME__|${escaped_home}|g" \
+    -e "s|__REPO_ROOT__|${escaped_repo}|g" \
+    "$template" >"$dest"
   echo "Wrote $dest"
 }
 
@@ -866,6 +930,35 @@ copilot_relay_health_ok() {
   [ "$code" = "200" ]
 }
 
+install_copilot_relay_healthcheck() {
+  local uid="$1"
+  local label="com.d0n9x1n.copilot-relay-healthcheck"
+  local plist="${HOME}/Library/LaunchAgents/${label}.plist"
+  local template=""
+  local script="${scripts_root}/launchd/copilot-relay-healthcheck.sh"
+
+  template="$(manifest_source_for_destination render "Library/LaunchAgents/${label}.plist")"
+  [ -f "$template" ] && [ -f "$script" ] || return 0
+
+  chmod +x "$script" 2>/dev/null || true
+  render_launchd_template "$template" "$plist"
+
+  if ! have_cmd copilot-relay || [ ! -f "${HOME}/.copilot-relay/github_token" ]; then
+    if launchctl print "gui/${uid}/${label}" >/dev/null 2>&1; then
+      launchctl bootout "gui/${uid}/${label}" 2>/dev/null || true
+    fi
+    echo "Skipping copilot-relay healthcheck until the relay is installed and authenticated."
+    return 0
+  fi
+
+  if bootstrap_launchd_agent "$uid" "$label" "$plist"; then
+    log_command launchctl kickstart -k "gui/${uid}/${label}" || true
+    echo "Loaded launchd agent $label (GET /healthz every 60s; logs: ~/Library/Logs/copilot-relay-healthcheck.log)"
+  else
+    echo "Warning: launchctl bootstrap failed for $label"
+  fi
+}
+
 if [ "${DOT_CONFIGS_INSTALL_LIB_ONLY:-0}" = "1" ]; then
   return 0 2>/dev/null || exit 0
 fi
@@ -891,211 +984,80 @@ else
   echo "Auto-install only supports macOS + Homebrew. Install apps/fonts/CLIs manually."
 fi
 
-# Top-level dotfiles (.rmux.conf etc.).
-while IFS= read -r -d '' entry; do
-  base="$(basename "$entry")"
-  should_link_dotfile "$entry" || continue
-  link_file "$entry" "${dest_dir}/${base}"
-done < <(find "$src_dir" -maxdepth 1 -mindepth 1 -name ".*" -type f -print0)
+validate_manifest
+link_manifest_files
+remove_repo_symlink "${HOME}/.gitignore" "${repo_root}/.gitignore" "old global Git ignore"
+remove_repo_symlink "${HOME}/.tmux.conf" "${repo_root}/.tmux.conf" "tmux config"
+remove_repo_symlink "${HOME}/.wezterm.lua" "${repo_root}/wezterm/wezterm.lua" "WezTerm config"
+remove_legacy_claude_subagent_hook
 
-# RMUX now owns the multiplexer layer, and SonicTerm is the managed outer
-# terminal. Remove only the exact legacy links this repository used to manage.
-remove_repo_symlink "${HOME}/.tmux.conf" "${src_dir}/.tmux.conf" "tmux config"
-remove_repo_symlink "${HOME}/.wezterm.lua" "${src_dir}/wezterm/wezterm.lua" "WezTerm config"
+echo "Linked active config from $manifest"
 
-# Link oh-my-zsh custom files (oh-my-zsh-custom/* -> ~/.oh-my-zsh/custom/*).
-omz_custom_src="${src_dir}/oh-my-zsh-custom"
-omz_custom_dest="${HOME}/.oh-my-zsh/custom"
-if [ -d "$omz_custom_src" ]; then
-  if [ -d "$omz_custom_dest" ]; then
-    while IFS= read -r -d '' entry; do
-      base="$(basename "$entry")"
-      link_file "$entry" "${omz_custom_dest}/${base}"
-    done < <(find "$omz_custom_src" -maxdepth 1 -mindepth 1 -type f -print0)
-    echo "Linked oh-my-zsh custom files to $omz_custom_dest"
+cleanup_script="$(manifest_source_for_destination link .copilot/cleanup-legacy.sh)"
+if [ -x "$cleanup_script" ]; then
+  if have_cmd copilot; then
+    log_command "$cleanup_script" || echo "Warning: Copilot legacy cleanup reported errors (skipping)"
   else
-    echo "Skipping oh-my-zsh custom files: $omz_custom_dest does not exist (oh-my-zsh not installed?)"
+    echo "Skipping Copilot legacy cleanup: copilot CLI not on PATH."
   fi
 fi
 
-# Link Copilot CLI config files (copilot/* -> ~/.copilot/*)
-copilot_src="${src_dir}/copilot"
-copilot_dest="${HOME}/.copilot"
-if [ -d "$copilot_src" ]; then
-  mkdir -p "$copilot_dest"
-  while IFS= read -r -d '' entry; do
-    base="$(basename "$entry")"
-    link_file "$entry" "${copilot_dest}/${base}"
-    # Preserve executable bit on shell scripts (e.g., statusline.sh) so
-    # Copilot CLI can run them directly without chmod each time.
-    case "$base" in
-      *.sh) chmod +x "$entry" ;;
-    esac
-  done < <(find "$copilot_src" -maxdepth 1 -mindepth 1 -type f -print0)
-  echo "Linked Copilot CLI config files to $copilot_dest"
-  if [ -x "${copilot_src}/cleanup-legacy.sh" ]; then
-    if have_cmd copilot; then
-      log_command "${copilot_src}/cleanup-legacy.sh" || echo "Warning: Copilot legacy cleanup reported errors (skipping)"
+# Merge tracked, secret-free MCP servers into the user's Copilot MCP config.
+shared_mcp="$(manifest_source_for_destination merge .config/github-copilot/mcp.json)"
+copilot_mcp_pre="${HOME}/.config/github-copilot/mcp.json"
+if have_cmd jq && [ -f "$shared_mcp" ]; then
+  mkdir -p "$(dirname "$copilot_mcp_pre")"
+  if [ ! -f "$copilot_mcp_pre" ]; then
+    jq '{mcpServers: (.mcpServers // {})}' "$shared_mcp" >"$copilot_mcp_pre" \
+      && echo "Created $copilot_mcp_pre with $(jq '.mcpServers | length' "$copilot_mcp_pre") shared MCP servers"
+  else
+    tmp_mcp="$(mktemp)"
+    if jq -s '
+          .[0].mcpServers as $local
+          | .[1].mcpServers as $shared
+          | .[0] + {mcpServers: ($local + $shared)}
+        ' "$copilot_mcp_pre" "$shared_mcp" >"$tmp_mcp"; then
+      mv "$tmp_mcp" "$copilot_mcp_pre"
+      echo "Merged shared MCP servers into $copilot_mcp_pre (shared wins on collision)"
     else
-      echo "Skipping Copilot legacy cleanup: copilot CLI not on PATH."
+      rm -f "$tmp_mcp"
+      echo "Warning: jq merge of shared MCP into $copilot_mcp_pre failed; skipped"
     fi
   fi
 fi
 
-# Link SonicTerm config without taking over runtime state. SonicTerm stores logs
-# and backups under ~/.sonicterm too, so keep ~/.sonicterm as a real directory
-# and symlink only the tracked TOML config/keymap/theme files into it.
-sonicterm_src="${src_dir}/.sonicterm"
-sonicterm_dest="${HOME}/.sonicterm"
-if [ -d "$sonicterm_src" ]; then
-  mkdir -p "$sonicterm_dest"
-  while IFS= read -r -d '' entry; do
-    base="$(basename "$entry")"
-    link_file "$entry" "${sonicterm_dest}/${base}"
-  done < <(find "$sonicterm_src" -maxdepth 1 -mindepth 1 -type f -name '*.toml' -print0)
+# The official Copilot plugin supersedes the old vendored WakaTime MCP.
+cleanup_legacy_wakatime_mcp
 
-  for subdir in keymaps themes; do
-    if [ -d "${sonicterm_src}/${subdir}" ]; then
-      mkdir -p "${sonicterm_dest}/${subdir}"
-      while IFS= read -r -d '' entry; do
-        base="$(basename "$entry")"
-        link_file "$entry" "${sonicterm_dest}/${subdir}/${base}"
-      done < <(find "${sonicterm_src}/${subdir}" -maxdepth 1 -mindepth 1 -type f -name '*.toml' -print0)
-    fi
-  done
-  echo "Linked SonicTerm config files to $sonicterm_dest"
-fi
+# The Copilot plugin manages its own WakaTime CLI on session start.
+ensure_copilot_wakatime_plugin
 
-# Link Claude Code config files (claude/* -> ~/.claude/*). Claude Code
-# normally creates ~/.claude on first launch; mkdir -p so install.sh can
-# wire things up on a fresh box without requiring a Claude Code launch
-# first. Used to point Claude Code at the local copilot-relay proxy so it
-# can talk to GitHub Copilot models (see ReadMe.md).
-claude_src="${src_dir}/claude"
-claude_dest="${HOME}/.claude"
-if [ -d "$claude_src" ]; then
-  mkdir -p "$claude_dest"
-  while IFS= read -r -d '' entry; do
-    base="$(basename "$entry")"
-    # Skip in-folder docs (README*) — they belong next to the config in the
-    # repo but shouldn't pollute ~/.claude/ where Claude Code keeps state.
-    case "$base" in
-      README*) continue ;;
-    esac
-    link_file "$entry" "${claude_dest}/${base}"
-    # Preserve executable bit on shell scripts (e.g., statusline.sh) so
-    # Claude Code can run them directly without chmod each time.
-    case "$base" in
-      *.sh) chmod +x "$entry" ;;
-    esac
-  done < <(find "$claude_src" -maxdepth 1 -mindepth 1 -type f -print0)
-  echo "Linked Claude Code config files to $claude_dest"
-
-  # Skills live one directory deep (claude/skills/<name>/SKILL.md), so the
-  # -type f loop above does not see them. Link each skill directory's files
-  # individually — same approach as the SonicTerm subdirectory pass — so a
-  # skill can ship supporting files alongside SKILL.md later.
-  claude_skills_src="${claude_src}/skills"
-  if [ -d "$claude_skills_src" ]; then
-    mkdir -p "${claude_dest}/skills"
-    while IFS= read -r -d '' skill_dir; do
-      skill_name="$(basename "$skill_dir")"
-      mkdir -p "${claude_dest}/skills/${skill_name}"
-      while IFS= read -r -d '' entry; do
-        base="$(basename "$entry")"
-        link_file "$entry" "${claude_dest}/skills/${skill_name}/${base}"
-      done < <(find "$skill_dir" -maxdepth 1 -mindepth 1 -type f -print0)
-    done < <(find "$claude_skills_src" -maxdepth 1 -mindepth 1 -type d -print0)
-    echo "Linked Claude Code skills to ${claude_dest}/skills"
-  fi
-
-  # Claude Code v2.1.217 added a native concurrent-subagent limit. Remove only
-  # the obsolete repo-managed hook symlink; preserve user-owned hooks/files.
-  remove_legacy_claude_subagent_hook
-
-  # Merge tracked, secret-free MCP servers from this repo into the user's
-  # Copilot MCP config. mcp-shared.json carries entries that are safe to
-  # commit (e.g. the GitHub remote MCP — OAuth, no PAT in the file). Per-
-  # machine secret-bearing entries (WAKATIME_API_KEY etc.) stay in the
-  # gitignored ~/.config/github-copilot/mcp.json and are preserved by the
-  # merge. shared > local on key collision so the synced version wins.
-  shared_mcp="${src_dir}/mcp-shared.json"
-  copilot_mcp_pre="${HOME}/.config/github-copilot/mcp.json"
-  if have_cmd jq && [ -f "$shared_mcp" ]; then
-    mkdir -p "$(dirname "$copilot_mcp_pre")"
-    if [ ! -f "$copilot_mcp_pre" ]; then
-      # Bootstrap with just the shared entries.
-      jq '{mcpServers: (.mcpServers // {})}' "$shared_mcp" >"$copilot_mcp_pre" \
-        && echo "Created $copilot_mcp_pre with $(jq '.mcpServers | length' "$copilot_mcp_pre") shared MCP servers"
-    else
-      tmp_mcp="$(mktemp)"
-      if jq -s '
-            .[0].mcpServers as $local
-            | .[1].mcpServers as $shared
-            | .[0] + {mcpServers: ($local + $shared)}
-          ' "$copilot_mcp_pre" "$shared_mcp" >"$tmp_mcp"; then
-        mv "$tmp_mcp" "$copilot_mcp_pre"
-        echo "Merged shared MCP servers into $copilot_mcp_pre (shared wins on collision)"
-      else
-        rm -f "$tmp_mcp"
-        echo "Warning: jq merge of shared MCP into $copilot_mcp_pre failed; skipped"
-      fi
-    fi
-  fi
-
-  # The official Copilot plugin supersedes the old vendored WakaTime MCP.
-  cleanup_legacy_wakatime_mcp
-
-  # Copilot CLI WakaTime upload plugin. This must run after Copilot CLI and
-  # ~/.wakatime.cfg are in place. The plugin installs/updates its own
-  # ~/.wakatime/wakatime-cli binary on Copilot session start.
-  ensure_copilot_wakatime_plugin
-
-  # Import Copilot CLI's MCP servers into Claude Code's user-scope config.
-  # Claude Code reads MCP servers from ~/.claude.json (top-level
-  # `mcpServers` key) — NOT from ~/.claude/settings.json — so we have to
-  # merge them into that file. The copilot list lives at
-  # ~/.config/github-copilot/mcp.json (symlinked at ~/.copilot/mcp-config.json
-  # on disk; never in this repo because it carries WAKATIME_API_KEY etc.).
-  #
-  # Idempotent: re-running install.sh just rewrites the same merged
-  # mcpServers map. If jq isn't installed, or the copilot MCP file is
-  # missing, this step is a silent no-op and Claude Code's existing
-  # mcpServers (or absence thereof) is left untouched.
-  copilot_mcp="${HOME}/.config/github-copilot/mcp.json"
-  claude_user_json="${HOME}/.claude.json"
-  if have_cmd jq && [ -f "$copilot_mcp" ]; then
-    # Read the source servers map (defaults to {} if the file is malformed).
-    src_mcp_json="$(jq -c '.mcpServers // {}' "$copilot_mcp" || echo '{}')"
-    if [ "$src_mcp_json" != '{}' ] && [ "$src_mcp_json" != "null" ]; then
-      tmp_user="$(mktemp -t claude-user-json.XXXXXX)"
-      if [ -f "$claude_user_json" ]; then
-        # Replace .mcpServers (no per-server merge — copilot's file is
-        # authoritative); preserve every other key (telemetry IDs, project
-        # state, settings cache, etc.).
-        if jq --argjson src "$src_mcp_json" '.mcpServers = $src' \
-            "$claude_user_json" >"$tmp_user"; then
-          backup_path "$claude_user_json"
-          mv "$tmp_user" "$claude_user_json"
-          chmod 600 "$claude_user_json"
-          echo "Imported $(echo "$src_mcp_json" | jq 'length') MCP servers into $claude_user_json (from $copilot_mcp)"
-        else
-          rm -f "$tmp_user"
-          echo "Warning: jq merge into $claude_user_json failed; MCP import skipped"
-        fi
-      else
-        # Fresh box — Claude Code hasn't run yet. Seed the file with just
-        # the mcpServers map; Claude Code will fill in the rest on launch.
-        printf '{"mcpServers":%s}\n' "$src_mcp_json" >"$tmp_user"
+# Import Copilot's merged MCP server map into Claude Code's local state file.
+copilot_mcp="${HOME}/.config/github-copilot/mcp.json"
+claude_user_json="${HOME}/.claude.json"
+if have_cmd jq && [ -f "$copilot_mcp" ]; then
+  src_mcp_json="$(jq -c '.mcpServers // {}' "$copilot_mcp" || echo '{}')"
+  if [ "$src_mcp_json" != '{}' ] && [ "$src_mcp_json" != "null" ]; then
+    tmp_user="$(mktemp -t claude-user-json.XXXXXX)"
+    if [ -f "$claude_user_json" ]; then
+      if jq --argjson src "$src_mcp_json" '.mcpServers = $src' \
+          "$claude_user_json" >"$tmp_user"; then
+        backup_path "$claude_user_json"
         mv "$tmp_user" "$claude_user_json"
         chmod 600 "$claude_user_json"
-        echo "Created $claude_user_json with $(echo "$src_mcp_json" | jq 'length') MCP servers (from $copilot_mcp)"
+        echo "Imported $(echo "$src_mcp_json" | jq 'length') MCP servers into $claude_user_json (from $copilot_mcp)"
+      else
+        rm -f "$tmp_user"
+        echo "Warning: jq merge into $claude_user_json failed; MCP import skipped"
       fi
+    else
+      printf '{"mcpServers":%s}\n' "$src_mcp_json" >"$tmp_user"
+      mv "$tmp_user" "$claude_user_json"
+      chmod 600 "$claude_user_json"
+      echo "Created $claude_user_json with $(echo "$src_mcp_json" | jq 'length') MCP servers (from $copilot_mcp)"
     fi
   fi
 fi
-
-echo "Linked dotfiles from $src_dir to $dest_dir"
 
 # launchd agent: copilot-relay on login (macOS only). Renders the
 # template (substituting absolute $HOME paths — launchd doesn't expand
@@ -1116,10 +1078,9 @@ if is_macos; then
     [ -f "$legacy_plist" ] && rm -f "$legacy_plist" && echo "Migration: removed $legacy_plist"
   done
   uninstall_legacy_npm_binary copilot-bridge
-  configure_copilot_relay
 
-  launchd_src="${src_dir}/launchd/com.d0n9x1n.copilot-relay.plist"
   launchd_dest="${HOME}/Library/LaunchAgents/com.d0n9x1n.copilot-relay.plist"
+  launchd_src="$(manifest_source_for_destination render Library/LaunchAgents/com.d0n9x1n.copilot-relay.plist)"
   if [ -f "$launchd_src" ]; then
     if ! have_cmd copilot-relay; then
       if [ "${SKIP_NPM_GLOBALS:-0}" = "1" ]; then
@@ -1162,41 +1123,23 @@ if is_macos; then
           echo "Warning: launchctl bootstrap failed for com.d0n9x1n.copilot-relay"
         fi
       fi
-
-      relay_health_src="${src_dir}/launchd/com.d0n9x1n.copilot-relay-healthcheck.plist"
-      relay_health_dest="${HOME}/Library/LaunchAgents/com.d0n9x1n.copilot-relay-healthcheck.plist"
-      relay_health_script="${src_dir}/launchd/copilot-relay-healthcheck.sh"
-      if [ -f "$relay_health_src" ] && [ -f "$relay_health_script" ]; then
-        chmod +x "$relay_health_script" 2>/dev/null || true
-        render_launchd_template "$relay_health_src" "$relay_health_dest"
-
-        if [ ! -f "${HOME}/.copilot-relay/github_token" ]; then
-          if launchctl print "gui/${uid}/com.d0n9x1n.copilot-relay-healthcheck" >/dev/null 2>&1; then
-            launchctl bootout "gui/${uid}/com.d0n9x1n.copilot-relay-healthcheck" 2>/dev/null || true
-          fi
-          echo "Skipping copilot-relay healthcheck agent until copilot-relay auth is complete."
-        elif bootstrap_launchd_agent "$uid" "com.d0n9x1n.copilot-relay-healthcheck" "$relay_health_dest"; then
-          log_command launchctl kickstart -k "gui/${uid}/com.d0n9x1n.copilot-relay-healthcheck" || true
-          echo "Loaded launchd agent com.d0n9x1n.copilot-relay-healthcheck (GET /healthz every 60s; logs: ~/Library/Logs/copilot-relay-healthcheck.log)"
-        else
-          echo "Warning: launchctl bootstrap failed for com.d0n9x1n.copilot-relay-healthcheck"
-        fi
-      fi
     fi
   fi
+
+  install_copilot_relay_healthcheck "$uid"
 fi
 
 # launchd agent: weekly npm/npx cache cleaner (macOS only). Renders the
-# template (substituting __HOME__ and __SRC_DIR__) into ~/Library/LaunchAgents
+# template (substituting __HOME__ and __REPO_ROOT__) into ~/Library/LaunchAgents
 # and bootstraps it. Unlike copilot-relay this has no auth/PATH gating — the
 # tracked script is always present in this repo, and it runs on a schedule
 # (Sun 03:17), not at load. Idempotent: bootout+bootstrap is a no-op restart
 # when content is unchanged, and replaces the agent when it differs.
 if is_macos; then
   uid="$(id -u)"
-  npmclean_src="${src_dir}/launchd/com.d0n9x1n.npm-cache-clean.plist"
   npmclean_dest="${HOME}/Library/LaunchAgents/com.d0n9x1n.npm-cache-clean.plist"
-  npmclean_script="${src_dir}/launchd/clean-npm-caches.sh"
+  npmclean_src="$(manifest_source_for_destination render Library/LaunchAgents/com.d0n9x1n.npm-cache-clean.plist)"
+  npmclean_script="${scripts_root}/launchd/clean-npm-caches.sh"
 
   if [ -f "$npmclean_src" ] && [ -f "$npmclean_script" ]; then
     chmod +x "$npmclean_script" 2>/dev/null || true

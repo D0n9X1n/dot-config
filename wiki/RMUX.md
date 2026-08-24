@@ -2,7 +2,7 @@
 
 English | [简体中文](RMUX-zh-CN.md)
 
-This repository uses RMUX 0.10.x as its terminal multiplexer. The tracked source is `.rmux.conf`; `install.sh` links it to `~/.rmux.conf` and installs the Homebrew `rmux` formula on new Macs.
+This repository uses RMUX 0.10.x as its terminal multiplexer. The tracked source is `config/rmux/rmux.conf`; `install.sh` links it to `~/.rmux.conf` and installs the Homebrew `rmux` formula on new Macs.
 
 ## What RMUX is
 
@@ -155,8 +155,8 @@ A repository config check uses an isolated socket and always kills it afterward:
 socket="rmux-check-$$"
 trap 'rmux -L "$socket" kill-server >/dev/null 2>&1 || true' EXIT
 rmux -L "$socket" -f /dev/null new-session -d -s validate
-rmux -L "$socket" source-file -n -v .rmux.conf
-rmux -L "$socket" source-file .rmux.conf
+rmux -L "$socket" source-file -n -v config/rmux/rmux.conf
+rmux -L "$socket" source-file config/rmux/rmux.conf
 ```
 
 Within an attached session, verify `C-q`, splits, CWD inheritance, copy mode, mouse toggle, truecolor, undercurl, titles, and the Gruvbox status line.

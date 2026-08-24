@@ -1,0 +1,8 @@
+.DS_Store
+.AppleDouble
+.LSOverride
+*.swp
+*.swo
+*~
+*.bak.*
+.copilot-cli.ts

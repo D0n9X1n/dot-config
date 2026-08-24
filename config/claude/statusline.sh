@@ -748,7 +748,7 @@ seg_mcp() {
   # Cache by file mtime to avoid re-reading + re-parsing the (potentially
   # large) ~/.claude.json on every render. jq is required by install.sh
   # for the MCP merge anyway, so it's always available — using it here
-  # too keeps claude/statusline.sh and copilot/statusline.sh aligned
+  # too keeps config/claude/statusline.sh and config/copilot/statusline.sh aligned
   # (was awk-based brace-counting; copilot uses jq; reviewer flagged the
   # drift). jq also handles MCP server names containing `}` in string
   # values correctly, which the awk parser would miscount.

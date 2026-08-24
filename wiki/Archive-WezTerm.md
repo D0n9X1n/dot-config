@@ -6,7 +6,7 @@ The former managed Lua profile is preserved at `archive/wezterm/wezterm.lua`. `i
 
 ## Why the old name still appears
 
-RMUX is a terminal multiplexer, not a terminal emulator. SonicTerm is the actively managed outer terminal under `.sonicterm/`; the installer no longer installs WezTerm or manages its Lua config.
+RMUX is a terminal multiplexer, not a terminal emulator. SonicTerm is the actively managed outer terminal under `config/sonicterm/`; the installer no longer installs WezTerm or manages its Lua config.
 
 SonicTerm's WezTerm-compatible keymap names and palette provenance remain historical compatibility signals, but child PTYs advertise the native `TERM_PROGRAM=SonicTerm`. Copilot alone receives a process-scoped `TERM_PROGRAM=WezTerm` plus true-color variables because it recognizes that capability path; this does not mean WezTerm is installed or active.
 

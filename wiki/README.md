@@ -2,28 +2,56 @@
 
 English | [简体中文](Home-zh-CN.md)
 
-This Wiki documents the macOS dotfiles in [D0n9X1n/dot-config](https://github.com/D0n9X1n/dot-config). The repository's `wiki/` directory is the source of truth; browser edits are overwritten by the next publication from `main`.
+This Wiki is the full guide for this repository.
 
-## Start here
+The source is the flat `wiki/` folder. GitHub Actions publishes it to the GitHub Wiki. A browser edit will be replaced by the next publish from `main`.
 
-- [RMUX](RMUX.md) — terminal multiplexer architecture, configuration, keybindings, Claude teammate mode, security, and verification.
-- [Archived tmux configuration](Archive-Tmux.md) — retired TPM-based setup and rollback notes.
-- [Archived WezTerm configuration](Archive-WezTerm.md) — retired Lua profile and remaining compatibility-name rationale.
+## Start
 
-## Repository model
+- [Getting started](Getting-Started.md) — install the files and run the main tools.
+- [Repository operations](Repository-Operations.md) — learn the folders, manifest, links, and safe update flow.
 
-- `install.sh` bootstraps a macOS machine and creates symlinks into the home directory.
-- `.rmux.conf` is the active multiplexer profile and lands at `~/.rmux.conf`.
-- SonicTerm is the actively managed outer terminal; tmux and WezTerm are not installed by this repository.
-- `archive/` contains inert historical configuration and is never linked.
-- `QUICKREF.md` remains the agent-facing operational source of truth; `ReadMe.md` is the complete human-facing repository guide.
+## Tools
+
+- [Claude Code](Claude-Code.md) — relay setup, models, settings, agents, and fixes.
+- [Copilot CLI](Copilot-CLI.md) — model defaults, global rules, status line, and WakaTime.
+- [RMUX](RMUX.md) — sessions, panes, resume, clipboard, and Claude teams.
+- [RMUX keymap](RMUX-Keymap.md) — all 278 active bindings.
+- [SonicTerm and shell](SonicTerm-and-Shell.md) — terminal files, zsh helpers, and launch wrappers.
+
+## Work
+
+- [Services and automation](Services-and-Automation.md) — installer jobs, relay health, MCP, WakaTime, and cache cleanup.
+- [Development and releases](Development-and-Releases.md) — checks, Wiki publish, issues, tags, and releases.
+- [Apollo theme](Apollo-Theme.md) — color data and manual editor setup.
+
+## Old files
+
+- [Archived tmux](Archive-Tmux.md) — the old TPM setup and rollback notes.
+- [Archived WezTerm](Archive-WezTerm.md) — the old Lua profile and compatibility name.
+
+## Main folders
+
+| Folder | Meaning |
+|---|---|
+| `config/` | Config used now |
+| `archive/` | Old config; never installed |
+| `scripts/` | Code that runs |
+| `themes/` | Color files |
+| `wiki/` | Full help |
+
+`install.sh` stays at the root. It reads `config/manifest.tsv` and installs only listed files.
 
 ## Quick start
 
 ```sh
 git clone git@github.com:D0n9X1n/dot-config.git ~/Public/dot-configs
-bash ~/Public/dot-configs/install.sh
-rmux
+cd ~/Public/dot-configs
+./install.sh
+npx copilot-relay auth
+./install.sh
 ```
 
-Run `scripts/check.sh all` before shipping a change. See the repository README for authentication and application-specific setup.
+Run `scripts/check.sh all` before a push.
+
+This is a public repository. Never add tokens, keys, auth files, logs, or runtime state.

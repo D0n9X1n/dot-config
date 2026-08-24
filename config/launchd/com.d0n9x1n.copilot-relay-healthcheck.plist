@@ -5,13 +5,13 @@
 
   This file is consumed by install.sh; do NOT symlink it directly.
   install.sh substitutes:
-    __HOME__    -> $HOME
-    __SRC_DIR__ -> repo path
+    __HOME__      -> $HOME
+    __REPO_ROOT__ -> repo path
   and writes the rendered plist to
   ~/Library/LaunchAgents/com.d0n9x1n.copilot-relay-healthcheck.plist.
 
   What the agent does once loaded:
-    - Runs launchd/copilot-relay-healthcheck.sh at load and every 60 seconds.
+    - Runs scripts/launchd/copilot-relay-healthcheck.sh at load and every 60 seconds.
     - Tier 1, every run: GET http://127.0.0.1:4142/healthz. Anything but 200
       triggers launchctl kickstart -k gui/<uid>/com.d0n9x1n.copilot-relay.
       /healthz is a static handler in copilot-relay that never contacts
@@ -39,7 +39,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>__SRC_DIR__/launchd/copilot-relay-healthcheck.sh</string>
+        <string>__REPO_ROOT__/scripts/launchd/copilot-relay-healthcheck.sh</string>
     </array>
 
     <key>EnvironmentVariables</key>

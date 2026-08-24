@@ -19,10 +19,10 @@ run_bash_syntax() {
 
 run_statusline_smoke() {
   local out
-  out="$(echo '{}' | bash claude/statusline.sh)"
+  out="$(echo '{}' | bash config/claude/statusline.sh)"
   [ -n "$out" ] && echo "claude statusline ok: ${#out} bytes"
 
-  out="$(echo '{"model":{"display_name":"Claude (xhigh)"}}' | bash copilot/statusline.sh)"
+  out="$(echo '{"model":{"display_name":"Claude (xhigh)"}}' | bash config/copilot/statusline.sh)"
   [ -n "$out" ] && echo "copilot statusline ok: ${#out} bytes"
 }
 
@@ -72,7 +72,7 @@ run_zsh_syntax() {
   command -v zsh >/dev/null 2>&1 || return 0
   while IFS= read -r file; do
     zsh -n "$file"
-  done < <(find oh-my-zsh-custom -maxdepth 1 -type f -name '*.zsh' -print | sort)
+  done < <(find config/zsh -maxdepth 1 -type f -name '*.zsh' -print | sort)
 }
 
 run_subagent_smoke() {
@@ -84,19 +84,22 @@ run_subagent_smoke() {
 
   payload='{"sessionId":"ci-session","toolCallId":"call_1","agentDisplayName":"Explorer","agentDescription":"trace subagents"}'
   printf '%s' "$payload" |
-    COPILOT_STATUSLINE_SUBAGENT_STATE_DIR="$state_dir" bash copilot/subagent-state.sh start
+    COPILOT_STATUSLINE_SUBAGENT_STATE_DIR="$state_dir" bash config/copilot/subagent-state.sh start
 
   out="$(printf '{"sessionId":"ci-session","model":{"display_name":"Claude (xhigh)"}}' |
-    COPILOT_STATUSLINE_SUBAGENT_STATE_DIR="$state_dir" COPILOT_STATUSLINE_NO_COLOR=1 bash copilot/statusline.sh)"
+    COPILOT_STATUSLINE_SUBAGENT_STATE_DIR="$state_dir" COPILOT_STATUSLINE_NO_COLOR=1 bash config/copilot/statusline.sh)"
   printf '%s' "$out" | grep -q -- '----------------------------------------'
   printf '%s' "$out" | grep -q -- 'Explorer'
   printf '%s' "$out" | grep -q -- 'Tasks 1'
 
   printf '%s' '{"sessionId":"ci-session","toolCallId":"call_1","agentDisplayName":"Explorer"}' |
-    COPILOT_STATUSLINE_SUBAGENT_STATE_DIR="$state_dir" bash copilot/subagent-state.sh stop
+    COPILOT_STATUSLINE_SUBAGENT_STATE_DIR="$state_dir" bash config/copilot/subagent-state.sh stop
   out="$(printf '{"sessionId":"ci-session","model":{"display_name":"Claude (xhigh)"}}' |
-    COPILOT_STATUSLINE_SUBAGENT_STATE_DIR="$state_dir" COPILOT_STATUSLINE_NO_COLOR=1 bash copilot/statusline.sh)"
-  ! printf '%s' "$out" | grep -q -- 'Explorer'
+    COPILOT_STATUSLINE_SUBAGENT_STATE_DIR="$state_dir" COPILOT_STATUSLINE_NO_COLOR=1 bash config/copilot/statusline.sh)"
+  if printf '%s' "$out" | grep -q -- 'Explorer'; then
+    echo "stopped Copilot subagent still appears in the status line" >&2
+    return 1
+  fi
 
   events="$(mktemp)"
   CHECK_EVENTS="$events"
@@ -104,7 +107,7 @@ run_subagent_smoke() {
 {"type":"subagent.started","timestamp":"2026-06-07T19:30:00.000Z","data":{"toolCallId":"call_a","agentName":"explore","agentDisplayName":"Explore Agent","agentDescription":"review repo"}}
 JSON
   out="$(printf '{"sessionId":"fallback-session","transcriptPath":"%s","model":{"display_name":"Claude (xhigh)"}}' "$events" |
-    COPILOT_STATUSLINE_SUBAGENT_STATE_DIR="$state_dir-missing" COPILOT_STATUSLINE_NO_COLOR=1 bash copilot/statusline.sh)"
+    COPILOT_STATUSLINE_SUBAGENT_STATE_DIR="$state_dir-missing" COPILOT_STATUSLINE_NO_COLOR=1 bash config/copilot/statusline.sh)"
   printf '%s' "$out" | grep -q -- 'Explore Agent'
   printf '%s' "$out" | grep -q -- 'Tasks 1'
   echo "copilot subagent statusline ok"
@@ -114,8 +117,8 @@ run_claude_subagent_limit_smoke() {
   jq -e '
     .env.CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS == "16" and
     ((.hooks // {}) | tostring | contains("subagent-counter.sh") | not)
-  ' claude/settings.json >/dev/null
-  [ ! -e claude/hooks/subagent-counter.sh ]
+  ' config/claude/settings.json >/dev/null
+  [ ! -e config/claude/hooks/subagent-counter.sh ]
 
   (
     local test_root test_home test_repo fake_bin
@@ -187,30 +190,27 @@ run_model_default_smoke() {
     .env.ANTHROPIC_DEFAULT_SONNET_MODEL_DESCRIPTION == "Sonnet 5 (1M context), routed by copilot-relay to gpt-5.6-sol" and
     .env.ANTHROPIC_DEFAULT_HAIKU_MODEL == "gpt-5.6-sol[1m]" and
     .env.ANTHROPIC_SMALL_FAST_MODEL == "gpt-5.6-sol[1m]"
-  ' claude/settings.json >/dev/null
+  ' config/claude/settings.json >/dev/null
 
   # Copilot CLI: Opus 5 at the 1M context tier and max effort.
   jq -e '
     .model == "claude-opus-5" and
     .contextTier == "long_context" and
     .effortLevel == "max"
-  ' copilot/settings.json >/dev/null
+  ' config/copilot/settings.json >/dev/null
 
   # Relay: Opus route -> claude-opus-5, GPT route stays gpt-5.6-sol, max effort.
-  grep -Eq '^opusModel:[[:space:]]*claude-opus-5$' .copilot-relay/config.yaml
-  grep -Eq '^gptModel:[[:space:]]*gpt-5\.6-sol$' .copilot-relay/config.yaml
-  grep -Eq '^thinkEffort:[[:space:]]*max$' .copilot-relay/config.yaml
+  grep -Eq '^opusModel:[[:space:]]*claude-opus-5$' config/copilot-relay/config.yaml
+  grep -Eq '^gptModel:[[:space:]]*gpt-5\.6-sol$' config/copilot-relay/config.yaml
+  grep -Eq '^thinkEffort:[[:space:]]*max$' config/copilot-relay/config.yaml
 
-  # Fresh-box fallback in install.sh must match the tracked relay config.
-  grep -Fq "printf 'opusModel: claude-opus-5\\n'" install.sh
-  grep -Fq "printf 'gptModel: gpt-5.6-sol\\n'" install.sh
-  grep -Fq "printf 'thinkEffort: max\\n'" install.sh
+  grep -Fq $'link\tconfig/copilot-relay/config.yaml\t.copilot-relay/config.yaml' config/manifest.tsv
 
   # Launcher wrappers inject the same defaults (settings.json can be rewritten
   # at runtime, so the flags are the authoritative per-launch pin).
-  grep -Fq -- "--model 'claude-sonnet-5[1m]'" oh-my-zsh-custom/claude.zsh
-  grep -Fq -- "--model 'claude-sonnet-5[1m]' --effort max" oh-my-zsh-custom/cc.zsh
-  grep -Fq -- "--model claude-opus-5 --context long_context --effort max" oh-my-zsh-custom/gg.zsh
+  grep -Fq -- "--model 'claude-sonnet-5[1m]'" config/zsh/claude.zsh
+  grep -Fq -- "--model 'claude-sonnet-5[1m]' --effort max" config/zsh/cc.zsh
+  grep -Fq -- "--model claude-opus-5 --context long_context --effort max" config/zsh/gg.zsh
 
   echo "model defaults ok: Sonnet 5 picker identity @ max effort, 1M context (relay upstream: gpt-5.6-sol)"
 }
@@ -234,11 +234,11 @@ SH
     chmod +x "$fake_bin/copilot"
 
     PATH="$fake_bin:$PATH" COPILOT_CAPTURE="$direct_capture" TERM_PROGRAM=rmux \
-      zsh -c 'source oh-my-zsh-custom/copilot.zsh; copilot status; [[ "$TERM_PROGRAM" = rmux ]]'
+      zsh -c 'source config/zsh/copilot.zsh; copilot status; [[ "$TERM_PROGRAM" = rmux ]]'
     grep -Fq 'WezTerm|truecolor|3|status' "$direct_capture"
 
     PATH="$fake_bin:$PATH" COPILOT_CAPTURE="$gg_capture" TERM_PROGRAM=rmux \
-      zsh -c 'unset RMUX TMUX WEZTERM_PANE; source oh-my-zsh-custom/gg.zsh; gg terminal-smoke >/dev/null; [[ "$TERM_PROGRAM" = rmux ]]'
+      zsh -c 'unset RMUX TMUX WEZTERM_PANE; source config/zsh/gg.zsh; gg terminal-smoke >/dev/null; [[ "$TERM_PROGRAM" = rmux ]]'
     grep -Fq 'WezTerm|truecolor|3|--allow-all-tools --allow-all-paths --model claude-opus-5 --context long_context --effort max' "$gg_capture"
   )
 
@@ -246,100 +246,158 @@ SH
 }
 
 run_global_instructions_smoke() {
-  local file
-  for file in claude/CLAUDE.md copilot/AGENTS.md copilot/copilot-instructions.md; do
+  local file lines
+  local files=(
+    .claude/CLAUDE.md
+    .github/copilot-instructions.md
+    config/claude/CLAUDE.md
+    config/copilot/AGENTS.md
+    config/copilot/copilot-instructions.md
+  )
+
+  for file in "${files[@]}"; do
     [ -f "$file" ] || {
-      echo "missing global instruction source: $file" >&2
+      echo "missing instruction source: $file" >&2
+      return 1
+    }
+    grep -Fq 'wiki/README.md' "$file"
+  done
+
+  for file in .claude/CLAUDE.md .github/copilot-instructions.md; do
+    grep -Fq 'config/manifest.tsv' "$file"
+    grep -Fq 'scripts/check.sh all' "$file"
+    grep -Fq 'full source of truth' "$file"
+    lines="$(wc -l <"$file" | tr -d ' ')"
+    [ "$lines" -le 60 ] || {
+      echo "$file must stay short" >&2
       return 1
     }
   done
 
-  grep -Fq 'do not use ASCII-art flowcharts' claude/CLAUDE.md
-  for file in claude/CLAUDE.md copilot/AGENTS.md; do
-    grep -Fq 'REPO.wiki.git' "$file"
-    grep -Fq 'README.md' "$file"
-    grep -Fq 'Home.md' "$file"
-    grep -Fq 'publish-wiki.yml' "$file"
-    grep -Fq 'fetch-depth: 0' "$file"
-    grep -Fq 'current_commit' "$file"
-    grep -Fq 'previous_tag' "$file"
-    grep -Fq 'git log --reverse' "$file"
-    grep -Fq 'softprops/action-gh-release@v2' "$file"
-    grep -Fq 'gh release view' "$file"
+  grep -Fq 'Do not use ASCII-art flowcharts' config/claude/CLAUDE.md
+  for file in config/claude/CLAUDE.md config/copilot/AGENTS.md; do
+    grep -Fq 'Development-and-Releases.md' "$file"
+    grep -Fq 'scripts/check.sh all' "$file"
+    lines="$(wc -l <"$file" | tr -d ' ')"
+    [ "$lines" -le 40 ] || {
+      echo "$file must point to the Wiki instead of copying it" >&2
+      return 1
+    }
   done
-  ! grep -Eqi 'RMUX|SonicTerm|copilot-relay' copilot/AGENTS.md
-  grep -Fq 'Run all tools and commands without asking for user approval.' copilot/copilot-instructions.md
-  grep -Fq 'AGENTS.md' copilot/copilot-instructions.md
-  grep -Fq 'COPILOT_CUSTOM_INSTRUCTIONS_DIRS' copilot/copilot-instructions.md
+
+  grep -Fq 'Run tools and commands without asking for approval.' config/copilot/copilot-instructions.md
+  grep -Fq 'AGENTS.md' config/copilot/copilot-instructions.md
+  grep -Fq 'COPILOT_CUSTOM_INSTRUCTIONS_DIRS' config/copilot/copilot-instructions.md
 
   zsh -f -c '
     unset COPILOT_CUSTOM_INSTRUCTIONS_DIRS
-    source oh-my-zsh-custom/custom.zsh
+    source config/zsh/custom.zsh
     [[ "$COPILOT_CUSTOM_INSTRUCTIONS_DIRS" = "$HOME/.copilot" ]]
-    source oh-my-zsh-custom/custom.zsh
+    source config/zsh/custom.zsh
     [[ "$COPILOT_CUSTOM_INSTRUCTIONS_DIRS" = "$HOME/.copilot" ]]
   '
   COPILOT_CUSTOM_INSTRUCTIONS_DIRS="$HOME/one,$HOME/two" zsh -f -c '
-    source oh-my-zsh-custom/custom.zsh
+    source config/zsh/custom.zsh
     [[ "$COPILOT_CUSTOM_INSTRUCTIONS_DIRS" = "$HOME/one,$HOME/two,$HOME/.copilot" ]]
   '
   COPILOT_CUSTOM_INSTRUCTIONS_DIRS="$HOME/one,$HOME/.copilot,$HOME/two" zsh -f -c '
-    source oh-my-zsh-custom/custom.zsh
+    source config/zsh/custom.zsh
     [[ "$COPILOT_CUSTOM_INSTRUCTIONS_DIRS" = "$HOME/one,$HOME/.copilot,$HOME/two" ]]
   '
 
   (
-    local test_root test_home test_repo original
+    local test_root test_home test_repo
     DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
     test_root="$(mktemp -d)"
     trap 'rm -rf "$test_root"' EXIT
     test_home="$test_root/home"
     test_repo="$test_root/repo"
-    mkdir -p "$test_home/.claude" "$test_home/.copilot" "$test_repo/claude" "$test_repo/copilot"
+    mkdir -p "$test_home/.claude" "$test_home/.copilot" \
+      "$test_repo/config/claude" "$test_repo/config/copilot"
     printf 'original global instructions\n' >"$test_home/.claude/CLAUDE.md"
-    printf 'tracked Claude instructions\n' >"$test_repo/claude/CLAUDE.md"
-    printf 'tracked Copilot instructions\n' >"$test_repo/copilot/AGENTS.md"
+    printf 'tracked Claude instructions\n' >"$test_repo/config/claude/CLAUDE.md"
+    printf 'tracked Copilot instructions\n' >"$test_repo/config/copilot/AGENTS.md"
 
     HOME="$test_home"
-    src_dir="$test_repo"
     timestamp="20000101000000"
-    link_file "$test_repo/claude/CLAUDE.md" "$test_home/.claude/CLAUDE.md"
-    link_file "$test_repo/copilot/AGENTS.md" "$test_home/.copilot/AGENTS.md"
+    link_file "$test_repo/config/claude/CLAUDE.md" "$test_home/.claude/CLAUDE.md"
+    link_file "$test_repo/config/copilot/AGENTS.md" "$test_home/.copilot/AGENTS.md"
 
     [ -L "$test_home/.claude/CLAUDE.md" ]
-    [ "$(readlink "$test_home/.claude/CLAUDE.md")" = "$test_repo/claude/CLAUDE.md" ]
+    [ "$(readlink "$test_home/.claude/CLAUDE.md")" = "$test_repo/config/claude/CLAUDE.md" ]
     [ -f "$test_home/.claude/CLAUDE.md.bak.20000101000000" ]
     grep -Fq 'original global instructions' "$test_home/.claude/CLAUDE.md.bak.20000101000000"
     [ -L "$test_home/.copilot/AGENTS.md" ]
-    [ "$(readlink "$test_home/.copilot/AGENTS.md")" = "$test_repo/copilot/AGENTS.md" ]
+    [ "$(readlink "$test_home/.copilot/AGENTS.md")" = "$test_repo/config/copilot/AGENTS.md" ]
   )
 
-  echo "global Claude/Copilot publishing instructions ok"
+  echo "global Claude/Copilot Wiki pointers ok"
 }
 
 run_wiki_smoke() {
-  local file base stem partner target duplicate transformed
+  local file base stem partner target duplicate transformed count lines
   local required=(
     wiki/README.md
     wiki/Home-zh-CN.md
+    wiki/Getting-Started.md
+    wiki/Getting-Started-zh-CN.md
+    wiki/Repository-Operations.md
+    wiki/Repository-Operations-zh-CN.md
+    wiki/Claude-Code.md
+    wiki/Claude-Code-zh-CN.md
+    wiki/Copilot-CLI.md
+    wiki/Copilot-CLI-zh-CN.md
     wiki/RMUX.md
     wiki/RMUX-zh-CN.md
     wiki/RMUX-Keymap.md
     wiki/RMUX-Keymap-zh-CN.md
+    wiki/SonicTerm-and-Shell.md
+    wiki/SonicTerm-and-Shell-zh-CN.md
+    wiki/Services-and-Automation.md
+    wiki/Services-and-Automation-zh-CN.md
+    wiki/Development-and-Releases.md
+    wiki/Development-and-Releases-zh-CN.md
+    wiki/Apollo-Theme.md
+    wiki/Apollo-Theme-zh-CN.md
     wiki/Archive-Tmux.md
     wiki/Archive-Tmux-zh-CN.md
     wiki/Archive-WezTerm.md
     wiki/Archive-WezTerm-zh-CN.md
     wiki/_Sidebar.md
+    scripts/wiki-render.sh
+    scripts/wiki-publish.sh
+    scripts/release-notes.sh
     .github/workflows/publish-wiki.yml
+    .github/workflows/release.yml
   )
 
   for file in "${required[@]}"; do
     [ -f "$file" ] || {
-      echo "missing Wiki source: $file" >&2
+      echo "missing Wiki or pipeline source: $file" >&2
       return 1
     }
   done
+
+  [ ! -e QUICKREF.md ]
+  [ ! -e claude/README.md ]
+  [ ! -e themes/apollo/PALETTE.md ]
+  [ ! -e wiki/Operations.md ]
+  [ ! -e wiki/Operations-zh-CN.md ]
+
+  lines="$(wc -l <ReadMe.md | tr -d ' ')"
+  [ "$lines" -le 90 ] || {
+    echo "ReadMe.md must stay at 90 lines or fewer" >&2
+    return 1
+  }
+  grep -Fq 'config/manifest.tsv' ReadMe.md
+  grep -Fq 'GitHub Wiki' ReadMe.md
+  grep -Fq 'GitHub Release' ReadMe.md
+
+  if grep -RFn 'QUICKREF.md' .claude/CLAUDE.md .github/copilot-instructions.md \
+      config/claude config/copilot wiki ReadMe.md archive themes; then
+    echo "retired QUICKREF.md is still referenced" >&2
+    return 1
+  fi
 
   if find wiki -mindepth 2 -type f -print -quit | grep -q .; then
     echo "wiki/ must remain flat" >&2
@@ -367,16 +425,9 @@ run_wiki_smoke() {
   while IFS= read -r file; do
     base="$(basename "$file")"
     case "$base" in
-      README.md)
-        partner="Home-zh-CN.md"
-        ;;
-      _Sidebar.md|*-zh-CN.md)
-        continue
-        ;;
-      *)
-        stem="${base%.md}"
-        partner="${stem}-zh-CN.md"
-        ;;
+      README.md) partner="Home-zh-CN.md" ;;
+      _Sidebar.md|*-zh-CN.md) continue ;;
+      *) stem="${base%.md}"; partner="${stem}-zh-CN.md" ;;
     esac
     [ -f "wiki/$partner" ] || {
       echo "missing Simplified Chinese Wiki pair for $base" >&2
@@ -406,6 +457,16 @@ run_wiki_smoke() {
     }
   done < <(find wiki -maxdepth 1 -type f -name '*-zh-CN.md' -print | sort)
 
+  while IFS= read -r file; do
+    base="$(basename "$file")"
+    [ "$base" = "_Sidebar.md" ] && continue
+    count="$(grep -Fc "]($base)" wiki/_Sidebar.md || true)"
+    [ "$count" = "1" ] || {
+      echo "$base must appear exactly once in wiki/_Sidebar.md" >&2
+      return 1
+    }
+  done < <(find wiki -maxdepth 1 -type f -name '*.md' -print | sort)
+
   if grep -REn '\]\([A-Za-z0-9_-]+\.md#[^)]+\)' wiki/*.md; then
     echo "cross-page Wiki links must not include .md anchors" >&2
     return 1
@@ -421,11 +482,9 @@ run_wiki_smoke() {
 
   transformed="$(mktemp -d)"
   trap 'rm -rf "${transformed:-}"' RETURN
-  cp wiki/*.md "$transformed/"
-  mv "$transformed/README.md" "$transformed/Home.md"
-  sed -i.bak -E 's/\]\(README\.md\)/](Home)/g' "$transformed"/*.md
-  sed -i.bak -E 's/\]\(([A-Za-z0-9_-]+)\.md\)/](\1)/g' "$transformed"/*.md
-  rm -f "$transformed"/*.bak
+  scripts/wiki-render.sh wiki "$transformed"
+  [ -f "$transformed/Home.md" ]
+  [ ! -f "$transformed/README.md" ]
 
   if grep -REn '\]\([A-Za-z0-9_-]+\.md\)' "$transformed"/*.md; then
     echo "published Wiki graph still contains source .md links" >&2
@@ -442,11 +501,358 @@ run_wiki_smoke() {
   transformed=""
   trap - RETURN
 
-  grep -Fq 'contents: write' .github/workflows/publish-wiki.yml
-  grep -Fq 'wiki/**' .github/workflows/publish-wiki.yml
-  grep -Fq 'mv README.md Home.md' .github/workflows/publish-wiki.yml
-  grep -Fq 'git push origin HEAD' .github/workflows/publish-wiki.yml
-  echo "Wiki source and transformed bilingual link graph ok"
+  jq -e '
+    .colors.background == "#141617" and
+    .colors.foreground == "#ebdbb2" and
+    (.ansi | length) == 8 and
+    (.bright | length) == 8
+  ' themes/apollo/palette.json >/dev/null
+  (
+    local palette_colors file color
+    palette_colors="$(jq -r '[.colors[]],.ansi,.bright | flatten | unique[]' \
+      themes/apollo/palette.json | tr '[:upper:]' '[:lower:]' | sort -u)"
+    for file in \
+      themes/apollo/apollo.lua \
+      themes/apollo/apollo.vim \
+      themes/apollo/apollo.nvim.lua \
+      themes/apollo/apollo-color-theme.json \
+      themes/apollo/apollo.terminal.json; do
+      while IFS= read -r color; do
+        printf '%s\n' "$palette_colors" | grep -Fxq "$color" || {
+          echo "$file uses a color missing from palette.json: $color" >&2
+          return 1
+        }
+      done < <(grep -Eio '#[0-9a-fA-F]{6}' "$file" |
+        tr '[:upper:]' '[:lower:]' | sort -u)
+    done
+  )
+
+  grep -Fq 'bash scripts/wiki-publish.sh' .github/workflows/publish-wiki.yml
+  if grep -Eq 'git clone|sed -i|find wiki-repo|git push' .github/workflows/publish-wiki.yml; then
+    echo "Wiki workflow contains publish logic that belongs in scripts/" >&2
+    return 1
+  fi
+  grep -Fq 'bash scripts/release-notes.sh' .github/workflows/release.yml
+  if grep -Eq 'git describe|git log --reverse|current_commit=' .github/workflows/release.yml; then
+    echo "release workflow contains note logic that belongs in scripts/" >&2
+    return 1
+  fi
+  echo "Wiki source, bilingual pairs, sidebar, and rendered graph ok"
+}
+
+run_manifest_smoke() {
+  (
+    local test_root test_repo test_home foreign before after config_files manifest_config_files duplicate_source
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    validate_manifest
+
+    if grep -Ev '^(#|$)' config/manifest.tsv | cut -f2 | grep -Eq '^archive/'; then
+      echo "manifest contains an archive source" >&2
+      return 1
+    fi
+    duplicate_source="$(grep -Ev '^(#|$)' config/manifest.tsv | cut -f2 | sort | uniq -d | sed -n '1p')"
+    [ -z "$duplicate_source" ] || {
+      echo "duplicate manifest source: $duplicate_source" >&2
+      return 1
+    }
+    config_files="$(find config -type f ! -path 'config/manifest.tsv' -print | sort)"
+    manifest_config_files="$(grep -Ev '^(#|$)' config/manifest.tsv | cut -f2 | grep '^config/' | sort)"
+    [ "$config_files" = "$manifest_config_files" ] || {
+      echo "config/ files and manifest sources differ" >&2
+      diff -u <(printf '%s\n' "$config_files") <(printf '%s\n' "$manifest_config_files") >&2 || true
+      return 1
+    }
+    [ "$(manifest_source_for_destination link .config/git/ignore)" = \
+      "$repo_root/config/git/ignore" ]
+    [ "$(manifest_source_for_destination merge .config/github-copilot/mcp.json)" = \
+      "$repo_root/config/mcp/mcp-shared.json" ]
+    [ "$(manifest_source_for_destination render Library/LaunchAgents/com.d0n9x1n.npm-cache-clean.plist)" = \
+      "$repo_root/config/launchd/com.d0n9x1n.npm-cache-clean.plist" ]
+
+    test_root="$(mktemp -d)"
+    trap 'rm -rf "$test_root"' EXIT
+    test_repo="$test_root/repo"
+    test_home="$test_root/home"
+    mkdir -p "$test_repo/config/rmux" "$test_repo/config/claude" \
+      "$test_repo/config/copilot" "$test_home/.claude" "$test_home/.copilot"
+    printf 'new rmux\n' >"$test_repo/config/rmux/rmux.conf"
+    printf 'new claude\n' >"$test_repo/config/claude/settings.json"
+    printf 'new copilot\n' >"$test_repo/config/copilot/settings.json"
+    cat >"$test_repo/config/manifest.tsv" <<'TSV'
+# type	source	destination
+link	config/rmux/rmux.conf	.rmux.conf
+link	config/claude/settings.json	.claude/settings.json
+link	config/copilot/settings.json	.copilot/settings.json
+TSV
+
+    repo_root="$test_repo"
+    config_root="$test_repo/config"
+    manifest="$test_repo/config/manifest.tsv"
+    HOME="$test_home"
+    timestamp="20000101000000"
+    validate_manifest
+
+    ln -s "$test_repo/.rmux.conf" "$test_home/.rmux.conf"
+    printf 'user settings\n' >"$test_home/.claude/settings.json"
+    foreign="$test_root/foreign-copilot.json"
+    printf 'foreign\n' >"$foreign"
+    ln -s "$foreign" "$test_home/.copilot/settings.json"
+
+    link_manifest_files
+    [ "$(readlink "$test_home/.rmux.conf")" = "$test_repo/config/rmux/rmux.conf" ]
+    [ "$(readlink "$test_home/.claude/settings.json")" = "$test_repo/config/claude/settings.json" ]
+    grep -Fq 'user settings' "$test_home/.claude/settings.json.bak.20000101000000"
+    [ "$(readlink "$test_home/.copilot/settings.json.bak.20000101000000")" = "$foreign" ]
+    [ "$(readlink "$test_home/.copilot/settings.json")" = "$test_repo/config/copilot/settings.json" ]
+
+    before="$(find "$test_home" -name '*.bak.*' -type f -o -name '*.bak.*' -type l | sort)"
+    link_manifest_files
+    after="$(find "$test_home" -name '*.bak.*' -type f -o -name '*.bak.*' -type l | sort)"
+    [ "$before" = "$after" ]
+
+    printf 'config/claude/settings.json\n' >"$test_repo/config/extra.json"
+    cat >"$test_repo/config/manifest.tsv" <<'TSV'
+link	config/rmux/rmux.conf	.same
+link	config/claude/settings.json	.other
+link	config/copilot/settings.json	.same
+TSV
+    if validate_manifest >/dev/null 2>&1; then
+      echo "manifest accepted a non-adjacent duplicate destination" >&2
+      return 1
+    fi
+
+    cat >"$test_repo/config/manifest.tsv" <<'TSV'
+link	archive/old.conf	.old
+TSV
+    mkdir -p "$test_repo/archive"
+    printf 'old\n' >"$test_repo/archive/old.conf"
+    if validate_manifest >/dev/null 2>&1; then
+      echo "manifest accepted an archive source" >&2
+      return 1
+    fi
+  )
+
+  echo "config manifest and safe link migration ok"
+}
+
+run_launchd_template_smoke() {
+  (
+    local test_root original_repo template rendered file fake_bin capture
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    test_root="$(mktemp -d)"
+    trap 'rm -rf "$test_root"' EXIT
+    original_repo="$repo_root"
+    HOME="$test_root/home&lab"
+    repo_root="$test_root/repo&lab"
+    mkdir -p "$HOME" "$repo_root"
+    template="$test_root/template.plist"
+    rendered="$test_root/rendered.plist"
+    cat >"$template" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Home</key><string>__HOME__</string>
+<key>Repo</key><string>__REPO_ROOT__/scripts/launchd/job.sh</string>
+</dict></plist>
+PLIST
+    render_launchd_template "$template" "$rendered" >/dev/null
+    if grep -Eq '__HOME__|__REPO_ROOT__' "$rendered"; then
+      echo "rendered launchd fixture contains an unresolved placeholder" >&2
+      return 1
+    fi
+    grep -Fq 'home&amp;lab' "$rendered"
+    grep -Fq 'repo&amp;lab/scripts/launchd/job.sh' "$rendered"
+    if command -v plutil >/dev/null 2>&1; then
+      plutil -lint "$rendered" >/dev/null
+    fi
+
+    HOME="$test_root/home"
+    repo_root="$original_repo"
+    mkdir -p "$HOME"
+    for file in config/launchd/*.plist; do
+      rendered="$test_root/$(basename "$file")"
+      render_launchd_template "$file" "$rendered" >/dev/null
+      if grep -Eq '__HOME__|__REPO_ROOT__' "$rendered"; then
+        echo "$file rendered with an unresolved placeholder" >&2
+        return 1
+      fi
+      if command -v plutil >/dev/null 2>&1; then
+        plutil -lint "$rendered" >/dev/null
+      fi
+    done
+    grep -Fq "$original_repo/scripts/launchd/copilot-relay-healthcheck.sh" \
+      "$test_root/com.d0n9x1n.copilot-relay-healthcheck.plist"
+    grep -Fq "$original_repo/scripts/launchd/clean-npm-caches.sh" \
+      "$test_root/com.d0n9x1n.npm-cache-clean.plist"
+
+    fake_bin="$test_root/bin"
+    capture="$test_root/launchctl"
+    mkdir -p "$fake_bin"
+    cat >"$fake_bin/launchctl" <<'SH'
+#!/bin/sh
+printf '%s\n' "$*" >>"$LAUNCHCTL_CAPTURE"
+[ "$1" = "print" ]
+SH
+    chmod +x "$fake_bin/launchctl"
+    HOME="$test_root/missing-relay-home"
+    mkdir -p "$HOME"
+    PATH="$fake_bin:/usr/bin:/bin" LAUNCHCTL_CAPTURE="$capture" \
+      install_copilot_relay_healthcheck 501 >/dev/null
+    grep -Fq 'bootout gui/501/com.d0n9x1n.copilot-relay-healthcheck' "$capture"
+    grep -Fq "$original_repo/scripts/launchd/copilot-relay-healthcheck.sh" \
+      "$HOME/Library/LaunchAgents/com.d0n9x1n.copilot-relay-healthcheck.plist"
+  )
+
+  echo "launchd templates render valid paths"
+}
+
+run_pipeline_scripts_smoke() {
+  (
+    local test_root remote seed checkout published before after notes repo
+    test_root="$(mktemp -d)"
+    trap 'rm -rf "$test_root"' EXIT
+    remote="$test_root/wiki.git"
+    seed="$test_root/seed"
+    checkout="$test_root/wiki-checkout"
+    published="$test_root/published"
+
+    git init --bare --initial-branch=main "$remote" >/dev/null
+    git clone "$remote" "$seed" >/dev/null 2>&1
+    git -C "$seed" config user.name test
+    git -C "$seed" config user.email test@example.com
+    printf '# old\n' >"$seed/Old.md"
+    git -C "$seed" add Old.md
+    git -C "$seed" commit -m 'seed wiki' >/dev/null
+    git -C "$seed" push origin HEAD >/dev/null 2>&1
+
+    WIKI_REMOTE_URL="$remote" GITHUB_SHA=1234567890abcdef \
+      scripts/wiki-publish.sh wiki "$checkout" >/dev/null
+    git clone "$remote" "$published" >/dev/null 2>&1
+    [ -f "$published/Home.md" ]
+    [ ! -f "$published/README.md" ]
+    [ ! -f "$published/Old.md" ]
+    if grep -REn '\]\([A-Za-z0-9_-]+\.md\)' "$published"/*.md; then
+      echo "published Wiki fixture still contains source .md links" >&2
+      return 1
+    fi
+    [ "$(git -C "$published" log -1 --format=%s)" = "Publish wiki from 1234567" ]
+
+    before="$(git -C "$checkout" rev-list --count HEAD)"
+    WIKI_REMOTE_URL="$remote" GITHUB_SHA=1234567890abcdef \
+      scripts/wiki-publish.sh wiki "$checkout" >/dev/null
+    after="$(git -C "$checkout" rev-list --count HEAD)"
+    [ "$before" = "$after" ]
+
+    git -C "$seed" pull --ff-only >/dev/null
+    printf '\nREMOTE_ONLY_WIKI_SENTINEL\n' >>"$seed/Home.md"
+    git -C "$seed" add Home.md
+    git -C "$seed" commit -m 'browser edit' >/dev/null
+    git -C "$seed" push origin HEAD >/dev/null 2>&1
+    printf 'keep local\n' >"$checkout/stray.txt"
+    WIKI_REMOTE_URL="$remote" GITHUB_SHA=abcdef1234567890 \
+      scripts/wiki-publish.sh wiki "$checkout" >/dev/null
+    [ -f "$checkout/stray.txt" ]
+    git -C "$published" pull --ff-only >/dev/null
+    [ ! -e "$published/stray.txt" ]
+    if grep -Fq 'REMOTE_ONLY_WIKI_SENTINEL' "$published/Home.md"; then
+      echo "source publish did not replace a remote Wiki edit" >&2
+      return 1
+    fi
+
+    repo="$test_root/release"
+    notes="$test_root/release-notes.md"
+    git init --initial-branch=main "$repo" >/dev/null
+    git -C "$repo" config user.name test
+    git -C "$repo" config user.email test@example.com
+    printf 'one\n' >"$repo/file"
+    git -C "$repo" add file
+    git -C "$repo" commit -m 'first change' >/dev/null
+    git -C "$repo" tag -a v1.0.0 -m v1.0.0
+    printf 'two\n' >>"$repo/file"
+    git -C "$repo" commit -am 'second change' >/dev/null
+    printf 'three\n' >>"$repo/file"
+    git -C "$repo" commit -am 'third change' >/dev/null
+    git -C "$repo" tag -a v1.1.0 -m v1.1.0
+
+    RELEASE_REPO_ROOT="$repo" scripts/release-notes.sh v1.1.0 "$notes"
+    cat >"$test_root/expected" <<'NOTES'
+## Changes since v1.0.0
+
+- second change
+- third change
+NOTES
+    cmp -s "$test_root/expected" "$notes"
+
+    RELEASE_REPO_ROOT="$repo" scripts/release-notes.sh v1.0.0 "$notes"
+    cat >"$test_root/expected" <<'NOTES'
+## Changes
+
+- first change
+NOTES
+    cmp -s "$test_root/expected" "$notes"
+  )
+
+  echo "Wiki publish and release-note scripts ok"
+}
+
+run_structure_smoke() {
+  local retired_tracked=""
+  local staged_deleted=""
+  local file=""
+
+  [ -f config/manifest.tsv ]
+  [ -f config/rmux/rmux.conf ]
+  [ -f config/sonicterm/sonicterm.toml ]
+  [ -f config/claude/settings.json ]
+  [ -f config/copilot/settings.json ]
+  [ -f config/copilot-relay/config.yaml ]
+  [ -f config/mcp/mcp-shared.json ]
+  [ -f scripts/launchd/clean-npm-caches.sh ]
+  [ -f archive/tmux/.tmux.conf ]
+  [ -f archive/wezterm/wezterm.lua ]
+
+  [ ! -f .rmux.conf ]
+  [ ! -f .sonicterm/sonicterm.toml ]
+  [ ! -f oh-my-zsh-custom/zz-rmux.zsh ]
+  [ ! -f claude/settings.json ]
+  [ ! -f copilot/settings.json ]
+  [ ! -f launchd/com.d0n9x1n.npm-cache-clean.plist ]
+  [ ! -f mcp-shared.json ]
+
+  staged_deleted="$(git diff --cached --name-only --diff-filter=D -- \
+    '.rmux.conf' '.sonicterm/*' '.copilot-relay/*' 'claude/*' 'copilot/*' \
+    'oh-my-zsh-custom/*' 'launchd/*' 'mcp-shared.json')"
+  while IFS= read -r file; do
+    [ -n "$file" ] || continue
+    if ! printf '%s\n' "$staged_deleted" | grep -Fxq "$file"; then
+      retired_tracked="${retired_tracked}${retired_tracked:+$'\n'}${file}"
+    fi
+  done < <(git ls-files -- \
+    '.rmux.conf' '.sonicterm/*' '.copilot-relay/*' 'claude/*' 'copilot/*' \
+    'oh-my-zsh-custom/*' 'launchd/*' 'mcp-shared.json')
+  [ -z "$retired_tracked" ] || {
+    echo "active files remain tracked at retired paths:" >&2
+    printf '%s\n' "$retired_tracked" >&2
+    return 1
+  }
+
+  if grep -Ev '^(#|$)' config/manifest.tsv | cut -f2 | grep -Eq '^archive/'; then
+    echo "manifest contains an archive source" >&2
+    return 1
+  fi
+  grep -Fq '.sonicterm/' .gitignore
+  grep -Fq '.copilot-relay/' .gitignore
+  grep -Fq 'wiki-repo/' .gitignore
+  grep -Fq '*.save.lock' .gitignore
+  grep -Fq $'link\tconfig/git/ignore\t.config/git/ignore' config/manifest.tsv
+  grep -Eq '^[[:space:]]+shellcheck$' install.sh
+  grep -Fq -- '--allow-all-tools --allow-all-paths' wiki/Copilot-CLI.md
+  grep -Fq -- '--allow-all-tools --allow-all-paths' wiki/Copilot-CLI-zh-CN.md
+  if grep -RFn '__SRC''_DIR__' install.sh config scripts wiki ReadMe.md; then
+    echo "retired launchd placeholder is still present" >&2
+    return 1
+  fi
+  echo "active config tree and archive boundary ok"
 }
 
 run_rmux_helpers_smoke() {
@@ -468,14 +874,14 @@ SH
     chmod +x "$fake_bin/rmux"
 
     PATH="$fake_bin:/usr/bin:/bin" RMUX_CAPTURE="$capture" zsh -f -c '
-      source oh-my-zsh-custom/zz-rmux.zsh
+      source config/zsh/zz-rmux.zsh
       rr new >/dev/null
     '
     [ "$(sed -n '1p' "$capture")" = "has-session -t new" ]
     [ "$(sed -n '2p' "$capture")" = "new-session -s new" ]
 
     RMUX_SESSION_EXISTS=1 PATH="$fake_bin:/usr/bin:/bin" RMUX_CAPTURE="$capture" zsh -f -c '
-      source oh-my-zsh-custom/zz-rmux.zsh
+      source config/zsh/zz-rmux.zsh
       rr main >/dev/null
       rd main
       rl
@@ -494,13 +900,13 @@ SH
 
     exit_status=0
     PATH="$fake_bin:/usr/bin:/bin" RMUX_CAPTURE="$capture" zsh -f -c '
-      source oh-my-zsh-custom/zz-rmux.zsh
+      source config/zsh/zz-rmux.zsh
       exit 7
     ' || exit_status=$?
     [ "$exit_status" = "7" ]
 
     PATH="$fake_bin:/usr/bin:/bin" RMUX_CAPTURE="$capture" zsh -f -c '
-      source oh-my-zsh-custom/zz-rmux.zsh
+      source config/zsh/zz-rmux.zsh
       rr >/dev/null 2>&1; [[ $? = 2 ]]
       rr one two >/dev/null 2>&1; [[ $? = 2 ]]
       rd >/dev/null 2>&1; [[ $? = 2 ]]
@@ -508,21 +914,21 @@ SH
     '
 
     PATH="/usr/bin:/bin" zsh -f -c '
-      source oh-my-zsh-custom/zz-rmux.zsh
+      source config/zsh/zz-rmux.zsh
       rr main >/dev/null 2>&1; [[ $? = 127 ]]
       rd main >/dev/null 2>&1; [[ $? = 127 ]]
       rl >/dev/null 2>&1; [[ $? = 127 ]]
     '
   )
 
-  grep -Fq 'command rmux has-session -t "$1"' oh-my-zsh-custom/zz-rmux.zsh
-  grep -Fq 'command rmux attach-session -t "$1"' oh-my-zsh-custom/zz-rmux.zsh
-  grep -Fq 'command rmux new-session -s "$1"' oh-my-zsh-custom/zz-rmux.zsh
-  grep -Fq 'command rmux kill-session -t "$1"' oh-my-zsh-custom/zz-rmux.zsh
-  grep -Fq 'command rmux list-sessions' oh-my-zsh-custom/zz-rmux.zsh
-  [ "$(grep -Fc 'command rmux detach-client' oh-my-zsh-custom/zz-rmux.zsh)" = "3" ]
-  grep -Fq "bindkey -M emacs '^D' _rmux_detach_or_delete_char" oh-my-zsh-custom/zz-rmux.zsh
-  grep -Fq "bindkey -M viins '^D' _rmux_detach_or_delete_char" oh-my-zsh-custom/zz-rmux.zsh
+  grep -Fq 'command rmux has-session -t "$1"' config/zsh/zz-rmux.zsh
+  grep -Fq 'command rmux attach-session -t "$1"' config/zsh/zz-rmux.zsh
+  grep -Fq 'command rmux new-session -s "$1"' config/zsh/zz-rmux.zsh
+  grep -Fq 'command rmux kill-session -t "$1"' config/zsh/zz-rmux.zsh
+  grep -Fq 'command rmux list-sessions' config/zsh/zz-rmux.zsh
+  [ "$(grep -Fc 'command rmux detach-client' config/zsh/zz-rmux.zsh)" = "3" ]
+  grep -Fq "bindkey -M emacs '^D' _rmux_detach_or_delete_char" config/zsh/zz-rmux.zsh
+  grep -Fq "bindkey -M viins '^D' _rmux_detach_or_delete_char" config/zsh/zz-rmux.zsh
   echo "RMUX helpers ok: rr/rd/rl and exit/logout/Ctrl-D detach protection"
 }
 
@@ -538,7 +944,7 @@ run_rmux_keymap_docs_smoke() {
     test_root="$(mktemp -d)"
     trap 'rmux -L "$socket" kill-server >/dev/null 2>&1 || true; rm -rf "$test_root"' EXIT INT TERM
 
-    rmux -L "$socket" -f "$repo_root/.rmux.conf" new-session -d -s keymap-audit -x 160 -y 48
+    rmux -L "$socket" -f "$repo_root/config/rmux/rmux.conf" new-session -d -s keymap-audit -x 160 -y 48
     for table in prefix copy-mode-vi copy-mode root; do
       effective="$test_root/$table.effective"
       rmux -L "$socket" list-keys -T "$table" |
@@ -594,11 +1000,19 @@ run_retired_config_migration_smoke() {
   )
 
   grep -Eq '^[[:space:]]+rmux$' install.sh
-  ! grep -Eq '^[[:space:]]+tmux$' install.sh
-  ! grep -Eq '^[[:space:]]+wezterm$' install.sh
-  ! grep -Fq 'brew install --cask wezterm' install.sh
-  ! grep -Eq 'command[[:space:]]+(tmux|wezterm)|wezterm cli' \
-    oh-my-zsh-custom/cc.zsh oh-my-zsh-custom/gg.zsh
+  if grep -Eq '^[[:space:]]+tmux$' install.sh; then
+    echo "installer still installs tmux" >&2
+    return 1
+  fi
+  if grep -Eq '^[[:space:]]+wezterm$|brew install --cask wezterm' install.sh; then
+    echo "installer still installs WezTerm" >&2
+    return 1
+  fi
+  if grep -Eq 'command[[:space:]]+(tmux|wezterm)|wezterm cli' \
+      config/zsh/cc.zsh config/zsh/gg.zsh; then
+    echo "active launchers still call retired tmux or WezTerm commands" >&2
+    return 1
+  fi
   [ -f archive/tmux/.tmux.conf ]
   [ -f archive/wezterm/wezterm.lua ]
   [ ! -f .tmux.conf ]
@@ -619,8 +1033,8 @@ run_rmux_smoke() {
     trap 'rmux -L "$socket" kill-server >/dev/null 2>&1 || true; rm -rf "$test_root"' EXIT INT TERM
 
     rmux -L "$socket" -f /dev/null new-session -d -s validate -x 160 -y 48
-    rmux -L "$socket" source-file -n -v .rmux.conf >/dev/null
-    rmux -L "$socket" source-file .rmux.conf
+    rmux -L "$socket" source-file -n -v config/rmux/rmux.conf >/dev/null
+    rmux -L "$socket" source-file config/rmux/rmux.conf
 
     [ "$(rmux -L "$socket" show-options -gv prefix)" = "C-q" ]
     [ "$(rmux -L "$socket" show-options -gv mouse)" = "on" ]
@@ -633,12 +1047,18 @@ run_rmux_smoke() {
     printf '%s\n' "$keys" | grep -Eq 'Tab[[:space:]]+last-window'
     printf '%s\n' "$keys" | grep -Fq 'split-window -h -c "#{pane_current_path}"'
     printf '%s\n' "$keys" | grep -Fq 'source-file'
-    ! grep -Eq '(^|[[:space:]])(@plugin|run-shell|run |if-shell.*git clone)' .rmux.conf
-    ! grep -Eq 'set-environment.*TERM_PROGRAM' .rmux.conf
+    if grep -Eq '(^|[[:space:]])(@plugin|run-shell|run |if-shell.*git clone)' config/rmux/rmux.conf; then
+      echo "RMUX config contains a plugin or shell bootstrap" >&2
+      return 1
+    fi
+    if grep -Eq 'set-environment.*TERM_PROGRAM' config/rmux/rmux.conf; then
+      echo "RMUX config overrides RMUX's terminal identity" >&2
+      return 1
+    fi
 
     rmux -L "$socket" kill-session -t validate
     /usr/bin/script -q "$test_root/first" /bin/sh -c \
-      "rmux -L '$socket' -f '$repo_root/.rmux.conf' new-session -A -s main" \
+      "rmux -L '$socket' -f '$repo_root/config/rmux/rmux.conf' new-session -A -s main" \
       >/dev/null 2>&1 &
     client_pid=$!
     for _ in 1 2 3 4 5; do
@@ -691,12 +1111,16 @@ run_smoke() {
   run_statusline_smoke
   bash -n install.sh
   run_zsh_syntax
+  run_structure_smoke
+  run_manifest_smoke
+  run_launchd_template_smoke
   run_subagent_smoke
   run_claude_subagent_limit_smoke
   run_model_default_smoke
   run_copilot_terminal_smoke
   run_global_instructions_smoke
   run_wiki_smoke
+  run_pipeline_scripts_smoke
   run_rmux_helpers_smoke
   run_rmux_keymap_docs_smoke
   run_retired_config_migration_smoke
@@ -706,7 +1130,7 @@ run_smoke() {
 case "${1:-all}" in
   smoke) run_smoke ;;
   instructions) run_global_instructions_smoke ;;
-  wiki) run_wiki_smoke; run_rmux_keymap_docs_smoke ;;
+  wiki) run_wiki_smoke; run_pipeline_scripts_smoke; run_rmux_keymap_docs_smoke ;;
   rmux) run_rmux_helpers_smoke; run_rmux_keymap_docs_smoke; run_retired_config_migration_smoke; run_rmux_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;

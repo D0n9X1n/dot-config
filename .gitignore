@@ -3,6 +3,7 @@
 .LSOverride
 *.swp
 *.swo
+*.save.lock
 *~
 *.bak.*
 .copilot-cli.ts
@@ -15,3 +16,9 @@
 .claude/state/
 .claude/settings.local.json
 .claude/*.local.json
+.claude/worktrees/
+
+# Runtime folders left at the old config paths.
+.copilot-relay/
+.sonicterm/
+wiki-repo/

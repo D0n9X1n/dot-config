@@ -1,6 +1,6 @@
 # cc [title]
 #
-# Sibling of `gg` (oh-my-zsh-custom/gg.zsh) but launches Anthropic's
+# Sibling of `gg` (config/zsh/gg.zsh) but launches Anthropic's
 # Claude Code CLI instead of GitHub Copilot CLI. Sets the active terminal
 # tab + window title to [title] via OSC 1/2 and tells RMUX directly so the
 # title sticks when nested, then runs `claude` in

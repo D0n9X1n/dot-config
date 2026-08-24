@@ -1,0 +1,181 @@
+# Development and releases
+
+English | [简体中文](Development-and-Releases-zh-CN.md)
+
+This page is the source of truth for checks, Wiki publishing, issues, tags, and releases.
+
+## Before a change
+
+Read the Wiki page for the tool you will change. Edit the source under `config/` or `scripts/`, not the installed link in `$HOME`.
+
+Keep the change small. Do not add new behavior that the task does not need.
+
+## Shell rules
+
+Shell scripts use:
+
+```sh
+#!/usr/bin/env bash
+set -euo pipefail
+```
+
+Keep Bash 3.2 support for macOS:
+
+- no associative arrays;
+- no `printf '%(...)T'`;
+- no Bash `\u` escapes;
+- use portable `awk`, `sed`, `grep`, and `find` forms;
+- use `stat -f %m` with a `stat -c %Y` fallback when needed.
+
+Status line functions use `printf -v` instead of command substitution when possible.
+
+## Coupled files
+
+When one status line changes, update both:
+
+```text
+config/claude/statusline.sh
+config/copilot/statusline.sh
+```
+
+Keep the same five-line shape, palette, and per-directory Git cache. Keep the provider fields different: Claude shows cost; Copilot shows premium requests and custom live-subagent rows.
+
+Keep these model families separate:
+
+- Sonnet-facing defaults route through `gptModel`.
+- Opus names route through `opusModel`.
+
+Do not change both families when the task names only one.
+
+For any user-visible or behavior change, update the matching English and Chinese Wiki pages in the same change. Keep the root README short.
+
+## Local checks
+
+Run everything:
+
+```sh
+scripts/check.sh all
+```
+
+Focused checks:
+
+```sh
+scripts/check.sh smoke
+scripts/check.sh shellcheck
+scripts/check.sh instructions
+scripts/check.sh wiki
+scripts/check.sh rmux
+```
+
+CI uses the same script:
+
+- macOS runs smoke checks and installs RMUX;
+- Ubuntu installs ShellCheck and runs the ShellCheck target.
+
+Do not push while checks are red.
+
+## Wiki source rules
+
+The source lives in the flat `wiki/` folder.
+
+Rules:
+
+- `README.md` is the English home source.
+- It publishes as `Home.md`.
+- Every English page has one `-zh-CN.md` page.
+- Each pair links to each other.
+- `_Sidebar.md` links every page once in each language.
+- Source links use `Page-Name.md`.
+- Do not use cross-page `Page-Name.md#anchor` links.
+- Same-page `#anchor` links are fine.
+
+Run:
+
+```sh
+scripts/check.sh wiki
+```
+
+## Wiki scripts
+
+`scripts/wiki-render.sh` copies source pages to a clean output folder, renames `README.md` to `Home.md`, and removes `.md` from flat internal links.
+
+`scripts/wiki-publish.sh` clones or uses the live Wiki repo, calls the render script, replaces managed Markdown pages, commits only when content changed, and pushes without force.
+
+The workflow is small. It only checks out the repo and calls the publish script.
+
+Browser edits are not a source. The next publish replaces them.
+
+## Wiki completion
+
+A merged Wiki change is not done until the run and live pages are checked:
+
+```sh
+gh run list --workflow=publish-wiki.yml --limit 3
+gh run view <run-id>
+git clone https://github.com/OWNER/REPO.wiki.git /tmp/REPO-wiki-live
+grep -REn '\]\([A-Za-z0-9_-]+\.md\)' /tmp/REPO-wiki-live/*.md
+```
+
+The newest run must match the merge commit. The grep should find nothing. Open the live Wiki and click new or changed links in both languages.
+
+## Issues and milestones
+
+Every work item needs a GitHub issue. Put the issue in the release milestone. Use closing words in the commit or close the issue after the change reaches `main`.
+
+Before a release:
+
+1. Check that all work-item issues are closed.
+2. Check that they belong to the release milestone.
+3. Close the milestone when the work is complete.
+
+## Versions
+
+Tags use `vX.Y.Z`:
+
+- patch for a fix;
+- minor for a new feature;
+- major for a breaking change.
+
+Create a new annotated tag. Never move or reuse a release tag.
+
+```sh
+git tag -a vX.Y.Z -m "vX.Y.Z"
+git push origin vX.Y.Z
+```
+
+## Release notes
+
+`scripts/release-notes.sh` builds notes from commit subjects.
+
+It:
+
+1. resolves the current tag commit;
+2. finds the previous reachable `v*.*.*` tag from `${current_commit}^`;
+3. uses `git log --reverse --format='- %s'` for oldest-to-newest bullets;
+4. writes a first-release fallback when no older tag exists.
+
+The release workflow checks out full history, calls the script, and gives `release-notes.md` to `softprops/action-gh-release@v2`.
+
+## Release completion
+
+A pushed tag is not done until the workflow and live release are checked:
+
+```sh
+gh run list --workflow=release.yml --limit 3
+gh run view <run-id>
+gh release view vX.Y.Z
+git log --reverse --format='- %s' vPREVIOUS..vX.Y.Z
+```
+
+The run must point at the tag commit. The live body must have the right previous-tag heading and the exact commit subjects in order.
+
+## Safe Git work
+
+- Never commit secrets or runtime files.
+- Do not use `--no-verify` unless the user asks.
+- Do not force-push.
+- Review staged files before a commit.
+- Keep unrelated local changes out of the commit.
+- Run `git status` before an action that could lose work.
+
+See [Repository operations](Repository-Operations.md) for installed files and local-state boundaries.
