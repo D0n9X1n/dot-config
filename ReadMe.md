@@ -20,24 +20,28 @@ that creates symlinks into the home directory.
 ```
 dot-configs/
 ├── install.sh                   # idempotent linker (macOS only)
-├── .tmux.conf                   # -> ~/.tmux.conf  (tab/split/session manager)
+├── .rmux.conf                   # -> ~/.rmux.conf (terminal multiplexer)
 ├── oh-my-zsh-custom/            # contents -> ~/.oh-my-zsh/custom/
 │   ├── custom.zsh               # aliases, proxy helpers, brew completions, env
 │   ├── copilot.zsh              # copilot update wrapper -> cleanup hook
 │   └── gg.zsh                   # gg() function (terminal title + copilot)
 ├── copilot/                     # contents -> ~/.copilot/
+│   ├── AGENTS.md                # global Wiki/release workflow guidance
+│   ├── copilot-instructions.md  # native global autonomy instructions
 │   ├── settings.json            # Copilot CLI settings
 │   ├── statusline.sh            # statusline (bash 3.2+)
 │   ├── subagent-state.sh        # hook-maintained live subagent rows
-│   ├── cleanup-legacy.sh        # prune stale Copilot CLI upgrade payloads
-│   └── copilot-instructions.md  # global agent instructions
+│   └── cleanup-legacy.sh        # prune stale Copilot CLI upgrade payloads
 ├── claude/                      # contents -> ~/.claude/
+│   ├── CLAUDE.md                # global Wiki/release workflow guidance
 │   ├── settings.json            # Claude Code settings
 │   ├── statusline.sh            # statusline
 │   └── skills/                  # skills -> ~/.claude/skills/ (load in every project)
 │       └── update-settings/     # edit any config here correctly, then apply it
-├── wezterm/                     # terminal config -> ~/.wezterm.lua
-│   └── wezterm.lua              # WezTerm config
+├── archive/                     # inert retired tmux/WezTerm configs
+│   ├── tmux/.tmux.conf
+│   └── wezterm/wezterm.lua
+├── wiki/                        # bilingual GitHub Wiki source (flat)
 ├── .sonicterm/                  # tracked TOML config -> ~/.sonicterm/
 │   ├── sonicterm.toml           # SonicTerm config
 │   ├── keymaps/                 # WezTerm-compatible keymaps
@@ -53,6 +57,7 @@ dot-configs/
 │   └── clean-npm-caches.sh                 # the cleaner script the agent runs
 ├── mcp-shared.json              # secret-free MCP entries synced via git
 ├── scripts/check.sh             # local/CI parity checks
+├── .github/workflows/publish-wiki.yml  # wiki/ -> GitHub Wiki
 ├── .claude/CLAUDE.md            # agent instructions for Claude Code working in this repo
 ├── .github/copilot-instructions.md  # agent instructions for Copilot CLI
 ├── LICENSE
@@ -72,13 +77,13 @@ probes do not appear as errors.
    command-line tools via Homebrew (best-effort after Homebrew itself exists,
    except Claude Code must satisfy the minimum version below).
    Set `SKIP_BREW=1` to skip this step entirely (useful for CI / fake-`HOME`
-   testing). Formulae: `autojump`, `eza`, `git`, `jq`, `neovim`, `node`, `tmux`,
+   testing). Formulae: `autojump`, `eza`, `git`, `jq`, `neovim`, `node`, `rmux`,
    `zsh-completions`, and `zsh-fast-syntax-highlighting`. Before installing Claude Code, the installer
    removes any old global npm `@anthropic-ai/claude-code` package, then ensures
    the active Claude Code is at least v2.1.217 (required by the native
    concurrent-subagent limit), installing or upgrading the Homebrew cask only
-   when needed. It also installs casks for `wezterm`, the
-   Recursive base/Nerd Fonts, Symbols Only Nerd Font, and Noto Color Emoji, and
+   when needed. It also installs casks for the Recursive base/Nerd Fonts,
+   Symbols Only Nerd Font, and Noto Color Emoji, and
    downloads the latest
    `RecMonoBaker-*.ttf` and `RecMonoSt.Helens-*.ttf` assets from
    `MOSconfig/recursive-code-config` releases into `~/Library/Fonts`.
@@ -90,14 +95,22 @@ probes do not appear as errors.
    fixes insecure zsh completion directory permissions so `compinit` does not
    block new shells. Set `SKIP_OH_MY_ZSH=1` to skip installation.
 4. Symlinks every **top-level non-ignored** dotfile in this repo (files starting
-   with `.`) into `$HOME` (currently `.tmux.conf` plus `.gitignore`; ignored
-   generated files such as `.copilot-cli.ts` are skipped).
+   with `.`) into `$HOME` (including `.rmux.conf`; ignored generated files such
+   as `.copilot-cli.ts` are skipped). After the RMUX link lands, removes the old
+   `~/.tmux.conf` and `~/.wezterm.lua` only when they still point to this
+   repository's retired source paths; user-owned replacements are preserved.
 5. Symlinks every file in `oh-my-zsh-custom/` into `~/.oh-my-zsh/custom/`.
+   `custom.zsh` adds `~/.copilot` to `COPILOT_CUSTOM_INSTRUCTIONS_DIRS`
+   without dropping or duplicating existing paths, making the linked global
+   `AGENTS.md` discoverable by Copilot CLI.
 6. Symlinks every file in `copilot/` into `~/.copilot/`. Creates the
-   destination directory if missing. Preserves the executable bit on `*.sh`
-   files (so `statusline.sh` runs without re-chmod), then runs
-   `cleanup-legacy.sh` to prune stale Copilot CLI package versions/logs.
-7. Symlinks every top-level config file in `claude/` into `~/.claude/`.
+   destination directory if missing. `copilot-instructions.md` is Copilot's
+   documented global entry point; `AGENTS.md` carries reusable Wiki/release
+   guidance and is activated by the shell environment above. Preserves the
+   executable bit on `*.sh`, then runs `cleanup-legacy.sh`.
+7. Symlinks every top-level config file in `claude/` into `~/.claude/`,
+   including global `CLAUDE.md`. A pre-existing regular global instruction
+   file is timestamp-backed up before the tracked symlink replaces it.
    **Creates the destination directory if missing** (Claude Code only creates
    `~/.claude/` on first launch; mkdir-p so install.sh wires things up on a
    fresh box). During migration it removes the obsolete
@@ -106,7 +119,8 @@ probes do not appear as errors.
    deeper (`claude/skills/<name>/SKILL.md`), so they get their own pass that
    links each skill's files into `~/.claude/skills/<name>/` — global, meaning
    they load in every project on the machine, not just this repo.
-8. Symlinks `wezterm/wezterm.lua` into `~/.wezterm.lua`.
+8. Does not install or configure WezTerm; the retired profile lives under
+   `archive/wezterm/`. SonicTerm is the actively managed outer terminal.
 9. Symlinks tracked SonicTerm TOML files into `~/.sonicterm/`:
    `sonicterm.toml`, `keymaps/*.toml`, and `themes/*.toml`. Logs and runtime
    backup files under `~/.sonicterm/` stay machine-local and are not linked.
@@ -120,9 +134,8 @@ probes do not appear as errors.
    WakaTime and Copilot CLI are available, it installs or updates the WakaTime-owned
    `wakatime/copilot-cli-wakatime` Copilot plugin. The plugin installs/updates
    its own `~/.wakatime/wakatime-cli` binary on Copilot session start.
-11. Bootstraps **TPM** (Tmux Plugin Manager): clones it under `~/.tmux/plugins/tpm`
-   if missing, then runs `tpm/bin/install_plugins` to clone every plugin
-   listed in `.tmux.conf`. Skipped if `tmux` isn't on PATH.
+11. Leaves archived tmux plugins and resurrect data untouched; RMUX uses no TPM
+   bootstrap and no global tmux shim.
 12. Links `.copilot-relay/config.yaml` to `~/.copilot-relay/config.yaml`, removes
    legacy proxy launchd jobs, and writes the per-user launchd agent plus its
    watchdog. The watchdog runs at load and every 60 seconds, in two tiers.
@@ -171,6 +184,15 @@ cd ~/Public/dot-configs && git pull
 Run `scripts/check.sh all` before pushing shell/statusline/install changes. CI
 uses the same script: macOS runs `scripts/check.sh smoke`, while Ubuntu installs
 ShellCheck and runs `scripts/check.sh shellcheck`.
+
+## Wiki
+
+`wiki/` is the flat, bilingual source of truth for the GitHub Wiki. English
+pages are paired with `-zh-CN` pages, and `_Sidebar.md` provides global
+navigation. `.github/workflows/publish-wiki.yml` publishes changes from `main`,
+renaming `README.md` to the Wiki-required `Home.md`; browser edits are replaced
+on the next publication. The Wiki repository must be initialized once by
+creating a temporary page in GitHub before the first workflow run.
 
 ## Releases
 
@@ -225,7 +247,8 @@ brew list --cask claude-code
 copilot --version
 npm list -g copilot-relay --depth=0
 copilot plugin list | grep -q copilot-cli-wakatime && echo "WakaTime plugin ok"
-ls -l ~/.tmux.conf ~/.copilot/settings.json ~/.claude/settings.json ~/.oh-my-zsh/custom/custom.zsh
+ls -l ~/.rmux.conf ~/.copilot/settings.json ~/.claude/settings.json ~/.oh-my-zsh/custom/custom.zsh
+rmux -V
 launchctl print "gui/$(id -u)/com.d0n9x1n.copilot-relay" | grep state
 ```
 
@@ -339,14 +362,21 @@ bash ~/Public/dot-configs/install.sh    # re-import into ~/.claude.json
 
 Then restart Claude Code; `/mcp` should show `github ✓ ready`.
 
-### 8. WezTerm (terminal)
+### 8. RMUX and the outer terminal
 
-`install.sh` installs the wezterm cask and symlinks the config automatically:
+`install.sh` installs RMUX and links `.rmux.conf`. SonicTerm supplies the
+actively managed outer terminal; the installer adds neither tmux nor WezTerm:
 
 ```bash
-ls -l ~/.wezterm.lua
-# Open WezTerm; verify Gruvbox dark hard scheme is active.
+ls -l ~/.rmux.conf
+rmux -V
+rmux diagnose --human
 ```
+
+Open RMUX in SonicTerm. Verify `C-q` is the prefix, `C-q |` and
+`C-q -` split in the current directory, `C-q T` toggles native mouse selection,
+and `C-q r` reloads the profile. For Claude teammate panes, use `rmux claude`;
+ordinary `claude` and `cc` sessions remain unchanged.
 
 ### 8.5. Optional: Apollo theme (wezterm / vim / neovim / vscode / windows terminal)
 
@@ -367,8 +397,8 @@ mkdir -p ~/.config/nvim/colors
 ln -sfn "$THEMES/apollo.nvim.lua" ~/.config/nvim/colors/apollo.lua
 # then in init.lua:  vim.cmd('colorscheme apollo')
 
-# WezTerm — already wired via wezterm/wezterm.lua (#141617 bg). To use
-# the standalone scheme instead, in wezterm.lua:
+# WezTerm — its old managed profile is archived. To use the standalone
+# scheme in a user-owned ~/.wezterm.lua:
 #   local apollo = dofile(os.getenv("HOME") .. "/Public/dot-configs/themes/apollo/apollo.lua")
 #   config.color_schemes = { Apollo = apollo }
 #   config.color_scheme  = "Apollo"
@@ -394,14 +424,17 @@ JSON
 # on the profile(s) you want.
 ```
 
-### 9. Optional: tmux plugins
-
-`install.sh` runs TPM bootstrap automatically. Verify:
+### 9. Validate RMUX and Wiki configuration
 
 ```bash
-ls ~/.tmux/plugins/ | head        # should list tpm + a handful of plugins
-tmux source-file ~/.tmux.conf 2>&1 || echo "FAIL: tmux config error"
+bash scripts/check.sh rmux
+bash scripts/check.sh wiki
 ```
+
+The RMUX check uses a unique named socket, parses and sources `.rmux.conf`,
+asserts representative options and bindings, and kills the isolated daemon on
+exit. The Wiki check validates English/Chinese pairing and both the source and
+published link graphs.
 
 ### 10. Smoke test — end to end
 
@@ -420,7 +453,7 @@ claude --print "say 'hello from devbox'" 2>&1 | head -5
 If all 10 steps print `ok` (or the equivalent positive signal), the box is
 fully set up. The `gg [title]` function, the statusline (5-line layout
 with git/branch/cost/ctx/agents/skills segments), the dark-ansi Claude Code
-theme, and the Gruvbox-aligned tmux/wezterm chrome are all live.
+theme, and the Gruvbox-aligned RMUX chrome are all live.
 
 ### Platform notes
 
@@ -439,8 +472,10 @@ theme, and the Gruvbox-aligned tmux/wezterm chrome are all live.
 | New Copilot CLI config | Drop the file under `copilot/`, then re-run `install.sh`. (`mcp-config.json` is gitignored because it contains secrets — manage that file manually.) |
 | New Claude Code config | Drop the file under `claude/`, then re-run `install.sh`. The destination directory is created automatically. |
 | New SonicTerm config | Drop TOML under `.sonicterm/`, `.sonicterm/keymaps/`, or `.sonicterm/themes/`, then re-run `install.sh`. Do not commit `logs/` or runtime backups. |
+| RMUX config | Edit `.rmux.conf`, then reload with `prefix + r`. Do not add TPM/plugin bootstrap or a global tmux shim. |
+| Wiki page | Add a flat English page plus its `-zh-CN` pair under `wiki/`, update `_Sidebar.md`, then run `scripts/check.sh wiki`. |
 | copilot-relay config | Edit `.copilot-relay/config.yaml`, then re-run `install.sh` if the symlink is not already installed. Never commit `github_token`, `copilot_token.json`, or `logs/`. |
-| Editing an existing config | Edit it in this repo. Symlinks make changes live immediately on every machine. Reload mechanisms: tmux `prefix + r`; wezterm auto-reloads. |
+| Editing an existing config | Edit the active source in this repo. Symlinks make changes live immediately; files under `archive/` are inert. |
 
 After adding/editing, commit and push. Other machines pick up the change with
 `git pull` (and `install.sh` again only if new files were introduced).
@@ -462,57 +497,45 @@ After adding/editing, commit and push. Other machines pick up the change with
 
 #### `copilot.zsh`
 
-Wraps `copilot update`: after a successful update it runs
-`~/.copilot/cleanup-legacy.sh`, so old `~/.copilot/pkg/<platform>/<version>`
-payloads left by upgrades are pruned automatically.
+Wraps every Copilot CLI process with `TERM_PROGRAM=WezTerm`,
+`COLORTERM=truecolor`, and `FORCE_COLOR=3`, selecting Copilot's
+WezTerm-compatible modern true-color UI even inside RMUX. The variables are
+process-scoped, so the surrounding pane remains `TERM_PROGRAM=rmux`. After a
+successful `copilot update`, it runs `~/.copilot/cleanup-legacy.sh`, pruning old
+`~/.copilot/pkg/<platform>/<version>` payloads.
 
 #### `gg.zsh` — `gg [title]`
 
 Sets the current terminal tab and window title to `[title]` via OSC 1 / 2
-escape sequences (works in WezTerm, iTerm2, anything OSC-compliant). If
+escape sequences (works in SonicTerm and other OSC-compliant terminals). If
 `title` is omitted, `gg` uses the current directory path so a bare session still
-has a useful name.
-**Inside tmux** the OSC escape doesn't propagate to the outer terminal because
-`.tmux.conf` keeps `allow-rename off` and `automatic-rename off`, so `gg` also
-calls `tmux rename-window` directly — that updates tmux's status-bar window
-name, and `set-titles on` then bubbles `#S · #W` up to the outer terminal's
-titlebar. After updating titles, `gg` launches
-`copilot --allow-all-tools --allow-all-paths --model claude-opus-5 --context long_context --effort max` in the current
-shell. Useful for labeling Copilot CLI sessions so they're identifiable in
-the tab bar.
+has a useful name. Inside RMUX, `gg` calls `rmux rename-window` directly so the
+status-bar window name and outer `#S · #W` title stay aligned while automatic
+rename is disabled. After updating titles, `gg` launches
+`copilot --allow-all-tools --allow-all-paths --model claude-opus-5 --context long_context --effort max` with a process-scoped
+`TERM_PROGRAM=WezTerm`, `COLORTERM=truecolor`, and `FORCE_COLOR=3`. This tells
+Copilot to use its supported true-color terminal path without masking
+`TERM_PROGRAM=rmux` from other pane processes.
 
 Implementation notes:
 
-- Sends OSC 1 (icon name / tab title) and OSC 2 (window title) — terminals
-  that pull the window title from the active surface's OSC 2 (WezTerm) pick
-  this up automatically when not nested in tmux.
+- Sends OSC 1 (icon name / tab title) and OSC 2 (window title); compliant
+  outer terminals pick these up automatically outside a multiplexer.
 - Prepends a Nerd Font glyph (`fa-github`, U+F09B) to the title so Copilot
   tabs are visually distinct from plain shells / `cc` tabs at a glance.
-  Requires a Nerd-patched font in the terminal — Rec Mono St.Helens (the
-  default in this repo's `wezterm.lua`) is itself a Nerd Font 3.4.0 build
-  so the glyph renders natively, no fallback needed.
-- When `$TMUX` is set, also runs `tmux rename-window -- "$title"` so tmux's
-  own window-name machinery is in sync (it doesn't read OSC sequences once
-  `automatic-rename` is off).
-- For WezTerm specifically (gated by `$WEZTERM_PANE`), also calls
-  `wezterm cli set-tab-title` and `set-window-title` to update WezTerm's
-  internal state — no-op when wezterm is on PATH but not the active terminal.
+  It requires a Nerd-patched font such as the installed Rec Mono builds.
+- When `$RMUX` is set, runs `rmux rename-window -- "$title"`; no active tmux
+  or WezTerm CLI fallback remains.
 - Sets `DISABLE_AUTO_TITLE=true` while Copilot is running so oh-my-zsh's
   `precmd` / `preexec` hooks don't keep overwriting the title.
 - Calls `command copilot ...` to bypass any shell alias of the same name.
 
-### Terminal — WezTerm (`wezterm/`)
+### Archived WezTerm profile (`archive/wezterm/`)
 
-The terminal config is kept in-repo and auto-linked by `install.sh` to
-`~/.wezterm.lua`.
-
-Highlights of the in-repo config: `color_scheme = "Gruvbox dark, hard
-(base16)"`, Rec Mono St.Helens, custom 5-row "floating tabs" with Nerd
-Font process icons and a Knight-Rider loading bar for vibe-coding
-sessions, DPI-adaptive font weight, FreeType fine-tuning, smart `Cmd+C`
-(copy if selection else SIGINT), `inactive_pane_hsb = {1,1,1}` (no
-dimming of inactive panes), and a tab-bar `BAR_BG` derived from the
-active color scheme so swapping schemes auto-aligns the tab strip.
+The former `wezterm.lua` is retained for reference but is no longer linked.
+The installer no longer installs WezTerm; SonicTerm is RMUX's actively managed
+outer terminal. SonicTerm's WezTerm-compatible keymaps, palette names, and the
+process-scoped Copilot identity remain intentional compatibility signals.
 
 ### Terminal — SonicTerm (`.sonicterm/`)
 
@@ -537,64 +560,48 @@ settings: local bind address/port, logging retention, `claudeSetup: false`,
 Do not commit the rest of `~/.copilot-relay/`: `github_token`,
 `copilot_token.json`, and `logs/` are machine-local auth/runtime state.
 
-### Terminal — tmux (`.tmux.conf`)
+### Terminal multiplexer — RMUX (`.rmux.conf`)
 
-Primary tab/split/session manager. Linked to `~/.tmux.conf` by `install.sh`.
+RMUX 0.10.x is the active tab/split/session manager. It is an independent Rust
+daemon and client, not a tmux wrapper and not a terminal emulator. The tracked
+profile is linked to `~/.rmux.conf`; a native file prevents RMUX from falling
+back to the executable TPM-enabled config now under `archive/tmux/`.
 
 | Setting | Value |
 |---|---|
-| Theme | hand-rolled Gruvbox Dark Hard palette (matches WezTerm) |
-| Prefix | `C-q` (chosen over default C-b for ergonomics — far from C-c/d/z, doesn't clash with readline, modern macOS disables the legacy C-q XON flow control so nothing reclaims the keystroke; press `prefix + C-q` to send a literal `C-q` to the active pane) |
-| `default-terminal` | `tmux-256color` + `RGB` overrides for `wezterm`, `xterm-256color`, `*-direct`; `terminal-features … :RGB` so tmux 3.2+ actually advertises truecolor (without it tmux silently downsamples to the 256-color cube) |
-| Env scrubbing | `set-environment -gu TERMINFO TERMINFO_DIRS TERMCAP TERM_PROGRAM TERM_PROGRAM_VERSION` + `set -g COLORTERM truecolor` — defends against long-lived tmux servers inheriting dead `$TERMINFO` from previously installed terminals (which otherwise silently degrades panes from `tmux-256color` to `xterm-color` and breaks Copilot CLI's truecolor input panel). **Recovery for an already-poisoned server**: save state with `prefix + Ctrl-s`, then `tmux kill-server` from a non-tmux shell. |
-| Mouse | `on` (scroll, click-to-select, drag-to-resize) |
-| `escape-time` | `0` (vim-friendly) |
-| `history-limit` | `100000` |
-| Window/pane base index | `1` (1-indexed; `renumber-windows on`) |
-| Status position | top |
-| Set-clipboard | `on` (OSC 52 — works through SSH because WezTerm honours OSC 52) |
-| Mode keys | `vi` |
-| Allow rename / Auto rename | `off` (so `gg` / Vim-buffer titles stick; `gg` calls `tmux rename-window` explicitly) |
-
-Keybinds (additive — tmux defaults like `prefix + n / p / 1..9 / Tab` for
-window nav, `prefix + z` for zoom, `prefix + Space` for layout cycle, `prefix
-+ d` for detach, `prefix + s` for session list are all kept):
+| Theme | hand-rolled Gruvbox Dark Hard, top status bar |
+| Prefix | `C-q`; `prefix + C-q` sends a literal `C-q` |
+| Terminal | `tmux-256color` with RGB/undercurl declarations; preserves `TERM_PROGRAM=rmux` |
+| Environment | clears stale `TERMINFO`, `TERMINFO_DIRS`, and `TERMCAP`; forces truecolor hints |
+| Mouse | on; `prefix + T` toggles native terminal selection |
+| History | 100000 lines |
+| Window/pane base index | 1, with automatic window renumbering |
+| Clipboard | `pbcopy` in copy mode plus trusted-pane OSC 52 (`set-clipboard on`) |
+| Titles | automatic rename off; `#S · #W` bubbles to the outer terminal |
 
 | Action | Shortcut |
 |---|---|
-| Reload tmux.conf | `prefix + r` |
-| Split right (vertical separator) | `prefix + |` (cwd inherited) |
-| Split down (horizontal separator) | `prefix + -` (cwd inherited) |
-| New window (cwd inherited) | `prefix + c` (default rebound to inherit cwd) |
-| Pane focus (vim-style) | `prefix + h / j / k / l` |
-| Pane resize (repeatable, no re-prefix) | `prefix + H / J / K / L` |
-| Copy mode (vi keys) | `prefix + v`, then `v` start-selection, `y` copy |
-| Mouse drag selection | auto-copies on drag end (OSC 52) |
+| Reload `.rmux.conf` | `prefix + r` |
+| Split right/down in current directory | `prefix + |` / `prefix + -` |
+| New window in current directory | `prefix + c` |
+| Pane focus | `prefix + h / j / k / l` |
+| Repeatable resize | `prefix + H / J / K / L` |
+| Previous window | `prefix + Tab` |
+| Copy mode | `prefix + v`; then `v` select and `y` copy |
+| Zoom / detach | `prefix + z` / `prefix + d` (RMUX defaults) |
 
-Status bar segments:
+`cc` and `gg` use `rmux rename-window` inside RMUX. `rmux claude` is the
+explicit Claude teammate-mode launcher: it adds a private, process-scoped shim,
+not a global replacement for `tmux`.
 
-- **Left**: yellow pill with the current session name (`#S`).
-- **Window list**: inactive in dim grey on bg0; active in dark text on a
-  Gruvbox bright-blue pill, plus a magnifier when zoomed
-  (`#{?window_zoomed_flag, ,}`).
-- **Right**: prefix indicator (only while the prefix is held, in red),
-  `HH:MM`, vertical bar, and `YYYY-MM-DD`.
+TPM, tmux-sensible, tmux-yank, resurrect, and continuum are retired rather
+than copied into RMUX. Existing local plugin and resurrect data is preserved in
+case of rollback. Full architecture, security, command, and migration details
+are available in the bilingual `wiki/RMUX*.md` pages.
 
-Plugins (managed by **TPM** — bootstrap is automatic on first run, both via
-`.tmux.conf`'s `if "test ! -d ..."` guard and via `install.sh`):
-
-| Plugin | Why |
-|---|---|
-| `tmux-plugins/tpm` | Plugin manager |
-| `tmux-plugins/tmux-sensible` | Opinionated defaults that don't fight ours |
-| `tmux-plugins/tmux-yank` | Cross-platform clipboard helpers |
-| `tmux-plugins/tmux-resurrect` | Save/restore sessions (`prefix + Ctrl-s` / `Ctrl-r`); pane contents and Vim/NeoVim sessions captured |
-| `tmux-plugins/tmux-continuum` | Auto-save every 5 min, auto-restore on tmux start |
-
-> **Validate locally** with
-> `tmux -f .tmux.conf -L _v new-session -d -s _v ; tmux -L _v kill-server`
-> — silent exit means the config parsed cleanly. To force re-install of
-> plugins: `~/.tmux/plugins/tpm/bin/install_plugins`.
+> **Validate locally** with `scripts/check.sh rmux`. The check uses an isolated
+> named socket, sources the profile, asserts representative options and keys,
+> and always kills the test daemon.
 
 ### Copilot CLI (`copilot/`)
 
@@ -714,14 +721,16 @@ proxy that translates Anthropic-format requests into Copilot ones.
   "env": {
     "ANTHROPIC_BASE_URL": "http://127.0.0.1:4142",
     "ANTHROPIC_AUTH_TOKEN": "dummy",
-    "ANTHROPIC_MODEL": "claude-opus-5[1m]",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5.6-sol[1m]",
+    "ANTHROPIC_MODEL": "claude-sonnet-5[1m]",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5[1m]",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL_NAME": "Sonnet 5",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL_DESCRIPTION": "Sonnet 5 (1M context), routed by copilot-relay to gpt-5.6-sol",
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-5.6-sol[1m]",
     "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.6-sol[1m]",
     "MODEL_REASONING_EFFORT": "max"
   },
   "permissions": { "allow": ["*"], "defaultMode": "auto" },
-  "model": "claude-opus-5[1m]",
+  "model": "claude-sonnet-5[1m]",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
@@ -737,30 +746,28 @@ proxy that translates Anthropic-format requests into Copilot ones.
 
 Defaults pinned globally (synced across machines via this repo):
 
-- **Model: `claude-opus-5[1m]`** (default). The `[1m]` suffix keeps Claude Code's
-  1M-context accounting — a bare custom name would
-  be treated as 200k. `copilot-relay` matches on the `opus` substring and
-  ignores the suffix, mapping the request to Copilot upstream
-  `opusModel: claude-opus-5`, so the Claude-facing label is cosmetic
-  relay-side. `env.ANTHROPIC_MODEL`, top-level `model`, and the zsh wrappers are
-  all pinned to `claude-opus-5[1m]`.
-- **The GPT route stays configured.** It is reachable via `/model` or
-  `--model 'gpt-5.6-sol[1m]'`, and every Sonnet/Haiku/small-fast alias still
-  uses it. `copilot-relay` sends every model name that does **not** contain
-  `opus` to `gptModel` (currently `gpt-5.6-sol`), also at max effort and 1M
-  Claude-side accounting.
+- **Model: `claude-sonnet-5[1m]`** (default). This is the Claude-facing model
+  identity used by `env.ANTHROPIC_MODEL`, the top-level `model`, and both zsh
+  wrappers. The `[1m]` suffix keeps Claude Code's 1M-context accounting.
+  Claude Code's `/model` picker shows the pinned row as **Sonnet 5**; the
+  companion description identifies its actual relay destination.
+- **The Sonnet-facing default uses the GPT relay lane.** `copilot-relay` sends
+  every model name that does **not** contain `opus` to `gptModel`, currently
+  `gpt-5.6-sol`. Therefore selecting Sonnet 5 in Claude Code still runs
+  `gpt-5.6-sol` upstream, at max effort, while retaining Claude Code's native
+  Sonnet picker identity and 1M accounting.
 - **Family-aware routing via env vars + relay**:
-  - **`ANTHROPIC_DEFAULT_SONNET_MODEL: gpt-5.6-sol[1m]`** — every Sonnet alias
-    from Claude Code's built-in picker uses the GPT route while preserving
-    Claude-side 1M context accounting.
+  - **`ANTHROPIC_DEFAULT_SONNET_MODEL: claude-sonnet-5[1m]`** — binds the
+    built-in `sonnet` alias and picker row to the Claude-facing Sonnet 5 ID.
+    `_NAME="Sonnet 5"` guarantees the friendly label, while `_DESCRIPTION`
+    discloses that copilot-relay maps it to `gpt-5.6-sol`.
   - **`ANTHROPIC_DEFAULT_HAIKU_MODEL: gpt-5.6-sol[1m]`** — Haiku tier for current
     Claude Code versions, including sub-agents and small-fast side tasks.
   - **`ANTHROPIC_SMALL_FAST_MODEL: gpt-5.6-sol[1m]`** — legacy alias for older
     Claude Code versions.
-  - `copilot-relay` routes every alias above to the
-    same upstream `gptModel` (`gpt-5.6-sol`), so the Claude-facing label only
-    affects Claude-side display/accounting. Plain unsuffixed names work too,
-    but Claude Code treats unknown custom model names as 200k.
+  - **Real Opus 5 remains available** via `/model claude-opus-5[1m]` or
+    `--model 'claude-opus-5[1m]'`; its name contains `opus`, so the relay sends
+    it to `opusModel: claude-opus-5`.
 - **Effort: `max`** — applied two ways:
   `effortLevel: "max"` (Claude Code's client-side reasoning budget,
   applied to every session) and `thinkEffort: max` in
@@ -818,9 +825,9 @@ the binary honors for non-interactive bypass — the equivalent
 settings.json key is gated off by feature flag.
 
 Same applies to `cc [title]`: it renames the active terminal tab via
-OSC 1/2 (+ tmux + WezTerm CLI fallbacks; default title is the current directory
+OSC 1/2 plus RMUX window naming (default title is the current directory
 path) then launches Claude Code with
-the bypass flag plus `--model 'claude-opus-5[1m]' --effort max`. The title is prefixed with a Nerd Font glyph
+the bypass flag plus `--model 'claude-sonnet-5[1m]' --effort max`. The title is prefixed with a Nerd Font glyph
 (`mdi-creation`, U+F0674 — sparkles) so Claude tabs are visually distinct
 from Copilot's `gg` tabs (which use `fa-github`) and from plain shells.
 
@@ -831,7 +838,7 @@ One-time setup (after running `install.sh` on a fresh box):
 
 ```bash
 npx copilot-relay auth  # browser device-code login (GitHub)
-claude              # in another shell — uses claude-opus-5 1M @ max effort
+claude              # in another shell — shows Sonnet 5 1M @ max; relay serves gpt-5.6-sol
 ```
 
 Project-specific Claude Code config is synced by committing files to each
@@ -851,8 +858,6 @@ safe user-scope MCP import from Copilot's MCP file.
 
 ### Apps and npm CLIs (auto-installed on macOS)
 
-- [WezTerm](https://wezfurlong.org/wezterm/) — terminal (cask installed
-  automatically; config symlinked to `~/.wezterm.lua`)
 - [oh-my-zsh](https://ohmyz.sh/) — installed unattended if missing so
   `oh-my-zsh-custom/` files can be linked
 - [GitHub Copilot CLI](https://github.com/github/copilot) — existing non-npm
@@ -875,10 +880,9 @@ safe user-scope MCP import from Copilot's MCP file.
   global CLIs
 - [`jq`](https://jqlang.github.io/jq/) — used to merge MCP config and remove
   legacy WakaTime MCP entries
-- [tmux](https://github.com/tmux/tmux) ≥ 3.3 (3.6a tested) — primary tab,
-  split, and session manager. TPM and listed plugins bootstrap automatically
-  on first launch.
-- `git` — installed via Homebrew; required by TPM and oh-my-zsh.
+- [RMUX](https://github.com/Helvesec/rmux) 0.10.x — daemon-backed terminal
+  multiplexer; `.rmux.conf` is parsed and exercised by `scripts/check.sh`.
+- `git` — installed via Homebrew; required by oh-my-zsh and repository workflows.
 
 ### Fonts (installed automatically)
 

@@ -1,6 +1,6 @@
 ---
 name: update-settings
-description: Change any setting in the dot-configs repo correctly — edit the right file, mirror it to whatever it is coupled to, update QUICKREF.md + ReadMe.md, run scripts/check.sh, then apply it to this Mac via install.sh and reload the affected launchd agents. TRIGGER when the user asks to change, set, enable, disable, or tune configuration for any app this repo manages (Claude Code, Copilot CLI, WezTerm, tmux, SonicTerm, copilot-relay, launchd agents, zsh), or asks to re-apply/sync settings to the machine. SKIP for questions about what a setting currently is (just read the file), and for code changes that are not configuration.
+description: Change any setting in the dot-configs repo correctly — edit the right file, mirror it to whatever it is coupled to, update QUICKREF.md + ReadMe.md, run scripts/check.sh, then apply it to this Mac via install.sh and reload the affected launchd agents. TRIGGER when the user asks to change, set, enable, disable, or tune configuration for any app this repo manages (Claude Code, Copilot CLI, RMUX, SonicTerm, copilot-relay, launchd agents, zsh), or asks to re-apply/sync settings to the machine. SKIP for questions about what a setting currently is (just read the file), archived tmux/WezTerm reference files, and code changes that are not configuration.
 ---
 
 # update-settings
@@ -20,24 +20,27 @@ user just wants the repo's current state pushed onto the machine ("re-sync",
 
 ### 1. Route to the right file
 
-Never edit `~/.claude/*`, `~/.wezterm.lua`, or anything else in `$HOME`
-directly — those are symlinks into this repo, and a direct edit either hits the
-repo through the link (untracked as a repo change) or gets clobbered on next
-install. Always edit the repo copy.
+Never edit `~/.claude/*`, `~/.rmux.conf`, or another repo-managed path in
+`$HOME` directly. Edit the repository source. `~/.wezterm.lua` and
+`~/.tmux.conf` are no longer managed; their old sources under `archive/` are
+reference-only and must not be treated as active settings.
 
 | Setting | Edit here | Lands at | Coupled to |
 | --- | --- | --- | --- |
 | Claude Code behavior, env, model | `claude/settings.json` | `~/.claude/settings.json` | model family rule (below) |
+| Claude global instructions | `claude/CLAUDE.md` | `~/.claude/CLAUDE.md` | `copilot/AGENTS.md` shared workflow guidance |
 | Claude statusline | `claude/statusline.sh` | `~/.claude/statusline.sh` | **`copilot/statusline.sh`** |
 | Copilot CLI behavior | `copilot/settings.json` | `~/.config/github-copilot/` | — |
+| Copilot native global instructions | `copilot/copilot-instructions.md` | `~/.copilot/copilot-instructions.md` | `AGENTS.md` discovery pointer |
+| Copilot global workflow guidance | `copilot/AGENTS.md` | `~/.copilot/AGENTS.md` | `custom.zsh` discovery env + `claude/CLAUDE.md` |
 | Copilot statusline | `copilot/statusline.sh` | — | **`claude/statusline.sh`** |
 | MCP server (no secret) | `mcp-shared.json` | merged into Copilot + `~/.claude.json` | — |
 | MCP server (needs token) | `~/.config/github-copilot/mcp.json` | per-device, gitignored | never commit |
 | Relay routing / effort | `.copilot-relay/config.yaml` | `~/.copilot-relay/config.yaml` | `claude/settings.json` model names |
-| Terminal | `wezterm/wezterm.lua` | `~/.wezterm.lua` | tmux truecolor, theme |
-| tmux | `.tmux.conf` | `~/.tmux.conf` | WezTerm truecolor |
+| RMUX | `.rmux.conf` | `~/.rmux.conf` | outer-terminal truecolor + shell title wrappers |
 | SonicTerm | `.sonicterm/**.toml` | `~/.sonicterm/` | — |
-| Shell aliases / wrappers | `oh-my-zsh-custom/*.zsh` | `~/.oh-my-zsh/custom/` | permission-mode flags |
+| Shell aliases / wrappers | `oh-my-zsh-custom/*.zsh` | `~/.oh-my-zsh/custom/` | permission-mode flags + RMUX title routing |
+| Wiki | flat `wiki/*.md` English/`-zh-CN` pairs | GitHub Wiki via Actions | `_Sidebar.md` + publish workflow |
 | launchd agent | `launchd/*.plist` (**template**) | rendered to `~/Library/LaunchAgents/` | must re-render + reload |
 
 ### 2. Apply the coupling rule that fits
@@ -54,9 +57,29 @@ subagent UI and admission. Copilot keeps both, with the magic-wand glyph
 
 **Model routing.** Opus and Sonnet are separate families. Applying "the same
 model for the family" means within Opus **or** within Sonnet, never across.
-Current: anything containing `opus` → `claude-opus-5[1m]`; Sonnet/Haiku/small-fast
-→ `gpt-5.6-sol[1m]`. Keep the `[1m]` suffix — a bare custom name makes Claude
-Code fall back to 200k context accounting instead of 1M.
+Current startup/default identity: `claude-sonnet-5[1m]`, shown as **Sonnet 5**
+in `/model`; because it does not contain `opus`, relay serves upstream
+`gptModel: gpt-5.6-sol`. Haiku/small-fast use `gpt-5.6-sol[1m]`. Real Opus 5
+remains reachable as `claude-opus-5[1m]`, which relay maps to
+`opusModel: claude-opus-5`. Keep `[1m]` on Claude-facing defaults for 1M
+context accounting.
+
+**RMUX.** `.rmux.conf` is native RMUX config even though it uses tmux command
+syntax. Preserve `TERM_PROGRAM=rmux`, validate on a unique named socket, and do
+not add TPM/plugin bootstrap or a global tmux shim. `rmux claude` uses a private,
+process-scoped shim for teammate mode.
+
+**Global publishing instructions.** Keep reusable Wiki and commit-derived
+release guidance aligned between `claude/CLAUDE.md` and `copilot/AGENTS.md`,
+while preserving tool-specific framing. Copilot's documented global entry point
+is still `copilot-instructions.md`; `custom.zsh` must append `~/.copilot` to
+`COPILOT_CUSTOM_INSTRUCTIONS_DIRS` without dropping or duplicating other paths.
+Run `scripts/check.sh instructions`.
+
+**Wiki.** Keep `wiki/` flat. Update English and Simplified Chinese pairs in the
+same change, maintain reciprocal links and `_Sidebar.md`, then run
+`scripts/check.sh wiki`. `README.md` publishes as `Home.md`; browser edits are
+overwritten.
 
 **launchd.** Plists are templates, not symlinks. install.sh substitutes
 `__HOME__` → `$HOME` (launchd does not expand `$HOME` at runtime) and
@@ -116,8 +139,13 @@ launchctl kickstart -k "gui/$(id -u)/com.d0n9x1n.copilot-relay"
 ### Verify what you changed
 
 ```bash
-# symlink landed where you think
-ls -l ~/.claude/settings.json ~/.wezterm.lua ~/.tmux.conf
+# active symlinks landed; user-owned legacy paths are allowed
+ls -l ~/.claude/settings.json ~/.claude/CLAUDE.md ~/.copilot/AGENTS.md \
+  ~/.copilot/copilot-instructions.md ~/.rmux.conf
+zsh -lic 'case ",${COPILOT_CUSTOM_INSTRUCTIONS_DIRS:-}," in *,"$HOME/.copilot",*) exit 0 ;; *) exit 1 ;; esac'
+repo_root="$(git rev-parse --show-toplevel)"
+[ ! -L ~/.tmux.conf ] || [ "$(readlink ~/.tmux.conf)" != "$repo_root/.tmux.conf" ]
+[ ! -L ~/.wezterm.lua ] || [ "$(readlink ~/.wezterm.lua)" != "$repo_root/wezterm/wezterm.lua" ]
 
 # agents loaded
 launchctl print "gui/$(id -u)/com.d0n9x1n.copilot-relay" | grep state
@@ -127,8 +155,9 @@ launchctl print "gui/$(id -u)/com.d0n9x1n.copilot-relay-healthcheck" | grep stat
 copilot-relay status --deep; echo "exit=$?"
 ```
 
-Claude Code settings need a **session restart** to take effect. WezTerm and
-tmux reload their own config; SonicTerm and the relay hot-reload.
+Claude Code settings need a **session restart** to take effect. RMUX reloads
+with `prefix + r`; SonicTerm and the relay hot-reload. WezTerm's config is no
+longer managed by this repository.
 
 ---
 
@@ -148,7 +177,7 @@ tag. Never `--no-verify` a commit unless the user explicitly asks.
 ## Never
 
 - Commit a token, key, or `github_token` — the repo is **public**.
-- Add a path outside `claude/`, `copilot/`, `oh-my-zsh-custom/`, `wezterm/`
-  without an install.sh update to link it.
+- Add an active config path outside the existing linker conventions without an
+  install.sh update. `archive/` is inert; `wiki/` is publication-only.
 - Commit SonicTerm `logs/`, relay logs, or `copilot_token.json`.
 - Add a non-macOS branch. This repo is macOS-only and untested elsewhere.

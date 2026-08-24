@@ -132,7 +132,7 @@ ICON_WAKA=$'\xef\x84\x9c'
 ICON_SKILLS=$'\xef\x82\xae'
 ICON_MCP=$'\xef\x87\xa6'
 
-# Gruvbox Dark Hard accents — match alacritty/wezterm/.tmux.conf palette.
+# Gruvbox Dark Hard accents — match the RMUX and terminal palette.
 # Use 24-bit ANSI so we don't depend on the terminal's 256-color cube.
 if [ -z "${CLAUDE_STATUSLINE_NO_COLOR:-}" ]; then
   C_RESET=$'\033[0m'

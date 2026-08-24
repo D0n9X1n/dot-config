@@ -677,9 +677,6 @@ install_macos_deps() {
   ensure_homebrew || exit 1
 
   local claude_min_version="2.1.217"
-  local app_casks=(
-    wezterm
-  )
   local font_casks=(
     font-recursive # Provides the Recursive Mono variable family (St.Helens, Casual, Linear, Duotone)
     font-recursive-mono-nerd-font
@@ -693,7 +690,7 @@ install_macos_deps() {
     jq
     neovim
     node
-    tmux
+    rmux
     zsh-completions
     zsh-fast-syntax-highlighting
   )
@@ -716,7 +713,7 @@ install_macos_deps() {
   ensure_claude_code_min_version "$claude_min_version" || exit 1
 
   local cask
-  for cask in "${app_casks[@]}" "${font_casks[@]}"; do
+  for cask in "${font_casks[@]}"; do
     if brew list --cask "$cask" >/dev/null 2>&1; then
       echo "Homebrew cask '$cask' is already installed."
       continue
@@ -785,6 +782,21 @@ remove_legacy_claude_subagent_hook() {
 
   if [ -d "$hooks_dir" ]; then
     rmdir "$hooks_dir" 2>/dev/null || true
+  fi
+}
+
+remove_repo_symlink() {
+  local path="$1"
+  local former_target="$2"
+  local label="$3"
+  local target=""
+
+  if [ -L "$path" ]; then
+    target="$(readlink "$path")"
+    if [ "$target" = "$former_target" ]; then
+      rm -f "$path"
+      echo "Migration: removed retired ${label} symlink."
+    fi
   fi
 }
 
@@ -879,12 +891,17 @@ else
   echo "Auto-install only supports macOS + Homebrew. Install apps/fonts/CLIs manually."
 fi
 
-# Top-level dotfiles (.tmux.conf etc.).
+# Top-level dotfiles (.rmux.conf etc.).
 while IFS= read -r -d '' entry; do
   base="$(basename "$entry")"
   should_link_dotfile "$entry" || continue
   link_file "$entry" "${dest_dir}/${base}"
 done < <(find "$src_dir" -maxdepth 1 -mindepth 1 -name ".*" -type f -print0)
+
+# RMUX now owns the multiplexer layer, and SonicTerm is the managed outer
+# terminal. Remove only the exact legacy links this repository used to manage.
+remove_repo_symlink "${HOME}/.tmux.conf" "${src_dir}/.tmux.conf" "tmux config"
+remove_repo_symlink "${HOME}/.wezterm.lua" "${src_dir}/wezterm/wezterm.lua" "WezTerm config"
 
 # Link oh-my-zsh custom files (oh-my-zsh-custom/* -> ~/.oh-my-zsh/custom/*).
 omz_custom_src="${src_dir}/oh-my-zsh-custom"
@@ -923,16 +940,6 @@ if [ -d "$copilot_src" ]; then
       echo "Skipping Copilot legacy cleanup: copilot CLI not on PATH."
     fi
   fi
-fi
-
-# Link WezTerm config (wezterm/wezterm.lua -> ~/.wezterm.lua). WezTerm reads
-# this path directly on macOS, so a fresh install gets the terminal config
-# without a manual opt-in step.
-wezterm_src="${src_dir}/wezterm/wezterm.lua"
-wezterm_dest="${HOME}/.wezterm.lua"
-if [ -f "$wezterm_src" ]; then
-  link_file "$wezterm_src" "$wezterm_dest"
-  echo "Linked WezTerm config to $wezterm_dest"
 fi
 
 # Link SonicTerm config without taking over runtime state. SonicTerm stores logs
@@ -1085,25 +1092,6 @@ if [ -d "$claude_src" ]; then
         echo "Created $claude_user_json with $(echo "$src_mcp_json" | jq 'length') MCP servers (from $copilot_mcp)"
       fi
     fi
-  fi
-fi
-
-# Bootstrap TPM (Tmux Plugin Manager) and install plugins listed in
-# .tmux.conf. Skipped if tmux isn't on PATH. Idempotent: re-running
-# install.sh is a no-op once everything is in place.
-if have_cmd tmux && [ -f "${HOME}/.tmux.conf" ]; then
-  tpm_dir="${HOME}/.tmux/plugins/tpm"
-  if [ ! -d "$tpm_dir" ]; then
-    log_command git clone --depth=1 https://github.com/tmux-plugins/tpm "$tpm_dir" \
-      || echo "Warning: failed to clone TPM (run prefix+I in tmux to retry)"
-  fi
-  if [ -d "$tpm_dir" ]; then
-    # install_plugins uses `tmux start-server; show-environment` to discover
-    # TMUX_PLUGIN_MANAGER_PATH. That requires the default tmux socket to
-    # load .tmux.conf (which exports the var via the tpm init line). The
-    # script below handles the server start/stop transparently.
-    log_command "$tpm_dir/bin/install_plugins" \
-      || echo "Warning: TPM plugin install reported errors (run prefix+I in tmux to retry)"
   fi
 fi
 

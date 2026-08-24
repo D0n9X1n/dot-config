@@ -2,8 +2,8 @@
 #
 # Sibling of `gg` (oh-my-zsh-custom/gg.zsh) but launches Anthropic's
 # Claude Code CLI instead of GitHub Copilot CLI. Sets the active terminal
-# tab + window title to [title] via OSC 1/2, also tells tmux + WezTerm
-# directly so the title sticks even when nested, then runs `claude` in
+# tab + window title to [title] via OSC 1/2 and tells RMUX directly so the
+# title sticks when nested, then runs `claude` in
 # the current shell. If title is omitted, use the current directory path.
 #
 # Model + effort are pinned globally in ~/.claude/settings.json and injected
@@ -31,13 +31,9 @@ function cc {
   DISABLE_AUTO_TITLE=true
   print -Pn "\e]2;${title}\a"
   print -Pn "\e]1;${title}\a"
-  if [[ -n "$TMUX" ]]; then
-    command tmux rename-window -- "$title" 2>/dev/null
+  if [[ -n "$RMUX" ]] && (( $+commands[rmux] )); then
+    command rmux rename-window -- "$title" 2>/dev/null
   fi
-  if [[ -n "$WEZTERM_PANE" ]] && (( $+commands[wezterm] )); then
-    wezterm cli set-tab-title -- "$title" 2>/dev/null
-    wezterm cli set-window-title -- "$title" 2>/dev/null
-  fi
-  command claude --permission-mode bypassPermissions --model 'claude-opus-5[1m]' --effort max
+  command claude --permission-mode bypassPermissions --model 'claude-sonnet-5[1m]' --effort max
   unset DISABLE_AUTO_TITLE
 }

@@ -19,13 +19,17 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
 ```
 .
 ├── install.sh                   # idempotent linker (macOS only)
-├── .tmux.conf                   # symlinked into $HOME
+├── .rmux.conf                   # symlinked to ~/.rmux.conf
+├── archive/                     # inert retired tmux/WezTerm configs
+├── wiki/                        # flat English + zh-CN Wiki source
 ├── oh-my-zsh-custom/            # zsh customs
-├── claude/                      # Claude Code config + statusline
+├── claude/                      # Claude Code config + global instructions
+│   ├── CLAUDE.md
 │   ├── settings.json
 │   └── statusline.sh
-├── copilot/                     # Same shape for GitHub Copilot CLI
-├── wezterm/wezterm.lua          # symlinked to ~/.wezterm.lua
+├── copilot/                     # Copilot config + global instructions
+│   ├── AGENTS.md
+│   └── copilot-instructions.md
 ├── .sonicterm/                  # SonicTerm TOML config linked into ~/.sonicterm/
 ├── .copilot-relay/config.yaml   # secret-free relay config linked into ~/.copilot-relay/
 ├── launchd/                     # macOS launchd agent templates (rendered by install.sh)
@@ -55,6 +59,24 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
   `/subtask` and resumed agents can pass the admission boundary, ultracode is
   exempt, and workflows/agent teams use separate limits. Do not restore the
   obsolete lifecycle counter hook.
+- **`.rmux.conf` is the active multiplexer config.** RMUX is its own daemon-backed
+  multiplexer, not a tmux wrapper or terminal emulator. Keep the `C-q` profile,
+  test with an isolated named socket, preserve `TERM_PROGRAM=rmux`, and never add
+  TPM/plugin bootstrap or a global tmux shim. Copilot alone receives a
+  process-scoped WezTerm/truecolor identity through its zsh launchers.
+  `archive/tmux/` and
+  `archive/wezterm/` are inert reference files. SonicTerm is the managed outer
+  terminal; neither tmux nor WezTerm is installed by this repository.
+- **Global publishing guidance is coupled.** `claude/CLAUDE.md` is linked to
+  `~/.claude/CLAUDE.md`. `copilot/AGENTS.md` carries equivalent generic Wiki and
+  release guidance; `copilot/copilot-instructions.md` remains Copilot's native
+  global entry point. `oh-my-zsh-custom/custom.zsh` must keep `~/.copilot` in
+  `COPILOT_CUSTOM_INSTRUCTIONS_DIRS` so Copilot discovers `AGENTS.md`. Update
+  both workflow guides together while retaining tool-specific framing.
+- **`wiki/` is the GitHub Wiki source of truth.** Keep it flat; pair every English
+  page with a `-zh-CN` page; use `README.md` as the source landing page and
+  `.md` internal links; update `_Sidebar.md`; never use cross-page `.md#anchor`
+  links. Browser edits are overwritten by `.github/workflows/publish-wiki.yml`.
 - **launchd plists in `launchd/` are templates, not symlinks.**
   install.sh substitutes `__HOME__` -> `$HOME` (launchd doesn't expand
   `$HOME` at runtime) and `__SRC_DIR__` -> this repo's absolute path (for
@@ -89,8 +111,8 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
 
 ### Config files
 
-- Color scheme: **Gruvbox dark hard (base16)** in WezTerm; matching
-  Gruvbox accents in tmux + statusline.
+- Color scheme: **Gruvbox dark hard (base16)** across RMUX, SonicTerm, and the
+  statuslines; the archived WezTerm/tmux files preserve their historical match.
 - Statusline label icons are **FontAwesome** glyphs (U+F0xx–F2xx),
   rendered via raw UTF-8 bytes in bash (since bash 3.2 doesn't support
   `\u`).
@@ -102,7 +124,7 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
 
 ## When you make changes
 
-- **Bump version + tag**. We use semver-ish tags (`v0.X.Y`); patch for
+- **Bump version + tag**. We use semver-ish tags (`vX.Y.Z`); patch for
   bugfixes, minor for new features, major for breaking changes.
   Pushing a `v*.*.*` tag triggers `.github/workflows/release.yml`, which
   publishes a GitHub Release whose body is the commit-subject list between
@@ -134,12 +156,11 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
 - `skipDangerousModePermissionPrompt` is dead config (only meaningful
   when bypass mode is active, which is gated off in settings). Claude
   Code's runtime sometimes re-adds it on its own writes; treat as noise.
-- WezTerm's `inactive_pane_hsb` defaults to `{1, 0.9, 0.8}` — that
-  desaturates unfocused windows and makes side-by-side comparisons
-  look mismatched. Set `{1, 1, 1}` to disable.
-- tmux 3.2+ uses `terminal-features ... :RGB` to advertise truecolor;
-  `terminal-overrides ... :RGB` alone leaves tmux quantizing into the
-  256-color cube.
+- RMUX loads `~/.tmux.conf` as a best-effort fallback only when no native config
+  is found. The archived tmux config contains executable TPM commands, so keep
+  the native `~/.rmux.conf` link present and never validate via fallback.
+- RMUX's process-scoped `tmux` shim is useful for `rmux claude`; a global shim is
+  deliberately not installed because it can redirect unrelated tmux callers.
 - GitHub's hosted MCP doesn't support OAuth Dynamic Client Registration
   with Anthropic's SDK. Use Bearer-PAT auth in HTTP headers (per
   github/github-mcp-server's official Claude Code guide).
@@ -149,20 +170,19 @@ Personal dotfiles, synced across machines via git + symlinks. macOS-only;
 Sonnet and Opus are treated as **separate model families** by user
 convention. Current routing:
 
-- **Default** (`ANTHROPIC_MODEL` + zsh wrappers) → `claude-opus-5[1m]`. Relay
-  matches the `opus` substring and maps it to upstream `claude-opus-5`,
-  ignoring the suffix; the `[1m]` suffix keeps Claude Code's 1M-context
-  accounting (bare custom names fall back to 200k).
-- Opus 4-5 / 4-6 / 4-7 / 4-8 / 5 → `claude-opus-5[1m]` — the **startup
-  default**. Any Claude-facing label containing `opus` routes to
-  upstream `opusModel: claude-opus-5`.
-- Sonnet 4-5 / 4-6 → Claude-facing `gpt-5.6-sol[1m]` (relay upstream = `gptModel`)
-- Haiku 4-5 → `gpt-5.6-sol[1m]`
-- gpt-5-mini → `gpt-5.6-sol[1m]`
+- **Default** (`ANTHROPIC_MODEL` + top-level `model` + zsh wrappers) →
+  Claude-facing `claude-sonnet-5[1m]` at max effort. The pinned Sonnet `_NAME`
+  and `_DESCRIPTION` variables make `/model` show **Sonnet 5** and disclose the
+  relay destination. The `[1m]` suffix keeps Claude Code's 1M accounting.
+- The relay sends any name without `opus` to `gptModel`, so the Sonnet-facing
+  startup default actually runs upstream `gpt-5.6-sol`.
+- Opus 4-5 / 4-6 / 4-7 / 4-8 / 5 → `claude-opus-5[1m]`; any Claude-facing
+  label containing `opus` routes to upstream `opusModel: claude-opus-5`.
+- Haiku 4-5 / small-fast → `gpt-5.6-sol[1m]`.
+- gpt-5-mini → `gpt-5.6-sol[1m]`.
 
-The GPT route stays fully configured at max effort + 1M context and is
-reachable via `/model` or `--model 'gpt-5.6-sol[1m]'`; Claude's
-Sonnet/Haiku/small-fast side-task tiers still use it.
+Real Opus 5 remains reachable via `/model claude-opus-5[1m]`; the default
+Sonnet picker row and Haiku/small-fast tiers use the GPT relay lane.
 
 When asked to "use the same model for the family", apply within Opus or
 within Sonnet — never both. When adding a new alias, default to the
@@ -171,7 +191,7 @@ family rule above.
 ## Don't do
 
 - Don't commit secrets. The repo is public on github.com/D0n9X1n/dot-config.
-- Don't add files outside `claude/`, `copilot/`, `oh-my-zsh-custom/`,
-  `wezterm/` without updating install.sh.
+- Don't add an active config path outside the existing linker conventions without
+  updating `install.sh`. `archive/` is never linked; `wiki/` is publication-only.
 - macOS-only. The repo is not regression-tested on other platforms.
 - Don't `--no-verify` git commits unless the user explicitly asks.

@@ -1,0 +1,65 @@
+name: Publish wiki
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "wiki/**"
+      - ".github/workflows/publish-wiki.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-wiki
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone the wiki repository
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! git clone \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" \
+            wiki-repo; then
+            echo "Initialize the GitHub Wiki with one temporary page, then rerun this workflow." >&2
+            exit 1
+          fi
+
+      - name: Publish wiki source
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          find wiki-repo -maxdepth 1 -name '*.md' -delete
+          cp wiki/*.md wiki-repo/
+
+          cd wiki-repo
+
+          if [ -f README.md ]; then
+            mv README.md Home.md
+          fi
+
+          sed -i -E 's/\]\(README\.md\)/](Home)/g' ./*.md
+          sed -i -E 's/\]\(([A-Za-z0-9_-]+)\.md\)/](\1)/g' ./*.md
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Wiki already matches wiki/; nothing to publish"
+            exit 0
+          fi
+
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -m "Publish wiki from ${GITHUB_SHA::7}
+
+          Source of truth is wiki/ in the code repository. Browser edits are
+          overwritten on the next publish."
+
+          git push origin HEAD

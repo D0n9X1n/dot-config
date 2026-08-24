@@ -13,6 +13,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install RMUX
+        run: brew install rmux
+
       - name: Smoke checks
         run: bash scripts/check.sh smoke
 

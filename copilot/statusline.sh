@@ -145,7 +145,7 @@ ICON_SUBAGENT_ROOT=$'\xef\x84\xa0'
 ICON_SUBAGENT=$'\xef\x83\x90'
 ICON_MODE=$'\xef\x82\x85'
 
-# Gruvbox Dark Hard accents — match alacritty/wezterm/.tmux.conf palette.
+# Gruvbox Dark Hard accents — match the RMUX and terminal palette.
 # Use 24-bit ANSI so we don't depend on the terminal's 256-color cube.
 # Honor both COPILOT_STATUSLINE_NO_COLOR (preferred) and the legacy
 # COPILOT_STATUSLINE_NO_DIM as an alias for backwards-compat.

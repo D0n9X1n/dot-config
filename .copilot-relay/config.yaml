@@ -29,7 +29,7 @@ logRetentionDays: 3
 thinkEffort: max
 
 # Max seconds to wait for a single Claude request's upstream Copilot calls.
-upstreamTimeoutSeconds: 180
+upstreamTimeoutSeconds: 300
 
 # Copilot model used for bridge-managed Claude WebSearch. Empty uses gptModel.
 webSearchBackend: 

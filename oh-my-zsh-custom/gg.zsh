@@ -5,18 +5,11 @@
 # directory path so a bare `gg` session is still identifiable.
 #
 # Notes:
-# - Uses OSC 1/2 escape sequences for the title (works in WezTerm,
-#   iTerm2, and anything OSC-compliant). Inside tmux the escape
-#   doesn't reach the outer terminal because we set `allow-rename off` /
-#   `automatic-rename off` in .tmux.conf, so we also call `tmux rename-window`
-#   directly — that updates tmux's status-bar window name, and tmux's
-#   `set-titles on` then propagates "#S · #W" up to the outer terminal.
-# - For WezTerm specifically, also calls `wezterm cli set-tab-title` /
-#   `set-window-title` to keep WezTerm's internal state in sync. Guarded by
-#   `(( $+commands[wezterm] ))` and `$WEZTERM_PANE`, so it's a no-op when
-#   wezterm is just on PATH but not the active terminal.
+# - Uses OSC 1/2 escape sequences for the outer terminal title and renames the
+#   RMUX window directly so the status bar stays aligned.
 # - Sets DISABLE_AUTO_TITLE during the Copilot session so oh-my-zsh's
 #   precmd/preexec hooks don't repeatedly overwrite the title.
+# - Sends Copilot a process-scoped WezTerm/true-color identity even inside RMUX.
 # - Uses `command copilot` to bypass any shell alias of the same name.
 
 unalias gg 2>/dev/null
@@ -32,13 +25,10 @@ function gg {
   DISABLE_AUTO_TITLE=true
   print -Pn "\e]2;${title}\a"
   print -Pn "\e]1;${title}\a"
-  if [[ -n "$TMUX" ]]; then
-    command tmux rename-window -- "$title" 2>/dev/null
+  if [[ -n "$RMUX" ]] && (( $+commands[rmux] )); then
+    command rmux rename-window -- "$title" 2>/dev/null
   fi
-  if [[ -n "$WEZTERM_PANE" ]] && (( $+commands[wezterm] )); then
-    wezterm cli set-tab-title -- "$title" 2>/dev/null
-    wezterm cli set-window-title -- "$title" 2>/dev/null
-  fi
-  command copilot --allow-all-tools --allow-all-paths --model claude-opus-5 --context long_context --effort max
+  TERM_PROGRAM=WezTerm COLORTERM=truecolor FORCE_COLOR=3 \
+    command copilot --allow-all-tools --allow-all-paths --model claude-opus-5 --context long_context --effort max
   unset DISABLE_AUTO_TITLE
 }

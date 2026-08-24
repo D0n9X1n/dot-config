@@ -19,8 +19,14 @@ secret-free file is linked into `~/.copilot-relay/`, while relay tokens and logs
 remain local and must not be committed.
 
 Adding a new config means dropping a dotfile at the repo root — `install.sh`
-picks it up automatically with no manifest to update. For SonicTerm, add TOML
-under `.sonicterm/`, `.sonicterm/keymaps/`, or `.sonicterm/themes/`.
+picks it up automatically with no manifest to update. Top-level files under
+`claude/` and `copilot/` are also auto-linked. `claude/CLAUDE.md` and
+`copilot/AGENTS.md` carry coupled global Wiki/release guidance; the latter is
+activated by `COPILOT_CUSTOM_INSTRUCTIONS_DIRS` in `custom.zsh` while
+`copilot-instructions.md` remains Copilot's native global entry point.
+`.rmux.conf` is the active multiplexer profile. `archive/` is inert and never
+linked. For SonicTerm, add TOML under `.sonicterm/`, `.sonicterm/keymaps/`, or
+`.sonicterm/themes/`.
 
 The install script also handles brand-new macOS bootstrap: installs Homebrew if
 missing, installs Homebrew formulae/casks (including Claude Code via
@@ -39,23 +45,29 @@ links.
   `/subtask` and resumed agents can pass the admission boundary, ultracode is
   exempt, and workflows/agent teams use separate limits. Do not restore the
   obsolete lifecycle counter hook.
-- **WezTerm config** (`.wezterm.lua`) is Lua. It uses `wezterm.config_builder()`
-  and adapts font weight and FreeType hinting at runtime based on display DPI
-  (Retina vs non-Retina) via `window-config-reloaded` / `window-resized` events.
-- Color scheme is **GruvboxDarkHard** throughout. Tab bar colors are defined as
-  local constants at the top of the colors section — reuse those when adding
-  UI elements.
-- Tab rendering uses a custom `format-tab-title` handler with Nerd Font icons
-  mapped per process name. To add icons for new tools, extend the
-  `process_icons` table.
+- **RMUX config** (`.rmux.conf`) uses tmux command syntax but must be tested
+  against RMUX itself. Preserve `TERM_PROGRAM=rmux`, use a unique `-L` socket
+  for checks, and do not add TPM/plugin bootstrap or a global tmux shim.
+- **Archives are inert.** `archive/tmux/.tmux.conf` and
+  `archive/wezterm/wezterm.lua` are historical references, never active config.
+  SonicTerm is the managed outer terminal; this repository installs neither
+  tmux nor WezTerm.
+- **Wiki pages are bilingual and flat.** Pair every English page with a
+  `-zh-CN` page, keep one `_Sidebar.md`, use source `.md` links, and run
+  `scripts/check.sh wiki`. Browser edits are overwritten on publication.
+- Color scheme is **Gruvbox Dark Hard** throughout active RMUX, SonicTerm, and
+  statusline configuration.
+- Copilot launchers set process-scoped `TERM_PROGRAM=WezTerm`,
+  `COLORTERM=truecolor`, and `FORCE_COLOR=3` so Copilot takes its supported
+  true-color UI path. Do not set this globally: other RMUX pane programs should
+  continue to see `TERM_PROGRAM=rmux`.
 
 ## How to test changes
 
-There is no automated test suite. To verify:
-
-- **Shell/install/statusline changes**: Run `scripts/check.sh all`.
-- **install.sh behavior**: After `scripts/check.sh all`, test in a throwaway
-  directory with `HOME=/tmp/test-home ./install.sh` when the change affects
-  linking/bootstrap behavior.
-- **.wezterm.lua**: Open WezTerm — it live-reloads on save. Check the debug
-  overlay (`Ctrl+Shift+L`) for Lua errors.
+- **All local/CI checks**: Run `scripts/check.sh all`.
+- **RMUX config and retirement migration**: Run `scripts/check.sh rmux`; it
+  uses an isolated socket and tests exact legacy-link removal.
+- **Global instruction discovery/content**: Run `scripts/check.sh instructions`.
+- **Wiki source/publication graph**: Run `scripts/check.sh wiki`.
+- **install.sh behavior**: After checks pass, run `install.sh` twice and verify
+  the second run is idempotent.
