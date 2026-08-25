@@ -1027,13 +1027,21 @@ run_rmux_smoke() {
   fi
 
   (
-    local socket keys test_root first_session first_pane second_session second_pane client_pid
+    local socket keys root_keys parse_output parse_status expected_parse_output test_root first_session first_pane second_session second_pane client_pid
     socket="dot-configs-check-$$"
     test_root="$(mktemp -d)"
     trap 'rmux -L "$socket" kill-server >/dev/null 2>&1 || true; rm -rf "$test_root"' EXIT INT TERM
 
     rmux -L "$socket" -f /dev/null new-session -d -s validate -x 160 -y 48
-    rmux -L "$socket" source-file -n -v config/rmux/rmux.conf >/dev/null
+    parse_status=0
+    parse_output="$(rmux -L "$socket" source-file -n -v config/rmux/rmux.conf 2>&1)" || parse_status=$?
+    if [ "$parse_status" -ne 0 ]; then
+      expected_parse_output="$repo_root/config/rmux/rmux.conf:1: target form {mouse} is recognized but deferred until mouse event state reaches the command queue"
+      if [ "$parse_status" -ne 1 ] || [ "$parse_output" != "$expected_parse_output" ]; then
+        printf '%s\n' "$parse_output" >&2
+        return 1
+      fi
+    fi
     rmux -L "$socket" source-file config/rmux/rmux.conf
 
     [ "$(rmux -L "$socket" show-options -gv prefix)" = "C-q" ]
@@ -1047,6 +1055,11 @@ run_rmux_smoke() {
     printf '%s\n' "$keys" | grep -Eq 'Tab[[:space:]]+last-window'
     printf '%s\n' "$keys" | grep -Fq 'split-window -h -c "#{pane_current_path}"'
     printf '%s\n' "$keys" | grep -Fq 'source-file'
+    root_keys="$(rmux -L "$socket" list-keys -T root)"
+    printf '%s\n' "$root_keys" | grep -Fq 'MouseDown1Pane            select-pane -t = \; send-keys -M'
+    printf '%s\n' "$root_keys" | grep -Fq 'if-shell -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" { send-keys -M } { copy-mode -M }'
+    grep -Fq 'bind -n MouseDown1Pane { select-pane -t=; send -M }' config/rmux/rmux.conf
+    grep -Fq "bind -n MouseDrag1Pane { if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' { send -M } { copy-mode -M } }" config/rmux/rmux.conf
     if grep -Eq '(^|[[:space:]])(@plugin|run-shell|run |if-shell.*git clone)' config/rmux/rmux.conf; then
       echo "RMUX config contains a plugin or shell bootstrap" >&2
       return 1

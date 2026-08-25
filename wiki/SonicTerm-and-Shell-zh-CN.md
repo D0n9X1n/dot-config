@@ -55,6 +55,8 @@ TERM_PROGRAM=rmux
 
 只有 Copilot 子进程会收到进程级 WezTerm 兼容名称。请看 [Copilot CLI](Copilot-CLI-zh-CN.md)。
 
+RMUX 配置会明确保留条件式鼠标 bindings。Copilot 等支持鼠标的内层应用会收到完整鼠标事件流；否则拖动会进入 RMUX copy mode。Shift-drag 会绕过 mouse reporting，在 SonicTerm 本地选择文字。请看 [RMUX](RMUX-zh-CN.md)。
+
 ## Zsh 文件
 
 `config/zsh/` 下的文件安装到 `~/.oh-my-zsh/custom/`。Oh-my-zsh 按名称顺序加载它们。

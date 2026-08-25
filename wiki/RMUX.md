@@ -96,6 +96,19 @@ The [complete RMUX keymap](RMUX-Keymap.md) lists all 278 effective bindings acro
 
 The `|`, `-`, and `c` commands use `#{pane_current_path}`, so new panes and windows inherit the active working directory.
 
+## SonicTerm mouse integration
+
+SonicTerm's Copilot guide requires RMUX's conditional root mouse bindings. The tracked config pins them instead of relying on RMUX defaults:
+
+```tmux
+set -g mouse on
+bind -n MouseDown1Pane { select-pane -t=; send -M }
+bind -n MouseDrag1Pane { if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' { send -M } { copy-mode -M } }
+set -s set-clipboard on
+```
+
+`MouseDown1Pane` selects the pane and forwards the press. `MouseDrag1Pane` forwards input when RMUX is already in a pane mode or the nested application requested mouse input; otherwise RMUX starts copy mode. This lets Copilot own transcript selection and edge scrolling. Do not force every drag into RMUX copy mode. Shift-drag remains the SonicTerm-local selection fallback.
+
 ## Clipboard trust
 
 The profile uses both `copy-command 'pbcopy'` and `set-clipboard on`:
@@ -159,6 +172,8 @@ rmux -L "$socket" source-file -n -v config/rmux/rmux.conf
 rmux -L "$socket" source-file config/rmux/rmux.conf
 ```
 
+RMUX 0.10.0's parse-only pass reports the event-time `{mouse}` target as deferred and exits with status 1. `scripts/check.sh rmux` accepts only that exact diagnostic, then live-loads the config and verifies the effective bindings. Any other parse diagnostic fails the check.
+
 Within an attached session, verify `C-q`, splits, CWD inheritance, copy mode, mouse toggle, truecolor, undercurl, titles, and the Gruvbox status line.
 
 ## Troubleshooting
@@ -171,6 +186,7 @@ Within an attached session, verify `C-q`, splits, CWD inheritance, copy mode, mo
 
 ## Authoritative sources
 
+- [SonicTerm usage](https://github.com/D0n9X1n/SonicTerm/blob/main/wiki/Usage.md)
 - [RMUX v0.10.0 README](https://github.com/Helvesec/rmux/blob/v0.10.0/README.md)
 - [Human-friendly configuration](https://github.com/Helvesec/rmux/blob/v0.10.0/docs/human-friendly-config.md)
 - [Starter configuration](https://github.com/Helvesec/rmux/blob/v0.10.0/docs/examples/human-friendly.conf)

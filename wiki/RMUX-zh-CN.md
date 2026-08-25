@@ -96,6 +96,19 @@ rd main       # 删除 main
 
 `|`、`-` 和 `c` 都使用 `#{pane_current_path}`，因此新窗格和新窗口会继承当前工作目录。
 
+## SonicTerm 鼠标集成
+
+SonicTerm 的 Copilot 指南要求保留 RMUX 的条件式 root mouse bindings。受管配置会明确固定它们，不依赖 RMUX 默认值：
+
+```tmux
+set -g mouse on
+bind -n MouseDown1Pane { select-pane -t=; send -M }
+bind -n MouseDrag1Pane { if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' { send -M } { copy-mode -M } }
+set -s set-clipboard on
+```
+
+`MouseDown1Pane` 会选择 pane 并转发按下事件。`MouseDrag1Pane` 会在 RMUX 已处于 pane mode 或内层应用请求鼠标输入时转发事件；否则 RMUX 会进入 copy mode。这样 Copilot 可以自己处理会话选择与边缘滚动。不要把所有拖动强制送入 RMUX copy mode；Shift-drag 仍可作为 SonicTerm 本地选择的后备方式。
+
 ## 剪贴板信任边界
 
 当前配置同时使用 `copy-command 'pbcopy'` 和 `set-clipboard on`：
@@ -159,6 +172,8 @@ rmux -L "$socket" source-file -n -v config/rmux/rmux.conf
 rmux -L "$socket" source-file config/rmux/rmux.conf
 ```
 
+RMUX 0.10.0 的 parse-only 检查会把事件发生时才可用的 `{mouse}` target 报告为 deferred，并以状态 1 退出。`scripts/check.sh rmux` 只接受这一条明确的已知诊断，然后实际加载配置并检查生效 bindings；其它 parse 诊断都会使检查失败。
+
 在已连接会话中检查 `C-q`、分割、目录继承、复制模式、鼠标切换、真彩色、undercurl、标题和 Gruvbox 状态栏。
 
 ## 故障排查
@@ -171,6 +186,7 @@ rmux -L "$socket" source-file config/rmux/rmux.conf
 
 ## 权威资料
 
+- [SonicTerm 使用说明](https://github.com/D0n9X1n/SonicTerm/blob/main/wiki/Usage.md)
 - [RMUX v0.10.0 README](https://github.com/Helvesec/rmux/blob/v0.10.0/README.md)
 - [Human-friendly 配置说明](https://github.com/Helvesec/rmux/blob/v0.10.0/docs/human-friendly-config.md)
 - [起始配置](https://github.com/Helvesec/rmux/blob/v0.10.0/docs/examples/human-friendly.conf)

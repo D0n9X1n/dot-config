@@ -55,6 +55,8 @@ TERM_PROGRAM=rmux
 
 Only a Copilot child gets the process-scoped WezTerm compatibility name. See [Copilot CLI](Copilot-CLI.md).
 
+The RMUX config keeps its conditional mouse bindings explicit. Mouse-aware nested applications such as Copilot receive the full mouse stream; otherwise dragging starts RMUX copy mode. Shift-drag bypasses mouse reporting for a local SonicTerm selection. See [RMUX](RMUX.md).
+
 ## Zsh files
 
 Files under `config/zsh/` install into `~/.oh-my-zsh/custom/`. Oh-my-zsh loads them in name order.
