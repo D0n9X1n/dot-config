@@ -65,23 +65,5 @@
     "openDiffOnEdit": true
   },
   "effortLevel": "max",
-  "sessionSync": [
-    {
-      "origin": "D0n9X1n/nvim-config",
-      "level": "user"
-    },
-    {
-      "origin": "D0n9X1n/chatgpt-tag-highlighter",
-      "level": "user"
-    },
-    {
-      "origin": "D0n9X1n/dot-config",
-      "level": "user"
-    },
-    {
-      "origin": "*",
-      "level": "local"
-    }
-  ],
   "showReasoning": false
 }
