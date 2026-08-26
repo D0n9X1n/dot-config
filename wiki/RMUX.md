@@ -104,10 +104,11 @@ SonicTerm's Copilot guide requires RMUX's conditional root mouse bindings. The t
 set -g mouse on
 bind -n MouseDown1Pane { select-pane -t=; send -M }
 bind -n MouseDrag1Pane { if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' { send -M } { copy-mode -M } }
+bind -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-no-clear
 set -s set-clipboard on
 ```
 
-`MouseDown1Pane` selects the pane and forwards the press. `MouseDrag1Pane` forwards input when RMUX is already in a pane mode or the nested application requested mouse input; otherwise RMUX starts copy mode. This lets Copilot own transcript selection and edge scrolling. Do not force every drag into RMUX copy mode. Shift-drag remains the SonicTerm-local selection fallback.
+`MouseDown1Pane` selects the pane and forwards the press. `MouseDrag1Pane` forwards input when RMUX is already in a pane mode or the nested application requested mouse input; otherwise RMUX starts copy mode. Releasing the mouse copies RMUX-owned selections without clearing the highlight or leaving copy mode; press `q` to leave copy mode. This lets Copilot own transcript selection and edge scrolling. Do not force every drag into RMUX copy mode. Shift-drag remains the SonicTerm-local selection fallback.
 
 ## Clipboard trust
 

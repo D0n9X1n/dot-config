@@ -104,10 +104,11 @@ SonicTerm 的 Copilot 指南要求保留 RMUX 的条件式 root mouse bindings�
 set -g mouse on
 bind -n MouseDown1Pane { select-pane -t=; send -M }
 bind -n MouseDrag1Pane { if -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' { send -M } { copy-mode -M } }
+bind -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-no-clear
 set -s set-clipboard on
 ```
 
-`MouseDown1Pane` 会选择 pane 并转发按下事件。`MouseDrag1Pane` 会在 RMUX 已处于 pane mode 或内层应用请求鼠标输入时转发事件；否则 RMUX 会进入 copy mode。这样 Copilot 可以自己处理会话选择与边缘滚动。不要把所有拖动强制送入 RMUX copy mode；Shift-drag 仍可作为 SonicTerm 本地选择的后备方式。
+`MouseDown1Pane` 会选择 pane 并转发按下事件。`MouseDrag1Pane` 会在 RMUX 已处于 pane mode 或内层应用请求鼠标输入时转发事件；否则 RMUX 会进入 copy mode。释放鼠标时，RMUX 管理的选择会完成复制，但不会清除高亮或退出 copy mode；按 `q` 可退出 copy mode。这样 Copilot 可以自己处理会话选择与边缘滚动。不要把所有拖动强制送入 RMUX copy mode；Shift-drag 仍可作为 SonicTerm 本地选择的后备方式。
 
 ## 剪贴板信任边界
 

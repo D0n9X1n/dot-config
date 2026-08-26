@@ -222,7 +222,6 @@ bind-key -T copy-mode-vi Left              send-keys -X cursor-left
 bind-key -T copy-mode-vi Right             send-keys -X cursor-right
 bind-key -T copy-mode-vi MouseDown1Pane    select-pane
 bind-key -T copy-mode-vi MouseDrag1Pane    select-pane \; send-keys -X begin-selection
-bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel
 bind-key -T copy-mode-vi WheelDownPane     select-pane \; send-keys -X -N 5 scroll-down
 bind-key -T copy-mode-vi WheelUpPane       select-pane \; send-keys -X -N 5 scroll-up
 bind-key -T copy-mode-vi DoubleClick1Pane  select-pane \; send-keys -X select-word \; run-shell -d 0.3 \; send-keys -X copy-pipe-and-cancel
@@ -242,6 +241,7 @@ bind-key -T copy-mode-vi C-Up              send-keys -X scroll-up
 bind-key -T copy-mode-vi C-Down            send-keys -X scroll-down
 bind-key -T copy-mode-vi v                 send-keys -X begin-selection
 bind-key -T copy-mode-vi y                 send-keys -X copy-pipe-and-cancel
+bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-no-clear
 bind-key -T copy-mode-vi C-c               send-keys -X copy-pipe-and-cancel
 ```
 <!-- END GENERATED copy-mode-vi -->
