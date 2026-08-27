@@ -55,6 +55,8 @@ TERM_PROGRAM=rmux
 
 只有 Copilot 子进程会收到进程级 WezTerm 兼容名称。请看 [Copilot CLI](Copilot-CLI-zh-CN.md)。
 
+RMUX 会向外层 SonicTerm 客户端声明 `xterm-256color:RGB:osc7`，并保持 `set-titles` 开启。Oh My Zsh 会在每次显示提示符时发出带主机名的 OSC 7 报告，因此 RMUX 可以把活动 pane 的准确工作目录转发给 SonicTerm。这样 SonicTerm 就能按正确 pane 解析相对路径和 bare file name。修改外层终端能力后，请重载 RMUX 并 detach/reattach。
+
 RMUX 配置会明确保留条件式鼠标 bindings。Copilot 等支持鼠标的内层应用会收到完整鼠标事件流；否则拖动会进入 RMUX copy mode。Shift-drag 会绕过 mouse reporting，在 SonicTerm 本地选择文字。请看 [RMUX](RMUX-zh-CN.md)。
 
 ## Zsh 文件

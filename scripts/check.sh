@@ -1027,7 +1027,7 @@ run_rmux_smoke() {
   fi
 
   (
-    local socket keys root_keys parse_output parse_status expected_parse_output test_root first_session first_pane second_session second_pane client_pid
+    local socket keys root_keys terminal_features parse_output parse_status expected_parse_output test_root first_session first_pane second_session second_pane client_pid
     socket="dot-configs-check-$$"
     test_root="$(mktemp -d)"
     trap 'rmux -L "$socket" kill-server >/dev/null 2>&1 || true; rm -rf "$test_root"' EXIT INT TERM
@@ -1049,7 +1049,11 @@ run_rmux_smoke() {
     [ "$(rmux -L "$socket" show-options -gv history-limit)" = "100000" ]
     [ "$(rmux -L "$socket" show-options -gv base-index)" = "1" ]
     [ "$(rmux -L "$socket" show-options -gv status-position)" = "top" ]
+    [ "$(rmux -L "$socket" show-options -gv status-style)" = "bg=#141617,fg=#ebdbb2" ]
+    [ "$(rmux -L "$socket" show-options -gv set-titles)" = "on" ]
     [ "$(rmux -L "$socket" show-window-options -gv pane-base-index)" = "1" ]
+    terminal_features="$(rmux -L "$socket" show-options -gv terminal-features)"
+    printf '%s\n' "$terminal_features" | grep -Fxq 'xterm-256color:RGB:osc7'
 
     keys="$(rmux -L "$socket" list-keys -T prefix)"
     printf '%s\n' "$keys" | grep -Eq 'Tab[[:space:]]+last-window'
@@ -1116,7 +1120,7 @@ run_rmux_smoke() {
     [ "$(rmux -L "$socket" list-panes -t main -F '#{pane_id}')" = "$first_pane" ]
   )
 
-  echo "RMUX config/resume ok: C-q profile and stable main session across detach"
+  echo "RMUX config/resume ok: C-q profile, Apollo status, OSC 7 path relay, and stable main session across detach"
 }
 
 run_smoke() {

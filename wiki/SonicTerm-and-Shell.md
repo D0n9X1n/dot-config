@@ -55,6 +55,8 @@ TERM_PROGRAM=rmux
 
 Only a Copilot child gets the process-scoped WezTerm compatibility name. See [Copilot CLI](Copilot-CLI.md).
 
+RMUX advertises `xterm-256color:RGB:osc7` to its outer SonicTerm client and keeps `set-titles` enabled. Oh My Zsh emits a host-qualified OSC 7 report at each prompt, so RMUX can relay the active pane's exact working directory to SonicTerm. This lets SonicTerm resolve relative and bare file paths against the correct pane. Reload RMUX and detach/reattach after changing the outer terminal capabilities.
+
 The RMUX config keeps its conditional mouse bindings explicit. Mouse-aware nested applications such as Copilot receive the full mouse stream; otherwise dragging starts RMUX copy mode. Shift-drag bypasses mouse reporting for a local SonicTerm selection. See [RMUX](RMUX.md).
 
 ## Zsh files

@@ -6,7 +6,7 @@ Apollo is a warm dark color theme.
 
 It uses a Gruvbox Dark Hard base, warm beige ANSI white, and a dark `#141617` canvas.
 
-Apollo is reference data. `install.sh` does not install it.
+The files under `themes/apollo/` remain reference data and `install.sh` does not install them directly. The active SonicTerm theme and RMUX status bar use matching Apollo palette values from their managed configs.
 
 ## Files
 
@@ -18,8 +18,10 @@ Apollo is reference data. `install.sh` does not install it.
 | `themes/apollo/apollo.nvim.lua` | Neovim |
 | `themes/apollo/apollo-color-theme.json` | VS Code |
 | `themes/apollo/apollo.terminal.json` | Windows Terminal |
+| `config/sonicterm/themes/wezterm.toml` | Active SonicTerm theme |
+| `config/rmux/rmux.conf` | Active RMUX status bar |
 
-When a color changes, update `palette.json` and every target file.
+When a shared color changes, update `palette.json`, every reference target, and the active SonicTerm/RMUX configs that use it.
 
 ## Main colors
 
@@ -95,4 +97,4 @@ Put the object from `apollo.terminal.json` in the `schemes` array, then set a pr
 jq . themes/apollo/palette.json >/dev/null
 ```
 
-The active SonicTerm theme is separate. See [SonicTerm and shell](SonicTerm-and-Shell.md).
+The active SonicTerm and RMUX configs use Apollo values directly rather than loading files from this reference folder. See [SonicTerm and shell](SonicTerm-and-Shell.md) and [RMUX](RMUX.md).

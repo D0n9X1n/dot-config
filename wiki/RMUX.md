@@ -52,11 +52,16 @@ The profile is adapted from RMUX's v0.10.0 human-friendly example and selected c
 | History | 100000 lines |
 | Window/pane indices | Start at 1; windows renumber after close |
 | Copy mode | Vi keys; `pbcopy` plus OSC 52 |
-| Status | Top, hand-built Gruvbox Dark Hard |
+| Status | Top, hand-built Apollo palette |
 | Titles | Automatic rename off; `#S · #W` propagated outward |
 | Terminal identity | `TERM=tmux-256color`; `TERM_PROGRAM=rmux` is preserved |
+| Working directory | Active pane OSC 7 reports are relayed to SonicTerm |
 
 The config clears stale `TERMINFO`, `TERMINFO_DIRS`, and `TERMCAP` inherited by a long-lived daemon, then sets `COLORTERM=truecolor` and `FORCE_COLOR=3`. It does not clear RMUX's own `TERM_PROGRAM` identity.
+
+The status bar uses Apollo's `#141617` canvas and `#1d2021` raised surfaces, with the existing Gruvbox yellow, blue, red, and neutral accents. This matches the active SonicTerm palette without adding a tmux theme plugin.
+
+The outer `xterm-256color` capability includes `osc7`, and `set-titles` is enabled. Oh My Zsh's `omz_termsupport_cwd` hook emits a host-qualified OSC 7 report at each prompt. RMUX records that report per pane and relays the active pane's path to SonicTerm, so relative file paths resolve against the correct directory. `#{pane_current_path}` is process metadata and does not replace the shell report. After changing `terminal-features`, reload the config and detach/reattach so the client capabilities are resolved again.
 
 ## Session helpers and resume
 
@@ -175,7 +180,7 @@ rmux -L "$socket" source-file config/rmux/rmux.conf
 
 RMUX 0.10.0's parse-only pass reports the event-time `{mouse}` target as deferred and exits with status 1. `scripts/check.sh rmux` accepts only that exact diagnostic, then live-loads the config and verifies the effective bindings. Any other parse diagnostic fails the check.
 
-Within an attached session, verify `C-q`, splits, CWD inheritance, copy mode, mouse toggle, truecolor, undercurl, titles, and the Gruvbox status line.
+Within an attached session, verify `C-q`, splits, CWD inheritance, OSC 7 path relay, copy mode, mouse toggle, truecolor, undercurl, titles, and the Apollo status line.
 
 ## Troubleshooting
 

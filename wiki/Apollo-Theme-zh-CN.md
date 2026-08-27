@@ -6,7 +6,7 @@ Apollo 是暖色深色主题。
 
 它使用 Gruvbox Dark Hard 基础、暖米色 ANSI white 和深色 `#141617` 画布。
 
-Apollo 是参考数据。`install.sh` 不会安装它。
+`themes/apollo/` 下的文件仍是参考数据，`install.sh` 不会直接安装它们。当前 SonicTerm 主题与 RMUX 状态栏会在各自的受管配置中使用相同的 Apollo palette 值。
 
 ## 文件
 
@@ -18,8 +18,10 @@ Apollo 是参考数据。`install.sh` 不会安装它。
 | `themes/apollo/apollo.nvim.lua` | Neovim |
 | `themes/apollo/apollo-color-theme.json` | VS Code |
 | `themes/apollo/apollo.terminal.json` | Windows Terminal |
+| `config/sonicterm/themes/wezterm.toml` | 当前 SonicTerm 主题 |
+| `config/rmux/rmux.conf` | 当前 RMUX 状态栏 |
 
-修改颜色时，请更新 `palette.json` 和所有目标文件。
+修改共享颜色时，请更新 `palette.json`、所有参考目标，以及使用这些颜色的 SonicTerm/RMUX 受管配置。
 
 ## 主要颜色
 
@@ -95,4 +97,4 @@ config.color_scheme = "Apollo"
 jq . themes/apollo/palette.json >/dev/null
 ```
 
-当前 SonicTerm 主题是另一套配置。请看 [SonicTerm 与 Shell](SonicTerm-and-Shell-zh-CN.md)。
+当前 SonicTerm 与 RMUX 配置会直接使用 Apollo 值，而不是加载此参考文件夹。请看 [SonicTerm 与 Shell](SonicTerm-and-Shell-zh-CN.md)和 [RMUX](RMUX-zh-CN.md)。

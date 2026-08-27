@@ -52,11 +52,16 @@ RMUX 使用 tmux 命令语法，不是 JSON、YAML 或 TOML。配置可以执行
 | 历史 | 100000 行 |
 | 窗口/窗格编号 | 从 1 开始；关闭窗口后自动重排 |
 | 复制模式 | Vi 按键；`pbcopy` 加 OSC 52 |
-| 状态栏 | 顶部、手工 Gruvbox Dark Hard 配色 |
+| 状态栏 | 顶部、手工 Apollo 配色 |
 | 标题 | 禁用自动重命名；向外传播 `#S · #W` |
 | 终端身份 | `TERM=tmux-256color`；保留 `TERM_PROGRAM=rmux` |
+| 工作目录 | 把活动 pane 的 OSC 7 报告转发给 SonicTerm |
 
 配置会清除守护进程可能继承的陈旧 `TERMINFO`、`TERMINFO_DIRS` 和 `TERMCAP`，然后设置 `COLORTERM=truecolor` 与 `FORCE_COLOR=3`。它不会清除 RMUX 自己的 `TERM_PROGRAM` 身份。
+
+状态栏使用 Apollo 的 `#141617` canvas 和 `#1d2021` raised surface，同时保留现有的 Gruvbox 黄、蓝、红和中性色 accents。这样可以匹配当前 SonicTerm palette，而不需要添加 tmux theme plugin。
+
+外层 `xterm-256color` 能力包含 `osc7`，并且已启用 `set-titles`。Oh My Zsh 的 `omz_termsupport_cwd` hook 会在每次显示提示符时发出带主机名的 OSC 7 报告。RMUX 按 pane 记录该报告，并把活动 pane 的路径转发给 SonicTerm，因此相对文件路径会按正确目录解析。`#{pane_current_path}` 是进程 metadata，不能代替 shell 报告。修改 `terminal-features` 后，请重载配置并 detach/reattach，让客户端重新解析能力。
 
 ## 会话助手与恢复
 
@@ -175,7 +180,7 @@ rmux -L "$socket" source-file config/rmux/rmux.conf
 
 RMUX 0.10.0 的 parse-only 检查会把事件发生时才可用的 `{mouse}` target 报告为 deferred，并以状态 1 退出。`scripts/check.sh rmux` 只接受这一条明确的已知诊断，然后实际加载配置并检查生效 bindings；其它 parse 诊断都会使检查失败。
 
-在已连接会话中检查 `C-q`、分割、目录继承、复制模式、鼠标切换、真彩色、undercurl、标题和 Gruvbox 状态栏。
+在已连接会话中检查 `C-q`、分割、目录继承、OSC 7 路径转发、复制模式、鼠标切换、真彩色、undercurl、标题和 Apollo 状态栏。
 
 ## 故障排查
 
