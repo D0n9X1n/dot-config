@@ -8,6 +8,7 @@ scripts_root="${repo_root}/scripts"
 manifest="${config_root}/manifest.tsv"
 timestamp="$(date +"%Y%m%d%H%M%S")"
 install_log="${DOT_CONFIGS_INSTALL_LOG:-${HOME}/Library/Logs/dot-configs-install.log}"
+source "${scripts_root}/apollo-theme.sh"
 RED="$(printf '\033[31m')"
 BOLD="$(printf '\033[1m')"
 RESET="$(printf '\033[0m')"
@@ -689,6 +690,18 @@ backup_path() {
   fi
 }
 
+backup_path_once() {
+  local path="$1"
+  local backup="${path}.bak.${timestamp}"
+  if [ -e "$backup" ] || [ -L "$backup" ]; then
+    return 0
+  fi
+  if [ -e "$path" ] || [ -L "$path" ]; then
+    cp -pP "$path" "$backup" || return 1
+    prune_old_backups "$path" 1
+  fi
+}
+
 prune_old_backups() {
   local path="$1"
   local keep="${2:-1}"
@@ -985,10 +998,13 @@ else
 fi
 
 validate_manifest
+install_apollo_themes
 link_manifest_files
 remove_repo_symlink "${HOME}/.gitignore" "${repo_root}/.gitignore" "old global Git ignore"
 remove_repo_symlink "${HOME}/.tmux.conf" "${repo_root}/.tmux.conf" "tmux config"
 remove_repo_symlink "${HOME}/.wezterm.lua" "${repo_root}/wezterm/wezterm.lua" "WezTerm config"
+remove_repo_symlink "${HOME}/.sonicterm/themes/wezterm.toml" \
+  "${repo_root}/config/sonicterm/themes/wezterm.toml" "SonicTerm WezTerm theme"
 remove_legacy_claude_subagent_hook
 
 echo "Linked active config from $manifest"
@@ -1042,10 +1058,14 @@ if have_cmd jq && [ -f "$copilot_mcp" ]; then
     if [ -f "$claude_user_json" ]; then
       if jq --argjson src "$src_mcp_json" '.mcpServers = $src' \
           "$claude_user_json" >"$tmp_user"; then
-        backup_path "$claude_user_json"
-        mv "$tmp_user" "$claude_user_json"
-        chmod 600 "$claude_user_json"
-        echo "Imported $(echo "$src_mcp_json" | jq 'length') MCP servers into $claude_user_json (from $copilot_mcp)"
+        if ! backup_path_once "$claude_user_json"; then
+          rm -f "$tmp_user"
+          echo "Warning: failed to back up $claude_user_json; MCP import skipped"
+        else
+          mv "$tmp_user" "$claude_user_json"
+          chmod 600 "$claude_user_json"
+          echo "Imported $(echo "$src_mcp_json" | jq 'length') MCP servers into $claude_user_json (from $copilot_mcp)"
+        fi
       else
         rm -f "$tmp_user"
         echo "Warning: jq merge into $claude_user_json failed; MCP import skipped"

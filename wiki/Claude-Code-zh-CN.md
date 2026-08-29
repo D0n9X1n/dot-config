@@ -59,7 +59,7 @@ Sonnet 和 Opus 是两个模型家族。任务只要求修改一个家族时，�
 | `effortLevel` | `max` |
 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `16` |
 | `statusLine.refreshInterval` | `100` |
-| `theme` | `dark-ansi` |
+| UI 主题 | 本机 `custom:apollo`，在 `~/.claude.json` 中选择 |
 | `autoCompactWindow` | `800000` |
 
 `refreshInterval` 必须放在 `statusLine` 里面。
@@ -67,7 +67,9 @@ Sonnet 和 Opus 是两个模型家族。任务只要求修改一个家族时，�
 `~/.claude/settings.json` 和 `~/.claude.json` 是不同文件：
 
 - `settings.json` 是链接的配置。
-- `~/.claude.json` 是本机状态。它保存 onboarding、API key 允许项、项目数据和导入的 MCP servers。
+- `~/.claude.json` 是本机状态。它保存 onboarding、API key 允许项、选中的 Apollo 主题、项目数据和导入的 MCP servers。
+
+`install.sh` 会从已验证的规范 Apollo release 生成 `~/.claude/themes/apollo.json`，并在选择 `custom:apollo` 时保留所有无关字段。生成主题是本机状态，不是 Git 源文件。
 
 不要把本机状态文件放进 Git。
 
@@ -102,7 +104,7 @@ Sonnet 和 Opus 是两个模型家族。任务只要求修改一个家族时，�
 
 ## 状态栏
 
-Claude 与 Copilot 状态栏共享五行布局、Gruvbox 颜色和每目录五秒 Git cache：
+Claude 与 Copilot 状态栏共享五行布局、本机生成的 Apollo 颜色和每目录五秒 Git cache：
 
 1. 时间、运行时间、费用、WakaTime
 2. 模型、effort、context
@@ -110,7 +112,7 @@ Claude 与 Copilot 状态栏共享五行布局、Gruvbox 颜色和每目录五�
 4. 当前路径
 5. repo、branch、diff、stash、worktree
 
-Claude 自定义状态栏没有 live-subagent 数量或树。Claude Code 已有原生 subagent UI。Copilot 保留自定义 rows。
+两个脚本读取同一个本机生成 Apollo 颜色 include。文件缺失或禁用颜色时，它们仍会输出可读的无色内容。Claude 自定义状态栏没有 live-subagent 数量或树，因为 Claude Code 已有原生 subagent UI。Copilot 保留自定义 rows。
 
 ## Plugins
 

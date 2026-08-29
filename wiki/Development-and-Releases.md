@@ -61,6 +61,8 @@ Focused checks:
 
 ```sh
 scripts/check.sh smoke
+scripts/check.sh apollo
+scripts/check.sh apollo-online
 scripts/check.sh shellcheck
 scripts/check.sh instructions
 scripts/check.sh wiki
@@ -71,6 +73,8 @@ CI uses the same script:
 
 - macOS runs smoke checks and installs RMUX;
 - Ubuntu installs ShellCheck and runs the ShellCheck target.
+
+Ordinary checks do not access the network. `apollo-online` is a maintainer-only check that downloads every pinned upstream file and verifies its SHA-256. Run it whenever `scripts/apollo-releases.tsv` changes.
 
 Do not push while checks are red.
 

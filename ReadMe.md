@@ -12,12 +12,11 @@ My macOS config for RMUX, SonicTerm, zsh, Claude Code, and GitHub Copilot CLI.
 ```text
 config/   config used now
 archive/  old config; never installed
-scripts/  code that runs
-themes/   color files
+scripts/  code and release pins
 wiki/     full help
 ```
 
-`install.sh` reads `config/manifest.tsv`. It installs only listed files.
+`install.sh` links tracked files from `config/manifest.tsv` and installs verified Apollo runtime assets.
 
 ## Install
 

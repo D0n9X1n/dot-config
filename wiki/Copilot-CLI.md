@@ -12,7 +12,7 @@ Copilot CLI files live under `config/copilot/`. They install under `~/.copilot/`
 model:       claude-opus-5
 context:     long_context
 effort:      max
-theme:       dark
+theme:       default (terminal Base-16)
 keep alive:  busy
 streaming:   on
 ```
@@ -44,7 +44,7 @@ COLORTERM=truecolor
 FORCE_COLOR=3
 ```
 
-This turns on Copilot's supported true-color UI. It does not install or run WezTerm. Other programs still see `SonicTerm` or `rmux`.
+This turns on Copilot's supported terminal path. The managed `default` theme uses the terminal's Base-16 colors, so it inherits SonicTerm's Apollo ANSI palette. It does not install or run WezTerm. Other programs still see `SonicTerm` or `rmux`.
 
 ## Launch commands
 
@@ -59,7 +59,7 @@ gg my-project    # titled, unrestricted Copilot session
 
 ## Status line
 
-The Copilot status line shares the five-line layout and Gruvbox palette with Claude:
+The Copilot status line shares the five-line layout and locally generated Apollo colors with Claude:
 
 1. time, run time, requests, WakaTime
 2. model, effort, context
@@ -67,7 +67,7 @@ The Copilot status line shares the five-line layout and Gruvbox palette with Cla
 4. current path
 5. repo, branch, diff, stash, worktree
 
-It reads session JSON with one `jq` call. Git data is cached for five seconds per working directory. GitHub auth data is cached for five minutes.
+It reads session JSON with one `jq` call. Both provider status scripts source the same generated Apollo color include and fall back to readable uncolored output when it is absent. Git data is cached for five seconds per working directory. GitHub auth data is cached for five minutes.
 
 Useful environment switches:
 

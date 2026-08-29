@@ -2,99 +2,80 @@
 
 English | [简体中文](Apollo-Theme-zh-CN.md)
 
-Apollo is a warm dark color theme.
+Apollo is the shared theme for the active terminal, multiplexer, shell, CLI status lines, and file listings.
 
-It uses a Gruvbox Dark Hard base, warm beige ANSI white, and a dark `#141617` canvas.
+The canonical palette and application adapters live in the [Apollo Theme organization](https://github.com/apollo-theme). This repository does not store palette values or generated theme artifacts.
 
-The files under `themes/apollo/` remain reference data and `install.sh` does not install them directly. The active SonicTerm theme and RMUX status bar use matching Apollo palette values from their managed configs.
+## Active surfaces
 
-## Files
-
-| File | Target |
+| Surface | Source |
 |---|---|
-| `themes/apollo/palette.json` | Machine-readable color source |
-| `themes/apollo/apollo.lua` | WezTerm |
-| `themes/apollo/apollo.vim` | Vim |
-| `themes/apollo/apollo.nvim.lua` | Neovim |
-| `themes/apollo/apollo-color-theme.json` | VS Code |
-| `themes/apollo/apollo.terminal.json` | Windows Terminal |
-| `config/sonicterm/themes/wezterm.toml` | Active SonicTerm theme |
-| `config/rmux/rmux.conf` | Active RMUX status bar |
+| SonicTerm | Tagged `sonicterm-apollo-theme` release asset |
+| RMUX | Tagged `rmux-apollo-theme` release asset |
+| eza | Tagged `eza-apollo-theme` release asset |
+| Claude Code UI | Generated locally from the tagged canonical palette |
+| Claude and Copilot status lines | One local include generated from the tagged canonical palette |
+| Oh My Zsh prompt | Structure in this repo; colors generated locally |
+| fast-syntax-highlighting | Its Base16 theme, using the terminal ANSI palette |
+| Copilot CLI UI | Built-in `default` theme, using the terminal ANSI palette |
 
-When a shared color changes, update `palette.json`, every reference target, and the active SonicTerm/RMUX configs that use it.
+Neovim is managed in a different repository. This installer does not modify Neovim config, plugins, or runtime state.
 
-## Main colors
+## Release lock
 
-| Role | Hex |
-|---|---|
-| Background | `#141617` |
-| Foreground | `#ebdbb2` |
-| Cursor | `#ebdbb2` |
-| Selection background | `#3c3836` |
-| Dim text | `#928374` |
-| Text | `#d5c4a1` |
-| Accent | `#fabd2f` |
+`scripts/apollo-releases.tsv` pins each upstream repository, tag, artifact, and SHA-256. Child projects have independent versions; do not infer their tags from the canonical palette release.
 
-ANSI 0–7:
+The installer downloads exact tagged files. It does not follow `main` or query `latest`. An online maintainer check verifies published bytes:
+
+```sh
+scripts/check.sh apollo-online
+```
+
+Ordinary `scripts/check.sh all` remains offline.
+
+## Local bundle
+
+Verified files live under:
 
 ```text
-#1d2021 #cc241d #98971a #d79921 #458588 #b16286 #689d6a #d4be98
+~/.local/share/dot-configs/apollo/
+  blobs/
+  sets/
+  current -> sets/<bundle-hash>
+  fsh/
 ```
 
-Bright 8–15:
+The bundle hash covers the release lock and adapter code. The installer verifies every download before creating a complete set, then switches `current` only after all release files and generated adapters validate. A valid bundle works offline. A failed download or checksum leaves the previous bundle active.
+
+Installed consumers link to `current`:
 
 ```text
-#928374 #fb4934 #b8bb26 #fabd2f #83a598 #d3869b #8ec07c #ebdbb2
+~/.sonicterm/themes/apollo.toml
+~/.config/rmux-apollo-theme/apollo-rmux.conf
+~/.config/eza-apollo-theme/theme.yml
+~/.claude/themes/apollo.json
 ```
 
-## Vim
+Generated runtime files are local state. Do not commit them.
 
-```sh
-mkdir -p ~/.vim/colors
-ln -sf "$PWD/themes/apollo/apollo.vim" ~/.vim/colors/apollo.vim
-```
+## Updates
 
-Then add:
+To update Apollo:
 
-```vim
-colorscheme apollo
-```
+1. Review the new release in its Apollo repository.
+2. Change only that row in `scripts/apollo-releases.tsv`.
+3. Update its SHA-256.
+4. Run `scripts/check.sh apollo-online`.
+5. Run `scripts/check.sh all`.
+6. Run `./install.sh` twice.
+7. Reload SonicTerm and RMUX, then start new Claude and Copilot sessions.
 
-## Neovim
+Do not copy colors from upstream into config, scripts, or Wiki pages.
 
-```sh
-mkdir -p ~/.config/nvim/colors
-ln -sf "$PWD/themes/apollo/apollo.nvim.lua" ~/.config/nvim/colors/apollo.lua
-```
+## Safe cleanup
 
-Then use:
+The old `themes/apollo/` copies are gone. The installer removes the former SonicTerm `wezterm.toml` only when it is the exact symlink previously managed by this repository.
 
-```lua
-vim.cmd('colorscheme apollo')
-```
+Manual Vim, Neovim, VS Code, Windows Terminal, or WezTerm theme files are user-owned and are never removed.
 
-## WezTerm reference
-
-The WezTerm app is not managed by this repo. To use the old reference theme manually:
-
-```lua
-local apollo = dofile("/path/to/themes/apollo/apollo.lua")
-config.color_schemes = { Apollo = apollo }
-config.color_scheme = "Apollo"
-```
-
-## VS Code
-
-Put `apollo-color-theme.json` in a local VS Code theme extension, then select `Apollo` as the workbench color theme.
-
-## Windows Terminal
-
-Put the object from `apollo.terminal.json` in the `schemes` array, then set a profile's `colorScheme` to `Apollo`.
-
-## Check
-
-```sh
-jq . themes/apollo/palette.json >/dev/null
-```
-
-The active SonicTerm and RMUX configs use Apollo values directly rather than loading files from this reference folder. See [SonicTerm and shell](SonicTerm-and-Shell.md) and [RMUX](RMUX.md).
+See [SonicTerm and shell](SonicTerm-and-Shell.md), [RMUX](RMUX.md), and [Development and releases](Development-and-Releases.md).

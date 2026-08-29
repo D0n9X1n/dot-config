@@ -10,8 +10,8 @@
 #   - Put named keymaps in "~/.sonicterm/keymaps/<name>.toml" and set keymap = "<name>"
 #   - Or set keymap = "/absolute/path/to/keymap.toml"
 
-# Active color theme. Bundled themes live in assets/themes/.
-theme = "wezterm"
+# Active color theme. install.sh links the pinned Apollo release locally.
+theme = "apollo"
 
 # Active keymap. The default is platform-specific:
 #   macOS   -> sonicterm-macos

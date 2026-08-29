@@ -46,6 +46,7 @@ run_shellcheck() {
     -o -name '*.ksh' \
     -o -name 'suid_profile' \
     -o -name '*.zsh' \
+    -o -name '*.zsh-theme' \
     -o -name '.zlogin' \
     -o -name 'zlogin' \
     -o -name '.zlogout' \
@@ -72,7 +73,7 @@ run_zsh_syntax() {
   command -v zsh >/dev/null 2>&1 || return 0
   while IFS= read -r file; do
     zsh -n "$file"
-  done < <(find config/zsh -maxdepth 1 -type f -name '*.zsh' -print | sort)
+  done < <(find config/zsh -type f \( -name '*.zsh' -o -name '*.zsh-theme' \) -print | sort)
 }
 
 run_subagent_smoke() {
@@ -380,7 +381,7 @@ run_wiki_smoke() {
 
   [ ! -e QUICKREF.md ]
   [ ! -e claude/README.md ]
-  [ ! -e themes/apollo/PALETTE.md ]
+  [ ! -e themes ]
   [ ! -e wiki/Operations.md ]
   [ ! -e wiki/Operations-zh-CN.md ]
 
@@ -394,7 +395,7 @@ run_wiki_smoke() {
   grep -Fq 'GitHub Release' ReadMe.md
 
   if grep -RFn 'QUICKREF.md' .claude/CLAUDE.md .github/copilot-instructions.md \
-      config/claude config/copilot wiki ReadMe.md archive themes; then
+      config/claude config/copilot wiki ReadMe.md archive; then
     echo "retired QUICKREF.md is still referenced" >&2
     return 1
   fi
@@ -500,32 +501,6 @@ run_wiki_smoke() {
   rm -rf "$transformed"
   transformed=""
   trap - RETURN
-
-  jq -e '
-    .colors.background == "#141617" and
-    .colors.foreground == "#ebdbb2" and
-    (.ansi | length) == 8 and
-    (.bright | length) == 8
-  ' themes/apollo/palette.json >/dev/null
-  (
-    local palette_colors file color
-    palette_colors="$(jq -r '[.colors[]],.ansi,.bright | flatten | unique[]' \
-      themes/apollo/palette.json | tr '[:upper:]' '[:lower:]' | sort -u)"
-    for file in \
-      themes/apollo/apollo.lua \
-      themes/apollo/apollo.vim \
-      themes/apollo/apollo.nvim.lua \
-      themes/apollo/apollo-color-theme.json \
-      themes/apollo/apollo.terminal.json; do
-      while IFS= read -r color; do
-        printf '%s\n' "$palette_colors" | grep -Fxq "$color" || {
-          echo "$file uses a color missing from palette.json: $color" >&2
-          return 1
-        }
-      done < <(grep -Eio '#[0-9a-fA-F]{6}' "$file" |
-        tr '[:upper:]' '[:lower:]' | sort -u)
-    done
-  )
 
   grep -Fq 'bash scripts/wiki-publish.sh' .github/workflows/publish-wiki.yml
   if grep -Eq 'git clone|sed -i|find wiki-repo|git push' .github/workflows/publish-wiki.yml; then
@@ -1027,9 +1002,20 @@ run_rmux_smoke() {
   fi
 
   (
-    local socket keys root_keys terminal_features parse_output parse_status expected_parse_output test_root first_session first_pane second_session second_pane client_pid
+    local socket keys root_keys terminal_features parse_output parse_status expected_parse_output test_root test_home first_session first_pane second_session second_pane client_pid
     socket="dot-configs-check-$$"
     test_root="$(mktemp -d)"
+    test_home="$test_root/home"
+    mkdir -p "$test_home/.config/rmux-apollo-theme"
+    cat >"$test_home/.config/rmux-apollo-theme/apollo-rmux.conf" <<'RMUX_THEME'
+set-option -g status-style "bg=default,fg=default"
+set-option -g status-left-style "bg=default,fg=default,bold"
+set-window-option -g window-status-current-style "bg=default,fg=default,bold"
+set-option -g pane-active-border-style "fg=default"
+set-option -g message-style "bg=default,fg=default,bold"
+set-window-option -g mode-style "bg=default,fg=default,bold"
+RMUX_THEME
+    export HOME="$test_home"
     trap 'rmux -L "$socket" kill-server >/dev/null 2>&1 || true; rm -rf "$test_root"' EXIT INT TERM
 
     rmux -L "$socket" -f /dev/null new-session -d -s validate -x 160 -y 48
@@ -1049,7 +1035,9 @@ run_rmux_smoke() {
     [ "$(rmux -L "$socket" show-options -gv history-limit)" = "100000" ]
     [ "$(rmux -L "$socket" show-options -gv base-index)" = "1" ]
     [ "$(rmux -L "$socket" show-options -gv status-position)" = "top" ]
-    [ "$(rmux -L "$socket" show-options -gv status-style)" = "bg=#141617,fg=#ebdbb2" ]
+    [ "$(rmux -L "$socket" show-options -gv status-style)" = "bg=default,fg=default" ]
+    [ "$(rmux -L "$socket" show-options -gv pane-active-border-style)" = "fg=default" ]
+    [ "$(rmux -L "$socket" show-window-options -gv mode-style)" = "bg=default,fg=default,bold" ]
     [ "$(rmux -L "$socket" show-options -gv set-titles)" = "on" ]
     [ "$(rmux -L "$socket" show-window-options -gv pane-base-index)" = "1" ]
     terminal_features="$(rmux -L "$socket" show-options -gv terminal-features)"
@@ -1123,8 +1111,260 @@ run_rmux_smoke() {
   echo "RMUX config/resume ok: C-q profile, Apollo status, OSC 7 path relay, and stable main session across detach"
 }
 
+run_apollo_smoke() {
+  local test_root fixtures fake_bin test_home lock bad_lock first_current curl_count_before curl_count_after out
+
+  [ -f scripts/apollo-releases.tsv ]
+  [ -f scripts/apollo-theme.sh ]
+  [ ! -d themes/apollo ]
+  [ ! -f config/sonicterm/themes/wezterm.toml ]
+  grep -Fq 'theme = "apollo"' config/sonicterm/sonicterm.toml
+  grep -Fq 'apollo-rmux.conf' config/rmux/rmux.conf
+  grep -Fq 'EZA_CONFIG_DIR' config/zsh/custom.zsh
+  grep -Fq 'ZSH_THEME=apollo' config/zsh/custom.zsh
+  grep -Fq 'FAST_WORK_DIR' config/zsh/custom.zsh
+  grep -Fq $'link\tconfig/zsh/themes/apollo.zsh-theme\t.oh-my-zsh/custom/themes/apollo.zsh-theme' config/manifest.tsv
+  jq -e 'has("theme") | not' config/claude/settings.json >/dev/null
+  jq -e '.theme == "default"' config/copilot/settings.json >/dev/null
+
+  if grep -En '#[0-9a-fA-F]{6}|38;2;|48;2;' \
+      config/rmux/rmux.conf \
+      config/claude/statusline.sh \
+      config/copilot/statusline.sh \
+      config/zsh/themes/apollo.zsh-theme; then
+    echo "tracked active theme consumers contain embedded palette colors" >&2
+    return 1
+  fi
+
+  test_root="$(mktemp -d)"
+  trap 'rm -rf "${test_root:-}"' RETURN
+  fixtures="$test_root/fixtures"
+  fake_bin="$test_root/bin"
+  test_home="$test_root/home"
+  lock="$test_root/releases.tsv"
+  bad_lock="$test_root/releases-bad.tsv"
+  mkdir -p "$fixtures" "$fake_bin" "$test_home/.claude" "$test_home/.sonicterm/themes"
+
+  python3 - "$fixtures/palette.json" <<'PY'
+import json
+import sys
+
+color = lambda value: f"#{value:06x}"
+colors = {
+    "background": color(1),
+    "surface": color(2),
+    "surfaceHover": color(3),
+    "selection": color(4),
+    "foreground": color(5),
+    "foregroundSecondary": color(6),
+    "foregroundInactive": color(7),
+    "foregroundBright": color(8),
+    "accent": color(9),
+    "danger": color(10),
+    "success": color(11),
+    "info": color(12),
+    "magenta": color(13),
+    "cyan": color(14),
+    "ansiBrightBlack": color(15),
+}
+palette = {
+    "schemaVersion": 1,
+    "id": "apollo",
+    "name": "Apollo",
+    "appearance": "dark",
+    "colors": colors,
+    "roles": {
+        "canvas": "{colors.background}",
+        "textPrimary": "{colors.foreground}",
+        "textSecondary": "{colors.foregroundSecondary}",
+        "textInactive": "{colors.foregroundInactive}",
+        "focus": "{colors.accent}",
+        "error": "{colors.danger}",
+        "warning": "{colors.accent}",
+        "success": "{colors.success}",
+        "information": "{colors.info}",
+    },
+    "terminal": {
+        "foreground": colors["foreground"],
+        "background": colors["background"],
+        "cursor": colors["accent"],
+        "cursorText": colors["background"],
+        "selection": {"color": colors["selection"], "alpha": 0.5, "foregroundMode": "preserve"},
+        "ansi": [color(value) for value in range(16, 24)],
+        "bright": [color(value) for value in range(24, 32)],
+    },
+}
+with open(sys.argv[1], "w", encoding="utf-8") as handle:
+    json.dump(palette, handle, separators=(",", ":"))
+    handle.write("\n")
+PY
+  printf 'name = "Apollo"\n' >"$fixtures/apollo.toml"
+  printf 'set-option -g status-style "bg=default,fg=default"\n' >"$fixtures/apollo-rmux.conf"
+  printf 'colourful: true\n' >"$fixtures/theme.yml"
+
+  {
+    printf '# id\tkind\trepository\ttag\tartifact\tsha256\n'
+    printf 'palette\traw\texample/apollo-theme\tv1.0.0\tpalette/apollo.json\t%s\n' "$(shasum -a 256 "$fixtures/palette.json" | awk '{print $1}')"
+    printf 'sonicterm\trelease\texample/sonicterm-apollo-theme\tv1.0.0\tapollo.toml\t%s\n' "$(shasum -a 256 "$fixtures/apollo.toml" | awk '{print $1}')"
+    printf 'rmux\trelease\texample/rmux-apollo-theme\tv1.0.0\tapollo-rmux.conf\t%s\n' "$(shasum -a 256 "$fixtures/apollo-rmux.conf" | awk '{print $1}')"
+    printf 'eza\trelease\texample/eza-apollo-theme\tv1.0.0\ttheme.yml\t%s\n' "$(shasum -a 256 "$fixtures/theme.yml" | awk '{print $1}')"
+  } >"$lock"
+
+  cat >"$fake_bin/curl" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+url=""
+out=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -o) out=$2; shift 2 ;;
+    http*) url=$1; shift ;;
+    *) shift ;;
+  esac
+done
+printf '%s\n' "$url" >>"$APOLLO_TEST_CURL_LOG"
+case "$url" in
+  */palette/apollo.json) source_file="$APOLLO_TEST_FIXTURES/palette.json" ;;
+  */apollo.toml) source_file="$APOLLO_TEST_FIXTURES/apollo.toml" ;;
+  */apollo-rmux.conf) source_file="$APOLLO_TEST_FIXTURES/apollo-rmux.conf" ;;
+  */theme.yml) source_file="$APOLLO_TEST_FIXTURES/theme.yml" ;;
+  *) exit 22 ;;
+esac
+cp "$source_file" "$out"
+SH
+  chmod +x "$fake_bin/curl"
+  printf '{"keep":true}\n' >"$test_home/.claude.json"
+  printf 'user theme\n' >"$test_home/.sonicterm/themes/apollo.toml"
+
+  (
+    export HOME="$test_home"
+    export PATH="$fake_bin:$PATH"
+    export APOLLO_RELEASES_FILE="$lock"
+    export APOLLO_ROOT="$test_home/.local/share/dot-configs/apollo"
+    export APOLLO_TEST_FIXTURES="$fixtures"
+    export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+    export APOLLO_SKIP_FSH=1
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    timestamp="20000101000000"
+    apollo_validate_lock "$APOLLO_RELEASES_FILE"
+    install_apollo_themes
+    printf '{"keep":true,"theme":"custom:apollo","second":true}\n' >"$test_home/.claude.json.next"
+    backup_path_once "$test_home/.claude.json"
+    mv "$test_home/.claude.json.next" "$test_home/.claude.json"
+  )
+
+  jq -e '.keep == true and (has("theme") | not)' \
+    "$test_home/.claude.json.bak.20000101000000" >/dev/null
+  jq -e '.theme == "custom:apollo" and .second == true' "$test_home/.claude.json" >/dev/null
+  [ -L "$test_home/.local/share/dot-configs/apollo/current" ]
+  first_current="$(readlink "$test_home/.local/share/dot-configs/apollo/current")"
+  mkdir -p "$test_root/blocked-home"
+  printf 'blocked\n' >"$test_root/blocked-home/.sonicterm"
+  printf 'adapter-v2\n' >"$test_root/adapter-v2"
+  if (
+    export HOME="$test_root/blocked-home"
+    export PATH="$fake_bin:$PATH"
+    export APOLLO_RELEASES_FILE="$lock"
+    export APOLLO_ROOT="$test_home/.local/share/dot-configs/apollo"
+    export APOLLO_THEME_SCRIPT="$test_root/adapter-v2"
+    export APOLLO_TEST_FIXTURES="$fixtures"
+    export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+    export APOLLO_SKIP_FSH=1
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    install_apollo_themes
+  ) >/dev/null 2>&1; then
+    echo "Apollo activation unexpectedly succeeded with a blocked consumer path" >&2
+    return 1
+  fi
+  [ "$(readlink "$test_home/.local/share/dot-configs/apollo/current")" = "$first_current" ]
+
+  mkdir -p "$test_home/.local/share/dot-configs/apollo/sets/switch-test"
+  (
+    export HOME="$test_home"
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    apollo_switch_current "$test_home/.local/share/dot-configs/apollo" "sets/switch-test"
+  )
+  [ "$(readlink "$test_home/.local/share/dot-configs/apollo/current")" = "sets/switch-test" ]
+  (
+    export HOME="$test_home"
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    apollo_switch_current "$test_home/.local/share/dot-configs/apollo" "$first_current"
+  )
+  [ "$(readlink "$test_home/.local/share/dot-configs/apollo/current")" = "$first_current" ]
+  [ -L "$test_home/.sonicterm/themes/apollo.toml" ]
+  grep -Fq 'user theme' "$test_home/.sonicterm/themes/apollo.toml.bak."*
+  [ -L "$test_home/.config/rmux-apollo-theme/apollo-rmux.conf" ]
+  [ -L "$test_home/.config/eza-apollo-theme/theme.yml" ]
+  [ -L "$test_home/.claude/themes/apollo.json" ]
+  jq -e '.keep == true and .theme == "custom:apollo"' "$test_home/.claude.json" >/dev/null
+  jq -e '
+    .name == "Apollo" and
+    .base == "dark-ansi" and
+    (.overrides | type == "object") and
+    .overrides.diffAdded == "#000004" and
+    .overrides.diffRemoved == "#000003" and
+    .overrides.diffAddedDimmed == "#000003" and
+    .overrides.diffRemovedDimmed == "#000002" and
+    .overrides.diffAddedWord == "#000005" and
+    .overrides.diffRemovedWord == "#000004" and
+    .overrides.diffAdded != .overrides.success and
+    .overrides.diffRemoved != .overrides.error
+  ' "$test_home/.claude/themes/apollo.json" >/dev/null
+  bash -n "$test_home/.local/share/dot-configs/apollo/current/generated/statusline-colors.sh"
+  zsh -n "$test_home/.local/share/dot-configs/apollo/current/generated/zsh-colors.zsh"
+
+  curl_count_before="$(wc -l <"$test_root/curl.log" | tr -d ' ')"
+  (
+    export HOME="$test_home"
+    export PATH="$fake_bin:$PATH"
+    export APOLLO_RELEASES_FILE="$lock"
+    export APOLLO_ROOT="$test_home/.local/share/dot-configs/apollo"
+    export APOLLO_TEST_FIXTURES="$fixtures"
+    export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+    export APOLLO_SKIP_FSH=1
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    install_apollo_themes
+  )
+  curl_count_after="$(wc -l <"$test_root/curl.log" | tr -d ' ')"
+  [ "$curl_count_before" = "$curl_count_after" ]
+  [ "$first_current" = "$(readlink "$test_home/.local/share/dot-configs/apollo/current")" ]
+  [ "$(find "$test_home/.sonicterm/themes" -name 'apollo.toml.bak.*' | wc -l | tr -d ' ')" = "1" ]
+
+  awk -F '\t' 'BEGIN { OFS="\t" } $1 == "palette" { $6 = "0000000000000000000000000000000000000000000000000000000000000000" } { print }' \
+    "$lock" >"$bad_lock"
+  if (
+    export HOME="$test_home"
+    export PATH="$fake_bin:$PATH"
+    export APOLLO_RELEASES_FILE="$bad_lock"
+    export APOLLO_ROOT="$test_home/.local/share/dot-configs/apollo"
+    export APOLLO_TEST_FIXTURES="$fixtures"
+    export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+    export APOLLO_SKIP_FSH=1
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    install_apollo_themes
+  ) >/dev/null 2>&1; then
+    echo "Apollo installer accepted a checksum mismatch" >&2
+    return 1
+  fi
+  [ "$first_current" = "$(readlink "$test_home/.local/share/dot-configs/apollo/current")" ]
+
+  out="$(printf '{}' | HOME="$test_home" bash config/claude/statusline.sh)"
+  printf '%s' "$out" | grep -q $'\033\[38;2;'
+  out="$(printf '{}' | HOME="$test_home" CLAUDE_STATUSLINE_NO_COLOR=1 bash config/claude/statusline.sh)"
+  if printf '%s' "$out" | grep -q $'\033\['; then
+    echo "Claude no-color status line still emits ANSI escapes" >&2
+    return 1
+  fi
+
+  rm -rf "$test_root"
+  test_root=""
+  trap - RETURN
+  echo "Apollo release bundle, generated adapters, and safe activation ok"
+}
+
 run_smoke() {
   run_bash_syntax
+  run_apollo_smoke
   run_statusline_smoke
   bash -n install.sh
   run_zsh_syntax
@@ -1146,13 +1386,15 @@ run_smoke() {
 
 case "${1:-all}" in
   smoke) run_smoke ;;
+  apollo) run_apollo_smoke ;;
+  apollo-online) DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh; verify_apollo_release_pins ;;
   instructions) run_global_instructions_smoke ;;
   wiki) run_wiki_smoke; run_pipeline_scripts_smoke; run_rmux_keymap_docs_smoke ;;
   rmux) run_rmux_helpers_smoke; run_rmux_keymap_docs_smoke; run_retired_config_migration_smoke; run_rmux_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;
   *)
-    echo "usage: $0 [smoke|instructions|wiki|rmux|shellcheck|all]" >&2
+    echo "usage: $0 [smoke|apollo|apollo-online|instructions|wiki|rmux|shellcheck|all]" >&2
     exit 2
     ;;
 esac

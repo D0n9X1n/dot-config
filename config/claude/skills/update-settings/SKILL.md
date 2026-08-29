@@ -26,8 +26,9 @@ Never edit a managed file under `$HOME`.
 | Relay | `config/copilot-relay/config.yaml` | `~/.copilot-relay/config.yaml` |
 | Safe MCP data | `config/mcp/mcp-shared.json` | merged locally |
 | launchd templates | `config/launchd/` | `~/Library/LaunchAgents/` |
+| Apollo runtime | `scripts/apollo-releases.tsv` + `scripts/apollo-theme.sh` | `~/.local/share/dot-configs/apollo/` and consumer links |
 
-`config/manifest.tsv` is the install list. Add a row when a new managed file is added.
+`config/manifest.tsv` is the tracked-file install list. Add a row when a new managed file is added.
 
 Never make a file under `archive/` active.
 
@@ -42,7 +43,7 @@ config/claude/statusline.sh
 config/copilot/statusline.sh
 ```
 
-They share the same five-line shape, Gruvbox colors, and five-second per-directory Git cache.
+They share the same five-line shape, generated Apollo colors, and five-second per-directory Git cache.
 
 Keep provider metrics different: Claude shows cost; Copilot shows premium requests. Copilot also shows custom live-subagent count and rows. Claude does not because Claude Code has native agent UI.
 
@@ -98,6 +99,7 @@ scripts/check.sh all
 Use a focused check while editing:
 
 ```sh
+scripts/check.sh apollo
 scripts/check.sh instructions
 scripts/check.sh wiki
 scripts/check.sh rmux

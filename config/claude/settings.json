@@ -37,7 +37,6 @@
     }
   },
   "skipDangerousModePermissionPrompt": true,
-  "theme": "dark-ansi",
   "skipAutoPermissionPrompt": true,
   "autoCompactWindow": 800000
 }

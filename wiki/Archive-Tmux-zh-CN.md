@@ -6,7 +6,7 @@
 
 ## 已迁移到 RMUX 的行为
 
-当前 `config/rmux/rmux.conf` 保留了 `C-q` prefix、顶部 Gruvbox 状态栏、从 1 开始的编号、继承当前目录的分割和窗口、vim 风格窗格移动与缩放、vi 复制模式、真彩色处理、固定标题，以及显式的 `prefix + Tab` 行为。
+当前 `config/rmux/rmux.conf` 保留了 `C-q` prefix、顶部 Apollo 状态栏、从 1 开始的编号、继承当前目录的分割和窗口、vim 风格窗格移动与缩放、vi 复制模式、真彩色处理、固定标题，以及显式的 `prefix + Tab` 行为。
 
 ## 未迁移的内容
 

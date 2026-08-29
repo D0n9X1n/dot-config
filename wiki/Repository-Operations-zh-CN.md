@@ -9,8 +9,7 @@
 ```text
 config/   现在使用的配置
 archive/  旧配置；永远不会安装
-scripts/  会运行的代码
-themes/   颜色文件
+scripts/  会运行的代码和外部 release pins
 wiki/     完整说明
 ```
 
@@ -52,7 +51,7 @@ type<TAB>source<TAB>home destination
 | `config/git/ignore` | `~/.config/git/ignore` |
 | `config/rmux/rmux.conf` | `~/.rmux.conf` |
 | `config/sonicterm/**.toml` | `~/.sonicterm/` 下的对应文件 |
-| `config/zsh/*.zsh` | `~/.oh-my-zsh/custom/` |
+| `config/zsh/**` | `~/.oh-my-zsh/custom/` 下的对应文件 |
 | `config/claude/**` | `~/.claude/` |
 | `config/copilot/**` | `~/.copilot/` |
 | `config/copilot-relay/config.yaml` | `~/.copilot-relay/config.yaml` |
@@ -60,7 +59,13 @@ type<TAB>source<TAB>home destination
 | `config/launchd/*.plist` | 渲染到 `~/Library/LaunchAgents/` |
 | `scripts/copilot/cleanup-legacy.sh` | `~/.copilot/cleanup-legacy.sh` |
 
-安装器永远不会链接 `archive/`、`themes/` 或 `wiki/`。
+安装器永远不会链接 `archive/` 或 `wiki/`。
+
+## 外部主题文件
+
+Apollo 主题文件不保存在 Git 中，也不作为 manifest source。`scripts/apollo-releases.tsv` 固定精确的上游 tag 和 SHA-256。`install.sh` 验证这些文件，在 `~/.local/share/dot-configs/apollo/` 下构建完整本机 set，再把 SonicTerm、RMUX、eza 和 Claude 的生效主题路径链接到该 set。
+
+状态栏、shell prompt 和 Claude 主题的生成文件，是从已验证规范 palette 派生的本机运行状态。下载失败或 checksum 不匹配时，不会替换当前 set。请看 [Apollo 主题](Apollo-Theme-zh-CN.md)。
 
 ## 安全链接
 
@@ -126,7 +131,8 @@ Token 和 API key 只能放在本机 Copilot MCP 文件中。不要把它们加�
 
 这些路径是本机状态，不是配置源：
 
-- `~/.claude.json` — Claude onboarding、允许项、项目状态和 MCP 状态
+- `~/.claude.json` — Claude onboarding、允许项、选中的 Apollo 主题、项目状态和 MCP 状态
+- `~/.local/share/dot-configs/apollo/` — 已验证 Apollo releases 和生成的运行 adapters
 - `~/.copilot-relay/github_token` — relay 认证
 - `~/.copilot-relay/copilot_token.json` — relay token cache
 - `~/.copilot-relay/logs/` — relay 日志
@@ -136,7 +142,7 @@ Token 和 API key 只能放在本机 Copilot MCP 文件中。不要把它们加�
 
 ## 已停用链接
 
-安装器不再安装 tmux 或 WezTerm。只有当 `~/.tmux.conf` 和 `~/.wezterm.lua` 仍指向本仓库过去的受管路径时，才会删除它们。用户自己的文件和链接会保留。
+安装器不再安装 tmux 或 WezTerm。只有当 `~/.tmux.conf`、`~/.wezterm.lua` 和停用的 SonicTerm `wezterm.toml` 仍指向本仓库过去的精确受管路径时，才会删除它们。用户自己的文件和链接会保留。手动安装的编辑器主题永远不会删除。
 
 请看[已归档的 tmux](Archive-Tmux-zh-CN.md)和[已归档的 WezTerm](Archive-WezTerm-zh-CN.md)。
 

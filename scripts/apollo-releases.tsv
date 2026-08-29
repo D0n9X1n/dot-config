@@ -1,0 +1,5 @@
+# id	kind	repository	tag	artifact	sha256
+palette	raw	apollo-theme/apollo-theme	v0.2.0	palette/apollo.json	550f8c36cf4ef6ac99551541d1fe9554f77d563fa1e7c129a6a82583321d61ef
+sonicterm	release	apollo-theme/sonicterm-apollo-theme	v0.1.0	apollo.toml	b13abc6bf86fe9dd62961975e48e7e7b3fbe21c2983dc84eeeae708009ff68e7
+rmux	release	apollo-theme/rmux-apollo-theme	v0.1.0	apollo-rmux.conf	3a948cb410ff209b9e6331ae1206c65b17937eb9454a2aa611baa86d0ddd2b85
+eza	release	apollo-theme/eza-apollo-theme	v0.1.0	theme.yml	ba46caa43b37fed33b9a22f85eb06f1eda95b54529f10cdf24d8cba6600976eb

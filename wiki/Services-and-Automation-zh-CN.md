@@ -16,8 +16,10 @@
 - `eza`、`jq`、`neovim` 和 autojump 等 shell 工具
 - Recursive 和 Nerd 字体
 - MOSconfig release 中的 RecMono Baker 与 St.Helens 字体
+- SonicTerm、RMUX 和 eza 的固定 Apollo theme releases
+- Claude、两个状态栏和 shell prompt 的本机 Apollo adapters
 
-Claude Code 需要 v2.1.217 或更高版本。
+Claude Code 需要 v2.1.217 或更高版本。`theme.yml` 需要 eza v0.23.5 或更高版本。
 
 使用这些开关跳过慢的设置工作：
 
@@ -28,6 +30,12 @@ SKIP_OH_MY_ZSH=1 ./install.sh
 ```
 
 安装日志在 `~/Library/Logs/dot-configs-install.log`。
+
+## Apollo release bundle
+
+`scripts/apollo-releases.tsv` 固定精确的上游 tag 和 SHA-256。安装器会复用已验证本机 blobs，在一个由 release lock 和 adapter code 派生的 bundle hash 下构建全部文件，并且只在完整 set 通过检查后切换 `current` symlink。第二次安装会直接使用已有 bundle，不下载或重写。
+
+第一次安装需要网络。只要固定 blobs 仍位于 `~/.local/share/dot-configs/apollo/`，以后就能离线安装。下载失败或 checksum 不匹配时，旧 bundle 保持生效。请看 [Apollo 主题](Apollo-Theme-zh-CN.md)。
 
 ## copilot-relay
 

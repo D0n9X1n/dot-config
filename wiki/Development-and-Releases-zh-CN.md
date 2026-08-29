@@ -61,6 +61,8 @@ scripts/check.sh all
 
 ```sh
 scripts/check.sh smoke
+scripts/check.sh apollo
+scripts/check.sh apollo-online
 scripts/check.sh shellcheck
 scripts/check.sh instructions
 scripts/check.sh wiki
@@ -71,6 +73,8 @@ CI 使用同一个脚本：
 
 - macOS 安装 RMUX 并运行 smoke checks；
 - Ubuntu 安装 ShellCheck 并运行 ShellCheck target。
+
+普通检查不会访问网络。`apollo-online` 是维护者专用检查，会下载所有固定的上游文件并验证 SHA-256。每次修改 `scripts/apollo-releases.tsv` 时都要运行它。
 
 检查失败时不要推送。
 

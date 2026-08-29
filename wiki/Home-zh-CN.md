@@ -23,7 +23,7 @@
 
 - [服务与自动化](Services-and-Automation-zh-CN.md) — 安装任务、relay 健康检查、MCP、WakaTime 和缓存清理。
 - [开发与发布](Development-and-Releases-zh-CN.md) — 检查、Wiki 发布、issues、tags 和 releases。
-- [Apollo 主题](Apollo-Theme-zh-CN.md) — 颜色数据和手动编辑器设置。
+- [Apollo 主题](Apollo-Theme-zh-CN.md) — 固定的上游 release 和本机运行 adapters。
 
 ## 旧文件
 
@@ -36,11 +36,10 @@
 |---|---|
 | `config/` | 现在使用的配置 |
 | `archive/` | 旧配置；永远不会安装 |
-| `scripts/` | 会运行的代码 |
-| `themes/` | 颜色文件 |
+| `scripts/` | 会运行的代码和外部 release pins |
 | `wiki/` | 完整说明 |
 
-`install.sh` 保留在根目录。它读取 `config/manifest.tsv`，只安装清单中的文件。
+`install.sh` 保留在根目录。它从 `config/manifest.tsv` 链接受管文件，并安装已验证的 Apollo 运行文件。
 
 ## 快速开始
 

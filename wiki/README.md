@@ -23,7 +23,7 @@ The source is the flat `wiki/` folder. GitHub Actions publishes it to the GitHub
 
 - [Services and automation](Services-and-Automation.md) — installer jobs, relay health, MCP, WakaTime, and cache cleanup.
 - [Development and releases](Development-and-Releases.md) — checks, Wiki publish, issues, tags, and releases.
-- [Apollo theme](Apollo-Theme.md) — color data and manual editor setup.
+- [Apollo theme](Apollo-Theme.md) — pinned upstream releases and local runtime adapters.
 
 ## Old files
 
@@ -36,11 +36,10 @@ The source is the flat `wiki/` folder. GitHub Actions publishes it to the GitHub
 |---|---|
 | `config/` | Config used now |
 | `archive/` | Old config; never installed |
-| `scripts/` | Code that runs |
-| `themes/` | Color files |
+| `scripts/` | Code that runs and external release pins |
 | `wiki/` | Full help |
 
-`install.sh` stays at the root. It reads `config/manifest.tsv` and installs only listed files.
+`install.sh` stays at the root. It links tracked files from `config/manifest.tsv` and installs verified Apollo runtime assets.
 
 ## Quick start
 

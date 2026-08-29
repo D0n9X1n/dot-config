@@ -12,7 +12,7 @@ Copilot CLI 文件在 `config/copilot/`。它们安装到 `~/.copilot/`。
 model:       claude-opus-5
 context:     long_context
 effort:      max
-theme:       dark
+theme:       default（终端 Base-16）
 keep alive:  busy
 streaming:   on
 ```
@@ -44,7 +44,7 @@ COLORTERM=truecolor
 FORCE_COLOR=3
 ```
 
-这样会启用 Copilot 支持的真彩色 UI。它不会安装或运行 WezTerm。其他程序仍看到 `SonicTerm` 或 `rmux`。
+这样会启用 Copilot 支持的终端路径。受管 `default` 主题使用终端 Base-16 颜色，因此会继承 SonicTerm 的 Apollo ANSI palette。它不会安装或运行 WezTerm。其他程序仍看到 `SonicTerm` 或 `rmux`。
 
 ## 启动命令
 
@@ -59,7 +59,7 @@ gg my-project    # 带标题、不限制工具和路径的 Copilot session
 
 ## 状态栏
 
-Copilot 状态栏与 Claude 共享五行布局和 Gruvbox 颜色：
+Copilot 状态栏与 Claude 共享五行布局和本机生成的 Apollo 颜色：
 
 1. 时间、运行时间、请求、WakaTime
 2. 模型、effort、context
@@ -67,7 +67,7 @@ Copilot 状态栏与 Claude 共享五行布局和 Gruvbox 颜色：
 4. 当前路径
 5. repo、branch、diff、stash、worktree
 
-它用一次 `jq` 读取 session JSON。Git 数据按工作目录缓存五秒。GitHub auth 数据缓存五分钟。
+它用一次 `jq` 读取 session JSON。两个 provider 状态脚本读取同一个本机生成 Apollo 颜色 include；文件缺失时会回退为可读的无色输出。Git 数据按工作目录缓存五秒。GitHub auth 数据缓存五分钟。
 
 有用的环境变量：
 

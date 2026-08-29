@@ -9,8 +9,7 @@ This page explains where files live and how `install.sh` moves them into your ho
 ```text
 config/   config used now
 archive/  old config; never installed
-scripts/  code that runs
-themes/   color files
+scripts/  code that runs and external release pins
 wiki/     full help
 ```
 
@@ -52,7 +51,7 @@ The installer checks that every source exists, every destination is unique, and 
 | `config/git/ignore` | `~/.config/git/ignore` |
 | `config/rmux/rmux.conf` | `~/.rmux.conf` |
 | `config/sonicterm/**.toml` | matching files under `~/.sonicterm/` |
-| `config/zsh/*.zsh` | `~/.oh-my-zsh/custom/` |
+| `config/zsh/**` | matching files under `~/.oh-my-zsh/custom/` |
 | `config/claude/**` | `~/.claude/` |
 | `config/copilot/**` | `~/.copilot/` |
 | `config/copilot-relay/config.yaml` | `~/.copilot-relay/config.yaml` |
@@ -60,7 +59,13 @@ The installer checks that every source exists, every destination is unique, and 
 | `config/launchd/*.plist` | render into `~/Library/LaunchAgents/` |
 | `scripts/copilot/cleanup-legacy.sh` | `~/.copilot/cleanup-legacy.sh` |
 
-`archive/`, `themes/`, and `wiki/` are never linked by the installer.
+`archive/` and `wiki/` are never linked by the installer.
+
+## External theme assets
+
+Apollo theme files are not stored in Git or listed as manifest sources. `scripts/apollo-releases.tsv` pins exact upstream tags and SHA-256 values. `install.sh` verifies those files, builds a complete local set under `~/.local/share/dot-configs/apollo/`, and links the active SonicTerm, RMUX, eza, and Claude theme paths to that set.
+
+Generated status-line, shell-prompt, and Claude theme files are local runtime state derived from the verified canonical palette. A failed download or checksum does not replace the active set. See [Apollo theme](Apollo-Theme.md).
 
 ## Safe links
 
@@ -126,7 +131,8 @@ The hosted GitHub MCP uses a Bearer PAT header. Its OAuth dynamic client registr
 
 These paths are local and are not config sources:
 
-- `~/.claude.json` — Claude onboarding, approvals, project state, and MCP state
+- `~/.claude.json` — Claude onboarding, approvals, selected Apollo theme, project state, and MCP state
+- `~/.local/share/dot-configs/apollo/` — verified Apollo releases and generated runtime adapters
 - `~/.copilot-relay/github_token` — relay auth
 - `~/.copilot-relay/copilot_token.json` — relay token cache
 - `~/.copilot-relay/logs/` — relay logs
@@ -136,7 +142,7 @@ These paths are local and are not config sources:
 
 ## Retired links
 
-The installer no longer installs tmux or WezTerm. It removes `~/.tmux.conf` and `~/.wezterm.lua` only when they still point to this repo's old managed paths. User-owned files and links stay.
+The installer no longer installs tmux or WezTerm. It removes `~/.tmux.conf`, `~/.wezterm.lua`, and the retired SonicTerm `wezterm.toml` only when they still point to this repo's exact old managed paths. User-owned files and links stay. Manually installed editor themes are never removed.
 
 See [Archived tmux](Archive-Tmux.md) and [Archived WezTerm](Archive-WezTerm.md).
 

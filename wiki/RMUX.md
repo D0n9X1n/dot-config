@@ -52,14 +52,14 @@ The profile is adapted from RMUX's v0.10.0 human-friendly example and selected c
 | History | 100000 lines |
 | Window/pane indices | Start at 1; windows renumber after close |
 | Copy mode | Vi keys; `pbcopy` plus OSC 52 |
-| Status | Top, hand-built Apollo palette |
+| Status | Top, styled by the pinned Apollo RMUX release |
 | Titles | Automatic rename off; `#S · #W` propagated outward |
 | Terminal identity | `TERM=tmux-256color`; `TERM_PROGRAM=rmux` is preserved |
 | Working directory | Active pane OSC 7 reports are relayed to SonicTerm |
 
 The config clears stale `TERMINFO`, `TERMINFO_DIRS`, and `TERMCAP` inherited by a long-lived daemon, then sets `COLORTERM=truecolor` and `FORCE_COLOR=3`. It does not clear RMUX's own `TERM_PROGRAM` identity.
 
-The status bar uses Apollo's `#141617` canvas and `#1d2021` raised surfaces, with the existing Gruvbox yellow, blue, red, and neutral accents. This matches the active SonicTerm palette without adding a tmux theme plugin.
+`install.sh` verifies the official `rmux-apollo-theme` release and links its theme-only config under `~/.config/rmux-apollo-theme/`. The local RMUX file sources it for status, window, pane, message, and copy-mode styles. Local status strings keep content only, so they do not override upstream colors. No plugin manager or shell bootstrap is added.
 
 The outer `xterm-256color` capability includes `osc7`, and `set-titles` is enabled. Oh My Zsh's `omz_termsupport_cwd` hook emits a host-qualified OSC 7 report at each prompt. RMUX records that report per pane and relays the active pane's path to SonicTerm, so relative file paths resolve against the correct directory. `#{pane_current_path}` is process metadata and does not replace the shell report. After changing `terminal-features`, reload the config and detach/reattach so the client capabilities are resolved again.
 
@@ -165,7 +165,7 @@ rmux -V
 rmux diagnose --human
 rmux capabilities --human
 rmux doctor tmux-dropin
-ls -l ~/.rmux.conf
+ls -l ~/.rmux.conf ~/.config/rmux-apollo-theme/apollo-rmux.conf
 ```
 
 A repository config check uses an isolated socket and always kills it afterward:

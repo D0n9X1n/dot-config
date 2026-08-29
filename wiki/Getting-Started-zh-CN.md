@@ -12,7 +12,9 @@ cd ~/Public/dot-configs
 ./install.sh
 ```
 
-脚本可以安装 Homebrew、RMUX、Claude Code、Copilot CLI、copilot-relay、shell 工具、字体和 oh-my-zsh。然后，它会链接 `config/manifest.tsv` 中列出的文件。
+脚本可以安装 Homebrew、RMUX、Claude Code、Copilot CLI、copilot-relay、shell 工具、字体和 oh-my-zsh。它会下载并验证固定的 Apollo theme releases，构建本机 adapters，然后链接 `config/manifest.tsv` 中列出的文件。
+
+第一次 Apollo 安装需要网络。以后可以复用 `~/.local/share/dot-configs/apollo/` 下已验证的本机 bundle。
 
 完整日志在这里：
 
@@ -88,6 +90,7 @@ scripts/check.sh all
 也可以只运行一个检查：
 
 ```sh
+scripts/check.sh apollo
 scripts/check.sh instructions
 scripts/check.sh wiki
 scripts/check.sh rmux
@@ -104,6 +107,7 @@ scripts/check.sh rmux
 - SonicTerm save lock
 - 本机 MCP secret
 - 生成的 Claude 状态
+- 下载或生成的 Apollo 运行文件
 
 带 secret 的 MCP 项目应放在每台 Mac 的 `~/.config/github-copilot/mcp.json`。
 

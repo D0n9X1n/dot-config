@@ -5,7 +5,6 @@ link	config/sonicterm/sonicterm.toml	.sonicterm/sonicterm.toml
 link	config/sonicterm/keymaps/sonicterm-linux.toml	.sonicterm/keymaps/sonicterm-linux.toml
 link	config/sonicterm/keymaps/sonicterm-macos.toml	.sonicterm/keymaps/sonicterm-macos.toml
 link	config/sonicterm/keymaps/sonicterm-windows.toml	.sonicterm/keymaps/sonicterm-windows.toml
-link	config/sonicterm/themes/wezterm.toml	.sonicterm/themes/wezterm.toml
 link	config/claude/CLAUDE.md	.claude/CLAUDE.md
 link	config/claude/settings.json	.claude/settings.json
 link	config/claude/statusline.sh	.claude/statusline.sh
@@ -22,6 +21,7 @@ link	config/zsh/copilot.zsh	.oh-my-zsh/custom/copilot.zsh
 link	config/zsh/custom.zsh	.oh-my-zsh/custom/custom.zsh
 link	config/zsh/gg.zsh	.oh-my-zsh/custom/gg.zsh
 link	config/zsh/zz-rmux.zsh	.oh-my-zsh/custom/zz-rmux.zsh
+link	config/zsh/themes/apollo.zsh-theme	.oh-my-zsh/custom/themes/apollo.zsh-theme
 link	config/copilot-relay/config.yaml	.copilot-relay/config.yaml
 merge	config/mcp/mcp-shared.json	.config/github-copilot/mcp.json
 render	config/launchd/com.d0n9x1n.copilot-relay.plist	Library/LaunchAgents/com.d0n9x1n.copilot-relay.plist

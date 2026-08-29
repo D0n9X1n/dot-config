@@ -2,99 +2,80 @@
 
 [English](Apollo-Theme.md) | 简体中文
 
-Apollo 是暖色深色主题。
+Apollo 是当前终端、multiplexer、shell、CLI 状态栏和文件列表共享的主题。
 
-它使用 Gruvbox Dark Hard 基础、暖米色 ANSI white 和深色 `#141617` 画布。
+规范 palette 和应用 adapters 位于 [Apollo Theme organization](https://github.com/apollo-theme)。本仓库不保存 palette 值或生成的主题文件。
 
-`themes/apollo/` 下的文件仍是参考数据，`install.sh` 不会直接安装它们。当前 SonicTerm 主题与 RMUX 状态栏会在各自的受管配置中使用相同的 Apollo palette 值。
+## 生效范围
 
-## 文件
-
-| 文件 | 目标 |
+| 范围 | 来源 |
 |---|---|
-| `themes/apollo/palette.json` | 机器可读颜色源 |
-| `themes/apollo/apollo.lua` | WezTerm |
-| `themes/apollo/apollo.vim` | Vim |
-| `themes/apollo/apollo.nvim.lua` | Neovim |
-| `themes/apollo/apollo-color-theme.json` | VS Code |
-| `themes/apollo/apollo.terminal.json` | Windows Terminal |
-| `config/sonicterm/themes/wezterm.toml` | 当前 SonicTerm 主题 |
-| `config/rmux/rmux.conf` | 当前 RMUX 状态栏 |
+| SonicTerm | 带 tag 的 `sonicterm-apollo-theme` release asset |
+| RMUX | 带 tag 的 `rmux-apollo-theme` release asset |
+| eza | 带 tag 的 `eza-apollo-theme` release asset |
+| Claude Code UI | 从带 tag 的规范 palette 在本机生成 |
+| Claude 与 Copilot 状态栏 | 从规范 palette 生成一个本机共享 include |
+| Oh My Zsh prompt | 结构在本仓库；颜色在本机生成 |
+| fast-syntax-highlighting | 使用它的 Base16 主题和终端 ANSI palette |
+| Copilot CLI UI | 使用内置 `default` 主题和终端 ANSI palette |
 
-修改共享颜色时，请更新 `palette.json`、所有参考目标，以及使用这些颜色的 SonicTerm/RMUX 受管配置。
+Neovim 在另一个仓库中管理。本安装器不会修改 Neovim 配置、plugins 或运行状态。
 
-## 主要颜色
+## Release lock
 
-| 作用 | Hex |
-|---|---|
-| 背景 | `#141617` |
-| 前景 | `#ebdbb2` |
-| 光标 | `#ebdbb2` |
-| 选择背景 | `#3c3836` |
-| 暗文字 | `#928374` |
-| 文字 | `#d5c4a1` |
-| 强调色 | `#fabd2f` |
+`scripts/apollo-releases.tsv` 固定每个上游仓库、tag、artifact 和 SHA-256。各子项目版本互相独立；不要根据规范 palette release 推断它们的 tag。
 
-ANSI 0–7：
+安装器下载精确 tag 文件。它不跟踪 `main`，也不查询 `latest`。维护者可以在线检查发布文件：
+
+```sh
+scripts/check.sh apollo-online
+```
+
+普通 `scripts/check.sh all` 仍然离线运行。
+
+## 本机 bundle
+
+已验证文件位于：
 
 ```text
-#1d2021 #cc241d #98971a #d79921 #458588 #b16286 #689d6a #d4be98
+~/.local/share/dot-configs/apollo/
+  blobs/
+  sets/
+  current -> sets/<bundle-hash>
+  fsh/
 ```
 
-Bright 8–15：
+Bundle hash 包含 release lock 和 adapter code。安装器会先验证每个下载，再创建完整 set；所有 release 文件和生成 adapters 都通过检查后，才切换 `current`。有效 bundle 可以离线使用。下载失败或 checksum 不匹配时，旧 bundle 保持生效。
+
+使用者链接到 `current`：
 
 ```text
-#928374 #fb4934 #b8bb26 #fabd2f #83a598 #d3869b #8ec07c #ebdbb2
+~/.sonicterm/themes/apollo.toml
+~/.config/rmux-apollo-theme/apollo-rmux.conf
+~/.config/eza-apollo-theme/theme.yml
+~/.claude/themes/apollo.json
 ```
 
-## Vim
+生成的运行文件是本机状态。不要提交它们。
 
-```sh
-mkdir -p ~/.vim/colors
-ln -sf "$PWD/themes/apollo/apollo.vim" ~/.vim/colors/apollo.vim
-```
+## 更新
 
-然后添加：
+更新 Apollo：
 
-```vim
-colorscheme apollo
-```
+1. 在对应 Apollo 仓库中检查新 release。
+2. 只修改 `scripts/apollo-releases.tsv` 中对应的一行。
+3. 更新 SHA-256。
+4. 运行 `scripts/check.sh apollo-online`。
+5. 运行 `scripts/check.sh all`。
+6. 运行两次 `./install.sh`。
+7. 重载 SonicTerm 和 RMUX，然后启动新的 Claude 与 Copilot session。
 
-## Neovim
+不要把上游颜色复制到 config、scripts 或 Wiki 页面中。
 
-```sh
-mkdir -p ~/.config/nvim/colors
-ln -sf "$PWD/themes/apollo/apollo.nvim.lua" ~/.config/nvim/colors/apollo.lua
-```
+## 安全清理
 
-然后使用：
+旧 `themes/apollo/` 副本已经删除。只有当原 SonicTerm `wezterm.toml` 是本仓库过去创建的精确 symlink 时，安装器才会删除它。
 
-```lua
-vim.cmd('colorscheme apollo')
-```
+手动创建的 Vim、Neovim、VS Code、Windows Terminal 或 WezTerm 主题文件都属于用户，安装器永远不会删除。
 
-## WezTerm 参考
-
-本仓库不管理 WezTerm app。需要手动使用旧参考主题时：
-
-```lua
-local apollo = dofile("/path/to/themes/apollo/apollo.lua")
-config.color_schemes = { Apollo = apollo }
-config.color_scheme = "Apollo"
-```
-
-## VS Code
-
-把 `apollo-color-theme.json` 放入本机 VS Code theme extension，然后选择 `Apollo` workbench color theme。
-
-## Windows Terminal
-
-把 `apollo.terminal.json` 中的 object 放入 `schemes` 数组，然后把 profile 的 `colorScheme` 设为 `Apollo`。
-
-## 检查
-
-```sh
-jq . themes/apollo/palette.json >/dev/null
-```
-
-当前 SonicTerm 与 RMUX 配置会直接使用 Apollo 值，而不是加载此参考文件夹。请看 [SonicTerm 与 Shell](SonicTerm-and-Shell-zh-CN.md)和 [RMUX](RMUX-zh-CN.md)。
+请看 [SonicTerm 与 Shell](SonicTerm-and-Shell-zh-CN.md)、[RMUX](RMUX-zh-CN.md)和[开发与发布](Development-and-Releases-zh-CN.md)。

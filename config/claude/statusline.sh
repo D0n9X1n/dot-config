@@ -3,7 +3,7 @@
 #
 # Sibling of ~/.copilot/statusline.sh — same vibe (one Nerd-Font-iconed
 # segment per data point, separated by Unicode bars), but each segment
-# gets its own Gruvbox accent color instead of a flat ANSI dim wrap, so
+# gets its own Apollo accent color instead of a flat ANSI dim wrap, so
 # the line pops a little more without screaming.
 #
 # Claude Code feeds this script a JSON payload on stdin. Schema reference:
@@ -132,38 +132,13 @@ ICON_WAKA=$'\xef\x84\x9c'
 ICON_SKILLS=$'\xef\x82\xae'
 ICON_MCP=$'\xef\x87\xa6'
 
-# Gruvbox Dark Hard accents — match the RMUX and terminal palette.
-# Use 24-bit ANSI so we don't depend on the terminal's 256-color cube.
-if [ -z "${CLAUDE_STATUSLINE_NO_COLOR:-}" ]; then
-  C_RESET=$'\033[0m'
-  C_DIM=$'\033[2m'                                # dim for separator + label
-  C_RED=$'\033[38;2;251;73;52m'                   # #fb4934
-  C_GREEN=$'\033[38;2;184;187;38m'                # #b8bb26
-  C_YELLOW=$'\033[38;2;250;189;47m'               # #fabd2f
-  C_BLUE=$'\033[38;2;131;165;152m'                # #83a598
-  # Background variants for highlighted values (e.g., vim mode badge).
-  # Palette + role assignment match vim-airline's gruvbox theme:
-  #   NORMAL  → yellow bg
-  #   INSERT  → blue bg
-  #   VISUAL  → orange bg
-  #   REPLACE → red bg
-  # Airline pairs each with a dark foreground (#1d2021) for contrast — the
-  # vim segment uses $C_BG_FG below instead of $C_FG.
-  CB_RED=$'\033[48;2;204;36;29m'                   # #cc241d — gruvbox red
-  CB_BLUE=$'\033[48;2;69;133;136m'                 # #458588 — gruvbox blue
-  CB_YELLOW=$'\033[48;2;215;153;33m'               # #d79921 — gruvbox yellow
-  CB_ORANGE=$'\033[48;2;214;93;14m'                # #d65d0e — gruvbox orange
-  CB_GREEN=$'\033[48;2;152;151;26m'                # #98971a — gruvbox green (kept for back-compat)
-  C_BG_FG=$'\033[38;2;29;32;33m'                   # #1d2021 — gruvbox dark0_hard, for text on bright bg
-  C_PURPLE=$'\033[38;2;211;134;155m'              # #d3869b
-  C_AQUA=$'\033[38;2;142;192;124m'                # #8ec07c
-  C_ORANGE=$'\033[38;2;254;128;25m'               # #fe8019
-  C_FG=$'\033[38;2;235;219;178m'                  # #ebdbb2
-else
-  C_RESET=""; C_DIM=""; C_RED=""; C_GREEN=""; C_YELLOW=""; C_BLUE=""
-  C_PURPLE=""; C_AQUA=""; C_ORANGE=""; C_FG=""
-  CB_RED=""; CB_BLUE=""; CB_YELLOW=""; CB_ORANGE=""; CB_GREEN=""
-  C_BG_FG=""
+C_RESET=""; C_DIM=""; C_RED=""; C_GREEN=""; C_YELLOW=""; C_BLUE=""
+C_PURPLE=""; C_AQUA=""; C_ORANGE=""; C_FG=""; C_FG_DIM=""
+CB_RED=""; CB_BLUE=""; CB_YELLOW=""; CB_ORANGE=""; CB_GREEN=""
+C_BG_FG=""
+APOLLO_STATUSLINE_COLORS="${HOME}/.local/share/dot-configs/apollo/current/generated/statusline-colors.sh"
+if [ -z "${CLAUDE_STATUSLINE_NO_COLOR:-}" ] && [ -f "$APOLLO_STATUSLINE_COLORS" ]; then
+  source "$APOLLO_STATUSLINE_COLORS"
 fi
 
 PAD_TOP="${CLAUDE_STATUSLINE_PAD_TOP:-0}"
@@ -496,11 +471,11 @@ seg_ctx() {
 
 seg_vim() {
   [ -n "$vim_mode" ] || return 0
-  # vim-airline gruvbox palette:
-  #   NORMAL  → yellow / dark fg
-  #   INSERT  → blue   / dark fg
-  #   VISUAL  → orange / dark fg
-  #   REPLACE → red    / dark fg
+  # Apollo semantic mode backgrounds:
+  #   NORMAL  → accent / canvas fg
+  #   INSERT  → info   / canvas fg
+  #   VISUAL  → magenta / canvas fg
+  #   REPLACE → danger / canvas fg
   # Dark foreground on each bright bg follows airline's high-contrast style.
   local mode_bg="$CB_YELLOW"
   case "$vim_mode" in

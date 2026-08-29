@@ -11,10 +11,9 @@ The manifest links these files:
 ```text
 config/sonicterm/sonicterm.toml
 config/sonicterm/keymaps/*.toml
-config/sonicterm/themes/*.toml
 ```
 
-They land under `~/.sonicterm/`.
+They land under `~/.sonicterm/`. `install.sh` also verifies the pinned upstream Apollo release and links its `apollo.toml` into `~/.sonicterm/themes/`.
 
 The whole folder is not linked. Logs, save locks, backups, and crash data stay local.
 
@@ -24,7 +23,7 @@ The tracked config uses:
 
 | Setting | Value |
 |---|---|
-| Theme | `wezterm` theme file |
+| Theme | `apollo`, from the pinned upstream release |
 | Keymap | `sonicterm-macos` |
 | Font | Rec Mono St.Helens, size 14 |
 | Line height | 1.2 |
@@ -37,7 +36,7 @@ The tracked config uses:
 
 Use **Reload Config** from the SonicTerm command palette after a config change. Some native window changes may need a restart.
 
-The files named `wezterm` keep old palette or keymap compatibility. SonicTerm still tells child shells its real name.
+The keymaps named `wezterm` keep old key compatibility. The active theme is Apollo, and SonicTerm still tells child shells its real name.
 
 ## RMUX identity
 
@@ -65,7 +64,8 @@ Files under `config/zsh/` install into `~/.oh-my-zsh/custom/`. Oh-my-zsh loads t
 
 | File | Work |
 |---|---|
-| `custom.zsh` | aliases, proxy helpers, completions, syntax color, SDK paths, Copilot instruction path |
+| `custom.zsh` | Apollo prompt selection, eza/Base16 paths, aliases, proxy helpers, completions, SDK paths |
+| `themes/apollo.zsh-theme` | Prompt structure; sources locally generated Apollo colors |
 | `claude.zsh` | Claude wrapper and pinned launch flags |
 | `cc.zsh` | titled Claude launch |
 | `copilot.zsh` | Copilot true-color wrapper and cleanup |
@@ -87,9 +87,9 @@ The proxy address is `127.0.0.1:46971`. The helpers update shell, Git, and npm p
 
 ## Completions and paths
 
-`custom.zsh` loads autojump and fast syntax highlighting when installed. It adds Homebrew zsh completions and fixes group-writable completion folders before `compinit -i`.
+`custom.zsh` selects the managed Apollo prompt before Oh My Zsh loads its theme. It does not edit `.zshrc`. It also points eza at the pinned upstream theme.
 
-It also adds local .NET and Android SDK paths.
+When fast-syntax-highlighting is installed, the installer prepares its shipped Base16 theme in an isolated local work folder. Syntax colors then use SonicTerm's Apollo ANSI slots. `custom.zsh` also loads autojump, adds Homebrew completions, fixes group-writable completion folders before `compinit -i`, and adds local .NET and Android SDK paths.
 
 ## RMUX helpers
 
@@ -122,8 +122,9 @@ They set `DISABLE_AUTO_TITLE` while the CLI runs so oh-my-zsh does not replace t
 
 ```sh
 zsh -n config/zsh/*.zsh
-zsh -ic 'type rr rd rl cc gg'
-grep -F 'term_program = "SonicTerm"' ~/.sonicterm/sonicterm.toml
+zsh -ic 'type rr rd rl cc gg; print -r -- "$ZSH_THEME $EZA_CONFIG_DIR $FAST_WORK_DIR"'
+grep -F 'theme = "apollo"' ~/.sonicterm/sonicterm.toml
+ls -l ~/.sonicterm/themes/apollo.toml ~/.config/eza-apollo-theme/theme.yml
 scripts/check.sh rmux
 ```
 

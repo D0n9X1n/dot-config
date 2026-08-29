@@ -9,6 +9,10 @@
 
 [ -f /opt/homebrew/etc/profile.d/autojump.sh ] && . /opt/homebrew/etc/profile.d/autojump.sh
 
+export EZA_CONFIG_DIR="$HOME/.config/eza-apollo-theme"
+export FAST_WORK_DIR="$HOME/.local/share/dot-configs/apollo/fsh"
+ZSH_THEME=apollo
+
 alias 'ls'='eza'
 alias 'll'='eza -l'
 alias 'c'='cd ..'

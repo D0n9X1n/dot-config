@@ -16,8 +16,10 @@ On macOS, the installer can add:
 - shell tools such as `eza`, `jq`, `neovim`, and autojump
 - Recursive and Nerd fonts
 - RecMono Baker and St.Helens fonts from the MOSconfig release
+- pinned Apollo theme releases for SonicTerm, RMUX, and eza
+- local Apollo adapters for Claude, both status lines, and the shell prompt
 
-The required Claude Code version is v2.1.217 or later.
+The required Claude Code version is v2.1.217 or later. eza v0.23.5 or later is required for `theme.yml`.
 
 Use these switches to skip slow setup work:
 
@@ -28,6 +30,12 @@ SKIP_OH_MY_ZSH=1 ./install.sh
 ```
 
 The install log is `~/Library/Logs/dot-configs-install.log`.
+
+## Apollo release bundle
+
+`scripts/apollo-releases.tsv` pins exact upstream tags and SHA-256 values. The installer reuses verified local blobs, builds all files under one bundle hash derived from the release lock and adapter code, and changes the `current` symlink only after the complete set validates. A second install uses the existing bundle without downloading or rewriting it.
+
+A first install needs network access. Later installs work offline while the pinned blobs remain under `~/.local/share/dot-configs/apollo/`. A failed download or checksum keeps the previous bundle active. See [Apollo theme](Apollo-Theme.md).
 
 ## copilot-relay
 

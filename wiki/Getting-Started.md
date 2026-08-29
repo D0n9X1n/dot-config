@@ -12,7 +12,9 @@ cd ~/Public/dot-configs
 ./install.sh
 ```
 
-The script can install Homebrew, RMUX, Claude Code, Copilot CLI, copilot-relay, shell tools, fonts, and oh-my-zsh. It then links the files listed in `config/manifest.tsv`.
+The script can install Homebrew, RMUX, Claude Code, Copilot CLI, copilot-relay, shell tools, fonts, and oh-my-zsh. It downloads and verifies the pinned Apollo theme releases, builds local adapters, then links the files listed in `config/manifest.tsv`.
+
+The first Apollo install needs network access. Later runs can reuse the verified local bundle under `~/.local/share/dot-configs/apollo/`.
 
 The full log is here:
 
@@ -88,6 +90,7 @@ scripts/check.sh all
 Focused checks:
 
 ```sh
+scripts/check.sh apollo
 scripts/check.sh instructions
 scripts/check.sh wiki
 scripts/check.sh rmux
@@ -104,6 +107,7 @@ Do not put these in Git:
 - SonicTerm save locks
 - local MCP secrets
 - generated Claude state
+- downloaded or generated Apollo runtime files
 
 Secret MCP entries belong in `~/.config/github-copilot/mcp.json` on each Mac.
 

@@ -11,10 +11,9 @@ SonicTerm 是当前外层终端。Zsh 文件提供日常助手和 CLI wrappers�
 ```text
 config/sonicterm/sonicterm.toml
 config/sonicterm/keymaps/*.toml
-config/sonicterm/themes/*.toml
 ```
 
-它们安装到 `~/.sonicterm/`。
+它们安装到 `~/.sonicterm/`。`install.sh` 还会验证固定的上游 Apollo release，并把其中的 `apollo.toml` 链接到 `~/.sonicterm/themes/`。
 
 整个文件夹不会被链接。日志、save lock、备份和 crash 数据保留在本机。
 
@@ -24,7 +23,7 @@ config/sonicterm/themes/*.toml
 
 | 设置 | 值 |
 |---|---|
-| 主题 | `wezterm` theme 文件 |
+| 主题 | `apollo`，来自固定的上游 release |
 | Keymap | `sonicterm-macos` |
 | 字体 | Rec Mono St.Helens，大小 14 |
 | 行高 | 1.2 |
@@ -37,7 +36,7 @@ config/sonicterm/themes/*.toml
 
 修改配置后，在 SonicTerm command palette 中使用 **Reload Config**。有些原生窗口修改可能需要重启。
 
-名为 `wezterm` 的文件保留旧 palette 或 keymap 兼容。SonicTerm 仍会告诉子 shell 它的真实名称。
+名为 `wezterm` 的 keymap 保留旧按键兼容。当前主题是 Apollo，SonicTerm 仍会告诉子 shell 它的真实名称。
 
 ## RMUX 身份
 
@@ -65,7 +64,8 @@ RMUX 配置会明确保留条件式鼠标 bindings。Copilot 等支持鼠标的�
 
 | 文件 | 作用 |
 |---|---|
-| `custom.zsh` | aliases、proxy 助手、补全、语法颜色、SDK 路径、Copilot 指令路径 |
+| `custom.zsh` | Apollo prompt 选择、eza/Base16 路径、aliases、proxy 助手、补全、SDK 路径 |
+| `themes/apollo.zsh-theme` | Prompt 结构；读取本机生成的 Apollo 颜色 |
 | `claude.zsh` | Claude wrapper 和固定启动 flags |
 | `cc.zsh` | 带标题的 Claude 启动器 |
 | `copilot.zsh` | Copilot 真彩色 wrapper 和清理 |
@@ -87,9 +87,9 @@ Proxy 地址是 `127.0.0.1:46971`。助手会修改 shell、Git 和 npm proxy �
 
 ## 补全与路径
 
-`custom.zsh` 在工具存在时加载 autojump 和 fast syntax highlighting。它添加 Homebrew zsh 补全，并在 `compinit -i` 前修复 group-writable 补全文件夹。
+`custom.zsh` 会在 Oh My Zsh 加载主题前选择受管 Apollo prompt。它不会修改 `.zshrc`。它还会让 eza 使用固定的上游主题。
 
-它也添加本机 .NET 和 Android SDK 路径。
+安装 fast-syntax-highlighting 后，安装器会在独立本机工作目录中准备它自带的 Base16 主题。语法颜色随后使用 SonicTerm 的 Apollo ANSI slots。`custom.zsh` 也会加载 autojump、添加 Homebrew 补全、在 `compinit -i` 前修复 group-writable 补全文件夹，并添加本机 .NET 与 Android SDK 路径。
 
 ## RMUX 助手
 
@@ -122,8 +122,9 @@ CLI 运行时会设置 `DISABLE_AUTO_TITLE`，所以 oh-my-zsh 不会覆盖标�
 
 ```sh
 zsh -n config/zsh/*.zsh
-zsh -ic 'type rr rd rl cc gg'
-grep -F 'term_program = "SonicTerm"' ~/.sonicterm/sonicterm.toml
+zsh -ic 'type rr rd rl cc gg; print -r -- "$ZSH_THEME $EZA_CONFIG_DIR $FAST_WORK_DIR"'
+grep -F 'theme = "apollo"' ~/.sonicterm/sonicterm.toml
+ls -l ~/.sonicterm/themes/apollo.toml ~/.config/eza-apollo-theme/theme.yml
 scripts/check.sh rmux
 ```
 

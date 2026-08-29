@@ -59,7 +59,7 @@ Sonnet and Opus are separate families. Do not change both when a task asks to up
 | `effortLevel` | `max` |
 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `16` |
 | `statusLine.refreshInterval` | `100` |
-| `theme` | `dark-ansi` |
+| UI theme | local `custom:apollo`, selected in `~/.claude.json` |
 | `autoCompactWindow` | `800000` |
 
 `refreshInterval` belongs inside `statusLine`.
@@ -67,7 +67,9 @@ Sonnet and Opus are separate families. Do not change both when a task asks to up
 `~/.claude/settings.json` and `~/.claude.json` are different files:
 
 - `settings.json` is linked config.
-- `~/.claude.json` is local state. It holds onboarding, API-key approval, project data, and imported MCP servers.
+- `~/.claude.json` is local state. It holds onboarding, API-key approval, the selected Apollo theme, project data, and imported MCP servers.
+
+`install.sh` generates `~/.claude/themes/apollo.json` from the verified canonical Apollo release and preserves every unrelated field when it selects `custom:apollo`. The generated theme is local state, not a Git source.
 
 Do not put the local state file in Git.
 
@@ -102,7 +104,7 @@ Do not restore the old lifecycle counter hook.
 
 ## Status line
 
-Claude and Copilot status lines share the same five-line shape, Gruvbox colors, and five-second per-directory Git cache:
+Claude and Copilot status lines share the same five-line shape, locally generated Apollo colors, and five-second per-directory Git cache:
 
 1. time, run time, cost, WakaTime
 2. model, effort, context
@@ -110,7 +112,7 @@ Claude and Copilot status lines share the same five-line shape, Gruvbox colors, 
 4. current path
 5. repo, branch, diff, stash, worktree
 
-Claude's custom status line has no live-subagent count or tree. Claude Code has native subagent UI. Copilot keeps the custom rows.
+Both scripts source the same generated Apollo color include. If it is missing or color is disabled, they remain readable without colors. Claude's custom status line has no live-subagent count or tree because Claude Code has native subagent UI. Copilot keeps the custom rows.
 
 ## Plugins
 
