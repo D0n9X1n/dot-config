@@ -18,6 +18,10 @@ alias 'll'='eza -l'
 alias 'c'='cd ..'
 alias 'vim'='nvim'
 
+# Codex sessions launched from this shell have unrestricted tool and sandbox
+# access. `command` bypasses this alias and invokes the real Codex executable.
+alias codex='command codex --dangerously-bypass-approvals-and-sandbox'
+
 # Copilot loads AGENTS.md from custom instruction directories. Keep the
 # repository-managed ~/.copilot/AGENTS.md global without replacing other paths.
 case ",${COPILOT_CUSTOM_INSTRUCTIONS_DIRS:-}," in
