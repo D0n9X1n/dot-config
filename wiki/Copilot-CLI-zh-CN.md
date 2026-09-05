@@ -32,11 +32,13 @@ Copilot 安装两个指令文件：
 - `config/copilot/copilot-instructions.md` → `~/.copilot/copilot-instructions.md`
 - `config/copilot/AGENTS.md` → `~/.copilot/AGENTS.md`
 
-原生文件保存 Copilot 的用户级行为。它让对话文字默认直接、简短。明确要求更多细节时仍按要求回答；代码、命令、检查结果、证据、必要说明、安全信息和技术准确性必须保持完整。
+原生文件保存 Copilot 的用户级行为。它让对话文字默认直接、简短。明确要求更多细节时仍按要求回答；代码、命令、检查结果、证据、必要说明、安全信息和技术准确性必须保持完整。它也保留工作规则：直接运行工具和命令，不再询问；直接开始任务。
 
-`AGENTS.md` 只保留 Wiki 指针，用于可复用的 GitHub Wiki 和 release 工作。
+两个全局文件只保留可复用行为，加一条条件指针：这些设置从 `~/Public/dot-configs` 同步；要修改它们，先读该目录的 `.github/copilot-instructions.md`。仓库专属规则留在本仓库自己的 `.github/copilot-instructions.md`，这样无关项目不会加载它们。
 
-`config/zsh/custom.zsh` 把 `~/.copilot` 加入 `COPILOT_CUSTOM_INSTRUCTIONS_DIRS`。它会保留已有路径，也不会重复添加。
+Copilot 不一定会内联全局 `AGENTS.md`，所以原生文件用绝对路径写明 `~/.copilot/AGENTS.md`，并自己重复一次设置来源指针。任何一个文件单独加载时，都能说明全局设置在哪里。
+
+`config/zsh/custom.zsh` 把 `~/.copilot` 加入 `COPILOT_CUSTOM_INSTRUCTIONS_DIRS`。它会保留已有路径，也不会重复添加。该接线属于 shell 层，由 `scripts/check.sh instructions` 断言，不再写进指令正文。
 
 ## 终端身份
 
@@ -74,6 +76,8 @@ Copilot 状态栏与 Claude 共享五行布局和本机生成的 Apollo 颜色�
 5. repo、branch、diff、stash、worktree
 
 它用一次 `jq` 读取 session JSON。两个 provider 状态脚本读取同一个本机生成 Apollo 颜色 include；文件缺失时会回退为可读的无色输出。Git 数据按工作目录缓存五秒。GitHub auth 数据缓存五分钟。
+
+Copilot 从该共享 include 中多用一个颜色角色。Model、Effort、Path 和 Branch 的值使用亮前景角色，让会话身份从普通值中突出。它们的标签保留强调色：Model 为黄色，Path 为青色，Run 为紫色。普通分隔符和 context 容量后缀改用暗前景角色，而不是纯 dim 属性。实时 subagent 行及其分隔线保持不变。Claude 状态栏不使用亮前景角色，所以共享生成器不会改变它。
 
 有用的环境变量：
 

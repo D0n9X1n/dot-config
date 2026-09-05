@@ -14,12 +14,19 @@ The Wiki is the full source of truth for this repo. Do not copy its full help in
 
 `config/manifest.tsv` is the install list. A new managed file needs a manifest row.
 
-Tool-required files stay at their fixed paths:
+Tool-required files stay at fixed paths: `.claude/CLAUDE.md`, `.github/copilot-instructions.md`, `.github/workflows/*.yml`, `.gitignore`.
 
-- `.claude/CLAUDE.md`
-- `.github/copilot-instructions.md`
-- `.github/workflows/*.yml`
-- `.gitignore`
+## Instruction scope
+
+`config/` holds the globally synced config for every project. Globals keep reusable behavior plus one conditional pointer back here. Anything repo-only stays in this file.
+
+## Model policy
+
+Keep native client names. Claude Code uses `claude-sonnet-5[1m]` and `claude-haiku-4-5-20251001`.
+
+The relay maps every non-Opus route through `gptModel` to `gpt-6-astra`. Opus stays separate as `claude-opus-5`.
+
+Do not replace a client identity with GPT. Never put a GPT id or a display override name back into Claude settings. Keep Sonnet and Opus model families separate.
 
 ## Before an edit
 
@@ -33,13 +40,9 @@ Read the matching Wiki page:
 - services: `wiki/Services-and-Automation.md`
 - checks and release: `wiki/Development-and-Releases.md`
 
-Keep English and `-zh-CN` Wiki pages together.
+Keep English and `-zh-CN` Wiki pages together. Keep the root README short.
 
-Keep the status-line layout and cache aligned. Preserve the documented provider metrics and live-subagent differences.
-
-Keep Sonnet and Opus model families separate.
-
-Launchd files under `config/launchd/` are templates. Run `install.sh` to render them.
+Keep the status-line layout and cache aligned. Preserve the documented provider metrics and live-subagent differences. Launchd files under `config/launchd/` are templates; run `install.sh` to render them.
 
 ## Check
 
@@ -51,8 +54,6 @@ For a config change, run `./install.sh` twice after checks pass. Then verify the
 
 ## Safety
 
-This repo is public.
-
-Do not commit tokens, keys, auth files, logs, runtime state, SonicTerm save locks, or `.claude/worktrees/`.
+This repo is public. Do not commit tokens, keys, auth files, logs, runtime state, SonicTerm save locks, or `.claude/worktrees/`.
 
 Do not force-push. Do not use `--no-verify` unless the user asks.

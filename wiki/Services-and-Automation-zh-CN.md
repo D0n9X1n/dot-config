@@ -4,6 +4,8 @@
 
 `install.sh` 会设置工具、本机服务、共享 MCP 数据、WakaTime 和清理任务。
 
+导入 MCP servers 之后，安装器会对以下情况发出警告：某个项目用未认证的同 endpoint 副本覆盖了 github server。该检查是只读的，不打印任何 auth 值。检测的具体形态和按 scope 的修复方式见[仓库操作](Repository-Operations-zh-CN.md)。
+
 ## 新 Mac 设置
 
 在 macOS 上，安装器可以添加：

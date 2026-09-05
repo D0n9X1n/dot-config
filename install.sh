@@ -972,6 +972,49 @@ install_copilot_relay_healthcheck() {
   fi
 }
 
+# Local MCP definitions replace user definitions rather than inheriting headers.
+warn_claude_github_mcp_overrides() {
+  local claude_user_json="${HOME}/.claude.json"
+  local projects project
+
+  have_cmd jq || return 0
+  [ -f "$claude_user_json" ] || return 0
+
+  projects="$(jq -r '
+      def github_http:
+        type == "object" and .type == "http"
+        and ((.url // "") | sub("/$"; "")) == "https://api.githubcopilot.com/mcp";
+      def auth_values:
+        [(.headers // {}) | to_entries[]
+         | select((.key | ascii_downcase) == "authorization")
+         | .value | select(type == "string")];
+      def delegated:
+        (keys_unsorted | map(ascii_downcase) | any(startswith("oauth")))
+        or has("headersHelper");
+      (.mcpServers.github // {}) as $global
+      | if ($global | github_http)
+          and ($global | auth_values | any(test("^Bearer[[:space:]]+[^[:space:]]+"; "i"))) then
+          (.projects // {}) | to_entries[]
+          | (.value.mcpServers.github // {}) as $local
+          | select($local | github_http)
+          | select($local | auth_values | any(test("[^[:space:]]")) | not)
+          | select($local | delegated | not)
+          | .key | @json
+        else empty end
+    ' "$claude_user_json" 2>/dev/null)" || {
+    printf '%s\n' 'Warning: could not inspect Claude local state for GitHub MCP overrides.'
+    return 0
+  }
+
+  [ -n "$projects" ] || return 0
+  while IFS= read -r project; do
+    printf 'Warning: local GitHub MCP entry for %s has no auth header and shadows the user entry with a configured Bearer token.\n' "$project"
+    printf '%s\n' '         Review the override. If unintended, run in that project: claude mcp remove github --scope local; then reconnect.'
+  done <<EOF
+$projects
+EOF
+}
+
 if [ "${DOT_CONFIGS_INSTALL_LIB_ONLY:-0}" = "1" ]; then
   return 0 2>/dev/null || exit 0
 fi
@@ -1078,6 +1121,8 @@ if have_cmd jq && [ -f "$copilot_mcp" ]; then
     fi
   fi
 fi
+
+warn_claude_github_mcp_overrides
 
 # launchd agent: copilot-relay on login (macOS only). Renders the
 # template (substituting absolute $HOME paths — launchd doesn't expand

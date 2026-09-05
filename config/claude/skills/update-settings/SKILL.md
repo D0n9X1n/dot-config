@@ -51,9 +51,11 @@ Keep provider metrics different: Claude shows cost; Copilot shows premium reques
 
 Sonnet and Opus are separate families.
 
-- Sonnet-facing names route to `gptModel`.
-- Opus names route to `opusModel`.
-- Keep `[1m]` on Claude-facing defaults that need one-million-token accounting.
+- Claude Code keeps native client ids: `claude-sonnet-5[1m]` and `claude-haiku-4-5-20251001`.
+- Sonnet-facing names route through `gptModel` to `gpt-6-astra`.
+- Opus names route to `opusModel` and stay `claude-opus-5`.
+- Keep `[1m]` on Claude-facing defaults that need one-million-token accounting. The Haiku id takes no suffix.
+- Do not put a GPT id, or a `_NAME` / `_DESCRIPTION` display override, into Claude settings.
 
 Do not change both families when the task names one.
 
@@ -78,9 +80,9 @@ Plists under `config/launchd/` are templates.
 
 ### Global instructions
 
-Keep `config/claude/CLAUDE.md` and `config/copilot/AGENTS.md` short. They point to `wiki/Development-and-Releases.md`.
+Keep `config/claude/CLAUDE.md`, `config/copilot/AGENTS.md`, and `config/copilot/copilot-instructions.md` short. They hold reusable behavior plus one conditional pointer: these settings are synced from `~/Public/dot-configs`, and a change to them starts by reading that folder's own instruction file. Repo-only rules stay in this repo's `.claude/CLAUDE.md` and `.github/copilot-instructions.md`, so an unrelated project never loads them.
 
-Copilot's native entry file is `config/copilot/copilot-instructions.md`. `config/zsh/custom.zsh` keeps `~/.copilot` in `COPILOT_CUSTOM_INSTRUCTIONS_DIRS`.
+Copilot's native entry file is `config/copilot/copilot-instructions.md`. It names `~/.copilot/AGENTS.md` by absolute path and repeats the settings-source pointer, because Copilot does not reliably inline the global `AGENTS.md`. `config/zsh/custom.zsh` keeps `~/.copilot` in `COPILOT_CUSTOM_INSTRUCTIONS_DIRS`; that wiring is asserted by `scripts/check.sh instructions`, not repeated in the instruction text.
 
 ## Update help
 

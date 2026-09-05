@@ -27,23 +27,25 @@ Claude Code 第一次启动时会问是否允许自定义 `dummy` API key。请�
 受管默认值：
 
 ```text
-Claude 端名称： gpt-6-astra[1m]
-Picker 名称：    GPT-6 Astra
+Claude 端名称： claude-sonnet-5[1m]
+Picker 名称：    原生 Sonnet 名称
 客户端 effort：  max
 Relay 路由：     gptModel
 上游模型：       gpt-6-astra
 ```
 
-名称中没有 `opus`，所以 copilot-relay 会把它发送到 `gptModel`。
+Claude Code 保留原生客户端身份。名称中没有 `opus`，所以 copilot-relay 会把它发送到 `gptModel`。
 
 其他路由：
 
 | Claude 端名称 | Relay lane | 上游 |
 |---|---|---|
 | `claude-opus-5[1m]` | `opusModel` | `claude-opus-5` |
-| Haiku / small-fast aliases | `gptModel` | `gpt-6-astra` |
+| `claude-haiku-4-5-20251001`（Haiku / small-fast） | `gptModel` | `gpt-6-astra` |
 
-`[1m]` 后缀让 Claude Code 使用一百万 token 的模型 context 计数；relay 向上游发送规范 ID `gpt-6-astra`。自动压缩刻意在 75,000 tokens 时触发，远早于 Astra 的 1M 总窗口内公布的 872,000-token prompt 上限。这并不意味着会保留完整的 1M-token 对话历史。Relay 端 thinking 在 `config/copilot-relay/config.yaml` 中设为 `max`。
+客户端名称和上游模型是两层。客户端保留原生 Anthropic ID；上游模型由 relay 决定。不要把 GPT ID 或 `_NAME` / `_DESCRIPTION` 显示覆盖写进 Claude 端设置。
+
+`[1m]` 后缀让 Claude Code 使用一百万 token 的模型 context 计数；relay 向上游发送规范 ID `gpt-6-astra`。Haiku ID 是已安装 CLI 自身的 small-fast ID，不加 `[1m]` 后缀。自动压缩刻意在 75,000 tokens 时触发，远早于 Astra 的 1M 总窗口内公布的 872,000-token prompt 上限。这并不意味着会保留完整的 1M-token 对话历史。Relay 端 thinking 在 `config/copilot-relay/config.yaml` 中设为 `max`。
 
 使用本设置前，请先使用支持 GPT-6 Astra 的 relay 构建（见 [copilot-relay issue #57](https://github.com/D0n9X1n/copilot-relay/issues/57)）。修改模型时应同时更新 `config/claude/settings.json`、`config/zsh/claude.zsh` 和 `config/zsh/cc.zsh`；wrapper 的 `--model` 优先于设置文件。Relay 的 `gptModel` 不带后缀，空白的 `webSearchBackend` 也使用 Astra。Opus 路由保持独立。
 
@@ -59,7 +61,11 @@ Sonnet-facing 槽位通过 `gptModel` 路由到 GPT-6 Astra；Opus 仍使用独�
 |---|---|
 | `ANTHROPIC_BASE_URL` | `http://127.0.0.1:4142` |
 | `ANTHROPIC_AUTH_TOKEN` | 本机占位符 `dummy` |
-| `ANTHROPIC_MODEL` | `gpt-6-astra[1m]` |
+| `ANTHROPIC_MODEL` | `claude-sonnet-5[1m]` |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | `claude-sonnet-5[1m]` |
+| `ANTHROPIC_DEFAULT_HAIKU_MODEL` | `claude-haiku-4-5-20251001` |
+| `ANTHROPIC_SMALL_FAST_MODEL` | `claude-haiku-4-5-20251001` |
+| `model` | `sonnet`；选择器自身的短别名 |
 | `MODEL_REASONING_EFFORT` | `max`；启动器同时传入 `--effort max` |
 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `16` |
 | `statusLine.refreshInterval` | `100` |
@@ -90,15 +96,19 @@ Claude Code 2.1.261 要求 `autoCompactWindow` 至少为 100,000，因此不能�
 
 `config/claude/CLAUDE.md` 安装为 `~/.claude/CLAUDE.md`，并设置用户级回复风格。对话文字默认直接、简短。明确要求更多细节时仍按要求回答；代码、命令、检查结果、证据、必要说明、安全信息和技术准确性必须保持完整。
 
+全局文件只保留可复用行为，加一条条件指针：这些设置从 `~/Public/dot-configs` 同步；要修改它们，先读该目录的 `.claude/CLAUDE.md`。仓库专属规则——Wiki 是完整信息源、manifest、检查、双语页面——留在本仓库自己的 `.claude/CLAUDE.md`，这样无关项目不会加载它们。
+
 ## 启动器
 
 `config/zsh/claude.zsh` 包装 `claude` 并添加：
 
 ```text
 --permission-mode bypassPermissions
---model gpt-6-astra[1m]
+--model claude-sonnet-5[1m]
 --effort max
 ```
+
+命令行上显式给出 `--model`、`--model=` 或 `--effort` 时，对应的默认值不再注入；另一个默认值仍然生效。
 
 二进制会拒绝 settings 中的 `permissions.defaultMode: bypassPermissions`。命令行 flag 可以工作。Claude Code 可能在运行时重写 settings，所以 wrapper 也固定模型和 effort。
 
@@ -156,7 +166,7 @@ WakaTime marketplace 指向官方 `wakatime/claude-code-wakatime` Git 仓库。
 
 ### 小任务出现 `model_not_supported`
 
-保持 Haiku 和 small-fast aliases 都是 `gpt-6-astra[1m]`。同时检查 relay base URL。
+保持 Haiku 和 small-fast aliases 都是 `claude-haiku-4-5-20251001`，即已安装 CLI 自身的 small-fast ID。那里不要加 `[1m]` 后缀。同时检查 relay base URL。
 
 ### Relay 重写 settings
 

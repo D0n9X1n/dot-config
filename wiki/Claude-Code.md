@@ -27,23 +27,25 @@ The first Claude Code launch asks if the custom `dummy` API key is allowed. Choo
 The tracked default is:
 
 ```text
-Claude-facing name: gpt-6-astra[1m]
-Picker name:        GPT-6 Astra
+Claude-facing name: claude-sonnet-5[1m]
+Picker name:        native Sonnet name
 Client effort:      max
 Relay route:        gptModel
 Upstream model:     gpt-6-astra
 ```
 
-The name has no `opus`, so copilot-relay sends it to `gptModel`.
+Claude Code keeps its native client identity. The name has no `opus`, so copilot-relay sends it to `gptModel`.
 
 Other routes:
 
 | Claude-facing name | Relay lane | Upstream |
 |---|---|---|
 | `claude-opus-5[1m]` | `opusModel` | `claude-opus-5` |
-| Haiku / small-fast aliases | `gptModel` | `gpt-6-astra` |
+| `claude-haiku-4-5-20251001` (Haiku / small-fast) | `gptModel` | `gpt-6-astra` |
 
-The `[1m]` suffix keeps Claude Code's one-million-token model context accounting; the relay sends canonical `gpt-6-astra` upstream. Automatic compaction deliberately starts at 75,000 tokens, well before Astra's advertised 872,000-token prompt limit within its 1M total window. This does not retain a full 1M-token conversation history. Relay-side thinking is `max` in `config/copilot-relay/config.yaml`.
+Client names and upstream models are separate layers. The client keeps native Anthropic ids; the relay decides the upstream model. Do not write a GPT id, or a `_NAME` / `_DESCRIPTION` display override, into Claude-facing settings.
+
+The `[1m]` suffix keeps Claude Code's one-million-token model context accounting; the relay sends canonical `gpt-6-astra` upstream. The Haiku id is the installed CLI's own small-fast id and takes no `[1m]` suffix. Automatic compaction deliberately starts at 75,000 tokens, well before Astra's advertised 872,000-token prompt limit within its 1M total window. This does not retain a full 1M-token conversation history. Relay-side thinking is `max` in `config/copilot-relay/config.yaml`.
 
 Use a relay build with GPT-6 Astra support before relying on this setup (tracked in [copilot-relay issue #57](https://github.com/D0n9X1n/copilot-relay/issues/57)). Update the model in `config/claude/settings.json`, `config/zsh/claude.zsh`, and `config/zsh/cc.zsh` together; the wrappers' `--model` overrides the settings. The relay's `gptModel` stays suffix-free. Its blank `webSearchBackend` also uses Astra. Keep the Opus route separate.
 
@@ -59,7 +61,11 @@ The Sonnet-facing slot routes to GPT-6 Astra through `gptModel`; Opus stays on i
 |---|---|
 | `ANTHROPIC_BASE_URL` | `http://127.0.0.1:4142` |
 | `ANTHROPIC_AUTH_TOKEN` | local placeholder `dummy` |
-| `ANTHROPIC_MODEL` | `gpt-6-astra[1m]` |
+| `ANTHROPIC_MODEL` | `claude-sonnet-5[1m]` |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | `claude-sonnet-5[1m]` |
+| `ANTHROPIC_DEFAULT_HAIKU_MODEL` | `claude-haiku-4-5-20251001` |
+| `ANTHROPIC_SMALL_FAST_MODEL` | `claude-haiku-4-5-20251001` |
+| `model` | `sonnet`; the picker's own short alias |
 | `MODEL_REASONING_EFFORT` | `max`; launch wrappers also pass `--effort max` |
 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `16` |
 | `statusLine.refreshInterval` | `100` |
@@ -90,15 +96,19 @@ Do not put the local state file in Git.
 
 `config/claude/CLAUDE.md` installs as `~/.claude/CLAUDE.md` and sets user-wide response style. Conversational prose is direct and concise by default. Requests for more detail still win, and code, commands, findings, evidence, caveats, safety information, and technical precision stay complete.
 
+The global file holds only reusable behavior plus one conditional pointer: these settings are synced from `~/Public/dot-configs`, and a change to them starts by reading that folder's `.claude/CLAUDE.md`. Repo-only rules — the Wiki source of truth, the manifest, checks, bilingual pages — stay in this repo's own `.claude/CLAUDE.md`, so an unrelated project never loads them.
+
 ## Launch wrappers
 
 `config/zsh/claude.zsh` wraps `claude` and adds:
 
 ```text
 --permission-mode bypassPermissions
---model gpt-6-astra[1m]
+--model claude-sonnet-5[1m]
 --effort max
 ```
+
+An explicit `--model`, `--model=`, or `--effort` on the command line suppresses the matching default; the other default still applies.
 
 The binary rejects `permissions.defaultMode: bypassPermissions` in settings. The command-line flag works. The wrapper also pins model and effort because Claude Code can rewrite settings at runtime.
 
@@ -156,7 +166,7 @@ The first prompt was answered no. In local `~/.claude.json`, move `dummy` from `
 
 ### Small jobs get `model_not_supported`
 
-Keep both Haiku and small-fast aliases set to `gpt-6-astra[1m]`. Also check the relay base URL.
+Keep both the Haiku and small-fast aliases set to `claude-haiku-4-5-20251001`, the installed CLI's own small-fast id. Do not add a `[1m]` suffix there. Also check the relay base URL.
 
 ### Relay rewrites settings
 

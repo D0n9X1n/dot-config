@@ -127,6 +127,20 @@ Put tokens and API keys only in the local Copilot MCP file. Do not add them to t
 
 The hosted GitHub MCP uses a Bearer PAT header. Its OAuth dynamic client registration does not work with this setup.
 
+### Local GitHub MCP overrides
+
+Claude's local-scope entries live under `projects[].mcpServers` in `~/.claude.json`. They override same-name user entries completely; headers are not merged. The MCP import leaves these local entries untouched.
+
+After import, `install.sh` warns if a local GitHub HTTP entry has no auth header while the user entry has a configured Bearer token for the same hosted endpoint. It skips entries with their own auth, OAuth, `headersHelper`, or a different endpoint. The check prints escaped project paths only, never credentials; it does not change state or test token validity.
+
+Review the override first. If it is unintended, run this inside the affected project, then reconnect or restart Claude Code:
+
+```sh
+claude mcp remove github --scope local
+```
+
+This removes only the local duplicate so Claude can use the user-scoped credentials. The installer never removes overrides for you.
+
 ## Local state
 
 These paths are local and are not config sources:
@@ -139,6 +153,8 @@ These paths are local and are not config sources:
 - `~/.sonicterm/logs/` — SonicTerm logs
 - SonicTerm save locks and backups
 - `~/.tmux/plugins/` and old resurrect files
+
+Local state is not the same as a user global. `~/.claude/CLAUDE.md`, `~/.copilot/AGENTS.md`, and `~/.copilot/copilot-instructions.md` are user globals: links to tracked sources in `config/`, edited here and reinstalled. `~/.claude.json` is local state the tools own. The MCP import replaces only its top-level `mcpServers` field and leaves per-project overrides alone. Other installer steps can update local preferences, such as the selected Apollo theme.
 
 ## Retired links
 

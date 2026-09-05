@@ -58,6 +58,10 @@ Installed consumers link to `current`:
 
 Generated runtime files are local state. Do not commit them.
 
+### Status-line color roles
+
+The shared include generates `C_FG_BRIGHT` from the canonical `foregroundBright` color. Copilot uses it for Model, Effort, Path, and Branch values. Older bundles fall back to the normal foreground; no-color mode remains plain text. Claude keeps its existing colors.
+
 ## Updates
 
 To update Apollo:

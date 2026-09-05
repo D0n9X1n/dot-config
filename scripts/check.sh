@@ -179,24 +179,40 @@ SH
 }
 
 run_model_default_smoke() {
-  # Claude Code: GPT-6 Astra is the startup identity; "[1m]" keeps
-  # one-million-token client context accounting while relay strips it upstream.
   jq -e '
-    .env.ANTHROPIC_MODEL == "gpt-6-astra[1m]" and
-    .model == "gpt-6-astra[1m]" and
+    .env.ANTHROPIC_MODEL == "claude-sonnet-5[1m]" and
+    .model == "sonnet" and
     (has("effortLevel") | not) and
     .env.MODEL_REASONING_EFFORT == "max" and
-    .env.ANTHROPIC_DEFAULT_SONNET_MODEL == "gpt-6-astra[1m]" and
-    .env.ANTHROPIC_DEFAULT_SONNET_MODEL_NAME == "GPT-6 Astra" and
-    .env.ANTHROPIC_DEFAULT_SONNET_MODEL_DESCRIPTION == "GPT-6 Astra (1M context) through copilot-relay" and
-    .env.ANTHROPIC_DEFAULT_HAIKU_MODEL == "gpt-6-astra[1m]" and
-    .env.ANTHROPIC_SMALL_FAST_MODEL == "gpt-6-astra[1m]" and
+    .env.ANTHROPIC_DEFAULT_SONNET_MODEL == "claude-sonnet-5[1m]" and
+    (.env | has("ANTHROPIC_DEFAULT_SONNET_MODEL_NAME") | not) and
+    (.env | has("ANTHROPIC_DEFAULT_SONNET_MODEL_DESCRIPTION") | not) and
+    .env.ANTHROPIC_DEFAULT_HAIKU_MODEL == "claude-haiku-4-5-20251001" and
+    .env.ANTHROPIC_SMALL_FAST_MODEL == "claude-haiku-4-5-20251001" and
+    .env.ANTHROPIC_BASE_URL == "http://127.0.0.1:4142" and
+    .env.CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS == "16" and
     .autoCompactEnabled == true and
     .autoCompactWindow == 120000 and
     .env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE == "75" and
     .feedbackDrafts == "off" and
+    .skipDangerousModePermissionPrompt == true and
+    .skipAutoPermissionPrompt == true and
+    .theme == "custom:apollo" and
+    .permissions.defaultMode == "auto" and
+    .statusLine.command == "~/.claude/statusline.sh" and
     .enabledPlugins["clangd-lsp@claude-plugins-official"] == true
   ' config/claude/settings.json >/dev/null
+
+  # No GPT identity may leak back into any Claude-facing selector or label.
+  if jq -e '
+      [(.env | to_entries[] | select(.key | test("^ANTHROPIC_.*MODEL")) | .value),
+       .model]
+      | map(select(type == "string") | ascii_downcase)
+      | any(test("gpt"))
+    ' config/claude/settings.json >/dev/null; then
+    echo "config/claude/settings.json carries a GPT identity on a Claude selector" >&2
+    return 1
+  fi
 
   # Copilot CLI: GPT-6 Astra at the 1M context tier and max effort.
   jq -e '
@@ -214,11 +230,283 @@ run_model_default_smoke() {
 
   # Launcher wrappers inject the same defaults (settings.json can be rewritten
   # at runtime, so the flags are the authoritative per-launch pin).
-  grep -Fq -- "--model 'gpt-6-astra[1m]'" config/zsh/claude.zsh
-  grep -Fq -- "--model 'gpt-6-astra[1m]' --effort max" config/zsh/cc.zsh
+  grep -Fq -- "--model 'claude-sonnet-5[1m]'" config/zsh/claude.zsh
+  grep -Fq -- "--model 'claude-sonnet-5[1m]' --effort max" config/zsh/cc.zsh
   grep -Fq -- "--model gpt-6-astra --context long_context --effort max" config/zsh/gg.zsh
+  if grep -Fq 'gpt-6-astra' config/zsh/claude.zsh config/zsh/cc.zsh; then
+    echo "Claude launchers must not pin a GPT model id" >&2
+    return 1
+  fi
 
-  echo "model defaults ok: GPT-6 Astra @ max effort, 1M context"
+  # The `claude` wrapper injects native defaults but yields to explicit flags.
+  (
+    local test_root fake_bin capture args
+    test_root="$(mktemp -d)"
+    trap 'rm -rf "$test_root"' EXIT
+    fake_bin="$test_root/bin"
+    capture="$test_root/capture"
+    mkdir -p "$fake_bin"
+    cat >"$fake_bin/claude" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"$CLAUDE_CAPTURE"
+SH
+    chmod +x "$fake_bin/claude"
+
+    PATH="$fake_bin:$PATH" CLAUDE_CAPTURE="$capture" \
+      zsh -c 'source config/zsh/claude.zsh; claude'
+    args="$(sed -n '1p' "$capture")"
+    case "$args" in
+      *"--model claude-sonnet-5[1m]"*) : ;;
+      *) echo "claude wrapper default lost the native Sonnet pin: $args" >&2; exit 1 ;;
+    esac
+    case "$args" in
+      *'--effort max'*) : ;;
+      *) echo "claude wrapper default lost --effort max: $args" >&2; exit 1 ;;
+    esac
+    case "$args" in
+      *'--permission-mode bypassPermissions'*) : ;;
+      *) echo "claude wrapper default lost bypassPermissions: $args" >&2; exit 1 ;;
+    esac
+
+    : >"$capture"
+    PATH="$fake_bin:$PATH" CLAUDE_CAPTURE="$capture" \
+      zsh -c 'source config/zsh/claude.zsh; claude --model opus'
+    args="$(sed -n '1p' "$capture")"
+    case "$args" in
+      *'claude-sonnet-5'*) echo "explicit --model was overridden: $args" >&2; exit 1 ;;
+    esac
+
+    : >"$capture"
+    PATH="$fake_bin:$PATH" CLAUDE_CAPTURE="$capture" \
+      zsh -c 'source config/zsh/claude.zsh; claude --model=opus'
+    args="$(sed -n '1p' "$capture")"
+    case "$args" in
+      *'claude-sonnet-5'*) echo "explicit --model= was overridden: $args" >&2; exit 1 ;;
+    esac
+
+    : >"$capture"
+    PATH="$fake_bin:$PATH" CLAUDE_CAPTURE="$capture" \
+      zsh -c 'source config/zsh/claude.zsh; claude --effort low'
+    args="$(sed -n '1p' "$capture")"
+    case "$args" in
+      *'--effort max'*) echo "explicit --effort was overridden: $args" >&2; exit 1 ;;
+    esac
+    case "$args" in
+      *"--model claude-sonnet-5[1m]"*) : ;;
+      *) echo "explicit --effort dropped the model default: $args" >&2; exit 1 ;;
+    esac
+  )
+
+  echo "model defaults ok: native Sonnet/Haiku client ids, relay maps non-Opus to GPT-6 Astra"
+}
+
+run_claude_github_mcp_warning_smoke() {
+  local test_root maker secret out digest_before digest_after case_dir case_output
+  test_root="$(mktemp -d)"
+  trap 'rm -rf "${test_root:-}"' RETURN
+  secret='ghu_FAKE_NOT_A_REAL_TOKEN_0123456789'
+  maker="$test_root/make-case.py"
+  out="$test_root/out.log"
+  : >"$out"
+
+  cat >"$maker" <<'PY'
+import json
+import os
+import sys
+
+case, root, secret = sys.argv[1], sys.argv[2], sys.argv[3]
+endpoint = "https://api.githubcopilot.com/mcp"
+os.makedirs(root, exist_ok=True)
+path = os.path.join(root, ".claude.json")
+
+
+def http_github(url=endpoint, headers=None, extra=None):
+    server = {"type": "http", "url": url}
+    if headers is not None:
+        server["headers"] = headers
+    if extra:
+        server.update(extra)
+    return server
+
+
+def authed(name="Authorization"):
+    return {"mcpServers": {"github": http_github(headers={name: "Bearer " + secret})}}
+
+
+weird_path = '/tmp/pro j\nsecond"q\\z'
+doc = None
+raw = None
+
+if case == "headerless":
+    doc = authed()
+    doc["projects"] = {"/tmp/proj-a": {"mcpServers": {"github": http_github()}}}
+elif case == "empty_headers":
+    doc = authed()
+    doc["projects"] = {"/tmp/proj-b": {"mcpServers": {"github": http_github(headers={})}}}
+elif case == "whitespace_auth":
+    doc = authed()
+    doc["projects"] = {
+        "/tmp/proj-c": {"mcpServers": {"github": http_github(headers={"Authorization": "   \t "})}}
+    }
+elif case == "lowercase_global":
+    doc = authed(name="authorization")
+    doc["projects"] = {"/tmp/proj-d": {"mcpServers": {"github": http_github()}}}
+elif case == "trailing_slash":
+    doc = {"mcpServers": {"github": http_github(url=endpoint + "/", headers={"Authorization": "Bearer " + secret})}}
+    doc["projects"] = {"/tmp/proj-e": {"mcpServers": {"github": http_github()}}}
+elif case == "weird_path":
+    doc = authed()
+    doc["projects"] = {weird_path: {"mcpServers": {"github": http_github()}}}
+elif case == "no_github_global":
+    doc = {"mcpServers": {"other": http_github()}}
+    doc["projects"] = {"/tmp/proj-f": {"mcpServers": {"github": http_github()}}}
+elif case == "unauthenticated_global":
+    doc = {"mcpServers": {"github": http_github()}}
+    doc["projects"] = {"/tmp/proj-g": {"mcpServers": {"github": http_github()}}}
+elif case == "non_bearer_global":
+    doc = {"mcpServers": {"github": http_github(headers={"Authorization": "Basic " + secret})}}
+    doc["projects"] = {"/tmp/proj-basic": {"mcpServers": {"github": http_github()}}}
+elif case == "empty_bearer_global":
+    doc = {"mcpServers": {"github": http_github(headers={"Authorization": "Bearer   "})}}
+    doc["projects"] = {"/tmp/proj-empty": {"mcpServers": {"github": http_github()}}}
+elif case == "authenticated_local":
+    doc = authed()
+    doc["projects"] = {
+        "/tmp/proj-h": {"mcpServers": {"github": http_github(headers={"Authorization": "Bearer " + secret})}}
+    }
+elif case == "lowercase_local":
+    doc = authed()
+    doc["projects"] = {"/tmp/proj-lower": {"mcpServers": {"github": http_github(headers={"authorization": "Bearer " + secret})}}}
+elif case == "different_url":
+    doc = authed()
+    doc["projects"] = {
+        "/tmp/proj-i": {"mcpServers": {"github": http_github(url="https://example.invalid/mcp")}}
+    }
+elif case == "oauth":
+    doc = authed()
+    doc["projects"] = {
+        "/tmp/proj-j": {"mcpServers": {"github": http_github(extra={"oauth": {"clientId": "x"}})}}
+    }
+elif case == "headers_helper":
+    doc = authed()
+    doc["projects"] = {
+        "/tmp/proj-k": {"mcpServers": {"github": http_github(extra={"headersHelper": "/bin/echo"})}}
+    }
+elif case == "no_projects":
+    doc = authed()
+elif case == "malformed":
+    raw = '{"mcpServers": {"github": {"type": "http", ' + secret + '\n'
+else:
+    raise SystemExit("unknown case: " + case)
+
+with open(path, "w", encoding="utf-8") as handle:
+    if raw is not None:
+        handle.write(raw)
+    else:
+        json.dump(doc, handle)
+        handle.write("\n")
+
+if case == "weird_path":
+    with open(os.path.join(root, "expected.txt"), "w", encoding="utf-8") as handle:
+        handle.write(json.dumps(weird_path) + "\n")
+PY
+
+  run_case() {
+    local case_name="$1"
+    local dir="$test_root/$case_name"
+    [ -f "$dir/.claude.json" ] || python3 "$maker" "$case_name" "$dir" "$secret" || return 1
+    cp "$dir/.claude.json" "$dir/before.json" || return 1
+    (
+      HOME="$dir"
+      DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh || exit 1
+      warn_claude_github_mcp_overrides
+    ) >"$test_root/$case_name.out" 2>"$test_root/$case_name.err" || return 1
+    cmp -s "$dir/before.json" "$dir/.claude.json" || {
+      echo "GitHub MCP warning changed state for case: $case_name" >&2
+      return 1
+    }
+    cat "$test_root/$case_name.out" "$test_root/$case_name.err" >>"$out"
+    cat "$test_root/$case_name.out" "$test_root/$case_name.err"
+  }
+
+  # Warns: an unauthenticated local override shadows the authenticated global.
+  for case_dir in headerless empty_headers whitespace_auth lowercase_global trailing_slash; do
+    if ! run_case "$case_dir" | grep -Fq 'claude mcp remove github --scope local'; then
+      echo "expected a github MCP override warning for case: $case_dir" >&2
+      return 1
+    fi
+  done
+  run_case headerless | grep -Fq '"/tmp/proj-a"'
+
+  # Silent: nothing to warn about, or the override is deliberate.
+  for case_dir in no_github_global unauthenticated_global non_bearer_global empty_bearer_global \
+      authenticated_local lowercase_local different_url oauth headers_helper no_projects; do
+    case_output="$(run_case "$case_dir")" || return 1
+    if [ -n "$case_output" ]; then
+      echo "unexpected github MCP warning for case: $case_dir" >&2
+      return 1
+    fi
+  done
+
+  # A project path with a newline or quote stays on one escaped line.
+  run_case weird_path >/dev/null
+  if ! grep -Fq "$(cat "$test_root/weird_path/expected.txt")" "$test_root/weird_path.out"; then
+    echo "project path was not JSON-escaped in the warning" >&2
+    return 1
+  fi
+  [ "$(grep -Fc 'claude mcp remove github --scope local' "$test_root/weird_path.out")" = "1" ]
+
+  # Malformed JSON: one generic diagnostic, never a dump of the file.
+  run_case malformed >/dev/null
+  if ! cat "$test_root/malformed.out" "$test_root/malformed.err" | grep -Fq 'could not inspect'; then
+    echo "malformed .claude.json did not produce a generic diagnostic" >&2
+    return 1
+  fi
+
+  # Missing state file and missing jq are both silent successes.
+  mkdir -p "$test_root/absent" "$test_root/nojq-bin"
+  if [ -n "$(
+      HOME="$test_root/absent"
+      DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+      warn_claude_github_mcp_overrides 2>&1
+    )" ]; then
+    echo "missing ~/.claude.json must stay silent" >&2
+    return 1
+  fi
+  (
+    HOME="$test_root/headerless"
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    # Assignment clears Bash 3.2's command cache; a function-prefix override does not.
+    PATH="$test_root/nojq-bin"
+    warn_claude_github_mcp_overrides
+  ) >"$test_root/nojq.out" 2>"$test_root/nojq.err"
+  if [ -s "$test_root/nojq.out" ] || [ -s "$test_root/nojq.err" ]; then
+    echo "missing jq must stay silent" >&2
+    return 1
+  fi
+
+  # Read-only and idempotent: bytes never change, output repeats exactly.
+  digest_before="$(shasum -a 256 "$test_root/headerless/.claude.json" | awk '{print $1}')"
+  run_case headerless >"$test_root/first.txt"
+  run_case headerless >"$test_root/second.txt"
+  digest_after="$(shasum -a 256 "$test_root/headerless/.claude.json" | awk '{print $1}')"
+  [ "$digest_before" = "$digest_after" ] || {
+    echo "github MCP inspection modified ~/.claude.json" >&2
+    return 1
+  }
+  cmp -s "$test_root/first.txt" "$test_root/second.txt" || {
+    echo "github MCP warning is not idempotent" >&2
+    return 1
+  }
+
+  # The bearer token never reaches stdout or stderr.
+  if grep -Fq "$secret" "$out" "$test_root/first.txt" "$test_root/second.txt"; then
+    echo "github MCP warning leaked an authorization value" >&2
+    return 1
+  fi
+
+  unset -f run_case
+  echo "claude github MCP override warning ok: read-only, escaped, secret-free"
 }
 
 run_copilot_terminal_smoke() {
@@ -252,27 +540,39 @@ SH
 }
 
 run_global_instructions_smoke() {
-  local file lines
-  local files=(
+  local file lines pattern
+  local project_files=(
     .claude/CLAUDE.md
     .github/copilot-instructions.md
+  )
+  local global_files=(
     config/claude/CLAUDE.md
     config/copilot/AGENTS.md
     config/copilot/copilot-instructions.md
   )
 
-  for file in "${files[@]}"; do
+  for file in "${project_files[@]}" "${global_files[@]}"; do
     [ -f "$file" ] || {
       echo "missing instruction source: $file" >&2
       return 1
     }
-    grep -Fq 'wiki/README.md' "$file"
   done
 
-  for file in .claude/CLAUDE.md .github/copilot-instructions.md; do
+  for file in "${project_files[@]}"; do
+    grep -Fq 'wiki/README.md' "$file"
     grep -Fq 'config/manifest.tsv' "$file"
     grep -Fq 'scripts/check.sh all' "$file"
     grep -Fq 'full source of truth' "$file"
+    grep -Fq -- '-zh-CN' "$file"
+    grep -Fq 'root README' "$file"
+    grep -Fq 'globally synced' "$file"
+    grep -Fq 'repo-only' "$file"
+    grep -Fq 'claude-sonnet-5' "$file"
+    grep -Fq 'claude-haiku-4-5-20251001' "$file"
+    grep -Fq 'gptModel' "$file"
+    grep -Fq 'gpt-6-astra' "$file"
+    grep -Fq 'claude-opus-5' "$file"
+    grep -Fq 'display override' "$file"
     lines="$(wc -l <"$file" | tr -d ' ')"
     [ "$lines" -le 60 ] || {
       echo "$file must stay short" >&2
@@ -283,20 +583,45 @@ run_global_instructions_smoke() {
   grep -Fq 'Do not use ASCII-art flowcharts' config/claude/CLAUDE.md
   for file in config/claude/CLAUDE.md config/copilot/copilot-instructions.md; do
     grep -Fq 'Keep conversational prose concise by default.' "$file"
+    grep -Fq 'Lead with the answer.' "$file"
+    grep -Fq 'Match detail to the' "$file"
+    grep -Fq 'Keep code, commands, diffs' "$file"
+    grep -Fq 'Preserve necessary caveats' "$file"
+    grep -Fq 'Use headings or other structure' "$file"
   done
-  for file in config/claude/CLAUDE.md config/copilot/AGENTS.md; do
-    grep -Fq 'Development-and-Releases.md' "$file"
-    grep -Fq 'scripts/check.sh all' "$file"
+  for file in "${global_files[@]}"; do
+    grep -Fq '~/Public/dot-configs' "$file"
+    for pattern in \
+      'wiki/README.md' \
+      'Development-and-Releases' \
+      'scripts/check.sh' \
+      '-zh-CN' \
+      'root README' \
+      'D0n9X1n/dot-config'; do
+      if grep -Fq -e "$pattern" "$file"; then
+        echo "$file must not carry repo-only directive: $pattern" >&2
+        return 1
+      fi
+    done
+    if grep -Eq '^@' "$file"; then
+      echo "$file must not use an @import" >&2
+      return 1
+    fi
     lines="$(wc -l <"$file" | tr -d ' ')"
     [ "$lines" -le 40 ] || {
-      echo "$file must point to the Wiki instead of copying it" >&2
+      echo "$file must stay a short global" >&2
       return 1
     }
   done
 
   grep -Fq 'Run tools and commands without asking for approval.' config/copilot/copilot-instructions.md
-  grep -Fq 'AGENTS.md' config/copilot/copilot-instructions.md
-  grep -Fq 'COPILOT_CUSTOM_INSTRUCTIONS_DIRS' config/copilot/copilot-instructions.md
+  grep -Fq 'Work on the task directly.' config/copilot/copilot-instructions.md
+  # Copilot does not reliably inline the global AGENTS.md.
+  grep -Fq '~/.copilot/AGENTS.md' config/copilot/copilot-instructions.md
+  if grep -Fq 'COPILOT_CUSTOM_INSTRUCTIONS_DIRS' config/copilot/copilot-instructions.md; then
+    echo "config/copilot/copilot-instructions.md must not carry loader internals" >&2
+    return 1
+  fi
 
   zsh -f -c '
     unset COPILOT_CUSTOM_INSTRUCTIONS_DIRS
@@ -326,11 +651,15 @@ run_global_instructions_smoke() {
     printf 'original global instructions\n' >"$test_home/.claude/CLAUDE.md"
     printf 'tracked Claude instructions\n' >"$test_repo/config/claude/CLAUDE.md"
     printf 'tracked Copilot instructions\n' >"$test_repo/config/copilot/AGENTS.md"
+    printf 'tracked native Copilot instructions\n' \
+      >"$test_repo/config/copilot/copilot-instructions.md"
 
     HOME="$test_home"
     timestamp="20000101000000"
     link_file "$test_repo/config/claude/CLAUDE.md" "$test_home/.claude/CLAUDE.md"
     link_file "$test_repo/config/copilot/AGENTS.md" "$test_home/.copilot/AGENTS.md"
+    link_file "$test_repo/config/copilot/copilot-instructions.md" \
+      "$test_home/.copilot/copilot-instructions.md"
 
     [ -L "$test_home/.claude/CLAUDE.md" ]
     [ "$(readlink "$test_home/.claude/CLAUDE.md")" = "$test_repo/config/claude/CLAUDE.md" ]
@@ -338,9 +667,12 @@ run_global_instructions_smoke() {
     grep -Fq 'original global instructions' "$test_home/.claude/CLAUDE.md.bak.20000101000000"
     [ -L "$test_home/.copilot/AGENTS.md" ]
     [ "$(readlink "$test_home/.copilot/AGENTS.md")" = "$test_repo/config/copilot/AGENTS.md" ]
+    [ -L "$test_home/.copilot/copilot-instructions.md" ]
+    [ "$(readlink "$test_home/.copilot/copilot-instructions.md")" \
+      = "$test_repo/config/copilot/copilot-instructions.md" ]
   )
 
-  echo "global Claude/Copilot Wiki pointers ok"
+  echo "global/project instruction scope, native model policy, and links ok"
 }
 
 run_wiki_smoke() {
@@ -1364,6 +1696,120 @@ SH
     return 1
   fi
 
+  local colors_file payload old_home pct code rows
+  colors_file="$test_home/.local/share/dot-configs/apollo/current/generated/statusline-colors.sh"
+  grep -Fq "C_FG_BRIGHT=" "$colors_file" || {
+    echo "generated statusline colors are missing C_FG_BRIGHT" >&2
+    return 1
+  }
+  (
+    # shellcheck disable=SC1090
+    . "$colors_file"
+    [ "$C_FG_BRIGHT" = "$(printf '\033[38;2;0;0;8m')" ] || {
+      echo "C_FG_BRIGHT was not generated from foregroundBright" >&2
+      exit 1
+    }
+    [ "$C_FG" = "$(printf '\033[38;2;0;0;5m')" ]
+    [ "$C_FG_DIM" = "$(printf '\033[38;2;0;0;7m')" ]
+  )
+
+  # Selected segments use the bright role for values; labels keep their roles.
+  payload='{"model":{"display_name":"Claude Sonnet 4.5 (max)"},"workspace":{"current_dir":"'"$test_home"'"},"context_window":{"used_percentage":50,"context_window_size":100000}}'
+  out="$(printf '%s' "$payload" | HOME="$test_home" \
+    COPILOT_STATUSLINE_NO_ICONS=1 \
+    COPILOT_STATUSLINE_SEGMENTS='model effort ctx \n path' \
+    bash config/copilot/statusline.sh)"
+  printf '%s' "$out" | grep -Fq $'\033[38;2;0;0;9mModel\033[0m \033[38;2;0;0;8mSonnet 4.5\033[0m' || {
+    echo "Model segment lost the yellow label / bright value styling" >&2
+    return 1
+  }
+  printf '%s' "$out" | grep -Fq $'\033[38;2;0;0;13mEffort\033[0m \033[38;2;0;0;8mmax\033[0m' || {
+    echo "Effort segment lost the bright value styling" >&2
+    return 1
+  }
+  printf '%s' "$out" | grep -Fq $'\033[38;2;0;0;14mPath\033[0m \033[38;2;0;0;8m~\033[0m' || {
+    echo "Path segment lost the aqua label / bright value styling" >&2
+    return 1
+  }
+  # Capacity suffix and ordinary separators use the dim foreground, not C_DIM.
+  printf '%s' "$out" | grep -Fq $'\033[38;2;0;0;7m/100k\033[0m' || {
+    echo "context capacity is not using the dim foreground role" >&2
+    return 1
+  }
+  printf '%s' "$out" | grep -Fq $'\033[38;2;0;0;7m │ \033[0m' || {
+    echo "ordinary separators are not using the dim foreground role" >&2
+    return 1
+  }
+  if printf '%s' "$out" | grep -Fq $'\033[2m'; then
+    echo "ordinary status-line row still emits the bare C_DIM attribute" >&2
+    return 1
+  fi
+
+  # Numeric context boundaries keep green / yellow / red.
+  while IFS=' ' read -r pct code; do
+    [ -n "$pct" ] || continue
+    out="$(printf '{"context_window":{"used_percentage":%s}}' "$pct" | HOME="$test_home" \
+      COPILOT_STATUSLINE_NO_ICONS=1 COPILOT_STATUSLINE_SEGMENTS='ctx' \
+      bash config/copilot/statusline.sh)"
+    printf '%s' "$out" | grep -Fq "$(printf '\033[38;2;0;0;%sm%s%%' "$code" "$pct")" || {
+      echo "context color boundary changed at ${pct}%" >&2
+      return 1
+    }
+  done <<'BOUNDS'
+49 11
+50 9
+80 10
+BOUNDS
+
+  # A file preserves the trailing newline of an empty last row.
+  printf '%s' "$payload" | HOME="$test_home" bash config/copilot/statusline.sh \
+    >"$test_root/default-line.txt"
+  rows="$(tr -dc '\n' <"$test_root/default-line.txt" | wc -c | tr -d ' ')"
+  [ "$rows" = "4" ] || {
+    echo "default Copilot status line is no longer five rows (separators: $rows)" >&2
+    return 1
+  }
+
+  # No-color, legacy no-dim, and a missing include all stay plain text.
+  for mode in COPILOT_STATUSLINE_NO_COLOR COPILOT_STATUSLINE_NO_DIM; do
+    out="$(printf '%s' "$payload" | HOME="$test_home" \
+      env "$mode=1" bash config/copilot/statusline.sh)"
+    if printf '%s' "$out" | grep -q $'\033\['; then
+      echo "$mode=1 still emits ANSI escapes" >&2
+      return 1
+    fi
+    printf '%s' "$out" | grep -Fq 'Sonnet 4.5'
+  done
+  out="$(printf '%s' "$payload" | HOME="$test_root/blocked-home" bash config/copilot/statusline.sh)"
+  if printf '%s' "$out" | grep -q $'\033\['; then
+    echo "a missing color include still emits ANSI escapes" >&2
+    return 1
+  fi
+
+  # An older include without C_FG_BRIGHT falls back to C_FG, never to empty.
+  old_home="$test_root/old-include-home"
+  mkdir -p "$old_home/.local/share/dot-configs/apollo/current/generated"
+  grep -v 'C_FG_BRIGHT=' "$colors_file" \
+    >"$old_home/.local/share/dot-configs/apollo/current/generated/statusline-colors.sh"
+  out="$(printf '%s' "$payload" | HOME="$old_home" \
+    COPILOT_STATUSLINE_NO_ICONS=1 COPILOT_STATUSLINE_SEGMENTS='model' \
+    bash config/copilot/statusline.sh)"
+  printf '%s' "$out" | grep -Fq $'\033[38;2;0;0;9mModel\033[0m \033[38;2;0;0;5mSonnet 4.5\033[0m' || {
+    echo "an older color include did not fall back to C_FG" >&2
+    return 1
+  }
+
+  # The shared generator must not change Claude's status line.
+  if grep -Fq 'C_FG_BRIGHT' config/claude/statusline.sh; then
+    echo "Claude status line must not adopt the bright foreground role" >&2
+    return 1
+  fi
+  out="$(printf '{}' | HOME="$test_home" bash config/claude/statusline.sh)"
+  if printf '%s' "$out" | grep -Fq $'\033[38;2;0;0;8m'; then
+    echo "Claude status line started emitting the bright foreground color" >&2
+    return 1
+  fi
+
   rm -rf "$test_root"
   test_root=""
   trap - RETURN
@@ -1382,6 +1828,7 @@ run_smoke() {
   run_subagent_smoke
   run_claude_subagent_limit_smoke
   run_model_default_smoke
+  run_claude_github_mcp_warning_smoke
   run_copilot_terminal_smoke
   run_global_instructions_smoke
   run_wiki_smoke
@@ -1397,12 +1844,14 @@ case "${1:-all}" in
   apollo) run_apollo_smoke ;;
   apollo-online) DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh; verify_apollo_release_pins ;;
   instructions) run_global_instructions_smoke ;;
+  models) run_model_default_smoke ;;
+  mcp) run_claude_github_mcp_warning_smoke ;;
   wiki) run_wiki_smoke; run_pipeline_scripts_smoke; run_rmux_keymap_docs_smoke ;;
   rmux) run_rmux_helpers_smoke; run_rmux_keymap_docs_smoke; run_retired_config_migration_smoke; run_rmux_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;
   *)
-    echo "usage: $0 [smoke|apollo|apollo-online|instructions|wiki|rmux|shellcheck|all]" >&2
+    echo "usage: $0 [smoke|apollo|apollo-online|instructions|models|mcp|wiki|rmux|shellcheck|all]" >&2
     exit 2
     ;;
 esac
