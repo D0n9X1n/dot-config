@@ -146,12 +146,14 @@ ICON_SUBAGENT=$'\xef\x83\x90'
 ICON_MODE=$'\xef\x82\x85'
 
 C_RESET=""; C_DIM=""; C_RED=""; C_GREEN=""; C_YELLOW=""; C_BLUE=""
-C_PURPLE=""; C_AQUA=""; C_ORANGE=""; C_FG=""; C_FG_DIM=""
+C_PURPLE=""; C_AQUA=""; C_ORANGE=""; C_FG=""; C_FG_DIM=""; C_FG_BRIGHT=""
 APOLLO_STATUSLINE_COLORS="${HOME}/.local/share/dot-configs/apollo/current/generated/statusline-colors.sh"
 if [ -z "${COPILOT_STATUSLINE_NO_COLOR:-}" ] && [ -z "${COPILOT_STATUSLINE_NO_DIM:-}" ] && \
     [ -f "$APOLLO_STATUSLINE_COLORS" ]; then
   source "$APOLLO_STATUSLINE_COLORS"
 fi
+# Existing bundles may not yet export the bright foreground role.
+[ -n "$C_FG_BRIGHT" ] || C_FG_BRIGHT="$C_FG"
 
 # Per-side padding emitted from inside the script. Copilot CLI's
 # statusLine.padding* fields are silently ignored — only the single
@@ -320,9 +322,6 @@ fi
 
 # --- 3. Helpers ------------------------------------------------------------
 label() {
-  # "<color><icon> <Label> <reset>" — icon + label share the segment's
-  # accent color; the value (printed by the segment after this returns)
-  # uses C_FG so it reads as the bright eye-catcher.
   local color="$1" icon="$2" text="$3"
   if [ "$ICONS_ON" = "1" ]; then
     printf '%s%s %s%s ' "$color" "$icon" "$text" "$C_RESET"
@@ -407,12 +406,12 @@ seg_model() {
         s/  +/ /g
         s/ +$//
       ')"
-  printf '%s%s%s%s' "$(label "$C_AQUA" "$ICON_MODEL" 'Model')" "$C_FG" "$short" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_YELLOW" "$ICON_MODEL" 'Model')" "$C_FG_BRIGHT" "$short" "$C_RESET"
 }
 
 seg_effort() {
   [ -n "$effort_level" ] || return 0
-  printf '%s%s%s%s' "$(label "$C_PURPLE" "$ICON_EFFORT" 'Effort')" "$C_FG" "$effort_level" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_PURPLE" "$ICON_EFFORT" 'Effort')" "$C_FG_BRIGHT" "$effort_level" "$C_RESET"
 }
 
 seg_timer() {
@@ -428,7 +427,7 @@ seg_timer() {
   is_pos_int "$started" || started="$now"
   elapsed=$((now - started))
   [ "$elapsed" -ge 60 ] || return 0
-  printf '%s%s%s%s' "$(label "$C_ORANGE" "$ICON_RUN" 'Run')" "$C_FG" "$(fmt_dhm "$elapsed")" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_PURPLE" "$ICON_RUN" 'Run')" "$C_FG" "$(fmt_dhm "$elapsed")" "$C_RESET"
 }
 
 seg_wall() {
@@ -494,7 +493,7 @@ seg_ctx() {
   fi
   local body
   if [ -n "$ctx_size" ] && [ "$ctx_size" != "null" ]; then
-    body="${color}${pct_int}%${C_RESET}${C_DIM}/$(fmt_tokens "$ctx_size")${C_RESET}"
+    body="${color}${pct_int}%${C_RESET}${C_FG_DIM}/$(fmt_tokens "$ctx_size")${C_RESET}"
   else
     body="${color}${pct_int}%${C_RESET}"
   fi
@@ -510,7 +509,7 @@ seg_path() {
     "$HOME") p="~" ;;
     "$HOME"/*) p="~${p#$HOME}" ;;
   esac
-  printf '%s%s%s%s' "$(label "$C_ORANGE" "$ICON_PATH" 'Path')" "$C_FG" "$p" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_AQUA" "$ICON_PATH" 'Path')" "$C_FG_BRIGHT" "$p" "$C_RESET"
 }
 
 # Vim / Style — Copilot CLI doesn't currently surface equivalent runtime
@@ -706,7 +705,7 @@ seg_branch() {
   if [ ${#br} -gt 24 ]; then
     br="${br:0:23}…"
   fi
-  printf '%s%s%s%s' "$(label "$C_YELLOW" "$ICON_BRANCH" 'Branch')" "$C_FG" "$br" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_YELLOW" "$ICON_BRANCH" 'Branch')" "$C_FG_BRIGHT" "$br" "$C_RESET"
 }
 
 seg_stash() {
@@ -1187,7 +1186,7 @@ for s in $SEGMENTS; do
   part="$("seg_$s" 2>/dev/null || true)"
   [ -n "$part" ] || continue
   if [ "$line_started" = 1 ]; then
-    out="${out}${C_DIM}${SEP}${C_RESET}${part}"
+    out="${out}${C_FG_DIM}${SEP}${C_RESET}${part}"
   else
     out="${out}${part}"
     line_started=1

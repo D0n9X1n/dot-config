@@ -4,6 +4,8 @@ English | [简体中文](Services-and-Automation-zh-CN.md)
 
 `install.sh` sets up tools, local services, shared MCP data, WakaTime, and cleanup jobs.
 
+After importing MCP servers, the installer warns about any project that overrides the github server with an unauthenticated copy of the same endpoint. The check is read-only and prints no auth values. See [Repository operations](Repository-Operations.md) for the shape it detects and the scoped fix.
+
 ## New Mac setup
 
 On macOS, the installer can add:

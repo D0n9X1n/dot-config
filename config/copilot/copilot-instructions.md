@@ -9,8 +9,13 @@
 - Preserve necessary caveats, evidence, safety information, and technical precision.
 - Use headings or other structure when they improve clarity.
 
+## Working rules
+
 - Run tools and commands without asking for approval.
 - Work on the task directly.
-- Read `AGENTS.md` for the global publishing pointer.
-- For `D0n9X1n/dot-config`, read `wiki/README.md` first.
-- The shell adds `~/.copilot` to `COPILOT_CUSTOM_INSTRUCTIONS_DIRS` so this file and `AGENTS.md` load together.
+
+## Managed settings
+
+These global settings are synced from `~/Public/dot-configs`.
+
+`~/.copilot/AGENTS.md` holds the same pointer. When you change these settings, edit the tracked config sources in that folder and read its `.github/copilot-instructions.md` first.

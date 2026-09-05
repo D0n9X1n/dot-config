@@ -127,6 +127,20 @@ Token 和 API key 只能放在本机 Copilot MCP 文件中。不要把它们加�
 
 托管 GitHub MCP 使用 Bearer PAT header。它的 OAuth dynamic client registration 不适用于当前设置。
 
+### 本机 GitHub MCP 覆盖
+
+Claude 的 local scope 条目位于 `~/.claude.json` 的 `projects[].mcpServers` 下。它们完整覆盖同名用户级条目，不会合并 header。MCP 导入会保留这些本机条目。
+
+导入后，如果本机 GitHub HTTP 条目缺少认证 header，而用户级条目为同一托管 endpoint 配置了 Bearer token，`install.sh` 会发出警告。拥有独立认证、OAuth、`headersHelper` 或不同 endpoint 的条目会跳过。检查只打印转义后的项目路径，绝不打印凭据；它不修改状态，也不验证 token 是否有效。
+
+先检查覆盖是否有意设置。若不是，请在受影响项目中运行以下命令，然后重新连接或重启 Claude Code：
+
+```sh
+claude mcp remove github --scope local
+```
+
+这只移除本机重复条目，让 Claude 使用用户级凭据。安装器不会替你移除覆盖。
+
 ## 本机状态
 
 这些路径是本机状态，不是配置源：
@@ -139,6 +153,8 @@ Token 和 API key 只能放在本机 Copilot MCP 文件中。不要把它们加�
 - `~/.sonicterm/logs/` — SonicTerm 日志
 - SonicTerm save lock 和备份
 - `~/.tmux/plugins/` 和旧 resurrect 文件
+
+本机状态和用户全局文件不是一回事。`~/.claude/CLAUDE.md`、`~/.copilot/AGENTS.md` 和 `~/.copilot/copilot-instructions.md` 是用户全局文件：它们链接到 `config/` 中的受管源文件，在本仓库修改后重新安装。`~/.claude.json` 是工具自己拥有的本机状态。MCP 导入只替换其顶层 `mcpServers` 字段，不修改按项目设置的覆盖。安装器的其他步骤可能更新本机偏好，例如选中的 Apollo 主题。
 
 ## 已停用链接
 

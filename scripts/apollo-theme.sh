@@ -250,6 +250,7 @@ apollo_generate_statusline_colors() {
   apollo_append_ansi C_ORANGE fg "$(apollo_color "$palette" accent)" "$output"
   apollo_append_ansi C_FG fg "$(apollo_color "$palette" foreground)" "$output"
   apollo_append_ansi C_FG_DIM fg "$(apollo_color "$palette" foregroundInactive)" "$output"
+  apollo_append_ansi C_FG_BRIGHT fg "$(apollo_color "$palette" foregroundBright)" "$output"
   apollo_append_ansi CB_RED bg "$(apollo_color "$palette" danger)" "$output"
   apollo_append_ansi CB_BLUE bg "$(apollo_color "$palette" info)" "$output"
   apollo_append_ansi CB_YELLOW bg "$(apollo_color "$palette" accent)" "$output"

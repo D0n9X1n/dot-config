@@ -58,6 +58,10 @@ Bundle hash 包含 release lock 和 adapter code。安装器会先验证每个�
 
 生成的运行文件是本机状态。不要提交它们。
 
+### 状态栏颜色角色
+
+共享 include 从规范 `foregroundBright` 颜色生成 `C_FG_BRIGHT`。Copilot 用它显示 Model、Effort、Path 和 Branch 的值。旧 bundle 回退到普通前景色；无色模式仍输出纯文本。Claude 保持原有颜色。
+
 ## 更新
 
 更新 Apollo：
