@@ -71,7 +71,7 @@ scripts/check.sh wiki
 scripts/check.sh rmux
 ```
 
-`models` asserts the tracked model selectors: native client ids in Claude settings and launcher wrappers, Copilot's own GPT-6 Astra settings, and the relay's separate Opus route. `mcp` covers the installer's read-only GitHub MCP override warning.
+`models` asserts the tracked model selectors: native client ids in Claude settings and launcher wrappers, Copilot's own GPT-6 Astra settings, and the relay's separate Opus route. `mcp` checks shared MCP defaults: Playwright remains configured, with no duplicate GitHub entry or PAT template.
 
 The status-line layout, cache, and generated palette are shared by both providers, so a change to either script or to the generator is checked by `apollo` and `smoke` together. Provider-specific emphasis still differs: Copilot uses the bright foreground role and keeps the live-subagent rows, Claude does neither. Keep Claude's output unchanged when editing the shared generator.
 

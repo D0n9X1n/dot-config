@@ -162,7 +162,7 @@ SH
     [ ! -e "$test_root/brew-called" ]
 
     HOME="$test_home"
-    src_dir="$test_repo"
+    repo_root="$test_repo"
     ln -s "$test_repo/claude/hooks/subagent-counter.sh" \
       "$test_home/.claude/hooks/subagent-counter.sh"
     printf 'keep\n' >"$test_home/.claude/hooks/user-hook.sh"
@@ -192,8 +192,8 @@ run_model_default_smoke() {
     .env.ANTHROPIC_BASE_URL == "http://127.0.0.1:4142" and
     .env.CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS == "16" and
     .autoCompactEnabled == true and
-    .autoCompactWindow == 120000 and
-    .env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE == "75" and
+    .autoCompactWindow == 800000 and
+    .env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE == "80" and
     .feedbackDrafts == "off" and
     .skipDangerousModePermissionPrompt == true and
     .skipAutoPermissionPrompt == true and
@@ -300,213 +300,18 @@ SH
   echo "model defaults ok: native Sonnet/Haiku client ids, relay maps non-Opus to GPT-6 Astra"
 }
 
-run_claude_github_mcp_warning_smoke() {
-  local test_root maker secret out digest_before digest_after case_dir case_output
-  test_root="$(mktemp -d)"
-  trap 'rm -rf "${test_root:-}"' RETURN
-  secret='ghu_FAKE_NOT_A_REAL_TOKEN_0123456789'
-  maker="$test_root/make-case.py"
-  out="$test_root/out.log"
-  : >"$out"
-
-  cat >"$maker" <<'PY'
-import json
-import os
-import sys
-
-case, root, secret = sys.argv[1], sys.argv[2], sys.argv[3]
-endpoint = "https://api.githubcopilot.com/mcp"
-os.makedirs(root, exist_ok=True)
-path = os.path.join(root, ".claude.json")
-
-
-def http_github(url=endpoint, headers=None, extra=None):
-    server = {"type": "http", "url": url}
-    if headers is not None:
-        server["headers"] = headers
-    if extra:
-        server.update(extra)
-    return server
-
-
-def authed(name="Authorization"):
-    return {"mcpServers": {"github": http_github(headers={name: "Bearer " + secret})}}
-
-
-weird_path = '/tmp/pro j\nsecond"q\\z'
-doc = None
-raw = None
-
-if case == "headerless":
-    doc = authed()
-    doc["projects"] = {"/tmp/proj-a": {"mcpServers": {"github": http_github()}}}
-elif case == "empty_headers":
-    doc = authed()
-    doc["projects"] = {"/tmp/proj-b": {"mcpServers": {"github": http_github(headers={})}}}
-elif case == "whitespace_auth":
-    doc = authed()
-    doc["projects"] = {
-        "/tmp/proj-c": {"mcpServers": {"github": http_github(headers={"Authorization": "   \t "})}}
-    }
-elif case == "lowercase_global":
-    doc = authed(name="authorization")
-    doc["projects"] = {"/tmp/proj-d": {"mcpServers": {"github": http_github()}}}
-elif case == "trailing_slash":
-    doc = {"mcpServers": {"github": http_github(url=endpoint + "/", headers={"Authorization": "Bearer " + secret})}}
-    doc["projects"] = {"/tmp/proj-e": {"mcpServers": {"github": http_github()}}}
-elif case == "weird_path":
-    doc = authed()
-    doc["projects"] = {weird_path: {"mcpServers": {"github": http_github()}}}
-elif case == "no_github_global":
-    doc = {"mcpServers": {"other": http_github()}}
-    doc["projects"] = {"/tmp/proj-f": {"mcpServers": {"github": http_github()}}}
-elif case == "unauthenticated_global":
-    doc = {"mcpServers": {"github": http_github()}}
-    doc["projects"] = {"/tmp/proj-g": {"mcpServers": {"github": http_github()}}}
-elif case == "non_bearer_global":
-    doc = {"mcpServers": {"github": http_github(headers={"Authorization": "Basic " + secret})}}
-    doc["projects"] = {"/tmp/proj-basic": {"mcpServers": {"github": http_github()}}}
-elif case == "empty_bearer_global":
-    doc = {"mcpServers": {"github": http_github(headers={"Authorization": "Bearer   "})}}
-    doc["projects"] = {"/tmp/proj-empty": {"mcpServers": {"github": http_github()}}}
-elif case == "authenticated_local":
-    doc = authed()
-    doc["projects"] = {
-        "/tmp/proj-h": {"mcpServers": {"github": http_github(headers={"Authorization": "Bearer " + secret})}}
-    }
-elif case == "lowercase_local":
-    doc = authed()
-    doc["projects"] = {"/tmp/proj-lower": {"mcpServers": {"github": http_github(headers={"authorization": "Bearer " + secret})}}}
-elif case == "different_url":
-    doc = authed()
-    doc["projects"] = {
-        "/tmp/proj-i": {"mcpServers": {"github": http_github(url="https://example.invalid/mcp")}}
-    }
-elif case == "oauth":
-    doc = authed()
-    doc["projects"] = {
-        "/tmp/proj-j": {"mcpServers": {"github": http_github(extra={"oauth": {"clientId": "x"}})}}
-    }
-elif case == "headers_helper":
-    doc = authed()
-    doc["projects"] = {
-        "/tmp/proj-k": {"mcpServers": {"github": http_github(extra={"headersHelper": "/bin/echo"})}}
-    }
-elif case == "no_projects":
-    doc = authed()
-elif case == "malformed":
-    raw = '{"mcpServers": {"github": {"type": "http", ' + secret + '\n'
-else:
-    raise SystemExit("unknown case: " + case)
-
-with open(path, "w", encoding="utf-8") as handle:
-    if raw is not None:
-        handle.write(raw)
-    else:
-        json.dump(doc, handle)
-        handle.write("\n")
-
-if case == "weird_path":
-    with open(os.path.join(root, "expected.txt"), "w", encoding="utf-8") as handle:
-        handle.write(json.dumps(weird_path) + "\n")
-PY
-
-  run_case() {
-    local case_name="$1"
-    local dir="$test_root/$case_name"
-    [ -f "$dir/.claude.json" ] || python3 "$maker" "$case_name" "$dir" "$secret" || return 1
-    cp "$dir/.claude.json" "$dir/before.json" || return 1
-    (
-      HOME="$dir"
-      DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh || exit 1
-      warn_claude_github_mcp_overrides
-    ) >"$test_root/$case_name.out" 2>"$test_root/$case_name.err" || return 1
-    cmp -s "$dir/before.json" "$dir/.claude.json" || {
-      echo "GitHub MCP warning changed state for case: $case_name" >&2
-      return 1
-    }
-    cat "$test_root/$case_name.out" "$test_root/$case_name.err" >>"$out"
-    cat "$test_root/$case_name.out" "$test_root/$case_name.err"
-  }
-
-  # Warns: an unauthenticated local override shadows the authenticated global.
-  for case_dir in headerless empty_headers whitespace_auth lowercase_global trailing_slash; do
-    if ! run_case "$case_dir" | grep -Fq 'claude mcp remove github --scope local'; then
-      echo "expected a github MCP override warning for case: $case_dir" >&2
-      return 1
-    fi
-  done
-  run_case headerless | grep -Fq '"/tmp/proj-a"'
-
-  # Silent: nothing to warn about, or the override is deliberate.
-  for case_dir in no_github_global unauthenticated_global non_bearer_global empty_bearer_global \
-      authenticated_local lowercase_local different_url oauth headers_helper no_projects; do
-    case_output="$(run_case "$case_dir")" || return 1
-    if [ -n "$case_output" ]; then
-      echo "unexpected github MCP warning for case: $case_dir" >&2
-      return 1
-    fi
-  done
-
-  # A project path with a newline or quote stays on one escaped line.
-  run_case weird_path >/dev/null
-  if ! grep -Fq "$(cat "$test_root/weird_path/expected.txt")" "$test_root/weird_path.out"; then
-    echo "project path was not JSON-escaped in the warning" >&2
+run_mcp_default_smoke() {
+  jq -e '
+    (has("_github_template") | not) and
+    (.mcpServers | has("github") | not) and
+    .mcpServers.playwright.type == "stdio" and
+    .mcpServers.playwright.command == "npx"
+  ' config/mcp/mcp-shared.json >/dev/null
+  if grep -Fq 'warn_claude_github_mcp_overrides' install.sh; then
+    echo "installer still carries custom GitHub MCP setup" >&2
     return 1
   fi
-  [ "$(grep -Fc 'claude mcp remove github --scope local' "$test_root/weird_path.out")" = "1" ]
-
-  # Malformed JSON: one generic diagnostic, never a dump of the file.
-  run_case malformed >/dev/null
-  if ! cat "$test_root/malformed.out" "$test_root/malformed.err" | grep -Fq 'could not inspect'; then
-    echo "malformed .claude.json did not produce a generic diagnostic" >&2
-    return 1
-  fi
-
-  # Missing state file and missing jq are both silent successes.
-  mkdir -p "$test_root/absent" "$test_root/nojq-bin"
-  if [ -n "$(
-      HOME="$test_root/absent"
-      DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
-      warn_claude_github_mcp_overrides 2>&1
-    )" ]; then
-    echo "missing ~/.claude.json must stay silent" >&2
-    return 1
-  fi
-  (
-    HOME="$test_root/headerless"
-    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
-    # Assignment clears Bash 3.2's command cache; a function-prefix override does not.
-    PATH="$test_root/nojq-bin"
-    warn_claude_github_mcp_overrides
-  ) >"$test_root/nojq.out" 2>"$test_root/nojq.err"
-  if [ -s "$test_root/nojq.out" ] || [ -s "$test_root/nojq.err" ]; then
-    echo "missing jq must stay silent" >&2
-    return 1
-  fi
-
-  # Read-only and idempotent: bytes never change, output repeats exactly.
-  digest_before="$(shasum -a 256 "$test_root/headerless/.claude.json" | awk '{print $1}')"
-  run_case headerless >"$test_root/first.txt"
-  run_case headerless >"$test_root/second.txt"
-  digest_after="$(shasum -a 256 "$test_root/headerless/.claude.json" | awk '{print $1}')"
-  [ "$digest_before" = "$digest_after" ] || {
-    echo "github MCP inspection modified ~/.claude.json" >&2
-    return 1
-  }
-  cmp -s "$test_root/first.txt" "$test_root/second.txt" || {
-    echo "github MCP warning is not idempotent" >&2
-    return 1
-  }
-
-  # The bearer token never reaches stdout or stderr.
-  if grep -Fq "$secret" "$out" "$test_root/first.txt" "$test_root/second.txt"; then
-    echo "github MCP warning leaked an authorization value" >&2
-    return 1
-  fi
-
-  unset -f run_case
-  echo "claude github MCP override warning ok: read-only, escaped, secret-free"
+  echo "shared MCP defaults ok: Playwright retained, no duplicate GitHub setup"
 }
 
 run_copilot_terminal_smoke() {
@@ -547,7 +352,6 @@ run_global_instructions_smoke() {
   )
   local global_files=(
     config/claude/CLAUDE.md
-    config/copilot/AGENTS.md
     config/copilot/copilot-instructions.md
   )
 
@@ -616,8 +420,11 @@ run_global_instructions_smoke() {
 
   grep -Fq 'Run tools and commands without asking for approval.' config/copilot/copilot-instructions.md
   grep -Fq 'Work on the task directly.' config/copilot/copilot-instructions.md
-  # Copilot does not reliably inline the global AGENTS.md.
-  grep -Fq '~/.copilot/AGENTS.md' config/copilot/copilot-instructions.md
+  [ ! -e config/copilot/AGENTS.md ]
+  if grep -Fq 'AGENTS.md' config/copilot/copilot-instructions.md; then
+    echo "native Copilot instructions still require a duplicate pointer" >&2
+    return 1
+  fi
   if grep -Fq 'COPILOT_CUSTOM_INSTRUCTIONS_DIRS' config/copilot/copilot-instructions.md; then
     echo "config/copilot/copilot-instructions.md must not carry loader internals" >&2
     return 1
@@ -626,13 +433,12 @@ run_global_instructions_smoke() {
   zsh -f -c '
     unset COPILOT_CUSTOM_INSTRUCTIONS_DIRS
     source config/zsh/custom.zsh
-    [[ "$COPILOT_CUSTOM_INSTRUCTIONS_DIRS" = "$HOME/.copilot" ]]
     source config/zsh/custom.zsh
-    [[ "$COPILOT_CUSTOM_INSTRUCTIONS_DIRS" = "$HOME/.copilot" ]]
+    [[ -z "${COPILOT_CUSTOM_INSTRUCTIONS_DIRS+x}" ]]
   '
   COPILOT_CUSTOM_INSTRUCTIONS_DIRS="$HOME/one,$HOME/two" zsh -f -c '
     source config/zsh/custom.zsh
-    [[ "$COPILOT_CUSTOM_INSTRUCTIONS_DIRS" = "$HOME/one,$HOME/two,$HOME/.copilot" ]]
+    [[ "$COPILOT_CUSTOM_INSTRUCTIONS_DIRS" = "$HOME/one,$HOME/two" ]]
   '
   COPILOT_CUSTOM_INSTRUCTIONS_DIRS="$HOME/one,$HOME/.copilot,$HOME/two" zsh -f -c '
     source config/zsh/custom.zsh
@@ -650,14 +456,12 @@ run_global_instructions_smoke() {
       "$test_repo/config/claude" "$test_repo/config/copilot"
     printf 'original global instructions\n' >"$test_home/.claude/CLAUDE.md"
     printf 'tracked Claude instructions\n' >"$test_repo/config/claude/CLAUDE.md"
-    printf 'tracked Copilot instructions\n' >"$test_repo/config/copilot/AGENTS.md"
     printf 'tracked native Copilot instructions\n' \
       >"$test_repo/config/copilot/copilot-instructions.md"
 
     HOME="$test_home"
     timestamp="20000101000000"
     link_file "$test_repo/config/claude/CLAUDE.md" "$test_home/.claude/CLAUDE.md"
-    link_file "$test_repo/config/copilot/AGENTS.md" "$test_home/.copilot/AGENTS.md"
     link_file "$test_repo/config/copilot/copilot-instructions.md" \
       "$test_home/.copilot/copilot-instructions.md"
 
@@ -665,8 +469,6 @@ run_global_instructions_smoke() {
     [ "$(readlink "$test_home/.claude/CLAUDE.md")" = "$test_repo/config/claude/CLAUDE.md" ]
     [ -f "$test_home/.claude/CLAUDE.md.bak.20000101000000" ]
     grep -Fq 'original global instructions' "$test_home/.claude/CLAUDE.md.bak.20000101000000"
-    [ -L "$test_home/.copilot/AGENTS.md" ]
-    [ "$(readlink "$test_home/.copilot/AGENTS.md")" = "$test_repo/config/copilot/AGENTS.md" ]
     [ -L "$test_home/.copilot/copilot-instructions.md" ]
     [ "$(readlink "$test_home/.copilot/copilot-instructions.md")" \
       = "$test_repo/config/copilot/copilot-instructions.md" ]
@@ -700,10 +502,6 @@ run_wiki_smoke() {
     wiki/Development-and-Releases-zh-CN.md
     wiki/Apollo-Theme.md
     wiki/Apollo-Theme-zh-CN.md
-    wiki/Archive-Tmux.md
-    wiki/Archive-Tmux-zh-CN.md
-    wiki/Archive-WezTerm.md
-    wiki/Archive-WezTerm-zh-CN.md
     wiki/_Sidebar.md
     scripts/wiki-render.sh
     scripts/wiki-publish.sh
@@ -735,7 +533,7 @@ run_wiki_smoke() {
   grep -Fq 'GitHub Release' ReadMe.md
 
   if grep -RFn 'QUICKREF.md' .claude/CLAUDE.md .github/copilot-instructions.md \
-      config/claude config/copilot wiki ReadMe.md archive; then
+      config/claude config/copilot wiki ReadMe.md; then
     echo "retired QUICKREF.md is still referenced" >&2
     return 1
   fi
@@ -906,6 +704,7 @@ TSV
     HOME="$test_home"
     timestamp="20000101000000"
     validate_manifest
+    [ "$(old_source_for_destination .copilot/cleanup-legacy.sh)" = "$test_repo/copilot/cleanup-legacy.sh" ]
 
     ln -s "$test_repo/.rmux.conf" "$test_home/.rmux.conf"
     printf 'user settings\n' >"$test_home/.claude/settings.json"
@@ -1118,13 +917,23 @@ run_structure_smoke() {
   [ -f config/manifest.tsv ]
   [ -f config/rmux/rmux.conf ]
   [ -f config/sonicterm/sonicterm.toml ]
+  python3 - <<'PY'
+import pathlib
+import re
+text = pathlib.Path('config/sonicterm/sonicterm.toml').read_text()
+window = re.search(r'^\[window\]\n(.*?)(?=^\[|\Z)', text, re.M | re.S).group(1)
+assert not re.search(r'^(opacity|blur)\s*=', window, re.M)
+assert not re.search(r'^\[render\]', text, re.M)
+assert 'keymap = "sonicterm-macos"' in text
+assert 'backdrop = "opaque"' in text and 'opacity = 1.0' in text
+PY
   [ -f config/claude/settings.json ]
   [ -f config/copilot/settings.json ]
   [ -f config/copilot-relay/config.yaml ]
   [ -f config/mcp/mcp-shared.json ]
   [ -f scripts/launchd/clean-npm-caches.sh ]
-  [ -f archive/tmux/.tmux.conf ]
-  [ -f archive/wezterm/wezterm.lua ]
+  [ ! -e archive/tmux/.tmux.conf ]
+  [ ! -e archive/wezterm/wezterm.lua ]
 
   [ ! -f .rmux.conf ]
   [ ! -f .sonicterm/sonicterm.toml ]
@@ -1292,7 +1101,7 @@ run_rmux_keymap_docs_smoke() {
 
 run_retired_config_migration_smoke() {
   (
-    local test_root exact other regular
+    local test_root exact other regular retired_source
     DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
     test_root="$(mktemp -d)"
     trap 'rm -rf "$test_root"' EXIT
@@ -1312,8 +1121,21 @@ run_retired_config_migration_smoke() {
     printf 'keep\n' >"$regular"
     remove_repo_symlink "$regular" "$test_root/repo/.tmux.conf" "test config" >/dev/null
     grep -Fq 'keep' "$regular"
+
+    for retired_source in config/copilot/AGENTS.md copilot/AGENTS.md; do
+      ln -s "$test_root/repo/$retired_source" "$exact"
+      remove_repo_symlink "$exact" "$test_root/repo/$retired_source" "Copilot instructions" >/dev/null
+      [ ! -e "$exact" ] && [ ! -L "$exact" ]
+      remove_repo_symlink "$exact" "$test_root/repo/$retired_source" "Copilot instructions" >/dev/null
+      remove_repo_symlink "$other" "$test_root/repo/$retired_source" "Copilot instructions" >/dev/null
+      [ "$(readlink "$other")" = "$test_root/user.conf" ]
+      remove_repo_symlink "$regular" "$test_root/repo/$retired_source" "Copilot instructions" >/dev/null
+      grep -Fq 'keep' "$regular"
+    done
   )
 
+  grep -Fq '"${repo_root}/config/copilot/AGENTS.md"' install.sh
+  grep -Fq '"${repo_root}/copilot/AGENTS.md"' install.sh
   grep -Eq '^[[:space:]]+rmux$' install.sh
   if grep -Eq '^[[:space:]]+tmux$' install.sh; then
     echo "installer still installs tmux" >&2
@@ -1328,8 +1150,8 @@ run_retired_config_migration_smoke() {
     echo "active launchers still call retired tmux or WezTerm commands" >&2
     return 1
   fi
-  [ -f archive/tmux/.tmux.conf ]
-  [ -f archive/wezterm/wezterm.lua ]
+  [ ! -e archive/tmux/.tmux.conf ]
+  [ ! -e archive/wezterm/wezterm.lua ]
   [ ! -f .tmux.conf ]
   [ ! -f wezterm/wezterm.lua ]
   echo "retired tmux/WezTerm link migration ok"
@@ -1828,7 +1650,7 @@ run_smoke() {
   run_subagent_smoke
   run_claude_subagent_limit_smoke
   run_model_default_smoke
-  run_claude_github_mcp_warning_smoke
+  run_mcp_default_smoke
   run_copilot_terminal_smoke
   run_global_instructions_smoke
   run_wiki_smoke
@@ -1845,7 +1667,7 @@ case "${1:-all}" in
   apollo-online) DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh; verify_apollo_release_pins ;;
   instructions) run_global_instructions_smoke ;;
   models) run_model_default_smoke ;;
-  mcp) run_claude_github_mcp_warning_smoke ;;
+  mcp) run_mcp_default_smoke ;;
   wiki) run_wiki_smoke; run_pipeline_scripts_smoke; run_rmux_keymap_docs_smoke ;;
   rmux) run_rmux_helpers_smoke; run_rmux_keymap_docs_smoke; run_retired_config_migration_smoke; run_rmux_smoke ;;
   shellcheck) run_shellcheck ;;

@@ -45,11 +45,11 @@ Claude Code 保留原生客户端身份。名称中没有 `opus`，所以 copilo
 
 客户端名称和上游模型是两层。客户端保留原生 Anthropic ID；上游模型由 relay 决定。不要把 GPT ID 或 `_NAME` / `_DESCRIPTION` 显示覆盖写进 Claude 端设置。
 
-`[1m]` 后缀让 Claude Code 使用一百万 token 的模型 context 计数；relay 向上游发送规范 ID `gpt-6-astra`。Haiku ID 是已安装 CLI 自身的 small-fast ID，不加 `[1m]` 后缀。自动压缩刻意在 75,000 tokens 时触发，远早于 Astra 的 1M 总窗口内公布的 872,000-token prompt 上限。这并不意味着会保留完整的 1M-token 对话历史。Relay 端 thinking 在 `config/copilot-relay/config.yaml` 中设为 `max`。
+`[1m]` 后缀让 Claude Code 使用一百万 token 的模型 context 计数；relay 向上游发送规范 ID `gpt-6-astra`。Haiku ID 是已安装 CLI 自身的 small-fast ID，不加 `[1m]` 后缀。默认 Sonnet 路径在 624,000 tokens 时触发自动压缩，低于 Astra 的 1M 总窗口内公布的 872,000-token prompt 上限。这并不意味着会保留完整的 1M-token 对话历史。Relay 端 thinking 在 `config/copilot-relay/config.yaml` 中设为 `max`。
 
 使用本设置前，请先使用支持 GPT-6 Astra 的 relay 构建（见 [copilot-relay issue #57](https://github.com/D0n9X1n/copilot-relay/issues/57)）。修改模型时应同时更新 `config/claude/settings.json`、`config/zsh/claude.zsh` 和 `config/zsh/cc.zsh`；wrapper 的 `--model` 优先于设置文件。Relay 的 `gptModel` 不带后缀，空白的 `webSearchBackend` 也使用 Astra。Opus 路由保持独立。
 
-切换模型前，运行 `copilot` 并输入 `/model`，检查账号可用性和 effort 选项。这是 Copilot 的选择器，不是 Claude Code 的选择器，也不是 relay 本地的 `/v1/models`。`scripts/check.sh all` 通过后，运行两次 `./install.sh` 应用配置，再启动新的 shell 和 Claude Code 会话。安装器会重启 relay，可能中断正在进行的请求；请先等待请求结束。
+切换模型前，运行 `copilot` 并输入 `/model`，检查账号可用性和 effort 选项。这是 Copilot 的选择器，不是 Claude Code 的选择器，也不是 relay 本地的 `/v1/models`。`scripts/check.sh all` 通过后，运行两次 `./install.sh` 应用配置，再启动新的 shell 和 Claude Code 会话。安装器会保留健康的 relay 进程；恢复不健康的 relay 时可能中断请求。
 
 Sonnet-facing 槽位通过 `gptModel` 路由到 GPT-6 Astra；Opus 仍使用独立的 `opusModel` 路由。任务只要求修改一条路由时，不要同时修改两条。
 
@@ -71,17 +71,17 @@ Sonnet-facing 槽位通过 `gptModel` 路由到 GPT-6 Astra；Opus 仍使用独�
 | `statusLine.refreshInterval` | `100` |
 | `theme` | `custom:apollo`；生成的主题资源仍保留在本机 |
 | `autoCompactEnabled` | `true` |
-| `autoCompactWindow` | `120000`，尚未扣除输出 token 预留量 |
-| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"75"`；默认输出预算下在 75,000 tokens 时触发压缩 |
+| `autoCompactWindow` | `800000`，尚未扣除输出 token 预留量 |
+| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"80"`；默认 Sonnet 输出预算下在 624,000 tokens 时触发压缩 |
 | `feedbackDrafts` | `off` |
 
 `refreshInterval` 必须放在 `statusLine` 里面。Max effort 保留在环境变量和启动器 flag 中：Claude Code 2.1.261 不接受在持久化的顶层 `effortLevel` 设置中填写 `max`。
 
-### 75k 自动压缩
+### 800k 自动压缩窗口
 
-Claude Code 2.1.261 要求 `autoCompactWindow` 至少为 100,000，因此不能直接设置为 `75000`。受管配置采用 120,000-token 窗口和 `env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: "75"`。默认输出预算下，Claude 先预留 20,000 tokens：`(120000 - 20000) × 75% = 75000`。
+配置的窗口不等于压缩触发阈值。Claude Code 2.1.261 先扣除输出 token 预留量，再应用百分比。默认原生 Sonnet 路径下，所选设置得到 `(800000 - 20000) × 80% = 624000`。
 
-使用这些受管设置、且未覆盖输出预算的隔离 CLI 运行报告了 `effective_window: 100000`、`threshold: 75000` 和 `enforced: true`，没有发送上游请求。这是触发阈值，不是对话大小的硬上限；某一轮可能先越过阈值，再执行压缩。修改模型、输出预算或 `CLAUDE_CODE_AUTO_COMPACT_WINDOW` 覆盖值可能改变计算结果。编辑源设置后请启动新的 Claude Code 会话。
+使用受管设置且未覆盖输出预算的隔离 CLI 运行报告了 `effective_window: 780000`、`threshold: 624000` 和 `enforced: true`，没有发送上游请求。这是触发阈值，不是对话大小的硬上限；某一轮可能先越过阈值，再执行压缩。其他模型、输出预算或 `CLAUDE_CODE_AUTO_COMPACT_WINDOW` 覆盖值可能改变计算结果。编辑源设置后请启动新的 Claude Code 会话。
 
 `~/.claude/settings.json` 和 `~/.claude.json` 是不同文件：
 

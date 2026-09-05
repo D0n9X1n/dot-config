@@ -8,7 +8,6 @@ This page explains where files live and how `install.sh` moves them into your ho
 
 ```text
 config/   config used now
-archive/  old config; never installed
 scripts/  code that runs and external release pins
 wiki/     full help
 ```
@@ -59,7 +58,7 @@ The installer checks that every source exists, every destination is unique, and 
 | `config/launchd/*.plist` | render into `~/Library/LaunchAgents/` |
 | `scripts/copilot/cleanup-legacy.sh` | `~/.copilot/cleanup-legacy.sh` |
 
-`archive/` and `wiki/` are never linked by the installer.
+The manifest rejects archived sources. Wiki pages are never installed.
 
 ## External theme assets
 
@@ -123,23 +122,11 @@ Local Copilot entries are kept. Shared entries win when the same server name exi
 
 A server added only to `~/.claude.json` will be removed by the next install. Put a server in the local Copilot MCP file when both tools need it.
 
-Put tokens and API keys only in the local Copilot MCP file. Do not add them to this repo.
+Tokens and API keys for optional MCP servers belong only in the local Copilot MCP file. Do not add them to this repo.
 
-The hosted GitHub MCP uses a Bearer PAT header. Its OAuth dynamic client registration does not work with this setup.
+Copilot includes `github-mcp-server` and uses its existing GitHub login. Claude uses authenticated `gh` for GitHub work. This repo does not provision a separate GitHub MCP entry or PAT; shared MCP sync remains in place for Playwright and other configured servers.
 
-### Local GitHub MCP overrides
-
-Claude's local-scope entries live under `projects[].mcpServers` in `~/.claude.json`. They override same-name user entries completely; headers are not merged. The MCP import leaves these local entries untouched.
-
-After import, `install.sh` warns if a local GitHub HTTP entry has no auth header while the user entry has a configured Bearer token for the same hosted endpoint. It skips entries with their own auth, OAuth, `headersHelper`, or a different endpoint. The check prints escaped project paths only, never credentials; it does not change state or test token validity.
-
-Review the override first. If it is unintended, run this inside the affected project, then reconnect or restart Claude Code:
-
-```sh
-claude mcp remove github --scope local
-```
-
-This removes only the local duplicate so Claude can use the user-scoped credentials. The installer never removes overrides for you.
+Claude's local-scope entries live under `projects[].mcpServers` in `~/.claude.json`. They replace same-name user entries; headers are not merged. The MCP import leaves these local entries untouched.
 
 ## Local state
 
@@ -154,13 +141,22 @@ These paths are local and are not config sources:
 - SonicTerm save locks and backups
 - `~/.tmux/plugins/` and old resurrect files
 
-Local state is not the same as a user global. `~/.claude/CLAUDE.md`, `~/.copilot/AGENTS.md`, and `~/.copilot/copilot-instructions.md` are user globals: links to tracked sources in `config/`, edited here and reinstalled. `~/.claude.json` is local state the tools own. The MCP import replaces only its top-level `mcpServers` field and leaves per-project overrides alone. Other installer steps can update local preferences, such as the selected Apollo theme.
+Local state is not the same as a user global. `~/.claude/CLAUDE.md` and `~/.copilot/copilot-instructions.md` are user globals: links to tracked sources in `config/`, edited here and reinstalled. `~/.claude.json` is local state the tools own. The MCP import replaces only its top-level `mcpServers` field and leaves per-project overrides alone. Other installer steps can update local preferences, such as the selected Apollo theme.
 
 ## Retired links
 
 The installer no longer installs tmux or WezTerm. It removes `~/.tmux.conf`, `~/.wezterm.lua`, and the retired SonicTerm `wezterm.toml` only when they still point to this repo's exact old managed paths. User-owned files and links stay. Manually installed editor themes are never removed.
 
-See [Archived tmux](Archive-Tmux.md) and [Archived WezTerm](Archive-WezTerm.md).
+The duplicate `~/.copilot/AGENTS.md` link is also removed only when it points to this repo's current or former managed source. User files and foreign links stay.
+
+Retired tmux and WezTerm configs remain in Git history. Inspect the v2.4.0 copies with:
+
+```sh
+git show v2.4.0:archive/tmux/.tmux.conf
+git show v2.4.0:archive/wezterm/wezterm.lua
+```
+
+These are reference copies, not active config. Any future managed file must follow the current manifest rules.
 
 ## Apply and check
 

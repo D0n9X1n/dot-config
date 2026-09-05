@@ -25,17 +25,11 @@
 - [开发与发布](Development-and-Releases-zh-CN.md) — 检查、Wiki 发布、issues、tags 和 releases。
 - [Apollo 主题](Apollo-Theme-zh-CN.md) — 固定的上游 release 和本机运行 adapters。
 
-## 旧文件
-
-- [已归档的 tmux](Archive-Tmux-zh-CN.md) — 旧 TPM 设置和回滚说明。
-- [已归档的 WezTerm](Archive-WezTerm-zh-CN.md) — 旧 Lua 配置和兼容名称。
-
 ## 主要文件夹
 
 | 文件夹 | 含义 |
 |---|---|
 | `config/` | 现在使用的配置 |
-| `archive/` | 旧配置；永远不会安装 |
 | `scripts/` | 会运行的代码和外部 release pins |
 | `wiki/` | 完整说明 |
 

@@ -11,7 +11,6 @@ My macOS config for RMUX, SonicTerm, zsh, Claude Code, and GitHub Copilot CLI.
 
 ```text
 config/   config used now
-archive/  old config; never installed
 scripts/  code and release pins
 wiki/     full help
 ```

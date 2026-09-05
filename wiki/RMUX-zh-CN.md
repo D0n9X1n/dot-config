@@ -152,11 +152,9 @@ Copilot CLI 尚不能识别所有 RMUX/SonicTerm 终端身份。因此仓库中�
 
 ## 迁移边界
 
-原 tmux 源文件保存在 `archive/tmux/`，但不再生效。TPM、tmux-sensible、tmux-yank、resurrect 和 continuum 没有迁移，因为 RMUX 的兼容契约不保证这些插件的行为。现有 `~/.tmux/plugins/` 和 resurrect 快照保留用于回滚。
+已停用的 tmux 和 WezTerm 配置保留在 v2.4.0 的 Git 历史中。恢复方法见[仓库操作](Repository-Operations-zh-CN.md)。安装器不再安装这两个工具；用户自己的配置、`~/.tmux/plugins/` 和 resurrect 快照会保留。
 
-原 WezTerm Lua 配置保存在 `archive/wezterm/`。本仓库不再安装 WezTerm，也不再链接 `~/.wezterm.lua`；RMUX 使用当前受管的 SonicTerm 作为外层终端。
-
-参阅[已归档的 tmux 配置](Archive-Tmux-zh-CN.md)和[已归档的 WezTerm 配置](Archive-WezTerm-zh-CN.md)。
+TPM 插件没有迁移，因为 RMUX 不保证它们的行为。SonicTerm 是当前受管的外层终端。
 
 ## 验证
 

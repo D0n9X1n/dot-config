@@ -18,4 +18,4 @@
 
 These global settings are synced from `~/Public/dot-configs`.
 
-`~/.copilot/AGENTS.md` holds the same pointer. When you change these settings, edit the tracked config sources in that folder and read its `.github/copilot-instructions.md` first.
+When you change these settings, edit the tracked config sources there and read that folder's `.github/copilot-instructions.md` first.

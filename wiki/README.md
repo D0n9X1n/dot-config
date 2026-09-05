@@ -25,17 +25,11 @@ The source is the flat `wiki/` folder. GitHub Actions publishes it to the GitHub
 - [Development and releases](Development-and-Releases.md) — checks, Wiki publish, issues, tags, and releases.
 - [Apollo theme](Apollo-Theme.md) — pinned upstream releases and local runtime adapters.
 
-## Old files
-
-- [Archived tmux](Archive-Tmux.md) — the old TPM setup and rollback notes.
-- [Archived WezTerm](Archive-WezTerm.md) — the old Lua profile and compatibility name.
-
 ## Main folders
 
 | Folder | Meaning |
 |---|---|
 | `config/` | Config used now |
-| `archive/` | Old config; never installed |
 | `scripts/` | Code that runs and external release pins |
 | `wiki/` | Full help |
 

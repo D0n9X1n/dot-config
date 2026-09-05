@@ -36,7 +36,7 @@ The tracked config uses:
 
 Use **Reload Config** from the SonicTerm command palette after a config change. Some native window changes may need a restart.
 
-The keymaps named `wezterm` keep old key compatibility. The active theme is Apollo, and SonicTerm still tells child shells its real name.
+The active keymap is `sonicterm-macos`; `sonicterm-linux` and `sonicterm-windows` are also managed. Their custom bindings stay unchanged. Appearance uses `[appearance]`; unused legacy window and render keys are omitted.
 
 ## RMUX identity
 

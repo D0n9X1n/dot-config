@@ -4,7 +4,7 @@
 
 `install.sh` 会设置工具、本机服务、共享 MCP 数据、WakaTime 和清理任务。
 
-导入 MCP servers 之后，安装器会对以下情况发出警告：某个项目用未认证的同 endpoint 副本覆盖了 github server。该检查是只读的，不打印任何 auth 值。检测的具体形态和按 scope 的修复方式见[仓库操作](Repository-Operations-zh-CN.md)。
+Copilot 使用内置 GitHub 集成；Claude 使用已认证的 `gh`。不需要额外的 GitHub MCP 条目或 PAT。共享 MCP 数据和本机秘密边界请看[仓库操作](Repository-Operations-zh-CN.md)。
 
 ## 新 Mac 设置
 
@@ -162,7 +162,7 @@ launchctl kickstart -k "gui/$(id -u)/com.d0n9x1n.npm-cache-clean"
 
 安装器把它们合并到本机 Copilot MCP 数据，然后把 server map 导入 `~/.claude.json`。
 
-所有 key 和 token 都应放在本机 `~/.config/github-copilot/mcp.json`。永远不要放进共享文件。
+可选 MCP server 的 key 和 token 保留在本机 `~/.config/github-copilot/mcp.json`。永远不要放进共享文件。
 
 ## WakaTime
 

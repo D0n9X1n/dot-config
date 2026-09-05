@@ -152,11 +152,9 @@ Use a named socket for tests and automation so they cannot alter the interactive
 
 ## Migration boundaries
 
-The previous tmux source is preserved under `archive/tmux/`, but it is inactive. TPM, tmux-sensible, tmux-yank, resurrect, and continuum were not ported because RMUX's compatibility contract does not guarantee plugin behavior. Existing `~/.tmux/plugins/` and resurrect snapshots are preserved for rollback.
+The retired tmux and WezTerm configs remain in v2.4.0 Git history. See [Repository operations](Repository-Operations.md) for recovery. The installer no longer installs those tools; user-owned config, `~/.tmux/plugins/`, and resurrect snapshots are preserved.
 
-The previous WezTerm Lua config is preserved under `archive/wezterm/`. The repository no longer installs WezTerm or links `~/.wezterm.lua`; SonicTerm is the actively managed outer terminal RMUX uses.
-
-See [Archived tmux configuration](Archive-Tmux.md) and [Archived WezTerm configuration](Archive-WezTerm.md).
+TPM plugins were not ported because RMUX does not guarantee their behavior. SonicTerm is the actively managed outer terminal.
 
 ## Verification
 
