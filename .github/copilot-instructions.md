@@ -53,3 +53,4 @@ For config changes, run `./install.sh` twice after checks pass.
 This repo is public. Do not commit tokens, keys, auth files, logs, runtime state, SonicTerm save locks, or `.claude/worktrees/`.
 
 Do not force-push. Do not use `--no-verify` unless the user asks.
+After merging a PR, complete the branch/worktree cleanup in `wiki/Development-and-Releases.md`, preserving active and unmerged work.
