@@ -52,7 +52,7 @@ http://127.0.0.1:4142
 ```yaml
 claudeSetup: false
 thinkEffort: max
-gptModel: gpt-5.6-sol
+gptModel: gpt-6-astra
 opusModel: claude-opus-5
 ```
 

@@ -179,41 +179,46 @@ SH
 }
 
 run_model_default_smoke() {
-  # Claude Code: Sonnet 5 is the startup picker identity and the relay maps its
-  # non-Opus name to gpt-5.6-sol; "[1m]" keeps 1M-context accounting.
+  # Claude Code: GPT-6 Astra is the startup identity; "[1m]" keeps
+  # one-million-token client context accounting while relay strips it upstream.
   jq -e '
-    .env.ANTHROPIC_MODEL == "claude-sonnet-5[1m]" and
-    .model == "claude-sonnet-5[1m]" and
-    .effortLevel == "max" and
+    .env.ANTHROPIC_MODEL == "gpt-6-astra[1m]" and
+    .model == "gpt-6-astra[1m]" and
+    (has("effortLevel") | not) and
     .env.MODEL_REASONING_EFFORT == "max" and
-    .env.ANTHROPIC_DEFAULT_SONNET_MODEL == "claude-sonnet-5[1m]" and
-    .env.ANTHROPIC_DEFAULT_SONNET_MODEL_NAME == "Sonnet 5" and
-    .env.ANTHROPIC_DEFAULT_SONNET_MODEL_DESCRIPTION == "Sonnet 5 (1M context), routed by copilot-relay to gpt-5.6-sol" and
-    .env.ANTHROPIC_DEFAULT_HAIKU_MODEL == "gpt-5.6-sol[1m]" and
-    .env.ANTHROPIC_SMALL_FAST_MODEL == "gpt-5.6-sol[1m]"
+    .env.ANTHROPIC_DEFAULT_SONNET_MODEL == "gpt-6-astra[1m]" and
+    .env.ANTHROPIC_DEFAULT_SONNET_MODEL_NAME == "GPT-6 Astra" and
+    .env.ANTHROPIC_DEFAULT_SONNET_MODEL_DESCRIPTION == "GPT-6 Astra (1M context) through copilot-relay" and
+    .env.ANTHROPIC_DEFAULT_HAIKU_MODEL == "gpt-6-astra[1m]" and
+    .env.ANTHROPIC_SMALL_FAST_MODEL == "gpt-6-astra[1m]" and
+    .autoCompactEnabled == true and
+    .autoCompactWindow == 120000 and
+    .env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE == "75" and
+    .feedbackDrafts == "off" and
+    .enabledPlugins["clangd-lsp@claude-plugins-official"] == true
   ' config/claude/settings.json >/dev/null
 
-  # Copilot CLI: Opus 5 at the 1M context tier and max effort.
+  # Copilot CLI: GPT-6 Astra at the 1M context tier and max effort.
   jq -e '
-    .model == "claude-opus-5" and
+    .model == "gpt-6-astra" and
     .contextTier == "long_context" and
     .effortLevel == "max"
   ' config/copilot/settings.json >/dev/null
 
-  # Relay: Opus route -> claude-opus-5, GPT route stays gpt-5.6-sol, max effort.
+  # Relay: Opus remains separate; every non-Opus route uses GPT-6 Astra.
   grep -Eq '^opusModel:[[:space:]]*claude-opus-5$' config/copilot-relay/config.yaml
-  grep -Eq '^gptModel:[[:space:]]*gpt-5\.6-sol$' config/copilot-relay/config.yaml
+  grep -Eq '^gptModel:[[:space:]]*gpt-6-astra$' config/copilot-relay/config.yaml
   grep -Eq '^thinkEffort:[[:space:]]*max$' config/copilot-relay/config.yaml
 
   grep -Fq $'link\tconfig/copilot-relay/config.yaml\t.copilot-relay/config.yaml' config/manifest.tsv
 
   # Launcher wrappers inject the same defaults (settings.json can be rewritten
   # at runtime, so the flags are the authoritative per-launch pin).
-  grep -Fq -- "--model 'claude-sonnet-5[1m]'" config/zsh/claude.zsh
-  grep -Fq -- "--model 'claude-sonnet-5[1m]' --effort max" config/zsh/cc.zsh
-  grep -Fq -- "--model claude-opus-5 --context long_context --effort max" config/zsh/gg.zsh
+  grep -Fq -- "--model 'gpt-6-astra[1m]'" config/zsh/claude.zsh
+  grep -Fq -- "--model 'gpt-6-astra[1m]' --effort max" config/zsh/cc.zsh
+  grep -Fq -- "--model gpt-6-astra --context long_context --effort max" config/zsh/gg.zsh
 
-  echo "model defaults ok: Sonnet 5 picker identity @ max effort, 1M context (relay upstream: gpt-5.6-sol)"
+  echo "model defaults ok: GPT-6 Astra @ max effort, 1M context"
 }
 
 run_copilot_terminal_smoke() {
@@ -240,7 +245,7 @@ SH
 
     PATH="$fake_bin:$PATH" COPILOT_CAPTURE="$gg_capture" TERM_PROGRAM=rmux \
       zsh -c 'unset RMUX TMUX WEZTERM_PANE; source config/zsh/gg.zsh; gg terminal-smoke >/dev/null; [[ "$TERM_PROGRAM" = rmux ]]'
-    grep -Fq 'WezTerm|truecolor|3|--allow-all-tools --allow-all-paths --model claude-opus-5 --context long_context --effort max' "$gg_capture"
+    grep -Fq 'WezTerm|truecolor|3|--allow-all-tools --allow-all-paths --model gpt-6-astra --context long_context --effort max' "$gg_capture"
   )
 
   echo "Copilot launchers advertise WezTerm truecolor without replacing RMUX identity"
@@ -276,6 +281,9 @@ run_global_instructions_smoke() {
   done
 
   grep -Fq 'Do not use ASCII-art flowcharts' config/claude/CLAUDE.md
+  for file in config/claude/CLAUDE.md config/copilot/copilot-instructions.md; do
+    grep -Fq 'Keep conversational prose concise by default.' "$file"
+  done
   for file in config/claude/CLAUDE.md config/copilot/AGENTS.md; do
     grep -Fq 'Development-and-Releases.md' "$file"
     grep -Fq 'scripts/check.sh all' "$file"
@@ -1124,7 +1132,7 @@ run_apollo_smoke() {
   grep -Fq 'ZSH_THEME=apollo' config/zsh/custom.zsh
   grep -Fq 'FAST_WORK_DIR' config/zsh/custom.zsh
   grep -Fq $'link\tconfig/zsh/themes/apollo.zsh-theme\t.oh-my-zsh/custom/themes/apollo.zsh-theme' config/manifest.tsv
-  jq -e 'has("theme") | not' config/claude/settings.json >/dev/null
+  jq -e '.theme == "custom:apollo"' config/claude/settings.json >/dev/null
   jq -e '.theme == "default"' config/copilot/settings.json >/dev/null
 
   if grep -En '#[0-9a-fA-F]{6}|38;2;|48;2;' \
