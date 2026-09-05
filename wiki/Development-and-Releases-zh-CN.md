@@ -71,7 +71,7 @@ scripts/check.sh wiki
 scripts/check.sh rmux
 ```
 
-`models` 断言受管模型选择器：Claude 设置和启动器 wrapper 中的原生客户端 ID、Copilot 自己的 GPT-6 Astra 设置，以及 relay 独立的 Opus 路由。`mcp` 覆盖安装器只读的 GitHub MCP 覆盖警告。
+`models` 断言受管模型选择器：Claude 设置和启动器 wrapper 中的原生客户端 ID、Copilot 自己的 GPT-6 Astra 设置，以及 relay 独立的 Opus 路由。`mcp` 检查共享 MCP 默认值：保留 Playwright，不配置重复的 GitHub 条目或 PAT 模板。
 
 状态栏布局、缓存和生成的 palette 由两个 provider 共享，所以修改任一脚本或生成器时，由 `apollo` 和 `smoke` 一起检查。provider 各自的强调仍然不同：Copilot 使用亮前景角色并保留实时 subagent 行，Claude 两者都不用。修改共享生成器时，保持 Claude 输出不变。
 

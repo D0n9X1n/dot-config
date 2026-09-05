@@ -4,7 +4,7 @@ English | [简体中文](Services-and-Automation-zh-CN.md)
 
 `install.sh` sets up tools, local services, shared MCP data, WakaTime, and cleanup jobs.
 
-After importing MCP servers, the installer warns about any project that overrides the github server with an unauthenticated copy of the same endpoint. The check is read-only and prints no auth values. See [Repository operations](Repository-Operations.md) for the shape it detects and the scoped fix.
+Copilot uses its built-in GitHub integration; Claude uses authenticated `gh`. No extra GitHub MCP entry or PAT is needed. See [Repository operations](Repository-Operations.md) for shared MCP data and local-secret boundaries.
 
 ## New Mac setup
 
@@ -162,7 +162,7 @@ Its main log is `~/Library/Logs/npm-cache-clean.log`. The script keeps at most 5
 
 The installer merges them into local Copilot MCP data and then imports the server map into `~/.claude.json`.
 
-Put all keys and tokens in local `~/.config/github-copilot/mcp.json`. Never put them in the shared file.
+Keys and tokens for optional MCP servers stay in local `~/.config/github-copilot/mcp.json`. Never put them in the shared file.
 
 ## WakaTime
 

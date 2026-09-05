@@ -36,7 +36,7 @@ config/sonicterm/keymaps/*.toml
 
 修改配置后，在 SonicTerm command palette 中使用 **Reload Config**。有些原生窗口修改可能需要重启。
 
-名为 `wezterm` 的 keymap 保留旧按键兼容。当前主题是 Apollo，SonicTerm 仍会告诉子 shell 它的真实名称。
+当前 keymap 是 `sonicterm-macos`；仓库也管理 `sonicterm-linux` 和 `sonicterm-windows`。它们的自定义按键保持不变。外观使用 `[appearance]`；已省去无效的旧 window 和 render 配置项。
 
 ## RMUX 身份
 

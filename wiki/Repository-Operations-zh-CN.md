@@ -8,7 +8,6 @@
 
 ```text
 config/   现在使用的配置
-archive/  旧配置；永远不会安装
 scripts/  会运行的代码和外部 release pins
 wiki/     完整说明
 ```
@@ -59,7 +58,7 @@ type<TAB>source<TAB>home destination
 | `config/launchd/*.plist` | 渲染到 `~/Library/LaunchAgents/` |
 | `scripts/copilot/cleanup-legacy.sh` | `~/.copilot/cleanup-legacy.sh` |
 
-安装器永远不会链接 `archive/` 或 `wiki/`。
+清单不接受归档源文件。Wiki 页面永远不会被安装。
 
 ## 外部主题文件
 
@@ -123,23 +122,11 @@ DOT_CONFIGS_INSTALL_LOG=/tmp/install.log ./install.sh
 
 只添加到 `~/.claude.json` 的 server 会在下一次安装时被删除。两个工具都需要的 server 应放在本机 Copilot MCP 文件中。
 
-Token 和 API key 只能放在本机 Copilot MCP 文件中。不要把它们加入本仓库。
+可选 MCP server 的 token 和 API key 只能放在本机 Copilot MCP 文件中。不要把它们加入本仓库。
 
-托管 GitHub MCP 使用 Bearer PAT header。它的 OAuth dynamic client registration 不适用于当前设置。
+Copilot 内置 `github-mcp-server`，使用已有的 GitHub 登录。Claude 通过已认证的 `gh` 处理 GitHub 工作。本仓库不再配置单独的 GitHub MCP 条目或 PAT；共享 MCP 同步仍服务于 Playwright 和其他已配置的 server。
 
-### 本机 GitHub MCP 覆盖
-
-Claude 的 local scope 条目位于 `~/.claude.json` 的 `projects[].mcpServers` 下。它们完整覆盖同名用户级条目，不会合并 header。MCP 导入会保留这些本机条目。
-
-导入后，如果本机 GitHub HTTP 条目缺少认证 header，而用户级条目为同一托管 endpoint 配置了 Bearer token，`install.sh` 会发出警告。拥有独立认证、OAuth、`headersHelper` 或不同 endpoint 的条目会跳过。检查只打印转义后的项目路径，绝不打印凭据；它不修改状态，也不验证 token 是否有效。
-
-先检查覆盖是否有意设置。若不是，请在受影响项目中运行以下命令，然后重新连接或重启 Claude Code：
-
-```sh
-claude mcp remove github --scope local
-```
-
-这只移除本机重复条目，让 Claude 使用用户级凭据。安装器不会替你移除覆盖。
+Claude 的 local scope 条目位于 `~/.claude.json` 的 `projects[].mcpServers` 下。它们替换同名用户级条目，不会合并 header。MCP 导入会保留这些本机条目。
 
 ## 本机状态
 
@@ -154,13 +141,22 @@ claude mcp remove github --scope local
 - SonicTerm save lock 和备份
 - `~/.tmux/plugins/` 和旧 resurrect 文件
 
-本机状态和用户全局文件不是一回事。`~/.claude/CLAUDE.md`、`~/.copilot/AGENTS.md` 和 `~/.copilot/copilot-instructions.md` 是用户全局文件：它们链接到 `config/` 中的受管源文件，在本仓库修改后重新安装。`~/.claude.json` 是工具自己拥有的本机状态。MCP 导入只替换其顶层 `mcpServers` 字段，不修改按项目设置的覆盖。安装器的其他步骤可能更新本机偏好，例如选中的 Apollo 主题。
+本机状态和用户全局文件不是一回事。`~/.claude/CLAUDE.md` 和 `~/.copilot/copilot-instructions.md` 是用户全局文件：它们链接到 `config/` 中的受管源文件，在本仓库修改后重新安装。`~/.claude.json` 是工具自己拥有的本机状态。MCP 导入只替换其顶层 `mcpServers` 字段，不修改按项目设置的覆盖。安装器的其他步骤可能更新本机偏好，例如选中的 Apollo 主题。
 
 ## 已停用链接
 
 安装器不再安装 tmux 或 WezTerm。只有当 `~/.tmux.conf`、`~/.wezterm.lua` 和停用的 SonicTerm `wezterm.toml` 仍指向本仓库过去的精确受管路径时，才会删除它们。用户自己的文件和链接会保留。手动安装的编辑器主题永远不会删除。
 
-请看[已归档的 tmux](Archive-Tmux-zh-CN.md)和[已归档的 WezTerm](Archive-WezTerm-zh-CN.md)。
+重复的 `~/.copilot/AGENTS.md` 链接也只在指向本仓库当前或过去的受管源文件时删除。用户文件和其他链接会保留。
+
+已停用的 tmux 和 WezTerm 配置保留在 Git 历史中。查看 v2.4.0 的副本：
+
+```sh
+git show v2.4.0:archive/tmux/.tmux.conf
+git show v2.4.0:archive/wezterm/wezterm.lua
+```
+
+这些副本仅供参考，不是生效配置。以后添加受管文件时，仍须遵循当前清单规则。
 
 ## 应用与检查
 

@@ -27,18 +27,17 @@ Copilot 可能在运行时添加或删除 `staff` 字段。不要把它留在受
 
 ## 全局指令
 
-Copilot 安装两个指令文件：
+`config/copilot/copilot-instructions.md` 安装为 `~/.copilot/copilot-instructions.md`。Copilot 会自动加载这个原生用户级全局文件。
 
-- `config/copilot/copilot-instructions.md` → `~/.copilot/copilot-instructions.md`
-- `config/copilot/AGENTS.md` → `~/.copilot/AGENTS.md`
+它让对话文字默认直接、简短。明确要求更多细节时仍按要求回答；代码、命令、检查结果、证据、必要说明、安全信息和技术准确性必须保持完整。它也保留工作规则：直接运行工具和命令，不再询问；直接开始任务。
 
-原生文件保存 Copilot 的用户级行为。它让对话文字默认直接、简短。明确要求更多细节时仍按要求回答；代码、命令、检查结果、证据、必要说明、安全信息和技术准确性必须保持完整。它也保留工作规则：直接运行工具和命令，不再询问；直接开始任务。
+文件保留可复用行为和指向 `~/Public/dot-configs` 的条件指针。修改这些受管设置前，先读该目录的 `.github/copilot-instructions.md`。仓库专属规则留在那里，不会在无关项目中加载。
 
-两个全局文件只保留可复用行为，加一条条件指针：这些设置从 `~/Public/dot-configs` 同步；要修改它们，先读该目录的 `.github/copilot-instructions.md`。仓库专属规则留在本仓库自己的 `.github/copilot-instructions.md`，这样无关项目不会加载它们。
+不再需要重复的全局 `AGENTS.md` 或 shell 注入的指令目录。用户自行设置的 `COPILOT_CUSTOM_INSTRUCTIONS_DIRS` 值保持不变。
 
-Copilot 不一定会内联全局 `AGENTS.md`，所以原生文件用绝对路径写明 `~/.copilot/AGENTS.md`，并自己重复一次设置来源指针。任何一个文件单独加载时，都能说明全局设置在哪里。
+## GitHub 访问
 
-`config/zsh/custom.zsh` 把 `~/.copilot` 加入 `COPILOT_CUSTOM_INSTRUCTIONS_DIRS`。它会保留已有路径，也不会重复添加。该接线属于 shell 层，由 `scripts/check.sh instructions` 断言，不再写进指令正文。
+Copilot 内置的 `github-mcp-server` 使用已有 GitHub 登录。本设置不需要单独的 GitHub MCP 条目或 PAT。Claude 使用已认证的 `gh`；其他 MCP server 的设置见[仓库操作](Repository-Operations-zh-CN.md)。
 
 ## 终端身份
 
@@ -127,10 +126,6 @@ wakatime/copilot-cli-wakatime
 它使用 `~/.wakatime.cfg` 中的 API key。Plugin 会管理自己的 WakaTime CLI。
 
 安装器发现旧 WakaTime MCP、旧 Homebrew `wakatime-cli` 或旧第三方 npm plugin 时，会删除它们。
-
-## Session sync
-
-受管设置会同步选定仓库的用户 session，并让其他 session 留在本机。修改列表前请检查 `sessionSync`。
 
 ## 检查
 

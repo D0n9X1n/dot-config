@@ -45,11 +45,11 @@ Other routes:
 
 Client names and upstream models are separate layers. The client keeps native Anthropic ids; the relay decides the upstream model. Do not write a GPT id, or a `_NAME` / `_DESCRIPTION` display override, into Claude-facing settings.
 
-The `[1m]` suffix keeps Claude Code's one-million-token model context accounting; the relay sends canonical `gpt-6-astra` upstream. The Haiku id is the installed CLI's own small-fast id and takes no `[1m]` suffix. Automatic compaction deliberately starts at 75,000 tokens, well before Astra's advertised 872,000-token prompt limit within its 1M total window. This does not retain a full 1M-token conversation history. Relay-side thinking is `max` in `config/copilot-relay/config.yaml`.
+The `[1m]` suffix keeps Claude Code's one-million-token model context accounting; the relay sends canonical `gpt-6-astra` upstream. The Haiku id is the installed CLI's own small-fast id and takes no `[1m]` suffix. Automatic compaction starts at 624,000 tokens on the default Sonnet path, below Astra's advertised 872,000-token prompt limit within its 1M total window. This does not retain a full 1M-token conversation history. Relay-side thinking is `max` in `config/copilot-relay/config.yaml`.
 
 Use a relay build with GPT-6 Astra support before relying on this setup (tracked in [copilot-relay issue #57](https://github.com/D0n9X1n/copilot-relay/issues/57)). Update the model in `config/claude/settings.json`, `config/zsh/claude.zsh`, and `config/zsh/cc.zsh` together; the wrappers' `--model` overrides the settings. The relay's `gptModel` stays suffix-free. Its blank `webSearchBackend` also uses Astra. Keep the Opus route separate.
 
-Run `copilot` and enter `/model` to check account availability and effort choices before changing models. That is Copilot's picker, not Claude Code's picker or the relay's local `/v1/models`. After `scripts/check.sh all` passes, apply through `./install.sh` twice and start a new shell and Claude Code session. The installer restarts the relay and may interrupt active requests; wait for them to finish first.
+Run `copilot` and enter `/model` to check account availability and effort choices before changing models. That is Copilot's picker, not Claude Code's picker or the relay's local `/v1/models`. After `scripts/check.sh all` passes, apply through `./install.sh` twice and start a new shell and Claude Code session. The installer leaves a healthy relay running; recovery of an unhealthy relay may interrupt requests.
 
 The Sonnet-facing slot routes to GPT-6 Astra through `gptModel`; Opus stays on its separate `opusModel` route. Do not change both routes when a task names only one.
 
@@ -71,17 +71,17 @@ The Sonnet-facing slot routes to GPT-6 Astra through `gptModel`; Opus stays on i
 | `statusLine.refreshInterval` | `100` |
 | `theme` | `custom:apollo`; generated theme assets stay local |
 | `autoCompactEnabled` | `true` |
-| `autoCompactWindow` | `120000` before the output-token reserve |
-| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"75"`; triggers compaction at 75,000 tokens with the default output budget |
+| `autoCompactWindow` | `800000` before the output-token reserve |
+| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"80"`; triggers compaction at 624,000 tokens with the default Sonnet output budget |
 | `feedbackDrafts` | `off` |
 
 `refreshInterval` belongs inside `statusLine`. Keep max effort in the environment and launcher flags: Claude Code 2.1.261 does not accept `max` in the persisted top-level `effortLevel` setting.
 
-### 75k automatic compaction
+### 800k automatic-compaction window
 
-Claude Code 2.1.261 requires `autoCompactWindow` to be at least 100,000, so setting it to `75000` is invalid. The tracked combination is a 120,000-token window and `env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: "75"`. With the default output budget, Claude reserves 20,000 tokens first: `(120000 - 20000) × 75% = 75000`.
+The configured window is not the compaction trigger. Claude Code 2.1.261 subtracts its output-token reserve before applying the percentage. On the default native Sonnet path, the selected settings give `(800000 - 20000) × 80% = 624000`.
 
-An isolated run of the installed CLI, using these tracked settings and no output-budget override, reported `effective_window: 100000`, `threshold: 75000`, and `enforced: true`. No upstream request was made. This sets a trigger, not a hard transcript-size cap; a turn can cross it before compaction runs. Changing the model, output budget, or `CLAUDE_CODE_AUTO_COMPACT_WINDOW` override can change the calculation. Start a new Claude Code session after editing the source settings.
+An isolated run of the installed CLI, using the tracked settings without an output-budget override, reported `effective_window: 780000`, `threshold: 624000`, and `enforced: true`. No upstream request was made. This is a trigger, not a hard transcript-size cap; a turn can cross it before compaction runs. Other models, output budgets, or `CLAUDE_CODE_AUTO_COMPACT_WINDOW` overrides can change the calculation. Start a new Claude Code session after editing the source settings.
 
 `~/.claude/settings.json` and `~/.claude.json` are different files:
 

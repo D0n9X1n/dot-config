@@ -7,7 +7,6 @@ The Wiki is the full source of truth for this repo. Do not copy its full help in
 ## Repo map
 
 - `config/` has config used now.
-- `archive/` has old files. Never link it.
 - `scripts/` has code that runs and external release pins.
 - `wiki/` has all full help.
 - `install.sh` stays at the root.

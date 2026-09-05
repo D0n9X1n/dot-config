@@ -1,6 +1,6 @@
 ---
 name: update-settings
-description: Change or apply a setting in this dot-configs repo. Use the config manifest, update the matching English and Chinese Wiki pages, run checks, then run install.sh. TRIGGER for changes to Claude Code, Copilot CLI, RMUX, SonicTerm, zsh, copilot-relay, MCP, status lines, or launchd. SKIP for read-only questions and archived tmux or WezTerm files.
+description: Change or apply a setting in this dot-configs repo. Use the config manifest, update the matching English and Chinese Wiki pages, run checks, then run install.sh. TRIGGER for changes to Claude Code, Copilot CLI, RMUX, SonicTerm, zsh, copilot-relay, MCP, status lines, or launchd. SKIP for read-only questions and retired tmux or WezTerm settings in Git history.
 ---
 
 # Update settings
@@ -18,7 +18,7 @@ Never edit a managed file under `$HOME`.
 | Claude status line | `config/claude/statusline.sh` | `~/.claude/statusline.sh` |
 | Claude skills | `config/claude/skills/` | `~/.claude/skills/` |
 | Copilot settings | `config/copilot/settings.json` | `~/.copilot/settings.json` |
-| Copilot global rules | `config/copilot/AGENTS.md` and `copilot-instructions.md` | `~/.copilot/` |
+| Copilot global rules | `config/copilot/copilot-instructions.md` | `~/.copilot/copilot-instructions.md` |
 | Copilot status line | `config/copilot/statusline.sh` | `~/.copilot/statusline.sh` |
 | RMUX | `config/rmux/rmux.conf` | `~/.rmux.conf` |
 | SonicTerm | `config/sonicterm/` | `~/.sonicterm/` |
@@ -30,7 +30,7 @@ Never edit a managed file under `$HOME`.
 
 `config/manifest.tsv` is the tracked-file install list. Add a row when a new managed file is added.
 
-Never make a file under `archive/` active.
+Retired configs stay in Git history. Managed sources must live under `config/` or `scripts/` and be listed in the manifest.
 
 ## Keep linked behavior together
 
@@ -80,9 +80,9 @@ Plists under `config/launchd/` are templates.
 
 ### Global instructions
 
-Keep `config/claude/CLAUDE.md`, `config/copilot/AGENTS.md`, and `config/copilot/copilot-instructions.md` short. They hold reusable behavior plus one conditional pointer: these settings are synced from `~/Public/dot-configs`, and a change to them starts by reading that folder's own instruction file. Repo-only rules stay in this repo's `.claude/CLAUDE.md` and `.github/copilot-instructions.md`, so an unrelated project never loads them.
+Keep `config/claude/CLAUDE.md` and `config/copilot/copilot-instructions.md` short. They hold reusable behavior and a conditional pointer to `~/Public/dot-configs`. Changes to managed settings start by reading that folder's own instruction file. Repo-only rules stay in `.claude/CLAUDE.md` and `.github/copilot-instructions.md`.
 
-Copilot's native entry file is `config/copilot/copilot-instructions.md`. It names `~/.copilot/AGENTS.md` by absolute path and repeats the settings-source pointer, because Copilot does not reliably inline the global `AGENTS.md`. `config/zsh/custom.zsh` keeps `~/.copilot` in `COPILOT_CUSTOM_INSTRUCTIONS_DIRS`; that wiring is asserted by `scripts/check.sh instructions`, not repeated in the instruction text.
+Copilot automatically loads `~/.copilot/copilot-instructions.md`. Do not add a duplicate global `AGENTS.md` or inject its directory through the shell. Preserve any user-supplied `COPILOT_CUSTOM_INSTRUCTIONS_DIRS` value.
 
 ## Update help
 

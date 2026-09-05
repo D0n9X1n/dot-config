@@ -27,18 +27,17 @@ Copilot can add or remove a `staff` field at runtime. Keep that field out of the
 
 ## Global instructions
 
-Copilot has two installed instruction files:
+`config/copilot/copilot-instructions.md` installs as `~/.copilot/copilot-instructions.md`. Copilot loads this native user-global file automatically.
 
-- `config/copilot/copilot-instructions.md` → `~/.copilot/copilot-instructions.md`
-- `config/copilot/AGENTS.md` → `~/.copilot/AGENTS.md`
+It makes conversational prose direct and concise by default. Requests for more detail still win; code, commands, findings, evidence, caveats, safety information, and technical precision stay complete. It also keeps the working rules: run tools and commands without asking, and work on the task directly.
 
-The native file keeps Copilot's user-wide behavior. It makes conversational prose direct and concise by default. Requests for more detail still win, and code, commands, findings, evidence, caveats, safety information, and technical precision stay complete. It also keeps the working rules: run tools and commands without asking, and work on the task directly.
+The file holds reusable behavior and a conditional pointer to `~/Public/dot-configs`. Changes to these managed settings start by reading that folder's `.github/copilot-instructions.md`. Repo-only rules stay there, so unrelated projects do not load them.
 
-Both global files hold only reusable behavior plus one conditional pointer: these settings are synced from `~/Public/dot-configs`, and a change to them starts by reading that folder's `.github/copilot-instructions.md`. Repo-only rules stay in this repo's own `.github/copilot-instructions.md`, so an unrelated project never loads them.
+No duplicate global `AGENTS.md` or shell-injected instruction directory is needed. Any user-supplied `COPILOT_CUSTOM_INSTRUCTIONS_DIRS` value stays untouched.
 
-Copilot does not reliably inline the global `AGENTS.md`, so the native file names `~/.copilot/AGENTS.md` by absolute path and repeats the settings-source pointer itself. Either file alone still says where the global settings live.
+## GitHub access
 
-`config/zsh/custom.zsh` adds `~/.copilot` to `COPILOT_CUSTOM_INSTRUCTIONS_DIRS`. It keeps any paths that already exist and does not add a duplicate. That wiring is a shell concern and is asserted by `scripts/check.sh instructions`, not repeated in the instruction text.
+Copilot's built-in `github-mcp-server` uses its existing GitHub login. No separate GitHub MCP entry or PAT is needed for this setup. Claude uses authenticated `gh`; see [Repository operations](Repository-Operations.md) for other MCP servers.
 
 ## Terminal identity
 
@@ -127,10 +126,6 @@ wakatime/copilot-cli-wakatime
 It uses the API key from `~/.wakatime.cfg`. The plugin manages its own WakaTime CLI.
 
 The installer removes the old WakaTime MCP, old Homebrew `wakatime-cli`, and old third-party npm plugin when found.
-
-## Session sync
-
-The tracked settings sync user sessions for selected repositories and keep all other sessions local. Review `sessionSync` before changing this list.
 
 ## Check
 

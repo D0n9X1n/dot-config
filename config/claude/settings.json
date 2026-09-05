@@ -7,7 +7,7 @@
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4-5-20251001",
     "ANTHROPIC_SMALL_FAST_MODEL": "claude-haiku-4-5-20251001",
     "MODEL_REASONING_EFFORT": "max",
-    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "75",
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "80",
     "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": "16"
   },
   "permissions": {
@@ -36,7 +36,7 @@
     }
   },
   "feedbackDrafts": "off",
-  "autoCompactWindow": 120000,
+  "autoCompactWindow": 800000,
   "skipDangerousModePermissionPrompt": true,
   "theme": "custom:apollo",
   "autoCompactEnabled": true,

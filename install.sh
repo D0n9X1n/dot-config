@@ -2,7 +2,6 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-src_dir="$repo_root"
 config_root="${repo_root}/config"
 scripts_root="${repo_root}/scripts"
 manifest="${config_root}/manifest.tsv"
@@ -742,7 +741,6 @@ old_source_for_destination() {
     .rmux.conf) printf '%s\n' "${repo_root}/.rmux.conf" ;;
     .sonicterm/*) printf '%s\n' "${repo_root}/$1" ;;
     .claude/*) printf '%s\n' "${repo_root}/claude/${1#.claude/}" ;;
-    .copilot/cleanup-legacy.sh) printf '%s\n' "${repo_root}/copilot/cleanup-legacy.sh" ;;
     .copilot/*) printf '%s\n' "${repo_root}/copilot/${1#.copilot/}" ;;
     .oh-my-zsh/custom/*) printf '%s\n' "${repo_root}/oh-my-zsh-custom/${1#.oh-my-zsh/custom/}" ;;
     .copilot-relay/config.yaml) printf '%s\n' "${repo_root}/.copilot-relay/config.yaml" ;;
@@ -836,19 +834,9 @@ link_manifest_files() {
 }
 
 remove_legacy_claude_subagent_hook() {
-  local hook="${HOME}/.claude/hooks/subagent-counter.sh"
   local hooks_dir="${HOME}/.claude/hooks"
-  local former_target="${src_dir}/claude/hooks/subagent-counter.sh"
-  local target=""
-
-  if [ -L "$hook" ]; then
-    target="$(readlink "$hook")"
-    if [ "$target" = "$former_target" ]; then
-      rm -f "$hook"
-      echo "Migration: removed obsolete Claude Code subagent-counter hook symlink."
-    fi
-  fi
-
+  remove_repo_symlink "${hooks_dir}/subagent-counter.sh" \
+    "${repo_root}/claude/hooks/subagent-counter.sh" "Claude subagent hook"
   if [ -d "$hooks_dir" ]; then
     rmdir "$hooks_dir" 2>/dev/null || true
   fi
@@ -972,49 +960,6 @@ install_copilot_relay_healthcheck() {
   fi
 }
 
-# Local MCP definitions replace user definitions rather than inheriting headers.
-warn_claude_github_mcp_overrides() {
-  local claude_user_json="${HOME}/.claude.json"
-  local projects project
-
-  have_cmd jq || return 0
-  [ -f "$claude_user_json" ] || return 0
-
-  projects="$(jq -r '
-      def github_http:
-        type == "object" and .type == "http"
-        and ((.url // "") | sub("/$"; "")) == "https://api.githubcopilot.com/mcp";
-      def auth_values:
-        [(.headers // {}) | to_entries[]
-         | select((.key | ascii_downcase) == "authorization")
-         | .value | select(type == "string")];
-      def delegated:
-        (keys_unsorted | map(ascii_downcase) | any(startswith("oauth")))
-        or has("headersHelper");
-      (.mcpServers.github // {}) as $global
-      | if ($global | github_http)
-          and ($global | auth_values | any(test("^Bearer[[:space:]]+[^[:space:]]+"; "i"))) then
-          (.projects // {}) | to_entries[]
-          | (.value.mcpServers.github // {}) as $local
-          | select($local | github_http)
-          | select($local | auth_values | any(test("[^[:space:]]")) | not)
-          | select($local | delegated | not)
-          | .key | @json
-        else empty end
-    ' "$claude_user_json" 2>/dev/null)" || {
-    printf '%s\n' 'Warning: could not inspect Claude local state for GitHub MCP overrides.'
-    return 0
-  }
-
-  [ -n "$projects" ] || return 0
-  while IFS= read -r project; do
-    printf 'Warning: local GitHub MCP entry for %s has no auth header and shadows the user entry with a configured Bearer token.\n' "$project"
-    printf '%s\n' '         Review the override. If unintended, run in that project: claude mcp remove github --scope local; then reconnect.'
-  done <<EOF
-$projects
-EOF
-}
-
 if [ "${DOT_CONFIGS_INSTALL_LIB_ONLY:-0}" = "1" ]; then
   return 0 2>/dev/null || exit 0
 fi
@@ -1049,6 +994,10 @@ remove_repo_symlink "${HOME}/.wezterm.lua" "${repo_root}/wezterm/wezterm.lua" "W
 remove_repo_symlink "${HOME}/.sonicterm/themes/wezterm.toml" \
   "${repo_root}/config/sonicterm/themes/wezterm.toml" "SonicTerm WezTerm theme"
 remove_legacy_claude_subagent_hook
+remove_repo_symlink "${HOME}/.copilot/AGENTS.md" \
+  "${repo_root}/config/copilot/AGENTS.md" "duplicate Copilot instructions"
+remove_repo_symlink "${HOME}/.copilot/AGENTS.md" \
+  "${repo_root}/copilot/AGENTS.md" "old Copilot instructions"
 
 echo "Linked active config from $manifest"
 
@@ -1121,8 +1070,6 @@ if have_cmd jq && [ -f "$copilot_mcp" ]; then
     fi
   fi
 fi
-
-warn_claude_github_mcp_overrides
 
 # launchd agent: copilot-relay on login (macOS only). Renders the
 # template (substituting absolute $HOME paths — launchd doesn't expand

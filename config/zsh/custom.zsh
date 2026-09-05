@@ -22,14 +22,6 @@ alias 'vim'='nvim'
 # access. `command` bypasses this alias and invokes the real Codex executable.
 alias codex='command codex --dangerously-bypass-approvals-and-sandbox'
 
-# Copilot loads AGENTS.md from custom instruction directories. Keep the
-# repository-managed ~/.copilot/AGENTS.md global without replacing other paths.
-case ",${COPILOT_CUSTOM_INSTRUCTIONS_DIRS:-}," in
-  *,"$HOME/.copilot",*) ;;
-  ,,) export COPILOT_CUSTOM_INSTRUCTIONS_DIRS="$HOME/.copilot" ;;
-  *) export COPILOT_CUSTOM_INSTRUCTIONS_DIRS="${COPILOT_CUSTOM_INSTRUCTIONS_DIRS},$HOME/.copilot" ;;
-esac
-
 ##############################################################################
 # {{{ Proxy Start
 ##############################################################################
