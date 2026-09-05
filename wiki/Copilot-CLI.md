@@ -32,7 +32,9 @@ Copilot has two installed instruction files:
 - `config/copilot/copilot-instructions.md` → `~/.copilot/copilot-instructions.md`
 - `config/copilot/AGENTS.md` → `~/.copilot/AGENTS.md`
 
-The native file keeps Copilot's user-wide behavior. `AGENTS.md` points to the Wiki for reusable GitHub Wiki and release work.
+The native file keeps Copilot's user-wide behavior. It makes conversational prose direct and concise by default. Requests for more detail still win, and code, commands, findings, evidence, caveats, safety information, and technical precision stay complete.
+
+`AGENTS.md` stays focused on the Wiki pointer for reusable GitHub Wiki and release work.
 
 `config/zsh/custom.zsh` adds `~/.copilot` to `COPILOT_CUSTOM_INSTRUCTIONS_DIRS`. It keeps any paths that already exist and does not add a duplicate.
 

@@ -43,13 +43,13 @@ Relay 路由：     gptModel
 | `claude-opus-5[1m]` | `opusModel` | `claude-opus-5` |
 | Haiku / small-fast aliases | `gptModel` | `gpt-6-astra` |
 
-`[1m]` 后缀让 Claude Code 使用一百万 token 的 context 计数；relay 向上游发送规范 ID `gpt-6-astra`。保持 `autoCompactWindow: 800000`，为 Astra 的 1M 总窗口内公布的 872,000-token prompt 上限预留余量。Relay 端 thinking 在 `config/copilot-relay/config.yaml` 中设为 `max`。
+`[1m]` 后缀让 Claude Code 使用一百万 token 的模型 context 计数；relay 向上游发送规范 ID `gpt-6-astra`。自动压缩刻意在 75,000 tokens 时触发，远早于 Astra 的 1M 总窗口内公布的 872,000-token prompt 上限。这并不意味着会保留完整的 1M-token 对话历史。Relay 端 thinking 在 `config/copilot-relay/config.yaml` 中设为 `max`。
 
 使用本设置前，请先使用支持 GPT-6 Astra 的 relay 构建（见 [copilot-relay issue #57](https://github.com/D0n9X1n/copilot-relay/issues/57)）。修改模型时应同时更新 `config/claude/settings.json`、`config/zsh/claude.zsh` 和 `config/zsh/cc.zsh`；wrapper 的 `--model` 优先于设置文件。Relay 的 `gptModel` 不带后缀，空白的 `webSearchBackend` 也使用 Astra。Opus 路由保持独立。
 
 切换模型前，运行 `copilot` 并输入 `/model`，检查账号可用性和 effort 选项。这是 Copilot 的选择器，不是 Claude Code 的选择器，也不是 relay 本地的 `/v1/models`。`scripts/check.sh all` 通过后，运行两次 `./install.sh` 应用配置，再启动新的 shell 和 Claude Code 会话。安装器会重启 relay，可能中断正在进行的请求；请先等待请求结束。
 
-Sonnet 和 Opus 是两个模型家族。任务只要求修改一个家族时，不要同时修改两个。
+Sonnet-facing 槽位通过 `gptModel` 路由到 GPT-6 Astra；Opus 仍使用独立的 `opusModel` 路由。任务只要求修改一条路由时，不要同时修改两条。
 
 ## 主要设置
 
@@ -63,19 +63,32 @@ Sonnet 和 Opus 是两个模型家族。任务只要求修改一个家族时，�
 | `MODEL_REASONING_EFFORT` | `max`；启动器同时传入 `--effort max` |
 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `16` |
 | `statusLine.refreshInterval` | `100` |
-| UI 主题 | 本机 `custom:apollo`，在 `~/.claude.json` 中选择 |
-| `autoCompactWindow` | `800000` |
+| `theme` | `custom:apollo`；生成的主题资源仍保留在本机 |
+| `autoCompactEnabled` | `true` |
+| `autoCompactWindow` | `120000`，尚未扣除输出 token 预留量 |
+| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"75"`；默认输出预算下在 75,000 tokens 时触发压缩 |
+| `feedbackDrafts` | `off` |
 
-`refreshInterval` 必须放在 `statusLine` 里面。
+`refreshInterval` 必须放在 `statusLine` 里面。Max effort 保留在环境变量和启动器 flag 中：Claude Code 2.1.261 不接受在持久化的顶层 `effortLevel` 设置中填写 `max`。
+
+### 75k 自动压缩
+
+Claude Code 2.1.261 要求 `autoCompactWindow` 至少为 100,000，因此不能直接设置为 `75000`。受管配置采用 120,000-token 窗口和 `env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: "75"`。默认输出预算下，Claude 先预留 20,000 tokens：`(120000 - 20000) × 75% = 75000`。
+
+使用这些受管设置、且未覆盖输出预算的隔离 CLI 运行报告了 `effective_window: 100000`、`threshold: 75000` 和 `enforced: true`，没有发送上游请求。这是触发阈值，不是对话大小的硬上限；某一轮可能先越过阈值，再执行压缩。修改模型、输出预算或 `CLAUDE_CODE_AUTO_COMPACT_WINDOW` 覆盖值可能改变计算结果。编辑源设置后请启动新的 Claude Code 会话。
 
 `~/.claude/settings.json` 和 `~/.claude.json` 是不同文件：
 
-- `settings.json` 是链接的配置。
-- `~/.claude.json` 是本机状态。它保存 onboarding、API key 允许项、选中的 Apollo 主题、项目数据和导入的 MCP servers。
+- `settings.json` 是链接的配置，包括 `custom:apollo` 主题偏好。
+- `~/.claude.json` 是本机状态。它保存 onboarding、API key 允许项、安装器同步选择的 Apollo 主题、项目数据和导入的 MCP servers。
 
 `install.sh` 会从已验证的规范 Apollo release 生成 `~/.claude/themes/apollo.json`，并在选择 `custom:apollo` 时保留所有无关字段。生成主题是本机状态，不是 Git 源文件。
 
 不要把本机状态文件放进 Git。
+
+## 全局指令
+
+`config/claude/CLAUDE.md` 安装为 `~/.claude/CLAUDE.md`，并设置用户级回复风格。对话文字默认直接、简短。明确要求更多细节时仍按要求回答；代码、命令、检查结果、证据、必要说明、安全信息和技术准确性必须保持完整。
 
 ## 启动器
 
@@ -88,6 +101,8 @@ Sonnet 和 Opus 是两个模型家族。任务只要求修改一个家族时，�
 ```
 
 二进制会拒绝 settings 中的 `permissions.defaultMode: bypassPermissions`。命令行 flag 可以工作。Claude Code 可能在运行时重写 settings，所以 wrapper 也固定模型和 effort。
+
+`settings.json` 是符号链接，因此 CLI 持久化的偏好可能表现为源文件改动。提交前检查 `git diff -- config/claude/settings.json`，只按上面的受支持设置核对变动的键，再运行 `scripts/check.sh all`。不要整份恢复文件，以免丢失其他有意保留的修改。
 
 `cc [标题]` 会设置 SonicTerm 标题，在 RMUX 中重命名窗口，并用相同默认值启动 Claude Code。
 
@@ -124,6 +139,7 @@ Claude 与 Copilot 状态栏共享五行布局、本机生成的 Apollo 颜色�
 
 - `frontend-design@claude-plugins-official`
 - `rust-analyzer-lsp@claude-plugins-official`
+- `clangd-lsp@claude-plugins-official`
 - `claude-code-wakatime@wakatime`
 
 WakaTime marketplace 指向官方 `wakatime/claude-code-wakatime` Git 仓库。

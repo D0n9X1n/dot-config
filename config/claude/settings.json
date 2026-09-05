@@ -9,6 +9,7 @@
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-6-astra[1m]",
     "ANTHROPIC_SMALL_FAST_MODEL": "gpt-6-astra[1m]",
     "MODEL_REASONING_EFFORT": "max",
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "75",
     "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": "16"
   },
   "permissions": {
@@ -16,7 +17,6 @@
     "defaultMode": "auto"
   },
   "model": "gpt-6-astra[1m]",
-  "effortLevel": "max",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
@@ -26,7 +26,8 @@
   "enabledPlugins": {
     "frontend-design@claude-plugins-official": true,
     "claude-code-wakatime@wakatime": true,
-    "rust-analyzer-lsp@claude-plugins-official": true
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "clangd-lsp@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "wakatime": {
@@ -36,7 +37,10 @@
       }
     }
   },
+  "feedbackDrafts": "off",
+  "autoCompactWindow": 120000,
   "skipDangerousModePermissionPrompt": true,
+  "autoCompactEnabled": true,
   "skipAutoPermissionPrompt": true,
-  "autoCompactWindow": 800000
+  "theme": "custom:apollo"
 }

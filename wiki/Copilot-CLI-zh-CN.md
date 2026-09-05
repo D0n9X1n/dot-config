@@ -32,7 +32,9 @@ Copilot 安装两个指令文件：
 - `config/copilot/copilot-instructions.md` → `~/.copilot/copilot-instructions.md`
 - `config/copilot/AGENTS.md` → `~/.copilot/AGENTS.md`
 
-原生文件保存 Copilot 的用户级行为。`AGENTS.md` 指向 Wiki，用于可复用的 GitHub Wiki 和 release 工作。
+原生文件保存 Copilot 的用户级行为。它让对话文字默认直接、简短。明确要求更多细节时仍按要求回答；代码、命令、检查结果、证据、必要说明、安全信息和技术准确性必须保持完整。
+
+`AGENTS.md` 只保留 Wiki 指针，用于可复用的 GitHub Wiki 和 release 工作。
 
 `config/zsh/custom.zsh` 把 `~/.copilot` 加入 `COPILOT_CUSTOM_INSTRUCTIONS_DIRS`。它会保留已有路径，也不会重复添加。
 

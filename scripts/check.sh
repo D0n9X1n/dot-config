@@ -184,13 +184,18 @@ run_model_default_smoke() {
   jq -e '
     .env.ANTHROPIC_MODEL == "gpt-6-astra[1m]" and
     .model == "gpt-6-astra[1m]" and
-    .effortLevel == "max" and
+    (has("effortLevel") | not) and
     .env.MODEL_REASONING_EFFORT == "max" and
     .env.ANTHROPIC_DEFAULT_SONNET_MODEL == "gpt-6-astra[1m]" and
     .env.ANTHROPIC_DEFAULT_SONNET_MODEL_NAME == "GPT-6 Astra" and
     .env.ANTHROPIC_DEFAULT_SONNET_MODEL_DESCRIPTION == "GPT-6 Astra (1M context) through copilot-relay" and
     .env.ANTHROPIC_DEFAULT_HAIKU_MODEL == "gpt-6-astra[1m]" and
-    .env.ANTHROPIC_SMALL_FAST_MODEL == "gpt-6-astra[1m]"
+    .env.ANTHROPIC_SMALL_FAST_MODEL == "gpt-6-astra[1m]" and
+    .autoCompactEnabled == true and
+    .autoCompactWindow == 120000 and
+    .env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE == "75" and
+    .feedbackDrafts == "off" and
+    .enabledPlugins["clangd-lsp@claude-plugins-official"] == true
   ' config/claude/settings.json >/dev/null
 
   # Copilot CLI: GPT-6 Astra at the 1M context tier and max effort.
@@ -276,6 +281,9 @@ run_global_instructions_smoke() {
   done
 
   grep -Fq 'Do not use ASCII-art flowcharts' config/claude/CLAUDE.md
+  for file in config/claude/CLAUDE.md config/copilot/copilot-instructions.md; do
+    grep -Fq 'Keep conversational prose concise by default.' "$file"
+  done
   for file in config/claude/CLAUDE.md config/copilot/AGENTS.md; do
     grep -Fq 'Development-and-Releases.md' "$file"
     grep -Fq 'scripts/check.sh all' "$file"
@@ -1124,7 +1132,7 @@ run_apollo_smoke() {
   grep -Fq 'ZSH_THEME=apollo' config/zsh/custom.zsh
   grep -Fq 'FAST_WORK_DIR' config/zsh/custom.zsh
   grep -Fq $'link\tconfig/zsh/themes/apollo.zsh-theme\t.oh-my-zsh/custom/themes/apollo.zsh-theme' config/manifest.tsv
-  jq -e 'has("theme") | not' config/claude/settings.json >/dev/null
+  jq -e '.theme == "custom:apollo"' config/claude/settings.json >/dev/null
   jq -e '.theme == "default"' config/copilot/settings.json >/dev/null
 
   if grep -En '#[0-9a-fA-F]{6}|38;2;|48;2;' \
