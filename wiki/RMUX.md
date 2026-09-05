@@ -130,7 +130,7 @@ Use normal `claude` or the repository's `cc` helper for an ordinary Claude Code 
 
 ```sh
 rmux claude --permission-mode bypassPermissions \
-  --model 'claude-sonnet-5[1m]' --effort max
+  --model 'gpt-6-astra[1m]' --effort max
 ```
 
 `rmux claude` enables Claude Code's tmux teammate mode and prepends a private, process-scoped `tmux` shim so Claude's teammate commands target RMUX. It does not replace the global `tmux` executable. This repository deliberately does not run `rmux setup tmux-shim`.

@@ -27,11 +27,11 @@ The first Claude Code launch asks if the custom `dummy` API key is allowed. Choo
 The tracked default is:
 
 ```text
-Claude-facing name: claude-sonnet-5[1m]
-Picker name:        Sonnet 5
+Claude-facing name: gpt-6-astra[1m]
+Picker name:        GPT-6 Astra
 Client effort:      max
 Relay route:        gptModel
-Upstream model:     gpt-5.6-sol
+Upstream model:     gpt-6-astra
 ```
 
 The name has no `opus`, so copilot-relay sends it to `gptModel`.
@@ -41,9 +41,13 @@ Other routes:
 | Claude-facing name | Relay lane | Upstream |
 |---|---|---|
 | `claude-opus-5[1m]` | `opusModel` | `claude-opus-5` |
-| Haiku / small-fast aliases | `gptModel` | `gpt-5.6-sol` |
+| Haiku / small-fast aliases | `gptModel` | `gpt-6-astra` |
 
-The `[1m]` suffix keeps Claude Code's one-million-token context accounting. Relay-side thinking is `max` in `config/copilot-relay/config.yaml`.
+The `[1m]` suffix keeps Claude Code's one-million-token context accounting; the relay sends canonical `gpt-6-astra` upstream. Keep `autoCompactWindow: 800000` to leave room below Astra's advertised 872,000-token prompt limit within its 1M total window. Relay-side thinking is `max` in `config/copilot-relay/config.yaml`.
+
+Use a relay build with GPT-6 Astra support before relying on this setup (tracked in [copilot-relay issue #57](https://github.com/D0n9X1n/copilot-relay/issues/57)). Update the model in `config/claude/settings.json`, `config/zsh/claude.zsh`, and `config/zsh/cc.zsh` together; the wrappers' `--model` overrides the settings. The relay's `gptModel` stays suffix-free. Its blank `webSearchBackend` also uses Astra. Keep the Opus route separate.
+
+Run `copilot` and enter `/model` to check account availability and effort choices before changing models. That is Copilot's picker, not Claude Code's picker or the relay's local `/v1/models`. After `scripts/check.sh all` passes, apply through `./install.sh` twice and start a new shell and Claude Code session. The installer restarts the relay and may interrupt active requests; wait for them to finish first.
 
 Sonnet and Opus are separate families. Do not change both when a task asks to update one family.
 
@@ -55,8 +59,8 @@ Sonnet and Opus are separate families. Do not change both when a task asks to up
 |---|---|
 | `ANTHROPIC_BASE_URL` | `http://127.0.0.1:4142` |
 | `ANTHROPIC_AUTH_TOKEN` | local placeholder `dummy` |
-| `ANTHROPIC_MODEL` | `claude-sonnet-5[1m]` |
-| `effortLevel` | `max` |
+| `ANTHROPIC_MODEL` | `gpt-6-astra[1m]` |
+| `MODEL_REASONING_EFFORT` | `max`; launch wrappers also pass `--effort max` |
 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `16` |
 | `statusLine.refreshInterval` | `100` |
 | UI theme | local `custom:apollo`, selected in `~/.claude.json` |
@@ -79,7 +83,7 @@ Do not put the local state file in Git.
 
 ```text
 --permission-mode bypassPermissions
---model claude-sonnet-5[1m]
+--model gpt-6-astra[1m]
 --effort max
 ```
 
@@ -136,7 +140,7 @@ The first prompt was answered no. In local `~/.claude.json`, move `dummy` from `
 
 ### Small jobs get `model_not_supported`
 
-Keep both Haiku and small-fast aliases set to `gpt-5.6-sol[1m]`. Also check the relay base URL.
+Keep both Haiku and small-fast aliases set to `gpt-6-astra[1m]`. Also check the relay base URL.
 
 ### Relay rewrites settings
 

@@ -9,13 +9,17 @@ Copilot CLI 文件在 `config/copilot/`。它们安装到 `~/.copilot/`。
 `config/copilot/settings.json` 使用：
 
 ```text
-model:       claude-opus-5
+model:       gpt-6-astra
 context:     long_context
 effort:      max
 theme:       default（终端 Base-16）
 keep alive:  busy
 streaming:   on
 ```
+
+运行 `copilot`，然后在其交互会话中输入 `/model`，即可查看账号可用模型及其 effort 选项。Astra 公布的档位为 `low`、`medium`、`high`、`xhigh`、`max`；可用性取决于账号和组织策略。CLI 使用规范 ID `gpt-6-astra`，不带 Claude Code 的 `[1m]` 后缀。
+
+修改受管默认值时，应同时编辑 `config/copilot/settings.json` 和 `config/zsh/gg.zsh` 中的 `--model`，然后运行 `scripts/check.sh all`。非受管安装可通过 `/config model` 修改 Copilot 用户默认值；本仓库应修改受版本控制的源文件，避免下次安装覆盖选择。
 
 自定义 footer 隐藏内置字段，并运行 `~/.copilot/statusline.sh`。
 
@@ -53,7 +57,7 @@ copilot          # 普通 Copilot wrapper
 gg my-project    # 带标题、不限制工具和路径的 Copilot session
 ```
 
-`gg` 使用 Opus 5、长 context 和 max effort。它也会传入 `--allow-all-tools --allow-all-paths`，所以工具和路径不会请求允许。不想使用这种访问模式时，请使用普通 `copilot`。
+`gg` 使用 GPT-6 Astra、长 context 和 max effort。它也会传入 `--allow-all-tools --allow-all-paths`，所以工具和路径不会请求允许。不想使用这种访问模式时，请使用普通 `copilot`。
 
 `gg` 会向 SonicTerm 发送 OSC 标题。它在 RMUX 中也会运行 `rmux rename-window`。它不会调用 tmux 或 WezTerm CLI。
 

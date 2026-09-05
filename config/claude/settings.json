@@ -2,12 +2,12 @@
   "env": {
     "ANTHROPIC_BASE_URL": "http://127.0.0.1:4142",
     "ANTHROPIC_AUTH_TOKEN": "dummy",
-    "ANTHROPIC_MODEL": "claude-sonnet-5[1m]",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5[1m]",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL_NAME": "Sonnet 5",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL_DESCRIPTION": "Sonnet 5 (1M context), routed by copilot-relay to gpt-5.6-sol",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-5.6-sol[1m]",
-    "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.6-sol[1m]",
+    "ANTHROPIC_MODEL": "gpt-6-astra[1m]",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-6-astra[1m]",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL_NAME": "GPT-6 Astra",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL_DESCRIPTION": "GPT-6 Astra (1M context) through copilot-relay",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-6-astra[1m]",
+    "ANTHROPIC_SMALL_FAST_MODEL": "gpt-6-astra[1m]",
     "MODEL_REASONING_EFFORT": "max",
     "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": "16"
   },
@@ -15,7 +15,7 @@
     "allow": [],
     "defaultMode": "auto"
   },
-  "model": "claude-sonnet-5[1m]",
+  "model": "gpt-6-astra[1m]",
   "effortLevel": "max",
   "statusLine": {
     "type": "command",

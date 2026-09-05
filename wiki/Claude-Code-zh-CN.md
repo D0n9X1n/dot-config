@@ -27,11 +27,11 @@ Claude Code 第一次启动时会问是否允许自定义 `dummy` API key。请�
 受管默认值：
 
 ```text
-Claude 端名称： claude-sonnet-5[1m]
-Picker 名称：    Sonnet 5
+Claude 端名称： gpt-6-astra[1m]
+Picker 名称：    GPT-6 Astra
 客户端 effort：  max
 Relay 路由：     gptModel
-上游模型：       gpt-5.6-sol
+上游模型：       gpt-6-astra
 ```
 
 名称中没有 `opus`，所以 copilot-relay 会把它发送到 `gptModel`。
@@ -41,9 +41,13 @@ Relay 路由：     gptModel
 | Claude 端名称 | Relay lane | 上游 |
 |---|---|---|
 | `claude-opus-5[1m]` | `opusModel` | `claude-opus-5` |
-| Haiku / small-fast aliases | `gptModel` | `gpt-5.6-sol` |
+| Haiku / small-fast aliases | `gptModel` | `gpt-6-astra` |
 
-`[1m]` 后缀让 Claude Code 使用一百万 token 的 context 计数。Relay 端 thinking 在 `config/copilot-relay/config.yaml` 中设为 `max`。
+`[1m]` 后缀让 Claude Code 使用一百万 token 的 context 计数；relay 向上游发送规范 ID `gpt-6-astra`。保持 `autoCompactWindow: 800000`，为 Astra 的 1M 总窗口内公布的 872,000-token prompt 上限预留余量。Relay 端 thinking 在 `config/copilot-relay/config.yaml` 中设为 `max`。
+
+使用本设置前，请先使用支持 GPT-6 Astra 的 relay 构建（见 [copilot-relay issue #57](https://github.com/D0n9X1n/copilot-relay/issues/57)）。修改模型时应同时更新 `config/claude/settings.json`、`config/zsh/claude.zsh` 和 `config/zsh/cc.zsh`；wrapper 的 `--model` 优先于设置文件。Relay 的 `gptModel` 不带后缀，空白的 `webSearchBackend` 也使用 Astra。Opus 路由保持独立。
+
+切换模型前，运行 `copilot` 并输入 `/model`，检查账号可用性和 effort 选项。这是 Copilot 的选择器，不是 Claude Code 的选择器，也不是 relay 本地的 `/v1/models`。`scripts/check.sh all` 通过后，运行两次 `./install.sh` 应用配置，再启动新的 shell 和 Claude Code 会话。安装器会重启 relay，可能中断正在进行的请求；请先等待请求结束。
 
 Sonnet 和 Opus 是两个模型家族。任务只要求修改一个家族时，不要同时修改两个。
 
@@ -55,8 +59,8 @@ Sonnet 和 Opus 是两个模型家族。任务只要求修改一个家族时，�
 |---|---|
 | `ANTHROPIC_BASE_URL` | `http://127.0.0.1:4142` |
 | `ANTHROPIC_AUTH_TOKEN` | 本机占位符 `dummy` |
-| `ANTHROPIC_MODEL` | `claude-sonnet-5[1m]` |
-| `effortLevel` | `max` |
+| `ANTHROPIC_MODEL` | `gpt-6-astra[1m]` |
+| `MODEL_REASONING_EFFORT` | `max`；启动器同时传入 `--effort max` |
 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `16` |
 | `statusLine.refreshInterval` | `100` |
 | UI 主题 | 本机 `custom:apollo`，在 `~/.claude.json` 中选择 |
@@ -79,7 +83,7 @@ Sonnet 和 Opus 是两个模型家族。任务只要求修改一个家族时，�
 
 ```text
 --permission-mode bypassPermissions
---model claude-sonnet-5[1m]
+--model gpt-6-astra[1m]
 --effort max
 ```
 
@@ -136,7 +140,7 @@ WakaTime marketplace 指向官方 `wakatime/claude-code-wakatime` Git 仓库。
 
 ### 小任务出现 `model_not_supported`
 
-保持 Haiku 和 small-fast aliases 都是 `gpt-5.6-sol[1m]`。同时检查 relay base URL。
+保持 Haiku 和 small-fast aliases 都是 `gpt-6-astra[1m]`。同时检查 relay base URL。
 
 ### Relay 重写 settings
 
