@@ -192,7 +192,7 @@ run_model_default_smoke() {
     .env.ANTHROPIC_BASE_URL == "http://127.0.0.1:4142" and
     .env.CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS == "16" and
     .autoCompactEnabled == true and
-    .autoCompactWindow == 800000 and
+    .autoCompactWindow == 700000 and
     .env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE == "80" and
     .feedbackDrafts == "off" and
     .skipDangerousModePermissionPrompt == true and
@@ -200,7 +200,8 @@ run_model_default_smoke() {
     .theme == "custom:apollo" and
     .permissions.defaultMode == "auto" and
     .statusLine.command == "~/.claude/statusline.sh" and
-    .enabledPlugins["clangd-lsp@claude-plugins-official"] == true
+    .enabledPlugins["clangd-lsp@claude-plugins-official"] == true and
+    .enabledPlugins["swift-lsp@claude-plugins-official"] == true
   ' config/claude/settings.json >/dev/null
 
   # No GPT identity may leak back into any Claude-facing selector or label.
@@ -224,7 +225,8 @@ run_model_default_smoke() {
   # Relay: Opus remains separate; every non-Opus route uses GPT-6 Astra.
   grep -Eq '^opusModel:[[:space:]]*claude-opus-5$' config/copilot-relay/config.yaml
   grep -Eq '^gptModel:[[:space:]]*gpt-6-astra$' config/copilot-relay/config.yaml
-  grep -Eq '^thinkEffort:[[:space:]]*max$' config/copilot-relay/config.yaml
+  grep -Eq '^thinkEffort:[[:space:]]*medium$' config/copilot-relay/config.yaml
+  grep -Eq '^upstreamTimeoutSeconds:[[:space:]]*600$' config/copilot-relay/config.yaml
 
   grep -Fq $'link\tconfig/copilot-relay/config.yaml\t.copilot-relay/config.yaml' config/manifest.tsv
 

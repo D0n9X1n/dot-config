@@ -45,7 +45,7 @@ Other routes:
 
 Client names and upstream models are separate layers. The client keeps native Anthropic ids; the relay decides the upstream model. Do not write a GPT id, or a `_NAME` / `_DESCRIPTION` display override, into Claude-facing settings.
 
-The `[1m]` suffix keeps Claude Code's one-million-token model context accounting; the relay sends canonical `gpt-6-astra` upstream. The Haiku id is the installed CLI's own small-fast id and takes no `[1m]` suffix. Automatic compaction starts at 624,000 tokens on the default Sonnet path, below Astra's advertised 872,000-token prompt limit within its 1M total window. This does not retain a full 1M-token conversation history. Relay-side thinking is `max` in `config/copilot-relay/config.yaml`.
+The `[1m]` suffix keeps Claude Code's one-million-token model context accounting; the relay sends canonical `gpt-6-astra` upstream. The Haiku id is the installed CLI's own small-fast id and takes no `[1m]` suffix. Automatic compaction is expected at 544,000 tokens on the default Sonnet path, below Astra's advertised 872,000-token prompt limit within its 1M total window. This does not retain a full 1M-token conversation history. Relay-side default thinking is `medium` in `config/copilot-relay/config.yaml`; client effort remains `max`.
 
 Use a relay build with GPT-6 Astra support before relying on this setup (tracked in [copilot-relay issue #57](https://github.com/D0n9X1n/copilot-relay/issues/57)). Update the model in `config/claude/settings.json`, `config/zsh/claude.zsh`, and `config/zsh/cc.zsh` together; the wrappers' `--model` overrides the settings. The relay's `gptModel` stays suffix-free. Its blank `webSearchBackend` also uses Astra. Keep the Opus route separate.
 
@@ -71,17 +71,17 @@ The Sonnet-facing slot routes to GPT-6 Astra through `gptModel`; Opus stays on i
 | `statusLine.refreshInterval` | `100` |
 | `theme` | `custom:apollo`; generated theme assets stay local |
 | `autoCompactEnabled` | `true` |
-| `autoCompactWindow` | `800000` before the output-token reserve |
-| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"80"`; triggers compaction at 624,000 tokens with the default Sonnet output budget |
+| `autoCompactWindow` | `700000` before the output-token reserve |
+| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"80"`; triggers compaction at 544,000 tokens with the default Sonnet output budget |
 | `feedbackDrafts` | `off` |
 
 `refreshInterval` belongs inside `statusLine`. Keep max effort in the environment and launcher flags: Claude Code 2.1.261 does not accept `max` in the persisted top-level `effortLevel` setting.
 
-### 800k automatic-compaction window
+### 700k automatic-compaction window
 
-The configured window is not the compaction trigger. Claude Code 2.1.261 subtracts its output-token reserve before applying the percentage. On the default native Sonnet path, the selected settings give `(800000 - 20000) × 80% = 624000`.
+The configured window is not the compaction trigger. Claude Code 2.1.261 subtracts its output-token reserve before applying the percentage. With the default native Sonnet output reserve, the selected settings calculate to `(700000 - 20000) × 80% = 544000`.
 
-An isolated run of the installed CLI, using the tracked settings without an output-budget override, reported `effective_window: 780000`, `threshold: 624000`, and `enforced: true`. No upstream request was made. This is a trigger, not a hard transcript-size cap; a turn can cross it before compaction runs. Other models, output budgets, or `CLAUDE_CODE_AUTO_COMPACT_WINDOW` overrides can change the calculation. Start a new Claude Code session after editing the source settings.
+This calculation gives an effective window of 680,000 tokens and an expected trigger of 544,000 tokens; it is not a fresh runtime measurement. This is a trigger, not a hard transcript-size cap; a turn can cross it before compaction runs. Other CLI versions, models, output budgets, or `CLAUDE_CODE_AUTO_COMPACT_WINDOW` overrides can change the calculation. Start a new Claude Code session after editing the source settings.
 
 `~/.claude/settings.json` and `~/.claude.json` are different files:
 
@@ -150,6 +150,7 @@ The tracked settings enable:
 - `frontend-design@claude-plugins-official`
 - `rust-analyzer-lsp@claude-plugins-official`
 - `clangd-lsp@claude-plugins-official`
+- `swift-lsp@claude-plugins-official`
 - `claude-code-wakatime@wakatime`
 
 The WakaTime marketplace points to the official `wakatime/claude-code-wakatime` Git repository.

@@ -53,12 +53,13 @@ http://127.0.0.1:4142
 
 ```yaml
 claudeSetup: false
-thinkEffort: max
+thinkEffort: medium
+upstreamTimeoutSeconds: 600
 gptModel: gpt-6-astra
 opusModel: claude-opus-5
 ```
 
-`claudeSetup: false` 会阻止 relay 重写链接的 Claude settings。
+`claudeSetup: false` 会阻止 relay 重写链接的 Claude settings。Relay 的默认 thinking effort 为 `medium`；Claude 客户端和启动器的 effort 仍为 `max`。`upstreamTimeoutSeconds: 600` 允许单个 Claude 请求的上游 Copilot 调用最多等待十分钟。
 
 登录一次：
 

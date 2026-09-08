@@ -45,7 +45,7 @@ Claude Code 保留原生客户端身份。名称中没有 `opus`，所以 copilo
 
 客户端名称和上游模型是两层。客户端保留原生 Anthropic ID；上游模型由 relay 决定。不要把 GPT ID 或 `_NAME` / `_DESCRIPTION` 显示覆盖写进 Claude 端设置。
 
-`[1m]` 后缀让 Claude Code 使用一百万 token 的模型 context 计数；relay 向上游发送规范 ID `gpt-6-astra`。Haiku ID 是已安装 CLI 自身的 small-fast ID，不加 `[1m]` 后缀。默认 Sonnet 路径在 624,000 tokens 时触发自动压缩，低于 Astra 的 1M 总窗口内公布的 872,000-token prompt 上限。这并不意味着会保留完整的 1M-token 对话历史。Relay 端 thinking 在 `config/copilot-relay/config.yaml` 中设为 `max`。
+`[1m]` 后缀让 Claude Code 使用一百万 token 的模型 context 计数；relay 向上游发送规范 ID `gpt-6-astra`。Haiku ID 是已安装 CLI 自身的 small-fast ID，不加 `[1m]` 后缀。默认 Sonnet 路径预计在 544,000 tokens 时触发自动压缩，低于 Astra 的 1M 总窗口内公布的 872,000-token prompt 上限。这并不意味着会保留完整的 1M-token 对话历史。Relay 端默认 thinking 在 `config/copilot-relay/config.yaml` 中设为 `medium`；客户端 effort 仍为 `max`。
 
 使用本设置前，请先使用支持 GPT-6 Astra 的 relay 构建（见 [copilot-relay issue #57](https://github.com/D0n9X1n/copilot-relay/issues/57)）。修改模型时应同时更新 `config/claude/settings.json`、`config/zsh/claude.zsh` 和 `config/zsh/cc.zsh`；wrapper 的 `--model` 优先于设置文件。Relay 的 `gptModel` 不带后缀，空白的 `webSearchBackend` 也使用 Astra。Opus 路由保持独立。
 
@@ -71,17 +71,17 @@ Sonnet-facing 槽位通过 `gptModel` 路由到 GPT-6 Astra；Opus 仍使用独�
 | `statusLine.refreshInterval` | `100` |
 | `theme` | `custom:apollo`；生成的主题资源仍保留在本机 |
 | `autoCompactEnabled` | `true` |
-| `autoCompactWindow` | `800000`，尚未扣除输出 token 预留量 |
-| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"80"`；默认 Sonnet 输出预算下在 624,000 tokens 时触发压缩 |
+| `autoCompactWindow` | `700000`，尚未扣除输出 token 预留量 |
+| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"80"`；默认 Sonnet 输出预算下在 544,000 tokens 时触发压缩 |
 | `feedbackDrafts` | `off` |
 
 `refreshInterval` 必须放在 `statusLine` 里面。Max effort 保留在环境变量和启动器 flag 中：Claude Code 2.1.261 不接受在持久化的顶层 `effortLevel` 设置中填写 `max`。
 
-### 800k 自动压缩窗口
+### 700k 自动压缩窗口
 
-配置的窗口不等于压缩触发阈值。Claude Code 2.1.261 先扣除输出 token 预留量，再应用百分比。默认原生 Sonnet 路径下，所选设置得到 `(800000 - 20000) × 80% = 624000`。
+配置的窗口不等于压缩触发阈值。Claude Code 2.1.261 先扣除输出 token 预留量，再应用百分比。使用默认原生 Sonnet 输出预留量时，所选设置的计算结果为 `(700000 - 20000) × 80% = 544000`。
 
-使用受管设置且未覆盖输出预算的隔离 CLI 运行报告了 `effective_window: 780000`、`threshold: 624000` 和 `enforced: true`，没有发送上游请求。这是触发阈值，不是对话大小的硬上限；某一轮可能先越过阈值，再执行压缩。其他模型、输出预算或 `CLAUDE_CODE_AUTO_COMPACT_WINDOW` 覆盖值可能改变计算结果。编辑源设置后请启动新的 Claude Code 会话。
+按此计算，有效窗口为 680,000 tokens，预期触发阈值为 544,000 tokens；这不是新的运行时测量结果。这是触发阈值，不是对话大小的硬上限；某一轮可能先越过阈值，再执行压缩。其他 CLI 版本、模型、输出预算或 `CLAUDE_CODE_AUTO_COMPACT_WINDOW` 覆盖值可能改变计算结果。编辑源设置后请启动新的 Claude Code 会话。
 
 `~/.claude/settings.json` 和 `~/.claude.json` 是不同文件：
 
@@ -150,6 +150,7 @@ Claude 与 Copilot 状态栏共享五行布局、本机生成的 Apollo 颜色�
 - `frontend-design@claude-plugins-official`
 - `rust-analyzer-lsp@claude-plugins-official`
 - `clangd-lsp@claude-plugins-official`
+- `swift-lsp@claude-plugins-official`
 - `claude-code-wakatime@wakatime`
 
 WakaTime marketplace 指向官方 `wakatime/claude-code-wakatime` Git 仓库。
