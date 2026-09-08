@@ -15,7 +15,7 @@ The canonical palette and application adapters live in the [Apollo Theme organiz
 | eza | Tagged `eza-apollo-theme` release asset |
 | Claude Code UI | Generated locally from the tagged canonical palette |
 | Claude and Copilot status lines | One local include generated from the tagged canonical palette |
-| Oh My Zsh prompt | Structure in this repo; colors generated locally |
+| Oh My Zsh prompt (optional) | Structure in this repo; colors generated locally; selected only through `.zshrc` |
 | fast-syntax-highlighting | Its Base16 theme, using the terminal ANSI palette |
 | Copilot CLI UI | Built-in `default` theme, using the terminal ANSI palette |
 

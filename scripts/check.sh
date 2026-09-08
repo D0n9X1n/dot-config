@@ -1283,7 +1283,10 @@ run_apollo_smoke() {
   grep -Fq 'theme = "apollo"' config/sonicterm/sonicterm.toml
   grep -Fq 'apollo-rmux.conf' config/rmux/rmux.conf
   grep -Fq 'EZA_CONFIG_DIR' config/zsh/custom.zsh
-  grep -Fq 'ZSH_THEME=apollo' config/zsh/custom.zsh
+  if grep -En '^[[:space:]]*((export|typeset)[[:space:]]+)?ZSH_THEME=' config/zsh/*.zsh; then
+    echo "managed zsh helpers must leave theme selection to .zshrc" >&2
+    return 1
+  fi
   grep -Fq 'FAST_WORK_DIR' config/zsh/custom.zsh
   grep -Fq $'link\tconfig/zsh/themes/apollo.zsh-theme\t.oh-my-zsh/custom/themes/apollo.zsh-theme' config/manifest.tsv
   jq -e '.theme == "custom:apollo"' config/claude/settings.json >/dev/null

@@ -64,7 +64,7 @@ RMUX 配置会明确保留条件式鼠标 bindings。Copilot 等支持鼠标的�
 
 | 文件 | 作用 |
 |---|---|
-| `custom.zsh` | Apollo prompt 选择、eza/Base16 路径、aliases、proxy 助手、补全、SDK 路径 |
+| `custom.zsh` | eza/Base16 路径、aliases、proxy 助手、补全、SDK 路径 |
 | `themes/apollo.zsh-theme` | Prompt 结构；读取本机生成的 Apollo 颜色 |
 | `claude.zsh` | Claude wrapper 和固定启动 flags |
 | `cc.zsh` | 带标题的 Claude 启动器 |
@@ -87,7 +87,7 @@ Proxy 地址是 `127.0.0.1:46971`。助手会修改 shell、Git 和 npm proxy �
 
 ## 补全与路径
 
-`custom.zsh` 会在 Oh My Zsh 加载主题前选择受管 Apollo prompt。它不会修改 `.zshrc`。它还会让 eza 使用固定的上游主题。
+提示符主题由 `.zshrc` 中的 `ZSH_THEME` 选择。受管 zsh 助手不会设置或覆盖它，安装器也不会修改 `.zshrc`。需要时仍可在该文件中选择 Apollo。`custom.zsh` 会让 eza 使用固定的上游主题。
 
 安装 fast-syntax-highlighting 后，安装器会在独立本机工作目录中准备它自带的 Base16 主题。语法颜色随后使用 SonicTerm 的 Apollo ANSI slots。`custom.zsh` 也会加载 autojump、添加 Homebrew 补全、在 `compinit -i` 前修复 group-writable 补全文件夹，并添加本机 .NET 与 Android SDK 路径。
 

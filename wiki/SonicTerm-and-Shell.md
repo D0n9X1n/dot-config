@@ -64,7 +64,7 @@ Files under `config/zsh/` install into `~/.oh-my-zsh/custom/`. Oh-my-zsh loads t
 
 | File | Work |
 |---|---|
-| `custom.zsh` | Apollo prompt selection, eza/Base16 paths, aliases, proxy helpers, completions, SDK paths |
+| `custom.zsh` | eza/Base16 paths, aliases, proxy helpers, completions, SDK paths |
 | `themes/apollo.zsh-theme` | Prompt structure; sources locally generated Apollo colors |
 | `claude.zsh` | Claude wrapper and pinned launch flags |
 | `cc.zsh` | titled Claude launch |
@@ -87,7 +87,7 @@ The proxy address is `127.0.0.1:46971`. The helpers update shell, Git, and npm p
 
 ## Completions and paths
 
-`custom.zsh` selects the managed Apollo prompt before Oh My Zsh loads its theme. It does not edit `.zshrc`. It also points eza at the pinned upstream theme.
+`.zshrc` owns prompt theme selection through `ZSH_THEME`. Managed zsh helpers do not set or override it, and the installer does not edit `.zshrc`. Apollo remains available if selected there. `custom.zsh` points eza at the pinned upstream theme.
 
 When fast-syntax-highlighting is installed, the installer prepares its shipped Base16 theme in an isolated local work folder. Syntax colors then use SonicTerm's Apollo ANSI slots. `custom.zsh` also loads autojump, adds Homebrew completions, fixes group-writable completion folders before `compinit -i`, and adds local .NET and Android SDK paths.
 

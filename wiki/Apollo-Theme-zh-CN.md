@@ -15,7 +15,7 @@ Apollo 是当前终端、multiplexer、shell、CLI 状态栏和文件列表共�
 | eza | 带 tag 的 `eza-apollo-theme` release asset |
 | Claude Code UI | 从带 tag 的规范 palette 在本机生成 |
 | Claude 与 Copilot 状态栏 | 从规范 palette 生成一个本机共享 include |
-| Oh My Zsh prompt | 结构在本仓库；颜色在本机生成 |
+| Oh My Zsh prompt（可选） | 结构在本仓库；颜色在本机生成；仅通过 `.zshrc` 选择 |
 | fast-syntax-highlighting | 使用它的 Base16 主题和终端 ANSI palette |
 | Copilot CLI UI | 使用内置 `default` 主题和终端 ANSI palette |
 
