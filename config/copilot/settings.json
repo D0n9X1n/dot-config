@@ -1,6 +1,7 @@
 {
   "model": "gpt-6-astra",
   "contextTier": "long_context",
+  "defaultPermissionMode": "allow-all",
   "theme": "default",
   "renderMarkdown": true,
   "logLevel": "all",
@@ -64,6 +65,6 @@
     "autoConnect": true,
     "openDiffOnEdit": true
   },
-  "effortLevel": "max",
+  "effortLevel": "medium",
   "showReasoning": false
 }

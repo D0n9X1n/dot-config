@@ -68,8 +68,8 @@ RMUX 配置会明确保留条件式鼠标 bindings。Copilot 等支持鼠标的�
 | `themes/apollo.zsh-theme` | Prompt 结构；读取本机生成的 Apollo 颜色 |
 | `claude.zsh` | Claude wrapper 和固定启动 flags |
 | `cc.zsh` | 带标题的 Claude 启动器 |
-| `copilot.zsh` | Copilot 真彩色 wrapper 和清理 |
-| `gg.zsh` | 带标题的 Copilot 启动器 |
+| `copilot.zsh` | allow-all Copilot alias、真彩色 wrapper 和清理 |
+| `gg.zsh` | 带标题、allow-all 的 Copilot 启动器 |
 | `zz-rmux.zsh` | RMUX 会话和安全分离助手；最后加载 |
 
 ## 小 aliases
@@ -81,9 +81,12 @@ c       cd ..
 vim     nvim
 proxy   启用 SOCKS5 proxy
 unproxy 关闭 proxy
+copilot 以 allow-all / YOLO 权限启动 Copilot
 ```
 
 Proxy 地址是 `127.0.0.1:46971`。助手会修改 shell、Git 和 npm proxy 设置。
+
+`copilot` 和 `gg` 会自动添加 `--yolo`，允许工具、路径和 URL，不再请求批准。不需要手动附加默认 flags。`copilot` alias 保留参数转发和成功更新后的清理；权限默认值与现有 shell 的重新加载方法见 [Copilot CLI](Copilot-CLI-zh-CN.md)。
 
 ## 补全与路径
 

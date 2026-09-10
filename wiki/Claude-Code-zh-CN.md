@@ -29,7 +29,7 @@ Claude Code 第一次启动时会问是否允许自定义 `dummy` API key。请�
 ```text
 Claude 端名称： claude-sonnet-5[1m]
 Picker 名称：    原生 Sonnet 名称
-客户端 effort：  max
+客户端 effort：  medium
 Relay 路由：     gptModel
 上游模型：       gpt-6-astra
 ```
@@ -45,9 +45,9 @@ Claude Code 保留原生客户端身份。名称中没有 `opus`，所以 copilo
 
 客户端名称和上游模型是两层。客户端保留原生 Anthropic ID；上游模型由 relay 决定。不要把 GPT ID 或 `_NAME` / `_DESCRIPTION` 显示覆盖写进 Claude 端设置。
 
-`[1m]` 后缀让 Claude Code 使用一百万 token 的模型 context 计数；relay 向上游发送规范 ID `gpt-6-astra`。Haiku ID 是已安装 CLI 自身的 small-fast ID，不加 `[1m]` 后缀。默认 Sonnet 路径预计在 544,000 tokens 时触发自动压缩，低于 Astra 的 1M 总窗口内公布的 872,000-token prompt 上限。这并不意味着会保留完整的 1M-token 对话历史。Relay 端默认 thinking 在 `config/copilot-relay/config.yaml` 中设为 `medium`；客户端 effort 仍为 `max`。
+`[1m]` 后缀让 Claude Code 使用一百万 token 的模型 context 计数；relay 向上游发送规范 ID `gpt-6-astra`。Haiku ID 是已安装 CLI 自身的 small-fast ID，不加 `[1m]` 后缀。默认 Sonnet 路径预计在 544,000 tokens 时触发自动压缩，低于 Astra 的 1M 总窗口内公布的 872,000-token prompt 上限。这并不意味着会保留完整的 1M-token 对话历史。Relay 端默认 thinking 在 `config/copilot-relay/config.yaml` 中设为 `medium`；客户端 effort 也默认为 `medium`。
 
-使用本设置前，请先使用支持 GPT-6 Astra 的 relay 构建（见 [copilot-relay issue #57](https://github.com/D0n9X1n/copilot-relay/issues/57)）。修改模型时应同时更新 `config/claude/settings.json`、`config/zsh/claude.zsh` 和 `config/zsh/cc.zsh`；wrapper 的 `--model` 优先于设置文件。Relay 的 `gptModel` 不带后缀，空白的 `webSearchBackend` 也使用 Astra。Opus 路由保持独立。
+使用本设置前，请先使用支持 GPT-6 Astra 的 relay 构建（见 [copilot-relay issue #57](https://github.com/D0n9X1n/copilot-relay/issues/57)）。修改模型或 effort 默认值时应同时更新 `config/claude/settings.json`、`config/zsh/claude.zsh` 和 `config/zsh/cc.zsh`；wrapper 的 `--model` 和 `--effort` flags 优先于设置文件。Relay 的 `gptModel` 不带后缀，空白的 `webSearchBackend` 也使用 Astra。Opus 路由保持独立。
 
 切换模型前，运行 `copilot` 并输入 `/model`，检查账号可用性和 effort 选项。这是 Copilot 的选择器，不是 Claude Code 的选择器，也不是 relay 本地的 `/v1/models`。`scripts/check.sh all` 通过后，运行两次 `./install.sh` 应用配置，再启动新的 shell 和 Claude Code 会话。安装器会保留健康的 relay 进程；恢复不健康的 relay 时可能中断请求。
 
@@ -66,7 +66,8 @@ Sonnet-facing 槽位通过 `gptModel` 路由到 GPT-6 Astra；Opus 仍使用独�
 | `ANTHROPIC_DEFAULT_HAIKU_MODEL` | `claude-haiku-4-5-20251001` |
 | `ANTHROPIC_SMALL_FAST_MODEL` | `claude-haiku-4-5-20251001` |
 | `model` | `sonnet`；选择器自身的短别名 |
-| `MODEL_REASONING_EFFORT` | `max`；启动器同时传入 `--effort max` |
+| `modelSettings.claude-sonnet-5.effortLevel` | `medium`；Sonnet 保存的 effort 偏好 |
+| `MODEL_REASONING_EFFORT` | `medium`；状态栏回退值与启动器的 `--effort medium` 保持一致 |
 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `16` |
 | `statusLine.refreshInterval` | `100` |
 | `theme` | `custom:apollo`；生成的主题资源仍保留在本机 |
@@ -75,7 +76,7 @@ Sonnet-facing 槽位通过 `gptModel` 路由到 GPT-6 Astra；Opus 仍使用独�
 | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"80"`；默认 Sonnet 输出预算下在 544,000 tokens 时触发压缩 |
 | `feedbackDrafts` | `off` |
 
-`refreshInterval` 必须放在 `statusLine` 里面。Max effort 保留在环境变量和启动器 flag 中：Claude Code 2.1.261 不接受在持久化的顶层 `effortLevel` 设置中填写 `max`。
+`refreshInterval` 必须放在 `statusLine` 里面。Sonnet 的 `modelSettings` 偏好、`MODEL_REASONING_EFFORT` 和两个启动器应统一为 `medium`。不管理顶层 `effortLevel`。
 
 ### 700k 自动压缩窗口
 
@@ -105,10 +106,10 @@ Sonnet-facing 槽位通过 `gptModel` 路由到 GPT-6 Astra；Opus 仍使用独�
 ```text
 --permission-mode bypassPermissions
 --model claude-sonnet-5[1m]
---effort max
+--effort medium
 ```
 
-命令行上显式给出 `--model`、`--model=` 或 `--effort` 时，对应的默认值不再注入；另一个默认值仍然生效。
+命令行上显式给出 `--model`、`--model=`、`--effort` 或 `--effort=` 时，对应的默认值不再注入；另一个默认值仍然生效。
 
 二进制会拒绝 settings 中的 `permissions.defaultMode: bypassPermissions`。命令行 flag 可以工作。Claude Code 可能在运行时重写 settings，所以 wrapper 也固定模型和 effort。
 

@@ -183,7 +183,8 @@ run_model_default_smoke() {
     .env.ANTHROPIC_MODEL == "claude-sonnet-5[1m]" and
     .model == "sonnet" and
     (has("effortLevel") | not) and
-    .env.MODEL_REASONING_EFFORT == "max" and
+    .env.MODEL_REASONING_EFFORT == "medium" and
+    .modelSettings["claude-sonnet-5"].effortLevel == "medium" and
     .env.ANTHROPIC_DEFAULT_SONNET_MODEL == "claude-sonnet-5[1m]" and
     (.env | has("ANTHROPIC_DEFAULT_SONNET_MODEL_NAME") | not) and
     (.env | has("ANTHROPIC_DEFAULT_SONNET_MODEL_DESCRIPTION") | not) and
@@ -215,11 +216,11 @@ run_model_default_smoke() {
     return 1
   fi
 
-  # Copilot CLI: GPT-6 Astra at the 1M context tier and max effort.
+  # Copilot CLI: GPT-6 Astra at the 1M context tier and medium effort.
   jq -e '
     .model == "gpt-6-astra" and
     .contextTier == "long_context" and
-    .effortLevel == "max"
+    .effortLevel == "medium"
   ' config/copilot/settings.json >/dev/null
 
   # Relay: Opus remains separate; every non-Opus route uses GPT-6 Astra.
@@ -233,8 +234,8 @@ run_model_default_smoke() {
   # Launcher wrappers inject the same defaults (settings.json can be rewritten
   # at runtime, so the flags are the authoritative per-launch pin).
   grep -Fq -- "--model 'claude-sonnet-5[1m]'" config/zsh/claude.zsh
-  grep -Fq -- "--model 'claude-sonnet-5[1m]' --effort max" config/zsh/cc.zsh
-  grep -Fq -- "--model gpt-6-astra --context long_context --effort max" config/zsh/gg.zsh
+  grep -Fq -- "--model 'claude-sonnet-5[1m]' --effort medium" config/zsh/cc.zsh
+  grep -Fq -- "--model gpt-6-astra --context long_context --effort medium" config/zsh/gg.zsh
   if grep -Fq 'gpt-6-astra' config/zsh/claude.zsh config/zsh/cc.zsh; then
     echo "Claude launchers must not pin a GPT model id" >&2
     return 1
@@ -262,8 +263,8 @@ SH
       *) echo "claude wrapper default lost the native Sonnet pin: $args" >&2; exit 1 ;;
     esac
     case "$args" in
-      *'--effort max'*) : ;;
-      *) echo "claude wrapper default lost --effort max: $args" >&2; exit 1 ;;
+      *'--effort medium'*) : ;;
+      *) echo "claude wrapper default lost --effort medium: $args" >&2; exit 1 ;;
     esac
     case "$args" in
       *'--permission-mode bypassPermissions'*) : ;;
@@ -291,12 +292,34 @@ SH
       zsh -c 'source config/zsh/claude.zsh; claude --effort low'
     args="$(sed -n '1p' "$capture")"
     case "$args" in
-      *'--effort max'*) echo "explicit --effort was overridden: $args" >&2; exit 1 ;;
+      *'--effort medium'*) echo "explicit --effort was overridden: $args" >&2; exit 1 ;;
+    esac
+    case "$args" in
+      *'--effort low'*) : ;;
+      *) echo "explicit --effort was not forwarded: $args" >&2; exit 1 ;;
     esac
     case "$args" in
       *"--model claude-sonnet-5[1m]"*) : ;;
       *) echo "explicit --effort dropped the model default: $args" >&2; exit 1 ;;
     esac
+
+    : >"$capture"
+    PATH="$fake_bin:$PATH" CLAUDE_CAPTURE="$capture" \
+      zsh -c 'source config/zsh/claude.zsh; claude --effort=high'
+    args="$(sed -n '1p' "$capture")"
+    if [ "$args" != "--permission-mode bypassPermissions --model claude-sonnet-5[1m] --effort=high" ]; then
+      echo "explicit --effort= was overridden or dropped other defaults: $args" >&2
+      exit 1
+    fi
+
+    : >"$capture"
+    PATH="$fake_bin:$PATH" CLAUDE_CAPTURE="$capture" \
+      zsh -c 'unset RMUX TMUX WEZTERM_PANE; source config/zsh/cc.zsh; cc model-smoke >/dev/null'
+    args="$(sed -n '1p' "$capture")"
+    if [ "$args" != "--permission-mode bypassPermissions --model claude-sonnet-5[1m] --effort medium" ]; then
+      echo "cc launcher lost the native model, medium effort, or permission default: $args" >&2
+      exit 1
+    fi
   )
 
   echo "model defaults ok: native Sonnet/Haiku client ids, relay maps non-Opus to GPT-6 Astra"
@@ -317,33 +340,86 @@ run_mcp_default_smoke() {
 }
 
 run_copilot_terminal_smoke() {
+  jq -e '.defaultPermissionMode == "allow-all"' config/copilot/settings.json >/dev/null
+
   (
-    local test_root fake_bin direct_capture gg_capture
+    local test_root test_home fake_bin capture cleanup_capture
     test_root="$(mktemp -d)"
     trap 'rm -rf "$test_root"' EXIT
+    test_home="$test_root/home"
     fake_bin="$test_root/bin"
-    direct_capture="$test_root/direct"
-    gg_capture="$test_root/gg"
-    mkdir -p "$fake_bin"
+    capture="$test_root/capture"
+    cleanup_capture="$test_root/cleanup"
+    mkdir -p "$fake_bin" "$test_home/.copilot"
 
     cat >"$fake_bin/copilot" <<'SH'
 #!/usr/bin/env bash
-printf '%s|%s|%s|%s\n' \
-  "${TERM_PROGRAM:-}" "${COLORTERM:-}" "${FORCE_COLOR:-}" "$*" \
-  >>"$COPILOT_CAPTURE"
+{
+  printf '%s|%s|%s\n' "${TERM_PROGRAM:-}" "${COLORTERM:-}" "${FORCE_COLOR:-}"
+  printf '%s\n' "$@"
+} >"$COPILOT_CAPTURE"
+exit "${COPILOT_EXIT_STATUS:-0}"
 SH
-    chmod +x "$fake_bin/copilot"
+    cat >"$test_home/.copilot/cleanup-legacy.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'cleanup\n' >>"$COPILOT_CLEANUP_CAPTURE"
+SH
+    chmod +x "$fake_bin/copilot" "$test_home/.copilot/cleanup-legacy.sh"
 
-    PATH="$fake_bin:$PATH" COPILOT_CAPTURE="$direct_capture" TERM_PROGRAM=rmux \
-      zsh -c 'source config/zsh/copilot.zsh; copilot status; [[ "$TERM_PROGRAM" = rmux ]]'
-    grep -Fq 'WezTerm|truecolor|3|status' "$direct_capture"
+    HOME="$test_home" PATH="$fake_bin:$PATH" COPILOT_CAPTURE="$capture" \
+      COPILOT_CLEANUP_CAPTURE="$cleanup_capture" TERM_PROGRAM=rmux \
+      COLORTERM=outer-color FORCE_COLOR=0 zsh -f <<'ZSH'
+function copilot { return 99 }
+alias copilot='false'
+source config/zsh/copilot.zsh
+source config/zsh/copilot.zsh
+source config/zsh/gg.zsh
+set -e
 
-    PATH="$fake_bin:$PATH" COPILOT_CAPTURE="$gg_capture" TERM_PROGRAM=rmux \
-      zsh -c 'unset RMUX TMUX WEZTERM_PANE; source config/zsh/gg.zsh; gg terminal-smoke >/dev/null; [[ "$TERM_PROGRAM" = rmux ]]'
-    grep -Fq 'WezTerm|truecolor|3|--allow-all-tools --allow-all-paths --model gpt-6-astra --context long_context --effort max' "$gg_capture"
+[[ "${aliases[copilot]}" = _dot_configs_copilot ]]
+(( ! $+functions[copilot] ))
+copilot
+diff -u <(printf '%s\n' 'WezTerm|truecolor|3' --yolo) "$COPILOT_CAPTURE"
+[[ "$TERM_PROGRAM|$COLORTERM|$FORCE_COLOR" = 'rmux|outer-color|0' ]]
+[[ ! -e "$COPILOT_CLEANUP_CAPTURE" ]]
+
+copilot --resume 'session with spaces' --model gpt-6-astra --effort low
+diff -u <(printf '%s\n' 'WezTerm|truecolor|3' --yolo \
+  --resume 'session with spaces' --model gpt-6-astra --effort low) "$COPILOT_CAPTURE"
+
+copilot -p 'inspect this project' --deny-tool 'shell(git push)' --deny-url https://example.com
+diff -u <(printf '%s\n' 'WezTerm|truecolor|3' --yolo \
+  -p 'inspect this project' --deny-tool 'shell(git push)' --deny-url https://example.com) "$COPILOT_CAPTURE"
+[[ ! -e "$COPILOT_CLEANUP_CAPTURE" ]]
+
+copilot update
+diff -u <(printf '%s\n' 'WezTerm|truecolor|3' --yolo update) "$COPILOT_CAPTURE"
+diff -u <(printf 'cleanup\n') "$COPILOT_CLEANUP_CAPTURE"
+if COPILOT_EXIT_STATUS=7 copilot update; then
+  print -u2 'copilot alias hid a failed update'
+  exit 1
+else
+  [[ $? = 7 ]]
+fi
+diff -u <(printf 'cleanup\n') "$COPILOT_CLEANUP_CAPTURE"
+
+copilot --version
+diff -u <(printf '%s\n' 'WezTerm|truecolor|3' --yolo --version) "$COPILOT_CAPTURE"
+diff -u <(printf 'cleanup\n') "$COPILOT_CLEANUP_CAPTURE"
+
+command copilot --version
+diff -u <(printf '%s\n' 'rmux|outer-color|0' --version) "$COPILOT_CAPTURE"
+
+unset RMUX TMUX WEZTERM_PANE
+gg terminal-smoke >/dev/null
+diff -u <(printf '%s\n' 'WezTerm|truecolor|3' --yolo \
+  --model gpt-6-astra --context long_context --effort medium) "$COPILOT_CAPTURE"
+[[ "$TERM_PROGRAM|$COLORTERM|$FORCE_COLOR" = 'rmux|outer-color|0' ]]
+[[ -z "${DISABLE_AUTO_TITLE:-}" ]]
+ZSH
   )
 
-  echo "Copilot launchers advertise WezTerm truecolor without replacing RMUX identity"
+  echo "Copilot allow-all alias and gg preserve arguments, cleanup, and terminal identity"
 }
 
 run_global_instructions_smoke() {

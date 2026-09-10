@@ -38,7 +38,7 @@ rd main          # delete RMUX session main
 claude           # start Claude Code
 cc my-project    # Claude Code with a title
 copilot          # start Copilot CLI
-gg my-project    # Copilot with a title and full tool/path access
+gg my-project    # Copilot with a title and YOLO permissions
 ```
 
 New SonicTerm tabs stay as normal shells.

@@ -6,7 +6,7 @@
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5[1m]",
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4-5-20251001",
     "ANTHROPIC_SMALL_FAST_MODEL": "claude-haiku-4-5-20251001",
-    "MODEL_REASONING_EFFORT": "max",
+    "MODEL_REASONING_EFFORT": "medium",
     "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "80",
     "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": "16"
   },
@@ -41,5 +41,10 @@
   "skipDangerousModePermissionPrompt": true,
   "theme": "custom:apollo",
   "autoCompactEnabled": true,
-  "skipAutoPermissionPrompt": true
+  "skipAutoPermissionPrompt": true,
+  "modelSettings": {
+    "claude-sonnet-5": {
+      "effortLevel": "medium"
+    }
+  }
 }

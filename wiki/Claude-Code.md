@@ -29,7 +29,7 @@ The tracked default is:
 ```text
 Claude-facing name: claude-sonnet-5[1m]
 Picker name:        native Sonnet name
-Client effort:      max
+Client effort:      medium
 Relay route:        gptModel
 Upstream model:     gpt-6-astra
 ```
@@ -45,9 +45,9 @@ Other routes:
 
 Client names and upstream models are separate layers. The client keeps native Anthropic ids; the relay decides the upstream model. Do not write a GPT id, or a `_NAME` / `_DESCRIPTION` display override, into Claude-facing settings.
 
-The `[1m]` suffix keeps Claude Code's one-million-token model context accounting; the relay sends canonical `gpt-6-astra` upstream. The Haiku id is the installed CLI's own small-fast id and takes no `[1m]` suffix. Automatic compaction is expected at 544,000 tokens on the default Sonnet path, below Astra's advertised 872,000-token prompt limit within its 1M total window. This does not retain a full 1M-token conversation history. Relay-side default thinking is `medium` in `config/copilot-relay/config.yaml`; client effort remains `max`.
+The `[1m]` suffix keeps Claude Code's one-million-token model context accounting; the relay sends canonical `gpt-6-astra` upstream. The Haiku id is the installed CLI's own small-fast id and takes no `[1m]` suffix. Automatic compaction is expected at 544,000 tokens on the default Sonnet path, below Astra's advertised 872,000-token prompt limit within its 1M total window. This does not retain a full 1M-token conversation history. Relay-side default thinking is `medium` in `config/copilot-relay/config.yaml`; client effort also defaults to `medium`.
 
-Use a relay build with GPT-6 Astra support before relying on this setup (tracked in [copilot-relay issue #57](https://github.com/D0n9X1n/copilot-relay/issues/57)). Update the model in `config/claude/settings.json`, `config/zsh/claude.zsh`, and `config/zsh/cc.zsh` together; the wrappers' `--model` overrides the settings. The relay's `gptModel` stays suffix-free. Its blank `webSearchBackend` also uses Astra. Keep the Opus route separate.
+Use a relay build with GPT-6 Astra support before relying on this setup (tracked in [copilot-relay issue #57](https://github.com/D0n9X1n/copilot-relay/issues/57)). Update model or effort defaults in `config/claude/settings.json`, `config/zsh/claude.zsh`, and `config/zsh/cc.zsh` together; the wrappers' `--model` and `--effort` flags override the settings. The relay's `gptModel` stays suffix-free. Its blank `webSearchBackend` also uses Astra. Keep the Opus route separate.
 
 Run `copilot` and enter `/model` to check account availability and effort choices before changing models. That is Copilot's picker, not Claude Code's picker or the relay's local `/v1/models`. After `scripts/check.sh all` passes, apply through `./install.sh` twice and start a new shell and Claude Code session. The installer leaves a healthy relay running; recovery of an unhealthy relay may interrupt requests.
 
@@ -66,7 +66,8 @@ The Sonnet-facing slot routes to GPT-6 Astra through `gptModel`; Opus stays on i
 | `ANTHROPIC_DEFAULT_HAIKU_MODEL` | `claude-haiku-4-5-20251001` |
 | `ANTHROPIC_SMALL_FAST_MODEL` | `claude-haiku-4-5-20251001` |
 | `model` | `sonnet`; the picker's own short alias |
-| `MODEL_REASONING_EFFORT` | `max`; launch wrappers also pass `--effort max` |
+| `modelSettings.claude-sonnet-5.effortLevel` | `medium`; Sonnet's saved effort preference |
+| `MODEL_REASONING_EFFORT` | `medium`; status-line fallback aligned with the launchers' `--effort medium` |
 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `16` |
 | `statusLine.refreshInterval` | `100` |
 | `theme` | `custom:apollo`; generated theme assets stay local |
@@ -75,7 +76,7 @@ The Sonnet-facing slot routes to GPT-6 Astra through `gptModel`; Opus stays on i
 | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"80"`; triggers compaction at 544,000 tokens with the default Sonnet output budget |
 | `feedbackDrafts` | `off` |
 
-`refreshInterval` belongs inside `statusLine`. Keep max effort in the environment and launcher flags: Claude Code 2.1.261 does not accept `max` in the persisted top-level `effortLevel` setting.
+`refreshInterval` belongs inside `statusLine`. Keep the Sonnet `modelSettings` preference, `MODEL_REASONING_EFFORT`, and both launchers aligned at `medium`. No top-level `effortLevel` is managed.
 
 ### 700k automatic-compaction window
 
@@ -105,10 +106,10 @@ The global file holds only reusable behavior plus one conditional pointer: these
 ```text
 --permission-mode bypassPermissions
 --model claude-sonnet-5[1m]
---effort max
+--effort medium
 ```
 
-An explicit `--model`, `--model=`, or `--effort` on the command line suppresses the matching default; the other default still applies.
+An explicit `--model`, `--model=`, `--effort`, or `--effort=` on the command line suppresses the matching default; the other default still applies.
 
 The binary rejects `permissions.defaultMode: bypassPermissions` in settings. The command-line flag works. The wrapper also pins model and effort because Claude Code can rewrite settings at runtime.
 

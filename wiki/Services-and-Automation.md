@@ -59,7 +59,7 @@ gptModel: gpt-6-astra
 opusModel: claude-opus-5
 ```
 
-`claudeSetup: false` stops the relay from rewriting the linked Claude settings. The relay's default thinking effort is `medium`; Claude's client and launcher effort remain `max`. `upstreamTimeoutSeconds: 600` allows up to ten minutes for a single Claude request's upstream Copilot calls.
+`claudeSetup: false` stops the relay from rewriting the linked Claude settings. The relay, Claude client, and Claude launchers all default to `medium` effort. `upstreamTimeoutSeconds: 600` allows up to ten minutes for a single Claude request's upstream Copilot calls.
 
 Login once:
 

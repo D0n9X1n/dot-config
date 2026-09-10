@@ -68,8 +68,8 @@ Files under `config/zsh/` install into `~/.oh-my-zsh/custom/`. Oh-my-zsh loads t
 | `themes/apollo.zsh-theme` | Prompt structure; sources locally generated Apollo colors |
 | `claude.zsh` | Claude wrapper and pinned launch flags |
 | `cc.zsh` | titled Claude launch |
-| `copilot.zsh` | Copilot true-color wrapper and cleanup |
-| `gg.zsh` | titled Copilot launch |
+| `copilot.zsh` | allow-all Copilot alias, true-color wrapper, and cleanup |
+| `gg.zsh` | titled, allow-all Copilot launch |
 | `zz-rmux.zsh` | RMUX session and safe-detach helpers; loads late |
 
 ## Small aliases
@@ -81,9 +81,12 @@ c       cd ..
 vim     nvim
 proxy   enable the SOCKS5 proxy
 unproxy disable the proxy
+copilot launch Copilot with allow-all / YOLO permissions
 ```
 
 The proxy address is `127.0.0.1:46971`. The helpers update shell, Git, and npm proxy settings.
+
+`copilot` and `gg` add `--yolo` automatically, allowing tools, paths, and URLs without approval prompts. No default flags need to be appended. The `copilot` alias keeps argument forwarding and successful-update cleanup; see [Copilot CLI](Copilot-CLI.md) for permission defaults and reloading existing shells.
 
 ## Completions and paths
 

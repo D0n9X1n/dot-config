@@ -11,7 +11,8 @@ Copilot CLI files live under `config/copilot/`. They install under `~/.copilot/`
 ```text
 model:       gpt-6-astra
 context:     long_context
-effort:      max
+effort:      medium
+permissions: allow-all
 theme:       default (terminal Base-16)
 keep alive:  busy
 streaming:   on
@@ -19,7 +20,7 @@ streaming:   on
 
 Run `copilot`, then enter `/model` inside its interactive session to see your account's available models and their effort choices. Astra advertises `low`, `medium`, `high`, `xhigh`, and `max`; availability depends on the account and organization policy. The CLI uses canonical `gpt-6-astra`, without Claude Code's `[1m]` suffix.
 
-To change the managed default, edit `config/copilot/settings.json` and the `--model` in `config/zsh/gg.zsh` together, then run `scripts/check.sh all`. For an unmanaged installation, `/config model` changes the Copilot user default; here, edit the tracked sources so the next install does not undo your choice.
+To change the managed model, context, or effort defaults, edit `config/copilot/settings.json` and the matching `--model`, `--context`, or `--effort` flag in `config/zsh/gg.zsh` together, then run `scripts/check.sh all`. For an unmanaged installation, `/config model` changes the Copilot user default; here, edit the tracked sources so the next install does not undo your choice.
 
 The custom footer hides built-in fields and runs `~/.copilot/statusline.sh`.
 
@@ -56,11 +57,22 @@ This turns on Copilot's supported terminal path. The managed `default` theme use
 ## Launch commands
 
 ```sh
-copilot          # normal Copilot wrapper
+copilot          # allow-all / YOLO Copilot alias
 gg my-project    # titled, unrestricted Copilot session
 ```
 
-`gg` uses GPT-6 Astra, long context, and max effort. It also passes `--allow-all-tools --allow-all-paths`, so tools and paths do not ask for approval. Use plain `copilot` when you do not want that access mode.
+The managed `copilot` alias calls a helper that adds `--yolo` and forwards your arguments unchanged. `gg` also passes `--yolo`. This is identical to `--allow-all`, or `--allow-all-tools --allow-all-paths --allow-all-urls`: tools, paths, and URLs do not ask for approval. No default flags need to be typed. Explicit deny rules and organization policy still apply.
+
+`settings.json` also sets `defaultPermissionMode: "allow-all"` for new interactive sessions launched without the alias. The alias covers resumed sessions and `-p` runs too. This changes permissions, not autopilot mode. GPT-6 Astra, long context, and medium effort are the defaults; `gg` also pins them at launch.
+
+Open a new shell after installation, or reload both launchers in the current shell:
+
+```sh
+source ~/.oh-my-zsh/custom/copilot.zsh
+source ~/.oh-my-zsh/custom/gg.zsh
+```
+
+Remove any later `alias copilot=...` from `~/.zshrc`; it would override the managed alias after oh-my-zsh loads. In particular, the old tools-and-paths-only alias omits URL permissions and bypasses the terminal wrapper and update cleanup. The installer does not edit `~/.zshrc`.
 
 `gg` sends OSC title codes to SonicTerm. Inside RMUX, it also runs `rmux rename-window`. It does not call tmux or the WezTerm CLI.
 
