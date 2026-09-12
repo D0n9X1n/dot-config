@@ -66,6 +66,7 @@ run_shellcheck() {
 
   # shellcheck disable=SC2086
   shellcheck -S error -e SC1090 -e SC1091 -e SC2155 -e SC2148 $files
+  shellcheck -S error scripts/rmux/rmux-store
 }
 
 run_zsh_syntax() {
@@ -1059,7 +1060,6 @@ PY
 
 run_rmux_store_tests() {
   bash -n scripts/rmux/rmux-store
-  shellcheck -S error scripts/rmux/rmux-store
   python3 -B -m unittest discover -s scripts/rmux -p 'test_store.py' -v
 }
 
