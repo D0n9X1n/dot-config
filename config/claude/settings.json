@@ -37,14 +37,14 @@
     }
   },
   "feedbackDrafts": "off",
-  "autoCompactWindow": 700000,
+  "modelSettings": {
+    "claude-sonnet-5": {
+      "effortLevel": "xhigh"
+    }
+  },
+  "autoCompactWindow": 800000,
   "skipDangerousModePermissionPrompt": true,
   "theme": "custom:apollo",
   "autoCompactEnabled": true,
-  "skipAutoPermissionPrompt": true,
-  "modelSettings": {
-    "claude-sonnet-5": {
-      "effortLevel": "medium"
-    }
-  }
+  "skipAutoPermissionPrompt": true
 }

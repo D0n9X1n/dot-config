@@ -16,19 +16,18 @@ claudeSetup: false
 
 # Log verbosity:
 #   error - startup/preflight/request failures only
-#   info  - error logs plus startup status, preflight status, and local HTTP
-#           status codes
-#   debug - info logs plus model routing summaries, Copilot upstream timings,
-#           and request payloads
+#   info  - error logs plus startup/preflight status, model/effort summaries,
+#           and local HTTP status codes
+#   debug - info logs plus detailed Copilot timings and request payloads
 logLevel: info
 
 # Number of days to keep files in ~/.copilot-relay/logs.
 logRetentionDays: 3
 
-# Default upstream thinking/reasoning effort: none, low, medium, high, xhigh, max.
+# Fallback effort when the request omits it: low, medium, high, xhigh, max.
 thinkEffort: medium
 
-# Max seconds to wait for a single Claude request's upstream Copilot calls.
+# Max seconds for one request's upstream calls; 0 disables the relay deadline.
 upstreamTimeoutSeconds: 600
 
 # Copilot model used for bridge-managed Claude WebSearch. Empty uses gptModel.

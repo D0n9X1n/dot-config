@@ -59,7 +59,7 @@ gptModel: gpt-6-astra
 opusModel: claude-opus-5
 ```
 
-`claudeSetup: false` 会阻止 relay 重写链接的 Claude settings。Relay、Claude 客户端和 Claude 启动器的 effort 均默认为 `medium`。`upstreamTimeoutSeconds: 600` 允许单个 Claude 请求的上游 Copilot 调用最多等待十分钟。
+`claudeSetup: false` 会阻止 relay 重写链接的 Claude settings。Relay 回退值和 Claude 启动器使用 `medium`；Sonnet 客户端保存的偏好为 `xhigh`，会被启动器显式 flags 覆盖。`upstreamTimeoutSeconds: 600` 允许单个 Claude 请求的上游 Copilot 调用最多等待十分钟。
 
 登录一次：
 

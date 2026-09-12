@@ -102,9 +102,11 @@ Proxy 地址是 `127.0.0.1:46971`。助手会修改 shell、Git 和 npm proxy �
 rr main       # main 存在时连接；只有不存在时才创建
 rl            # 列出会话
 rd main       # 删除 main
+rs            # 保存全部会话，确认重启后恢复
+rh            # 助手、父 PID 1、升级步骤
 ```
 
-它永远不会自动连接新标签页。
+它永远不会自动连接新标签页。`rr` 新启动的服务器必须在连接前具有父 PID 1；终端只拥有连接客户端。已有服务器保持不变。用 `brew upgrade rmux` 升级，准备好以新 shell 重建全部会话时再执行 `rs`。受管 `rmux` shell 函数会保留与当前服务器兼容的客户端版本。快照限制请看 [RMUX](RMUX-zh-CN.md)。
 
 在 RMUX 中：
 

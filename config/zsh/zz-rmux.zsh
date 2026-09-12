@@ -1,7 +1,36 @@
 # RMUX session helpers.
 
-unalias rr rd rl 2>/dev/null
-unfunction rr rd rl 2>/dev/null
+unalias rr rd rl rs rh rmux 2>/dev/null
+unfunction rr rd rl rs rh rmux 2>/dev/null
+
+function _rmux_store {
+  if [[ -x "$HOME/.local/bin/rmux-store" ]]; then
+    "$HOME/.local/bin/rmux-store" "$@"
+  elif (( $+commands[rmux-store] )); then
+    command rmux-store "$@"
+  else
+    print -u2 'RMUX helpers are not installed; run ./install.sh in dot-configs.'
+    return 127
+  fi
+}
+
+function rmux {
+  _rmux_store client "$@"
+}
+function rs {
+  if (( $# )); then
+    print -u2 'usage: rs'
+    return 2
+  fi
+  _rmux_store restart
+}
+function rh {
+  if (( $# )); then
+    print -u2 'usage: rh'
+    return 2
+  fi
+  _rmux_store help
+}
 
 function rr {
   emulate -L zsh
@@ -9,17 +38,7 @@ function rr {
     print -u2 "usage: rr <session>"
     return 2
   fi
-  if (( ! $+commands[rmux] )); then
-    print -u2 "rr: rmux not found"
-    return 127
-  fi
-  if command rmux has-session -t "$1" >/dev/null 2>&1; then
-    print "rr: resuming session '$1'"
-    command rmux attach-session -t "$1"
-  else
-    print "rr: session '$1' does not exist; creating it"
-    command rmux new-session -s "$1"
-  fi
+  _rmux_store rr "$1"
 }
 
 function rd {
@@ -28,11 +47,7 @@ function rd {
     print -u2 "usage: rd <session>"
     return 2
   fi
-  if (( ! $+commands[rmux] )); then
-    print -u2 "rd: rmux not found"
-    return 127
-  fi
-  command rmux kill-session -t "$1"
+  _rmux_store rd "$1"
 }
 
 function rl {
@@ -41,11 +56,7 @@ function rl {
     print -u2 "usage: rl"
     return 2
   fi
-  if (( ! $+commands[rmux] )); then
-    print -u2 "rl: rmux not found"
-    return 127
-  fi
-  command rmux list-sessions
+  _rmux_store rl
 }
 
 unalias exit logout 2>/dev/null
@@ -53,8 +64,8 @@ unfunction exit logout 2>/dev/null
 
 function exit {
   emulate -L zsh
-  if [[ -n "${RMUX:-}" ]] && (( $+commands[rmux] )); then
-    command rmux detach-client
+  if [[ -n "${RMUX:-}" ]]; then
+    _rmux_store client detach-client
     return $?
   fi
   builtin exit "$@"
@@ -62,17 +73,17 @@ function exit {
 
 function logout {
   emulate -L zsh
-  if [[ -n "${RMUX:-}" ]] && (( $+commands[rmux] )); then
-    command rmux detach-client
+  if [[ -n "${RMUX:-}" ]]; then
+    _rmux_store client detach-client
     return $?
   fi
   builtin logout "$@"
 }
 
 function _rmux_detach_or_delete_char {
-  if [[ -n "${RMUX:-}" && -z "$BUFFER" ]] && (( $+commands[rmux] )); then
+  if [[ -n "${RMUX:-}" && -z "$BUFFER" ]]; then
     zle -I
-    command rmux detach-client
+    _rmux_store client detach-client
   else
     zle .delete-char-or-list
   fi

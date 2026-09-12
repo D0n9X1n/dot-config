@@ -646,6 +646,7 @@ install_macos_deps() {
     jq
     neovim
     node
+    python
     rmux
     shellcheck
     zsh-completions
@@ -988,6 +989,12 @@ fi
 validate_manifest
 install_apollo_themes
 link_manifest_files
+if is_macos && have_cmd python3 && have_cmd rmux; then
+  log_command python3 -B "${scripts_root}/rmux/store.py" prepare || {
+    action_required "RMUX runtime retention failed; do not upgrade RMUX until this is resolved."
+    exit 1
+  }
+fi
 remove_repo_symlink "${HOME}/.gitignore" "${repo_root}/.gitignore" "old global Git ignore"
 remove_repo_symlink "${HOME}/.tmux.conf" "${repo_root}/.tmux.conf" "tmux config"
 remove_repo_symlink "${HOME}/.wezterm.lua" "${repo_root}/wezterm/wezterm.lua" "WezTerm config"

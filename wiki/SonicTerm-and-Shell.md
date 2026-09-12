@@ -102,9 +102,11 @@ When fast-syntax-highlighting is installed, the installer prepares its shipped B
 rr main       # attach if main exists; create only when absent
 rl            # list sessions
 rd main       # delete main
+rs            # save all sessions, confirm restart, restore
+rh            # helpers, parent PID 1, upgrade steps
 ```
 
-It never auto-attaches a new tab.
+It never auto-attaches a new tab. New servers started by `rr` must have parent PID 1 before attachment; the terminal owns only the attached client. Existing servers remain untouched. Upgrade with `brew upgrade rmux`, then run `rs` when ready to restart all sessions as fresh shells. The managed `rmux` shell function retains the client version compatible with the running server. See [RMUX](RMUX.md) for snapshot limits.
 
 Inside RMUX:
 

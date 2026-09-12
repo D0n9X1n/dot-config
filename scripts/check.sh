@@ -184,7 +184,7 @@ run_model_default_smoke() {
     .model == "sonnet" and
     (has("effortLevel") | not) and
     .env.MODEL_REASONING_EFFORT == "medium" and
-    .modelSettings["claude-sonnet-5"].effortLevel == "medium" and
+    .modelSettings["claude-sonnet-5"].effortLevel == "xhigh" and
     .env.ANTHROPIC_DEFAULT_SONNET_MODEL == "claude-sonnet-5[1m]" and
     (.env | has("ANTHROPIC_DEFAULT_SONNET_MODEL_NAME") | not) and
     (.env | has("ANTHROPIC_DEFAULT_SONNET_MODEL_DESCRIPTION") | not) and
@@ -193,7 +193,7 @@ run_model_default_smoke() {
     .env.ANTHROPIC_BASE_URL == "http://127.0.0.1:4142" and
     .env.CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS == "16" and
     .autoCompactEnabled == true and
-    .autoCompactWindow == 700000 and
+    .autoCompactWindow == 800000 and
     .env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE == "80" and
     .feedbackDrafts == "off" and
     .skipDangerousModePermissionPrompt == true and
@@ -1057,6 +1057,12 @@ PY
   echo "active config tree and archive boundary ok"
 }
 
+run_rmux_store_tests() {
+  bash -n scripts/rmux/rmux-store
+  shellcheck -S error scripts/rmux/rmux-store
+  python3 -B -m unittest discover -s scripts/rmux -p 'test_store.py' -v
+}
+
 run_rmux_helpers_smoke() {
   (
     local test_root fake_bin capture exit_status
@@ -1064,7 +1070,8 @@ run_rmux_helpers_smoke() {
     trap 'rm -rf "$test_root"' EXIT
     fake_bin="$test_root/bin"
     capture="$test_root/capture"
-    mkdir -p "$fake_bin"
+    export HOME="$test_root/home"
+    mkdir -p "$fake_bin" "$HOME"
 
     cat >"$fake_bin/rmux" <<'SH'
 #!/bin/sh
@@ -1075,12 +1082,25 @@ fi
 SH
     chmod +x "$fake_bin/rmux"
 
+    cat >"$fake_bin/rmux-store" <<'SH'
+#!/bin/sh
+printf '%s\n' "$*" >>"$RMUX_CAPTURE"
+SH
+    chmod +x "$fake_bin/rmux-store"
+    PATH="$fake_bin:/usr/bin:/bin" RMUX_CAPTURE="$capture" zsh -f -c '
+      source config/zsh/zz-rmux.zsh
+      rs
+      rh
+    '
+    grep -Fxq 'restart' "$capture"
+    grep -Fxq 'help' "$capture"
+    : >"$capture"
+
     PATH="$fake_bin:/usr/bin:/bin" RMUX_CAPTURE="$capture" zsh -f -c '
       source config/zsh/zz-rmux.zsh
       rr new >/dev/null
     '
-    [ "$(sed -n '1p' "$capture")" = "has-session -t new" ]
-    [ "$(sed -n '2p' "$capture")" = "new-session -s new" ]
+    [ "$(sed -n '1p' "$capture")" = "rr new" ]
 
     RMUX_SESSION_EXISTS=1 PATH="$fake_bin:/usr/bin:/bin" RMUX_CAPTURE="$capture" zsh -f -c '
       source config/zsh/zz-rmux.zsh
@@ -1092,13 +1112,12 @@ SH
       bindkey -M emacs "^D"
       bindkey -M viins "^D"
     '
-    [ "$(sed -n '3p' "$capture")" = "has-session -t main" ]
-    [ "$(sed -n '4p' "$capture")" = "attach-session -t main" ]
-    [ "$(sed -n '5p' "$capture")" = "kill-session -t main" ]
-    [ "$(sed -n '6p' "$capture")" = "list-sessions" ]
-    [ "$(sed -n '7p' "$capture")" = "detach-client" ]
-    [ "$(sed -n '8p' "$capture")" = "detach-client" ]
-    [ "$(wc -l <"$capture" | tr -d ' ')" = "8" ]
+    [ "$(sed -n '2p' "$capture")" = "rr main" ]
+    [ "$(sed -n '3p' "$capture")" = "rd main" ]
+    [ "$(sed -n '4p' "$capture")" = "rl" ]
+    [ "$(sed -n '5p' "$capture")" = "client detach-client" ]
+    [ "$(sed -n '6p' "$capture")" = "client detach-client" ]
+    [ "$(wc -l <"$capture" | tr -d ' ')" = "6" ]
 
     exit_status=0
     PATH="$fake_bin:/usr/bin:/bin" RMUX_CAPTURE="$capture" zsh -f -c '
@@ -1113,22 +1132,26 @@ SH
       rr one two >/dev/null 2>&1; [[ $? = 2 ]]
       rd >/dev/null 2>&1; [[ $? = 2 ]]
       rl extra >/dev/null 2>&1; [[ $? = 2 ]]
+      rs extra >/dev/null 2>&1; [[ $? = 2 ]]
+      rh extra >/dev/null 2>&1; [[ $? = 2 ]]
+      rmux -V
     '
+    grep -Fxq 'client -V' "$capture"
 
     PATH="/usr/bin:/bin" zsh -f -c '
       source config/zsh/zz-rmux.zsh
       rr main >/dev/null 2>&1; [[ $? = 127 ]]
       rd main >/dev/null 2>&1; [[ $? = 127 ]]
       rl >/dev/null 2>&1; [[ $? = 127 ]]
+      RMUX=socket exit >/dev/null 2>&1; [[ $? = 127 ]]
+      RMUX=socket logout >/dev/null 2>&1; [[ $? = 127 ]]
     '
   )
 
-  grep -Fq 'command rmux has-session -t "$1"' config/zsh/zz-rmux.zsh
-  grep -Fq 'command rmux attach-session -t "$1"' config/zsh/zz-rmux.zsh
-  grep -Fq 'command rmux new-session -s "$1"' config/zsh/zz-rmux.zsh
-  grep -Fq 'command rmux kill-session -t "$1"' config/zsh/zz-rmux.zsh
-  grep -Fq 'command rmux list-sessions' config/zsh/zz-rmux.zsh
-  [ "$(grep -Fc 'command rmux detach-client' config/zsh/zz-rmux.zsh)" = "3" ]
+  grep -Fq '_rmux_store rr "$1"' config/zsh/zz-rmux.zsh
+  grep -Fq '_rmux_store rd "$1"' config/zsh/zz-rmux.zsh
+  grep -Fq '_rmux_store rl' config/zsh/zz-rmux.zsh
+  [ "$(grep -Fc '_rmux_store client detach-client' config/zsh/zz-rmux.zsh)" = "3" ]
   grep -Fq "bindkey -M emacs '^D' _rmux_detach_or_delete_char" config/zsh/zz-rmux.zsh
   grep -Fq "bindkey -M viins '^D' _rmux_detach_or_delete_char" config/zsh/zz-rmux.zsh
   echo "RMUX helpers ok: rr/rd/rl and exit/logout/Ctrl-D detach protection"
@@ -1737,6 +1760,7 @@ run_smoke() {
   run_wiki_smoke
   run_pipeline_scripts_smoke
   run_rmux_helpers_smoke
+  run_rmux_store_tests
   run_rmux_keymap_docs_smoke
   run_retired_config_migration_smoke
   run_rmux_smoke
@@ -1750,7 +1774,7 @@ case "${1:-all}" in
   models) run_model_default_smoke ;;
   mcp) run_mcp_default_smoke ;;
   wiki) run_wiki_smoke; run_pipeline_scripts_smoke; run_rmux_keymap_docs_smoke ;;
-  rmux) run_rmux_helpers_smoke; run_rmux_keymap_docs_smoke; run_retired_config_migration_smoke; run_rmux_smoke ;;
+  rmux) run_rmux_helpers_smoke; run_rmux_store_tests; run_rmux_keymap_docs_smoke; run_retired_config_migration_smoke; run_rmux_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;
   *)

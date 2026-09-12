@@ -57,6 +57,8 @@ type<TAB>source<TAB>home destination
 | `config/mcp/mcp-shared.json` | 合并到本机 Copilot MCP 数据 |
 | `config/launchd/*.plist` | 渲染到 `~/Library/LaunchAgents/` |
 | `scripts/copilot/cleanup-legacy.sh` | `~/.copilot/cleanup-legacy.sh` |
+| `scripts/rmux/rmux-store` | `~/.local/bin/rmux-store` |
+| `scripts/rmux/store.py` | `~/.local/lib/rmux-store/store.py` |
 
 清单不接受归档源文件。Wiki 页面永远不会被安装。
 

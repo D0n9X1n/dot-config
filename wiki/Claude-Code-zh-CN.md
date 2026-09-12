@@ -29,7 +29,8 @@ Claude Code 第一次启动时会问是否允许自定义 `dummy` API key。请�
 ```text
 Claude 端名称： claude-sonnet-5[1m]
 Picker 名称：    原生 Sonnet 名称
-客户端 effort：  medium
+Sonnet 保存偏好：xhigh
+启动器 effort：  medium
 Relay 路由：     gptModel
 上游模型：       gpt-6-astra
 ```
@@ -45,7 +46,7 @@ Claude Code 保留原生客户端身份。名称中没有 `opus`，所以 copilo
 
 客户端名称和上游模型是两层。客户端保留原生 Anthropic ID；上游模型由 relay 决定。不要把 GPT ID 或 `_NAME` / `_DESCRIPTION` 显示覆盖写进 Claude 端设置。
 
-`[1m]` 后缀让 Claude Code 使用一百万 token 的模型 context 计数；relay 向上游发送规范 ID `gpt-6-astra`。Haiku ID 是已安装 CLI 自身的 small-fast ID，不加 `[1m]` 后缀。默认 Sonnet 路径预计在 544,000 tokens 时触发自动压缩，低于 Astra 的 1M 总窗口内公布的 872,000-token prompt 上限。这并不意味着会保留完整的 1M-token 对话历史。Relay 端默认 thinking 在 `config/copilot-relay/config.yaml` 中设为 `medium`；客户端 effort 也默认为 `medium`。
+`[1m]` 后缀让 Claude Code 使用一百万 token 的模型 context 计数；relay 向上游发送规范 ID `gpt-6-astra`。Haiku ID 是已安装 CLI 自身的 small-fast ID，不加 `[1m]` 后缀。默认 Sonnet 路径预计在 624,000 tokens 时触发自动压缩，低于 Astra 的 1M 总窗口内公布的 872,000-token prompt 上限。这并不意味着会保留完整的 1M-token 对话历史。Relay 端默认 thinking 在 `config/copilot-relay/config.yaml` 中设为 `medium`；Sonnet 保存的偏好为 `xhigh`，shell 启动器仍显式请求 `medium`。
 
 使用本设置前，请先使用支持 GPT-6 Astra 的 relay 构建（见 [copilot-relay issue #57](https://github.com/D0n9X1n/copilot-relay/issues/57)）。修改模型或 effort 默认值时应同时更新 `config/claude/settings.json`、`config/zsh/claude.zsh` 和 `config/zsh/cc.zsh`；wrapper 的 `--model` 和 `--effort` flags 优先于设置文件。Relay 的 `gptModel` 不带后缀，空白的 `webSearchBackend` 也使用 Astra。Opus 路由保持独立。
 
@@ -66,23 +67,23 @@ Sonnet-facing 槽位通过 `gptModel` 路由到 GPT-6 Astra；Opus 仍使用独�
 | `ANTHROPIC_DEFAULT_HAIKU_MODEL` | `claude-haiku-4-5-20251001` |
 | `ANTHROPIC_SMALL_FAST_MODEL` | `claude-haiku-4-5-20251001` |
 | `model` | `sonnet`；选择器自身的短别名 |
-| `modelSettings.claude-sonnet-5.effortLevel` | `medium`；Sonnet 保存的 effort 偏好 |
+| `modelSettings.claude-sonnet-5.effortLevel` | `xhigh`；Sonnet 保存的 effort 偏好 |
 | `MODEL_REASONING_EFFORT` | `medium`；状态栏回退值与启动器的 `--effort medium` 保持一致 |
 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `16` |
 | `statusLine.refreshInterval` | `100` |
 | `theme` | `custom:apollo`；生成的主题资源仍保留在本机 |
 | `autoCompactEnabled` | `true` |
-| `autoCompactWindow` | `700000`，尚未扣除输出 token 预留量 |
-| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"80"`；默认 Sonnet 输出预算下在 544,000 tokens 时触发压缩 |
+| `autoCompactWindow` | `800000`，尚未扣除输出 token 预留量 |
+| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"80"`；默认 Sonnet 输出预算下在 624,000 tokens 时触发压缩 |
 | `feedbackDrafts` | `off` |
 
-`refreshInterval` 必须放在 `statusLine` 里面。Sonnet 的 `modelSettings` 偏好、`MODEL_REASONING_EFFORT` 和两个启动器应统一为 `medium`。不管理顶层 `effortLevel`。
+`refreshInterval` 必须放在 `statusLine` 里面。Sonnet 保存的偏好为 `xhigh`。`MODEL_REASONING_EFFORT` 和两个启动器仍为 `medium`；除非显式提供其他 effort flag，否则启动器的 `--effort` 会覆盖保存的偏好。不管理顶层 `effortLevel`。
 
-### 700k 自动压缩窗口
+### 800k 自动压缩窗口
 
-配置的窗口不等于压缩触发阈值。Claude Code 2.1.261 先扣除输出 token 预留量，再应用百分比。使用默认原生 Sonnet 输出预留量时，所选设置的计算结果为 `(700000 - 20000) × 80% = 544000`。
+配置的窗口不等于压缩触发阈值。Claude Code 2.1.261 先扣除输出 token 预留量，再应用百分比。使用默认原生 Sonnet 输出预留量时，所选设置的计算结果为 `(800000 - 20000) × 80% = 624000`。
 
-按此计算，有效窗口为 680,000 tokens，预期触发阈值为 544,000 tokens；这不是新的运行时测量结果。这是触发阈值，不是对话大小的硬上限；某一轮可能先越过阈值，再执行压缩。其他 CLI 版本、模型、输出预算或 `CLAUDE_CODE_AUTO_COMPACT_WINDOW` 覆盖值可能改变计算结果。编辑源设置后请启动新的 Claude Code 会话。
+按此计算，有效窗口为 780,000 tokens，预期触发阈值为 624,000 tokens；这不是新的运行时测量结果。这是触发阈值，不是对话大小的硬上限；某一轮可能先越过阈值，再执行压缩。其他 CLI 版本、模型、输出预算或 `CLAUDE_CODE_AUTO_COMPACT_WINDOW` 覆盖值可能改变计算结果。编辑源设置后请启动新的 Claude Code 会话。
 
 `~/.claude/settings.json` 和 `~/.claude.json` 是不同文件：
 

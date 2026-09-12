@@ -57,6 +57,8 @@ The installer checks that every source exists, every destination is unique, and 
 | `config/mcp/mcp-shared.json` | merge into local Copilot MCP data |
 | `config/launchd/*.plist` | render into `~/Library/LaunchAgents/` |
 | `scripts/copilot/cleanup-legacy.sh` | `~/.copilot/cleanup-legacy.sh` |
+| `scripts/rmux/rmux-store` | `~/.local/bin/rmux-store` |
+| `scripts/rmux/store.py` | `~/.local/lib/rmux-store/store.py` |
 
 The manifest rejects archived sources. Wiki pages are never installed.
 

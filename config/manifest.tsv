@@ -20,6 +20,8 @@ link	config/zsh/copilot.zsh	.oh-my-zsh/custom/copilot.zsh
 link	config/zsh/custom.zsh	.oh-my-zsh/custom/custom.zsh
 link	config/zsh/gg.zsh	.oh-my-zsh/custom/gg.zsh
 link	config/zsh/zz-rmux.zsh	.oh-my-zsh/custom/zz-rmux.zsh
+link	scripts/rmux/rmux-store	.local/bin/rmux-store
+link	scripts/rmux/store.py	.local/lib/rmux-store/store.py
 link	config/zsh/themes/apollo.zsh-theme	.oh-my-zsh/custom/themes/apollo.zsh-theme
 link	config/copilot-relay/config.yaml	.copilot-relay/config.yaml
 merge	config/mcp/mcp-shared.json	.config/github-copilot/mcp.json

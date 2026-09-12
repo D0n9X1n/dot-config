@@ -71,13 +71,30 @@ New SonicTerm tabs open normal shells. The late-loading `zz-rmux.zsh` file provi
 rr main       # create or resume main
 rl            # list all sessions
 rd main       # delete main
+rs            # save all sessions, confirm, restart, restore
+rh            # helper help, parent PID, and upgrade steps
 ```
 
-`rr <name>` checks whether the session exists, runs `attach-session` when it does, and runs `new-session` only when it is absent. It prints which path it chose. `rd <name>` runs `kill-session`, so it permanently ends that session. SonicTerm advertises its real `TERM_PROGRAM=SonicTerm`; only Copilot child processes receive the WezTerm compatibility identity.
+`rr <name>` attaches to an exact session name or creates it when absent. A new server starts through a short-lived detached bootstrap; `rr` verifies the daemon's **parent PID is 1** before attaching. The terminal still owns the attached client, not the daemon. Existing servers are reused without restarting or forcibly reparenting them. `rd <name>` permanently ends that session. SonicTerm advertises its real `TERM_PROGRAM=SonicTerm`; only Copilot child processes receive the WezTerm compatibility identity.
 
 Inside RMUX, the zsh helpers turn `exit`, `logout`, and Ctrl+D at an empty prompt into `detach-client`. Ctrl+D with text in the edit buffer keeps its normal delete/list behavior. `prefix + d` and closing the SonicTerm tab also disconnect the client while leaving panes running. Run `rr main` later to reconnect.
 
-Use `rd <name>` for intentional session deletion. Persistence is still in memory only: `rd`, `kill-server`, daemon loss, or reboot destroys the session; there is no resurrect-style disk restore.
+Use `rd <name>` for intentional session deletion. Closing SonicTerm does not require `rs`: detached sessions remain in the running daemon. PID 1 is the expected parent for newly bootstrapped servers, not a guarantee against crashes or system shutdown.
+
+### Upgrade and restart
+
+```sh
+brew upgrade rmux
+rs
+```
+
+Upgrade the package whenever needed; run `rs` only when ready to stop running programs. The current Homebrew formula has no service or restart hook. The installer retains matching client/daemon binaries outside Homebrew cleanup. Managed zsh helpers and the `rmux` shell function keep using the active pair until restart. Absolute Homebrew executable paths and explicit separate sockets bypass that protection.
+
+`rs` has no parameters. It saves **all sessions, including detached sessions**, validates the snapshot, and asks for confirmation. Only then does an independent worker restart with the installed version and restore the workspace. A failed save or cancellation leaves the daemon alone. The worker is separate from the invoking pane, so restarting that pane cannot interrupt restoration.
+
+Restore recreates session/window names, pane layouts, working directories, and active selections as fresh shells. It does not recover running programs, unsaved buffers, scrollback, or process memory, and never replays captured commands. Snapshot and runtime files stay private under `~/.local/state/rmux-store/` and `~/.local/share/rmux-store/`; do not commit them. Failures retain the snapshot instead of overwriting it with partial state.
+
+There is no LaunchAgent, periodic save, or automatic reboot restoration. A crash or reboot can lose changes since the last `rs` save. `rh` shows only helper usage, the parent-PID behavior, upgrade steps, and restart warnings.
 
 ### Keybindings
 
