@@ -13,6 +13,15 @@
 
 Do not use ASCII-art flowcharts in Markdown. Use a fenced Mermaid diagram.
 
+## After a PR merges
+
+- Treat post-merge local cleanup as part of finishing the task, not an optional follow-up.
+- Confirm the PR is merged and fetch the base branch. Check Git status, worktrees, and active sessions before removing anything; verify squash/rebase merges through the PR, not ancestry alone.
+- Remove the merged PR's clean, inactive worktrees and local feature branches, then prune stale worktree and remote-tracking references. Return to the updated base branch when safe.
+- Remove task-created temporary files and stop task-owned background processes that are no longer needed, including those outside the repo.
+- Preserve uncommitted or unmerged work, stashes, active sessions and locks, unrelated files, and shared processes. Never force-delete uncertain work or run broad cleanup commands to make the tree look clean.
+- Verify the final Git status and worktree list. Report any leftovers and why they were kept; ask when ownership or safety is unclear.
+
 ## Managed settings
 
 These global settings are synced from `~/Public/dot-configs`.

@@ -36,6 +36,8 @@ The file holds reusable behavior and a conditional pointer to `~/Public/dot-conf
 
 No duplicate global `AGENTS.md` or shell-injected instruction directory is needed. Any user-supplied `COPILOT_CUSTOM_INSTRUCTIONS_DIRS` value stays untouched.
 
+After a PR merges, the global rules require local cleanup before the task is called complete: confirm the merge, remove clean inactive PR worktrees and local branches, prune stale references, remove task-created temporary files, and stop unneeded task-owned processes. Preserve uncommitted or unmerged work, stashes, active sessions and locks, unrelated files, and shared processes. Verify the final state and report anything kept. This is an agent instruction, not an unattended merge hook.
+
 ## GitHub access
 
 Copilot's built-in `github-mcp-server` uses its existing GitHub login. No separate GitHub MCP entry or PAT is needed for this setup. Claude uses authenticated `gh`; see [Repository operations](Repository-Operations.md) for other MCP servers.
