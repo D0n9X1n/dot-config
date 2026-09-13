@@ -100,6 +100,8 @@ Do not put the local state file in Git.
 
 The global file holds only reusable behavior plus one conditional pointer: these settings are synced from `~/Public/dot-configs`, and a change to them starts by reading that folder's `.claude/CLAUDE.md`. Repo-only rules — the Wiki source of truth, the manifest, checks, bilingual pages — stay in this repo's own `.claude/CLAUDE.md`, so an unrelated project never loads them.
 
+After a PR merges, the global rules require local cleanup before the task is called complete: confirm the merge, remove clean inactive PR worktrees and local branches, prune stale references, remove task-created temporary files, and stop unneeded task-owned processes. Preserve uncommitted or unmerged work, stashes, active sessions and locks, unrelated files, and shared processes. Verify the final state and report anything kept. This is an agent instruction, not an unattended merge hook.
+
 ## Launch wrappers
 
 `config/zsh/claude.zsh` wraps `claude` and adds:
