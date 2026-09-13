@@ -30,6 +30,7 @@ The tracked config uses:
 | Line height | 1.2 |
 | New window grid | 100 × 30 |
 | Scrollback | 1000 lines |
+| Keypad mode | `numeric`: ordinary digits, operators, and Enter in legacy input; Kitty protocol unchanged |
 | Cursor | block, no blink |
 | Backdrop | opaque |
 | Software render mode | auto |

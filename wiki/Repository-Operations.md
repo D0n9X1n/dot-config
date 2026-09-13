@@ -43,6 +43,8 @@ Types:
 
 The installer checks that every source exists, every destination is unique, and every source is under `config/` or `scripts/`.
 
+The manifest check excludes SonicTerm `*.save.lock` runtime files. Leave these ignored locks in place; never add them to the manifest or Git.
+
 ## Active paths
 
 | Repository source | Home destination or work |

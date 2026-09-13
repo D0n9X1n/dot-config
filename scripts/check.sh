@@ -218,11 +218,11 @@ run_model_default_smoke() {
     return 1
   fi
 
-  # Copilot CLI: GPT-6 Astra at the 1M context tier and medium effort.
+  # Copilot CLI: GPT-6 Astra at the 1M context tier and high effort.
   jq -e '
     .model == "gpt-6-astra" and
     .contextTier == "long_context" and
-    .effortLevel == "medium"
+    .effortLevel == "high"
   ' config/copilot/settings.json >/dev/null
 
   # Relay: Opus remains separate; every non-Opus route uses GPT-6 Astra.
@@ -237,7 +237,7 @@ run_model_default_smoke() {
   # at runtime, so the flags are the authoritative per-launch pin).
   grep -Fq -- "--model 'claude-sonnet-5[1m]'" config/zsh/claude.zsh
   grep -Fq -- "--model 'claude-sonnet-5[1m]' --effort high" config/zsh/cc.zsh
-  grep -Fq -- "--model gpt-6-astra --context long_context --effort medium" config/zsh/gg.zsh
+  grep -Fq -- "--model gpt-6-astra --context long_context --effort high" config/zsh/gg.zsh
   if grep -Fq 'gpt-6-astra' config/zsh/claude.zsh config/zsh/cc.zsh; then
     echo "Claude launchers must not pin a GPT model id" >&2
     return 1
@@ -415,7 +415,7 @@ diff -u <(printf '%s\n' 'rmux|outer-color|0' --version) "$COPILOT_CAPTURE"
 unset RMUX TMUX WEZTERM_PANE
 gg terminal-smoke >/dev/null
 diff -u <(printf '%s\n' 'WezTerm|truecolor|3' --yolo \
-  --model gpt-6-astra --context long_context --effort medium) "$COPILOT_CAPTURE"
+  --model gpt-6-astra --context long_context --effort high) "$COPILOT_CAPTURE"
 [[ "$TERM_PROGRAM|$COLORTERM|$FORCE_COLOR" = 'rmux|outer-color|0' ]]
 [[ -z "${DISABLE_AUTO_TITLE:-}" ]]
 ZSH
@@ -748,7 +748,8 @@ run_manifest_smoke() {
       echo "duplicate manifest source: $duplicate_source" >&2
       return 1
     }
-    config_files="$(find config -type f ! -path 'config/manifest.tsv' -print | sort)"
+    config_files="$(find config -type f ! -path 'config/manifest.tsv' \
+      ! -path 'config/sonicterm/*.save.lock' -print | sort)"
     manifest_config_files="$(grep -Ev '^(#|$)' config/manifest.tsv | cut -f2 | grep '^config/' | sort)"
     [ "$config_files" = "$manifest_config_files" ] || {
       echo "config/ files and manifest sources differ" >&2

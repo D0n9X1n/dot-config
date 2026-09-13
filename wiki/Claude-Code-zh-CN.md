@@ -77,7 +77,7 @@ Sonnet-facing 槽位通过 `gptModel` 路由到 GPT-6 Astra；Opus 仍使用独�
 | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"100"`；默认 Sonnet 输出预算下，目标是在 750,000 tokens 时触发压缩 |
 | `feedbackDrafts` | `off` |
 
-`refreshInterval` 必须放在 `statusLine` 里面。Sonnet 保存的偏好为 `high`。`MODEL_REASONING_EFFORT` 和两个启动器均为 `high`；除非显式提供其他 effort flag，否则启动器的 `--effort` 会覆盖保存的偏好。不管理顶层 `effortLevel`。
+`refreshInterval` 必须放在 `statusLine` 里面。Sonnet 保存的偏好为 `high`。`MODEL_REASONING_EFFORT` 和两个启动器均为 `high`；除非显式提供其他 effort flag，否则启动器的 `--effort` 会覆盖保存的偏好。不管理顶层 `effortLevel`。`high` 是 Claude Code 和 [Copilot CLI](Copilot-CLI-zh-CN.md) 共同的默认推理强度，不是模型名称。
 
 ### 750k 自动压缩目标
 

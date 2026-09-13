@@ -77,7 +77,7 @@ The Sonnet-facing slot routes to GPT-6 Astra through `gptModel`; Opus stays on i
 | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"100"`; targets compaction at 750,000 tokens with the default Sonnet output budget |
 | `feedbackDrafts` | `off` |
 
-`refreshInterval` belongs inside `statusLine`. The saved Sonnet preference is `high`. `MODEL_REASONING_EFFORT` and both launchers use `high`; their explicit `--effort` flags override the saved preference unless you supply another effort flag. No top-level `effortLevel` is managed.
+`refreshInterval` belongs inside `statusLine`. The saved Sonnet preference is `high`. `MODEL_REASONING_EFFORT` and both launchers use `high`; their explicit `--effort` flags override the saved preference unless you supply another effort flag. No top-level `effortLevel` is managed. `high` is the shared reasoning-effort default for Claude Code and [Copilot CLI](Copilot-CLI.md), not a model name.
 
 ### 750k automatic-compaction target
 

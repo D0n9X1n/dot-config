@@ -65,6 +65,6 @@
     "autoConnect": true,
     "openDiffOnEdit": true
   },
-  "effortLevel": "medium",
+  "effortLevel": "high",
   "showReasoning": false
 }

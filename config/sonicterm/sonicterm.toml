@@ -23,6 +23,7 @@ warm_window_pool = 2
 [terminal]
 # Only Copilot children receive the WezTerm compatibility identity.
 term_program = "SonicTerm"
+keypad_mode = "numeric"
 scrollback = 1000
 cursor_blink = false
 cursor_shape = "block"

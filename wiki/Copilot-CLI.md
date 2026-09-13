@@ -11,7 +11,7 @@ Copilot CLI files live under `config/copilot/`. They install under `~/.copilot/`
 ```text
 model:       gpt-6-astra
 context:     long_context
-effort:      medium
+effort:      high
 permissions: allow-all
 theme:       default (terminal Base-16)
 keep alive:  busy
@@ -65,7 +65,7 @@ gg my-project    # titled, unrestricted Copilot session
 
 The managed `copilot` alias calls a helper that adds `--yolo` and forwards your arguments unchanged. `gg` also passes `--yolo`. This is identical to `--allow-all`, or `--allow-all-tools --allow-all-paths --allow-all-urls`: tools, paths, and URLs do not ask for approval. No default flags need to be typed. Explicit deny rules and organization policy still apply.
 
-`settings.json` also sets `defaultPermissionMode: "allow-all"` for new interactive sessions launched without the alias. The alias covers resumed sessions and `-p` runs too. This changes permissions, not autopilot mode. GPT-6 Astra, long context, and medium effort are the defaults; `gg` also pins them at launch.
+`settings.json` also sets `defaultPermissionMode: "allow-all"` for new interactive sessions launched without the alias. The alias covers resumed sessions and `-p` runs too. This changes permissions, not autopilot mode. GPT-6 Astra, long context, and high effort are the defaults; `gg` also pins them at launch. `high` is the shared reasoning-effort default with [Claude Code](Claude-Code.md), not a model name. For a one-off override, use `copilot --effort <level>`; `gg` arguments are a title, not CLI flags.
 
 Open a new shell after installation, or reload both launchers in the current shell:
 

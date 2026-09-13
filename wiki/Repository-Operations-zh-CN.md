@@ -43,6 +43,8 @@ type<TAB>source<TAB>home destination
 
 安装器会检查每个源文件存在、每个目标唯一，并且每个源文件都在 `config/` 或 `scripts/` 下。
 
+清单检查会排除 SonicTerm 的 `*.save.lock` 运行时文件。保留这些已忽略的锁文件，不要加入清单或 Git。
+
 ## 生效路径
 
 | 仓库源文件 | 用户目录目标或工作 |

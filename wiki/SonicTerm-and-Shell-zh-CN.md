@@ -30,6 +30,7 @@ config/sonicterm/keymaps/*.toml
 | 行高 | 1.2 |
 | 新窗口网格 | 100 × 30 |
 | Scrollback | 1000 行 |
+| 数字键盘模式 | `numeric`：传统输入使用普通数字、运算符和回车；Kitty 协议保持不变 |
 | 光标 | block，不闪烁 |
 | 背景 | opaque |
 | 软件渲染模式 | auto |

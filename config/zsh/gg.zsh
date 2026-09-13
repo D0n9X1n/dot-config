@@ -29,6 +29,6 @@ function gg {
     command rmux rename-window -- "$title" 2>/dev/null
   fi
   TERM_PROGRAM=WezTerm COLORTERM=truecolor FORCE_COLOR=3 \
-    command copilot --yolo --model gpt-6-astra --context long_context --effort medium
+    command copilot --yolo --model gpt-6-astra --context long_context --effort high
   unset DISABLE_AUTO_TITLE
 }
