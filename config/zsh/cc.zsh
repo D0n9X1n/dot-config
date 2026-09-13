@@ -34,6 +34,6 @@ function cc {
   if [[ -n "$RMUX" ]] && (( $+commands[rmux] )); then
     command rmux rename-window -- "$title" 2>/dev/null
   fi
-  command claude --permission-mode bypassPermissions --model 'claude-sonnet-5[1m]' --effort medium
+  command claude --permission-mode bypassPermissions --model 'claude-sonnet-5[1m]' --effort high
   unset DISABLE_AUTO_TITLE
 }

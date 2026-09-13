@@ -184,8 +184,8 @@ run_model_default_smoke() {
     .env.ANTHROPIC_MODEL == "claude-sonnet-5[1m]" and
     .model == "sonnet" and
     (has("effortLevel") | not) and
-    .env.MODEL_REASONING_EFFORT == "medium" and
-    .modelSettings["claude-sonnet-5"].effortLevel == "xhigh" and
+    .env.MODEL_REASONING_EFFORT == "high" and
+    .modelSettings["claude-sonnet-5"].effortLevel == "high" and
     .env.ANTHROPIC_DEFAULT_SONNET_MODEL == "claude-sonnet-5[1m]" and
     (.env | has("ANTHROPIC_DEFAULT_SONNET_MODEL_NAME") | not) and
     (.env | has("ANTHROPIC_DEFAULT_SONNET_MODEL_DESCRIPTION") | not) and
@@ -194,8 +194,9 @@ run_model_default_smoke() {
     .env.ANTHROPIC_BASE_URL == "http://127.0.0.1:4142" and
     .env.CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS == "16" and
     .autoCompactEnabled == true and
-    .autoCompactWindow == 800000 and
-    .env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE == "80" and
+    .autoCompactWindow == 770000 and
+    .env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE == "100" and
+    ((.autoCompactWindow - 20000) * (.env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE | tonumber) / 100) == 750000 and
     .feedbackDrafts == "off" and
     .skipDangerousModePermissionPrompt == true and
     .skipAutoPermissionPrompt == true and
@@ -235,7 +236,7 @@ run_model_default_smoke() {
   # Launcher wrappers inject the same defaults (settings.json can be rewritten
   # at runtime, so the flags are the authoritative per-launch pin).
   grep -Fq -- "--model 'claude-sonnet-5[1m]'" config/zsh/claude.zsh
-  grep -Fq -- "--model 'claude-sonnet-5[1m]' --effort medium" config/zsh/cc.zsh
+  grep -Fq -- "--model 'claude-sonnet-5[1m]' --effort high" config/zsh/cc.zsh
   grep -Fq -- "--model gpt-6-astra --context long_context --effort medium" config/zsh/gg.zsh
   if grep -Fq 'gpt-6-astra' config/zsh/claude.zsh config/zsh/cc.zsh; then
     echo "Claude launchers must not pin a GPT model id" >&2
@@ -264,8 +265,8 @@ SH
       *) echo "claude wrapper default lost the native Sonnet pin: $args" >&2; exit 1 ;;
     esac
     case "$args" in
-      *'--effort medium'*) : ;;
-      *) echo "claude wrapper default lost --effort medium: $args" >&2; exit 1 ;;
+      *'--effort high'*) : ;;
+      *) echo "claude wrapper default lost --effort high: $args" >&2; exit 1 ;;
     esac
     case "$args" in
       *'--permission-mode bypassPermissions'*) : ;;
@@ -293,7 +294,7 @@ SH
       zsh -c 'source config/zsh/claude.zsh; claude --effort low'
     args="$(sed -n '1p' "$capture")"
     case "$args" in
-      *'--effort medium'*) echo "explicit --effort was overridden: $args" >&2; exit 1 ;;
+      *'--effort high'*) echo "explicit --effort was overridden: $args" >&2; exit 1 ;;
     esac
     case "$args" in
       *'--effort low'*) : ;;
@@ -317,8 +318,8 @@ SH
     PATH="$fake_bin:$PATH" CLAUDE_CAPTURE="$capture" \
       zsh -c 'unset RMUX TMUX WEZTERM_PANE; source config/zsh/cc.zsh; cc model-smoke >/dev/null'
     args="$(sed -n '1p' "$capture")"
-    if [ "$args" != "--permission-mode bypassPermissions --model claude-sonnet-5[1m] --effort medium" ]; then
-      echo "cc launcher lost the native model, medium effort, or permission default: $args" >&2
+    if [ "$args" != "--permission-mode bypassPermissions --model claude-sonnet-5[1m] --effort high" ]; then
+      echo "cc launcher lost the native model, high effort, or permission default: $args" >&2
       exit 1
     fi
   )
