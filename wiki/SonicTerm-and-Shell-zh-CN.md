@@ -25,7 +25,8 @@ config/sonicterm/keymaps/*.toml
 |---|---|
 | 主题 | `apollo`，来自固定的上游 release |
 | Keymap | `sonicterm-macos` |
-| 字体 | Rec Mono St.Helens，大小 14 |
+| 字体 | Rec Mono St.Helens，大小 13 |
+| 字重缩放 | 1 |
 | 行高 | 1.2 |
 | 新窗口网格 | 100 × 30 |
 | Scrollback | 1000 行 |

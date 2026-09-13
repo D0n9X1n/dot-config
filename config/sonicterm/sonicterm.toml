@@ -6,9 +6,9 @@ tab_max_width = 240
 
 [font]
 family = "Rec Mono St.Helens"
-size = 14
+size = 13
 line_height = 1.2
-weight_scale = 1.25
+weight_scale = 1
 
 [window]
 cols = 100
