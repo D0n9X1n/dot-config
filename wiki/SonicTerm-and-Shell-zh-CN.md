@@ -90,6 +90,12 @@ Proxy 地址是 `127.0.0.1:46971`。助手会修改 shell、Git 和 npm proxy �
 
 `copilot` 和 `gg` 会自动添加 `--yolo`，允许工具、路径和 URL，不再请求批准。不需要手动附加默认 flags。`copilot` alias 保留参数转发和成功更新后的清理；权限默认值与现有 shell 的重新加载方法见 [Copilot CLI](Copilot-CLI-zh-CN.md)。
 
+## Homebrew 更新
+
+`custom.zsh` 导出 `HOMEBREW_NO_AUTO_UPDATE=1`。`brew install` 和 `brew upgrade` 等命令会跳过自动更新软件包目录及其提示。需要最新软件包版本时，请先手动运行 `brew update`，再升级。
+
+打开新 shell 即可生效，也可以在现有 shell 中运行 `export HOMEBREW_NO_AUTO_UPDATE=1`。
+
 ## 补全与路径
 
 提示符主题由 `.zshrc` 中的 `ZSH_THEME` 选择。受管 zsh 助手不会设置或覆盖它，安装器也不会修改 `.zshrc`。需要时仍可在该文件中选择 Apollo。`custom.zsh` 会让 eza 使用固定的上游主题。

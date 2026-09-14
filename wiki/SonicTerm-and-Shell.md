@@ -90,6 +90,12 @@ The proxy address is `127.0.0.1:46971`. The helpers update shell, Git, and npm p
 
 `copilot` and `gg` add `--yolo` automatically, allowing tools, paths, and URLs without approval prompts. No default flags need to be appended. The `copilot` alias keeps argument forwarding and successful-update cleanup; see [Copilot CLI](Copilot-CLI.md) for permission defaults and reloading existing shells.
 
+## Homebrew updates
+
+`custom.zsh` exports `HOMEBREW_NO_AUTO_UPDATE=1`. Commands such as `brew install` and `brew upgrade` skip the automatic catalog update and its announcements. Run `brew update` manually before upgrading when you want the latest package versions.
+
+Open a new shell to apply it, or run `export HOMEBREW_NO_AUTO_UPDATE=1` in an existing shell.
+
 ## Completions and paths
 
 `.zshrc` owns prompt theme selection through `ZSH_THEME`. Managed zsh helpers do not set or override it, and the installer does not edit `.zshrc`. Apollo remains available if selected there. `custom.zsh` points eza at the pinned upstream theme.

@@ -9,6 +9,7 @@
 
 [ -f /opt/homebrew/etc/profile.d/autojump.sh ] && . /opt/homebrew/etc/profile.d/autojump.sh
 
+export HOMEBREW_NO_AUTO_UPDATE=1
 export EZA_CONFIG_DIR="$HOME/.config/eza-apollo-theme"
 export FAST_WORK_DIR="$HOME/.local/share/dot-configs/apollo/fsh"
 
