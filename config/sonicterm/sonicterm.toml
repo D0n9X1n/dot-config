@@ -6,8 +6,8 @@ tab_max_width = 240
 
 [font]
 family = "Rec Mono St.Helens"
-size = 13
-line_height = 1.2
+size = 13.5
+line_height = 1.1
 weight_scale = 1
 
 [window]
@@ -25,7 +25,7 @@ warm_window_pool = 2
 term_program = "SonicTerm"
 keypad_mode = "numeric"
 scrollback = 1000
-cursor_blink = false
+cursor_blink = false 
 cursor_shape = "block"
 
 [logging]
