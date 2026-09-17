@@ -15,10 +15,12 @@ This is the complete effective keymap for RMUX with this repository's `config/rm
 | Delete a session | `rd <name>` |
 | Detach without ending the session | `prefix + d`, `exit`, `logout`, empty-prompt Ctrl+D, or close tab |
 | Reload config | `prefix + r` |
+| Rename current window (tab) | `prefix + n` |
 | New window in current directory | `prefix + c` |
 | Split right / down | `prefix + \|` / `prefix + -` |
 | Move between panes | `prefix + h/j/k/l` |
 | Resize panes (repeatable) | `prefix + H/J/K/L` |
+| Previous / next window (tab), repeatable | `prefix + Left/Right` |
 | Last window | `prefix + Tab` |
 | Toggle mouse/native selection | `prefix + T` |
 | Enter copy mode | `prefix + v` or `prefix + [` |
@@ -91,7 +93,6 @@ bind-key    -T prefix d       detach-client
 bind-key    -T prefix f       command-prompt { find-window -Z "%%" }
 bind-key    -T prefix i       display-message
 bind-key    -T prefix m       select-pane -m
-bind-key    -T prefix n       next-window
 bind-key    -T prefix o       select-pane -t :.+
 bind-key    -T prefix p       previous-window
 bind-key    -T prefix q       display-panes
@@ -106,8 +107,6 @@ bind-key    -T prefix \~      show-messages
 bind-key    -T prefix PPage   copy-mode -u
 bind-key -r -T prefix Up      select-pane -U
 bind-key -r -T prefix Down    select-pane -D
-bind-key -r -T prefix Left    select-pane -L
-bind-key -r -T prefix Right   select-pane -R
 bind-key    -T prefix M-1     select-layout even-horizontal
 bind-key    -T prefix M-2     select-layout even-vertical
 bind-key    -T prefix M-3     select-layout main-horizontal
@@ -140,9 +139,12 @@ bind-key    -T prefix h       select-pane -L
 bind-key    -T prefix j       select-pane -D
 bind-key    -T prefix k       select-pane -U
 bind-key    -T prefix l       select-pane -R
+bind-key    -T prefix n       command-prompt -I "#W" "rename-window \"%%\""
 bind-key    -T prefix r       source-file ~/.rmux.conf \; display-message "RMUX reloaded"
 bind-key    -T prefix v       copy-mode
 bind-key    -T prefix |       split-window -h -c "#{pane_current_path}"
+bind-key -r -T prefix Left    previous-window
+bind-key -r -T prefix Right   next-window
 bind-key    -T prefix C-q     send-prefix
 ```
 <!-- END GENERATED prefix -->

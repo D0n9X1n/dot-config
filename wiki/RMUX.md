@@ -52,14 +52,16 @@ The profile is adapted from RMUX's v0.10.0 human-friendly example and selected c
 | History | 100000 lines |
 | Window/pane indices | Start at 1; windows renumber after close |
 | Copy mode | Vi keys; `pbcopy` plus OSC 52 |
-| Status | Top, styled by the pinned Apollo RMUX release |
+| Status | One bottom row, styled by the pinned Apollo RMUX release |
 | Titles | Automatic rename off; `#S · #W` propagated outward |
 | Terminal identity | `TERM=tmux-256color`; `TERM_PROGRAM=rmux` is preserved |
 | Working directory | Active pane OSC 7 reports are relayed to SonicTerm |
 
 The config clears stale `TERMINFO`, `TERMINFO_DIRS`, and `TERMCAP` inherited by a long-lived daemon, then sets `COLORTERM=truecolor` and `FORCE_COLOR=3`. It does not clear RMUX's own `TERM_PROGRAM` identity.
 
-`install.sh` verifies the official `rmux-apollo-theme` release and links its theme-only config under `~/.config/rmux-apollo-theme/`. The local RMUX file sources it for status, window, pane, message, and copy-mode styles. Local status strings keep content only, so they do not override upstream colors. No plugin manager or shell bootstrap is added.
+`install.sh` verifies the official `rmux-apollo-theme` release and links its theme-only config under `~/.config/rmux-apollo-theme/`. The local RMUX file sources it for status, window, pane, message, and copy-mode styles. The bar matches the local bufferline.nvim setup: slope separators, a dark-blue active tab with bold white text, and inactive tabs on the bar background. Only the active-tab colors are a fixed bufferline-specific override; all other colors come from Apollo. No plugin manager or shell bootstrap is added.
+
+The bottom bar shows a red, slanted session label and slanted, numbered window tabs on the left, with a plain `HH:MM` clock on the right. A one-cell gap separates the label and tabs. Session names are capped at 19 display cells so both sloped ends fit within the 24-cell label budget. Activity and bell colors remain visible. `PREFIX` appears while the prefix is active; `ZOOM` marks a zoomed window. Sloped ends use the same Powerline glyphs as bufferline's `slope` style (`U+E0BA` and `U+E0BC`), so the terminal font or its fallback must support them. The bar has no full date or decorative clock icon.
 
 The outer `xterm-256color` capability includes `osc7`, and `set-titles` is enabled. Oh My Zsh's `omz_termsupport_cwd` hook emits a host-qualified OSC 7 report at each prompt. RMUX records that report per pane and relays the active pane's path to SonicTerm, so relative file paths resolve against the correct directory. `#{pane_current_path}` is process metadata and does not replace the shell report. After changing `terminal-features`, reload the config and detach/reattach so the client capabilities are resolved again.
 
@@ -103,12 +105,14 @@ The [complete RMUX keymap](RMUX-Keymap.md) lists all 278 effective bindings acro
 | Action | Binding |
 |---|---|
 | Reload config | `prefix + r` |
+| Rename current window (tab) | `prefix + n` |
 | Toggle mouse/native selection | `prefix + T` |
 | New window in current directory | `prefix + c` |
 | Split right in current directory | `prefix + \|` |
 | Split down in current directory | `prefix + -` |
 | Focus pane | `prefix + h/j/k/l` |
 | Resize pane, repeatable | `prefix + H/J/K/L` |
+| Previous / next window (tab), repeatable | `prefix + Left/Right` |
 | Last window | `prefix + Tab` |
 | Copy mode | `prefix + v` |
 | Start/select line/rectangle | `v` / `V` / `C-v` in copy mode |

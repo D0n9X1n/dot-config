@@ -1275,7 +1275,10 @@ run_rmux_smoke() {
     cat >"$test_home/.config/rmux-apollo-theme/apollo-rmux.conf" <<'RMUX_THEME'
 set-option -g status-style "bg=default,fg=default"
 set-option -g status-left-style "bg=default,fg=default,bold"
-set-window-option -g window-status-current-style "bg=default,fg=default,bold"
+set-window-option -g window-status-style "bg=black,fg=white"
+set-window-option -g window-status-current-style "bg=blue,fg=black,bold"
+set-window-option -g window-status-activity-style "bg=black,fg=red,bold"
+set-window-option -g window-status-bell-style "bg=red,fg=black,bold"
 set-option -g pane-active-border-style "fg=default"
 set-option -g message-style "bg=default,fg=default,bold"
 set-window-option -g mode-style "bg=default,fg=default,bold"
@@ -1299,7 +1302,46 @@ RMUX_THEME
     [ "$(rmux -L "$socket" show-options -gv mouse)" = "on" ]
     [ "$(rmux -L "$socket" show-options -gv history-limit)" = "100000" ]
     [ "$(rmux -L "$socket" show-options -gv base-index)" = "1" ]
-    [ "$(rmux -L "$socket" show-options -gv status-position)" = "top" ]
+    [ "$(rmux -L "$socket" show-options -gv status)" = "on" ]
+    [ "$(rmux -L "$socket" show-options -gv status-position)" = "bottom" ]
+    [ "$(rmux -L "$socket" show-options -gv status-justify)" = "left" ]
+    [ "$(rmux -L "$socket" show-options -gv status-left-length)" = "24" ]
+    [ "$(rmux -L "$socket" display-message -p -t validate -F '#{E:status-left}')" = '#[fg=red,bg=default,nobold]#[bg=red,fg=black,bold] validate #[fg=red,bg=default,nobold] ' ]
+    rmux -L "$socket" new-session -d -s abcdefghijklmnopqrstuvwxyz /bin/sh
+    [ "$(rmux -L "$socket" display-message -p -t abcdefghijklmnopqrstuvwxyz -F '#{E:status-left}')" = '#[fg=red,bg=default,nobold]#[bg=red,fg=black,bold] abcdefghijklmnopqrs #[fg=red,bg=default,nobold] ' ]
+    rmux -L "$socket" rename-session -t abcdefghijklmnopqrstuvwxyz '界界界界界界界界界界界界'
+    [ "$(rmux -L "$socket" display-message -p -t '界界界界界界界界界界界界' -F '#{E:status-left}')" = '#[fg=red,bg=default,nobold]#[bg=red,fg=black,bold] 界界界界界界界界界 #[fg=red,bg=default,nobold] ' ]
+    rmux -L "$socket" kill-session -t '界界界界界界界界界界界界'
+    [ "$(rmux -L "$socket" show-options -gv status-right-length)" = "24" ]
+    [ "$(rmux -L "$socket" show-options -gv status-right)" = ' #{?client_prefix,PREFIX  ,}%H:%M ' ]
+    [ "$(rmux -L "$socket" show-window-options -gv window-status-separator)" = " " ]
+    rmux -L "$socket" rename-window -t validate shell
+    local tab_format inactive_style expected_cap tab_index flags bell activity expected_style expected_background
+    tab_index="$(rmux -L "$socket" display-message -p -t validate -F '#I')"
+    expected_cap='#[fg=#365b80,bg=default,nobold]'
+    [ "$(rmux -L "$socket" display-message -p -t validate -F '#{E:window-status-current-format}')" = "${expected_cap}#[bg=#365b80,fg=#ffffff,bold] ${tab_index}:shell ${expected_cap}" ]
+    rmux -L "$socket" split-window -d -t validate /bin/sh
+    rmux -L "$socket" resize-pane -Z -t validate
+    [ "$(rmux -L "$socket" display-message -p -t validate -F '#{E:window-status-current-format}')" = "${expected_cap}#[bg=#365b80,fg=#ffffff,bold] ${tab_index}:shell ZOOM ${expected_cap}" ]
+    rmux -L "$socket" resize-pane -Z -t validate
+    [ "$(rmux -L "$socket" display-message -p -t validate -F '#{E:window-status-current-format}')" = "${expected_cap}#[bg=#365b80,fg=#ffffff,bold] ${tab_index}:shell ${expected_cap}" ]
+    inactive_style="$(rmux -L "$socket" show-options -gv @tab-inactive-style)"
+    [ "$inactive_style" = '#{?window_bell_flag,#{window-status-bell-style},#{?window_activity_flag,#{window-status-activity-style},#{window-status-style}}}' ]
+    for flags in 00 01 10 11; do
+      bell="#{==:${flags%?},1}"
+      activity="#{==:${flags#?},1}"
+      tab_format="${inactive_style//window_bell_flag/$bell}"
+      tab_format="${tab_format//window_activity_flag/$activity}"
+      rmux -L "$socket" set -g @tab-inactive-style "$tab_format"
+      case "$flags" in
+        00) expected_style='bg=default,fg=white'; expected_background=default ;;
+        01) expected_style='bg=default,fg=red,bold'; expected_background=default ;;
+        10|11) expected_style='bg=red,fg=black,bold'; expected_background=red ;;
+      esac
+      expected_cap="#[fg=${expected_background},bg=default,nobold]"
+      [ "$(rmux -L "$socket" display-message -p -t validate -F '#{E:window-status-format}')" = "${expected_cap}#[${expected_style}] ${tab_index}:shell ${expected_cap}" ]
+    done
+    rmux -L "$socket" set -g @tab-inactive-style "$inactive_style"
     [ "$(rmux -L "$socket" show-options -gv status-style)" = "bg=default,fg=default" ]
     [ "$(rmux -L "$socket" show-options -gv pane-active-border-style)" = "fg=default" ]
     [ "$(rmux -L "$socket" show-window-options -gv mode-style)" = "bg=default,fg=default,bold" ]
@@ -1310,8 +1352,15 @@ RMUX_THEME
 
     keys="$(rmux -L "$socket" list-keys -T prefix)"
     printf '%s\n' "$keys" | grep -Eq 'Tab[[:space:]]+last-window'
+    printf '%s\n' "$keys" | grep -Eq '^bind-key -r -T prefix Left[[:space:]]+previous-window$'
+    printf '%s\n' "$keys" | grep -Eq '^bind-key -r -T prefix Right[[:space:]]+next-window$'
+    printf '%s\n' "$keys" | grep -Eq '^bind-key[[:space:]]+-T prefix h[[:space:]]+select-pane -L$'
+    printf '%s\n' "$keys" | grep -Eq '^bind-key[[:space:]]+-T prefix j[[:space:]]+select-pane -D$'
+    printf '%s\n' "$keys" | grep -Eq '^bind-key[[:space:]]+-T prefix k[[:space:]]+select-pane -U$'
+    printf '%s\n' "$keys" | grep -Eq '^bind-key[[:space:]]+-T prefix l[[:space:]]+select-pane -R$'
     printf '%s\n' "$keys" | grep -Fq 'split-window -h -c "#{pane_current_path}"'
-    printf '%s\n' "$keys" | grep -Fq 'source-file'
+    printf '%s\n' "$keys" | grep -Fxq 'bind-key    -T prefix n       command-prompt -I "#W" "rename-window \"%%\""'
+    printf '%s\n' "$keys" | grep -Fxq "bind-key    -T prefix r       source-file $HOME/.rmux.conf \\; display-message \"RMUX reloaded\""
     root_keys="$(rmux -L "$socket" list-keys -T root)"
     printf '%s\n' "$root_keys" | grep -Fq 'MouseDown1Pane            select-pane -t = \; send-keys -M'
     printf '%s\n' "$root_keys" | grep -Fq 'if-shell -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" { send-keys -M } { copy-mode -M }'
@@ -1396,10 +1445,11 @@ run_apollo_smoke() {
   jq -e '.theme == "default"' config/copilot/settings.json >/dev/null
 
   if grep -En '#[0-9a-fA-F]{6}|38;2;|48;2;' \
-      config/rmux/rmux.conf \
       config/claude/statusline.sh \
       config/copilot/statusline.sh \
-      config/zsh/themes/apollo.zsh-theme; then
+      config/zsh/themes/apollo.zsh-theme || \
+      grep -Fxv "set -g window-status-current-style 'bg=#365b80,fg=#ffffff,bold'" config/rmux/rmux.conf | \
+        grep -En '#[0-9a-fA-F]{6}|38;2;|48;2;'; then
     echo "tracked active theme consumers contain embedded palette colors" >&2
     return 1
   fi
