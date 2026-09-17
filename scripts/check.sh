@@ -1362,6 +1362,7 @@ RMUX_THEME
     printf '%s\n' "$keys" | grep -Fxq 'bind-key    -T prefix n       command-prompt -I "#W" "rename-window \"%%\""'
     printf '%s\n' "$keys" | grep -Fxq "bind-key    -T prefix r       source-file $HOME/.rmux.conf \\; display-message \"RMUX reloaded\""
     root_keys="$(rmux -L "$socket" list-keys -T root)"
+    printf '%s\n' "$root_keys" | grep -Fxq 'bind-key -T root MouseDown1Status          select-window -t ='
     printf '%s\n' "$root_keys" | grep -Fq 'MouseDown1Pane            select-pane -t = \; send-keys -M'
     printf '%s\n' "$root_keys" | grep -Fq 'if-shell -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" { send-keys -M } { copy-mode -M }'
     grep -Fq 'bind -n MouseDown1Pane { select-pane -t=; send -M }' config/rmux/rmux.conf

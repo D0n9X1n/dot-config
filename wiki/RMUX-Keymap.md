@@ -341,7 +341,6 @@ bind-key -T copy-mode C-M-f             send-keys -X next-matching-bracket
 <!-- BEGIN GENERATED root -->
 ```text
 bind-key -T root MouseDown1Pane            select-pane -t = \; send-keys -M
-bind-key -T root MouseDown1Status          switch-client -t =
 bind-key -T root MouseDown1Border          select-pane -M
 bind-key -T root MouseDown1ScrollbarUp     if-shell -F -t = "#{pane_in_mode}" { send-keys -X page-up } { copy-mode -u }
 bind-key -T root MouseDown1ScrollbarDown   if-shell -F -t = "#{pane_in_mode}" { send-keys -X page-down } { copy-mode -d }
@@ -364,6 +363,7 @@ bind-key -T root M-MouseDown3Status        display-menu -T "#[align=centre]#{win
 bind-key -T root M-MouseDown3StatusLeft    display-menu -T "#[align=centre]#{session_name}" -t = -x M -y W Next n { switch-client -n } Previous p { switch-client -p } '' Renumber N { move-window -r } Rename r { command-prompt -I "#S" { rename-session "%%" } } Detach d { detach-client } '' "New Session" s { new-session } "New Window" w { new-window }
 bind-key -T root C-MouseDown1Pane          swap-pane -s @
 bind-key -T root C-MouseDown1Status        swap-window -t @
+bind-key -T root MouseDown1Status          select-window -t =
 ```
 <!-- END GENERATED root -->
 
