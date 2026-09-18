@@ -29,6 +29,7 @@ The tracked config uses:
 | Font weight scale | 1 |
 | Line height | 1.2 |
 | New window grid | 100 × 30 |
+| Bottom padding | 0 logical pixels |
 | Scrollback | 1000 lines |
 | Keypad mode | `numeric`: ordinary digits, operators, and Enter in legacy input; Kitty protocol unchanged |
 | Cursor | block, no blink |
@@ -36,7 +37,9 @@ The tracked config uses:
 | Software render mode | auto |
 | Child identity | `TERM_PROGRAM=SonicTerm` |
 
-Use **Reload Config** from the SonicTerm command palette after a config change. Some native window changes may need a restart.
+Use **Reload Config** from the SonicTerm command palette (`Cmd+Shift+R`) after a config change. Some native window changes may need a restart.
+
+Zero bottom padding removes the configured margin above the native tab bar. A partial-row gap may remain because the terminal uses whole text rows; its size depends on the window height. `panel_padding` affects popup panels, not this gap.
 
 The active keymap is `sonicterm-macos`; `sonicterm-linux` and `sonicterm-windows` are also managed. Their custom bindings stay unchanged. Appearance uses `[appearance]`; unused legacy window and render keys are omitted.
 

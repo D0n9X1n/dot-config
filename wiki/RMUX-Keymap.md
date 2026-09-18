@@ -64,7 +64,6 @@ bind-key    -T prefix &       confirm-before -p "kill-window #W? (y/n)" kill-win
 bind-key    -T prefix \'      command-prompt -T window-target -p index { select-window -t ":%%" }
 bind-key    -T prefix (       switch-client -p
 bind-key    -T prefix )       switch-client -n
-bind-key    -T prefix ,       command-prompt -I "#W" { rename-window "%%" }
 bind-key    -T prefix .       command-prompt -T target { move-window -t "%%" }
 bind-key    -T prefix /       command-prompt -k -p key { list-keys -1N "%%" }
 bind-key    -T prefix 0       select-window -t :=0
@@ -128,6 +127,7 @@ bind-key -r -T prefix C-Down  resize-pane -D
 bind-key -r -T prefix C-Left  resize-pane -L
 bind-key -r -T prefix C-Right resize-pane -R
 bind-key    -T prefix Tab     last-window
+bind-key    -T prefix ,       command-prompt -F -I "#{E:@tab-name}" "rename-window -t \"#{window_id}\" -- \"%%%%%%\""
 bind-key    -T prefix -       split-window -v -c "#{pane_current_path}"
 bind-key -r -T prefix H       resize-pane -L 5
 bind-key -r -T prefix J       resize-pane -D 3
@@ -139,7 +139,7 @@ bind-key    -T prefix h       select-pane -L
 bind-key    -T prefix j       select-pane -D
 bind-key    -T prefix k       select-pane -U
 bind-key    -T prefix l       select-pane -R
-bind-key    -T prefix n       command-prompt -I "#W" "rename-window \"%%\""
+bind-key    -T prefix n       command-prompt -F -I "#{E:@tab-name}" "rename-window -t \"#{window_id}\" -- \"%%%%%%\""
 bind-key    -T prefix r       source-file ~/.rmux.conf \; display-message "RMUX reloaded"
 bind-key    -T prefix v       copy-mode
 bind-key    -T prefix |       split-window -h -c "#{pane_current_path}"

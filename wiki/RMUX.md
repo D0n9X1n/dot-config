@@ -53,7 +53,7 @@ The profile is adapted from RMUX's v0.10.0 human-friendly example and selected c
 | Window/pane indices | Start at 1; windows renumber after close |
 | Copy mode | Vi keys; `pbcopy` plus OSC 52 |
 | Status | One bottom row, styled by the pinned Apollo RMUX release |
-| Titles | Automatic rename off; `#S · #W` propagated outward |
+| Titles | Automatic rename off by default; empty rename resets it for that window; `#S · #W` propagated outward |
 | Terminal identity | `TERM=tmux-256color`; `TERM_PROGRAM=rmux` is preserved |
 | Working directory | Active pane OSC 7 reports are relayed to SonicTerm |
 
@@ -121,6 +121,10 @@ The [complete RMUX keymap](RMUX-Keymap.md) lists all 278 effective bindings acro
 | Detach | `prefix + d` (RMUX default) |
 
 The `|`, `-`, and `c` commands use `#{pane_current_path}`, so new panes and windows inherit the active working directory.
+
+Every bottom tab shows `index:icon title`, with one space between the icon and title. The icon follows the window's active pane command: Claude, Copilot, and Vim/Neovim have app icons; zsh and other commands use the unboxed terminal glyph (`U+F120`). It is separate from the name, so plain-text renames keep an icon. Existing `cc`/`gg` icon prefixes are hidden in the displayed title to avoid duplicates.
+
+Use `prefix + n` or `prefix + ,` to edit only the title text. Esc cancels. Submit an empty name to restore that window's default app-based name; it then follows the active command until you set another custom name. The same reset applies to `rmux rename-window ''`. Quotes and format-like text stay literal. RMUX 0.10 doubles typed backslashes in this escaped prompt; use the CLI with a quoted argument when exact backslashes matter. This changes the RMUX bottom tabs, not SonicTerm's outer tab icons.
 
 ## SonicTerm mouse integration
 

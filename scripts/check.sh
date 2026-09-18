@@ -1004,6 +1004,7 @@ import re
 text = pathlib.Path('config/sonicterm/sonicterm.toml').read_text()
 window = re.search(r'^\[window\]\n(.*?)(?=^\[|\Z)', text, re.M | re.S).group(1)
 assert not re.search(r'^(opacity|blur)\s*=', window, re.M)
+assert re.search(r'^padding_bottom\s*=\s*0\s*$', window, re.M)
 assert not re.search(r'^\[render\]', text, re.M)
 assert 'keymap = "sonicterm-macos"' in text
 assert 'backdrop = "opaque"' in text and 'opacity = 1.0' in text
@@ -1316,15 +1317,32 @@ RMUX_THEME
     [ "$(rmux -L "$socket" show-options -gv status-right)" = ' #{?client_prefix,PREFIX  ,}%H:%M ' ]
     [ "$(rmux -L "$socket" show-window-options -gv window-status-separator)" = " " ]
     rmux -L "$socket" rename-window -t validate shell
+    local icon_format app expected_icon name
+    icon_format="$(rmux -L "$socket" show-options -gv @tab-icon)"
+    for app in claude copilot nvim vim zsh unknown; do
+      case "$app" in
+        claude) expected_icon='' ;;
+        copilot) expected_icon='' ;;
+        nvim|vim) expected_icon='' ;;
+        *) expected_icon='' ;;
+      esac
+      rmux -L "$socket" set -g @test-command "$app"
+      [ "$(rmux -L "$socket" display-message -p -t validate -F "${icon_format//pane_current_command/@test-command}")" = "$expected_icon" ]
+    done
+    for name in ' custom name' ' custom name' 'custom name'; do
+      rmux -L "$socket" rename-window -t validate -- "$name"
+      [ "$(rmux -L "$socket" display-message -p -t validate -F '#{E:@tab-name}')" = 'custom name' ]
+    done
+    rmux -L "$socket" rename-window -t validate shell
     local tab_format inactive_style expected_cap tab_index flags bell activity expected_style expected_background
     tab_index="$(rmux -L "$socket" display-message -p -t validate -F '#I')"
     expected_cap='#[fg=#365b80,bg=default,nobold]'
-    [ "$(rmux -L "$socket" display-message -p -t validate -F '#{E:window-status-current-format}')" = "${expected_cap}#[bg=#365b80,fg=#ffffff,bold] ${tab_index}:shell ${expected_cap}" ]
+    [ "$(rmux -L "$socket" display-message -p -t validate -F '#{E:window-status-current-format}')" = "${expected_cap}#[bg=#365b80,fg=#ffffff,bold] ${tab_index}: shell ${expected_cap}" ]
     rmux -L "$socket" split-window -d -t validate /bin/sh
     rmux -L "$socket" resize-pane -Z -t validate
-    [ "$(rmux -L "$socket" display-message -p -t validate -F '#{E:window-status-current-format}')" = "${expected_cap}#[bg=#365b80,fg=#ffffff,bold] ${tab_index}:shell ZOOM ${expected_cap}" ]
+    [ "$(rmux -L "$socket" display-message -p -t validate -F '#{E:window-status-current-format}')" = "${expected_cap}#[bg=#365b80,fg=#ffffff,bold] ${tab_index}: shell ZOOM ${expected_cap}" ]
     rmux -L "$socket" resize-pane -Z -t validate
-    [ "$(rmux -L "$socket" display-message -p -t validate -F '#{E:window-status-current-format}')" = "${expected_cap}#[bg=#365b80,fg=#ffffff,bold] ${tab_index}:shell ${expected_cap}" ]
+    [ "$(rmux -L "$socket" display-message -p -t validate -F '#{E:window-status-current-format}')" = "${expected_cap}#[bg=#365b80,fg=#ffffff,bold] ${tab_index}: shell ${expected_cap}" ]
     inactive_style="$(rmux -L "$socket" show-options -gv @tab-inactive-style)"
     [ "$inactive_style" = '#{?window_bell_flag,#{window-status-bell-style},#{?window_activity_flag,#{window-status-activity-style},#{window-status-style}}}' ]
     for flags in 00 01 10 11; do
@@ -1339,7 +1357,7 @@ RMUX_THEME
         10|11) expected_style='bg=red,fg=black,bold'; expected_background=red ;;
       esac
       expected_cap="#[fg=${expected_background},bg=default,nobold]"
-      [ "$(rmux -L "$socket" display-message -p -t validate -F '#{E:window-status-format}')" = "${expected_cap}#[${expected_style}] ${tab_index}:shell ${expected_cap}" ]
+      [ "$(rmux -L "$socket" display-message -p -t validate -F '#{E:window-status-format}')" = "${expected_cap}#[${expected_style}] ${tab_index}: shell ${expected_cap}" ]
     done
     rmux -L "$socket" set -g @tab-inactive-style "$inactive_style"
     [ "$(rmux -L "$socket" show-options -gv status-style)" = "bg=default,fg=default" ]
@@ -1359,7 +1377,9 @@ RMUX_THEME
     printf '%s\n' "$keys" | grep -Eq '^bind-key[[:space:]]+-T prefix k[[:space:]]+select-pane -U$'
     printf '%s\n' "$keys" | grep -Eq '^bind-key[[:space:]]+-T prefix l[[:space:]]+select-pane -R$'
     printf '%s\n' "$keys" | grep -Fq 'split-window -h -c "#{pane_current_path}"'
-    printf '%s\n' "$keys" | grep -Fxq 'bind-key    -T prefix n       command-prompt -I "#W" "rename-window \"%%\""'
+    for key in n ,; do
+      printf '%s\n' "$keys" | grep -Fxq "bind-key    -T prefix $key       "'command-prompt -F -I "#{E:@tab-name}" "rename-window -t \"#{window_id}\" -- \"%%%%%%\""'
+    done
     printf '%s\n' "$keys" | grep -Fxq "bind-key    -T prefix r       source-file $HOME/.rmux.conf \\; display-message \"RMUX reloaded\""
     root_keys="$(rmux -L "$socket" list-keys -T root)"
     printf '%s\n' "$root_keys" | grep -Fxq 'bind-key -T root MouseDown1Status          select-window -t ='
@@ -1423,7 +1443,8 @@ RMUX_THEME
     [ "$(rmux -L "$socket" list-panes -t main -F '#{pane_id}')" = "$first_pane" ]
   )
 
-  echo "RMUX config/resume ok: C-q profile, Apollo status, OSC 7 path relay, and stable main session across detach"
+  python3 scripts/rmux/test_tab_rename.py
+  echo "RMUX config/resume ok: C-q profile, Apollo status, app icons with title spacing, OSC 7 path relay, and stable main session across detach"
 }
 
 run_apollo_smoke() {
