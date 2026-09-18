@@ -11,12 +11,12 @@ line_height = 1.1
 weight_scale = 1
 
 [window]
-cols = 100
-rows = 30
+cols = 80
+rows = 40
 padding_left = 12
 padding_right = 12
 padding_top = 8
-padding_bottom = 0
+padding_bottom = 2
 decorations = true
 warm_window_pool = 2
 

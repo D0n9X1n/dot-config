@@ -111,7 +111,7 @@ launchctl kickstart -k "gui/$(id -u)/com.d0n9x1n.copilot-relay"
 它有两个检查：
 
 1. 每次运行都执行 `GET /healthz`。不是 200 时重启 relay。
-2. 每 900 秒执行 `copilot-relay status --deep`。这会通过 Copilot 发送真实请求。
+2. 每 900 秒执行 `copilot-relay status --deep --json`，超时为 45 秒。这会通过 Copilot 发送真实请求。
 
 `/healthz` 返回 200 只表示有 socket 在监听。Deep check 还会检查认证和上游访问。
 
@@ -120,8 +120,14 @@ Deep 结果：
 | 退出码 | 含义 | 操作 |
 |---|---|---|
 | `0` | Relay 正常 | 不做事 |
-| `1` | Relay 没有运行 | 重启 |
-| `2` | Relay 在监听，但不能访问 Copilot | 重新认证 |
+| `1` | 探针报告 Relay 没有运行 | 重新检查本地健康状态；HTTP 200 时保持运行 |
+| `2` | 健康探针或上游探针失败 | 重新检查本地健康状态；HTTP 200 时保持运行 |
+| `124` | 诊断超时 | 只停止诊断进程；重新检查本地健康状态 |
+| 其他非零值 | 诊断失败 | 重新检查本地健康状态；HTTP 200 时保持运行 |
+
+即使连续失败，deep check 也不会重启本地健康的 relay。只有新的本地检查也失败时才执行恢复。探针运行前会写入时间戳，因此失败不会导致每分钟发送付费请求。恢复后只检查本地健康状态，下次 deep probe 等待正常间隔。
+
+失败日志只记录退出码、新的本地状态，以及同一次 JSON 探针中白名单允许的布尔值、有界耗时和 HTTP 状态码。原始详情、凭证、路径、提示词和 stderr 不会复制到 watchdog 日志。JSON 缺失或无效时记录 `diagnostic=unavailable`，不改变恢复决定。不把退出码 `2` 直接当作认证过期；应检查上游可用性，仅在需要时重新认证。
 
 可以用下面的变量调整 deep check：
 

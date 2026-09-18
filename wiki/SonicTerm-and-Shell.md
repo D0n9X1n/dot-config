@@ -25,11 +25,11 @@ The tracked config uses:
 |---|---|
 | Theme | `apollo`, from the pinned upstream release |
 | Keymap | `sonicterm-macos` |
-| Font | Rec Mono St.Helens, size 13 |
+| Font | Rec Mono St.Helens, size 13.5 |
 | Font weight scale | 1 |
-| Line height | 1.2 |
-| New window grid | 100 × 30 |
-| Bottom padding | 0 logical pixels |
+| Line height | 1.1 |
+| New window grid | 80 × 40 |
+| Bottom padding | 2 logical pixels |
 | Scrollback | 1000 lines |
 | Keypad mode | `numeric`: ordinary digits, operators, and Enter in legacy input; Kitty protocol unchanged |
 | Cursor | block, no blink |
@@ -39,7 +39,7 @@ The tracked config uses:
 
 Use **Reload Config** from the SonicTerm command palette (`Cmd+Shift+R`) after a config change. Some native window changes may need a restart.
 
-Zero bottom padding removes the configured margin above the native tab bar. A partial-row gap may remain because the terminal uses whole text rows; its size depends on the window height. `panel_padding` affects popup panels, not this gap.
+Bottom padding keeps a small 2-logical-pixel margin above the native tab bar. A partial-row gap may remain because the terminal uses whole text rows; its size depends on the window height. `panel_padding` affects popup panels, not this gap.
 
 The active keymap is `sonicterm-macos`; `sonicterm-linux` and `sonicterm-windows` are also managed. Their custom bindings stay unchanged. Appearance uses `[appearance]`; unused legacy window and render keys are omitted.
 

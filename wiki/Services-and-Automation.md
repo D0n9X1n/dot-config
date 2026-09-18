@@ -111,7 +111,7 @@ Logs:
 It has two checks:
 
 1. `GET /healthz` on every run. A non-200 result restarts the relay.
-2. `copilot-relay status --deep` every 900 seconds. This sends a real request through Copilot.
+2. `copilot-relay status --deep --json` every 900 seconds, with a 45-second timeout. This sends a real request through Copilot.
 
 A 200 from `/healthz` only means a socket is listening. The deep check also tests auth and upstream access.
 
@@ -120,8 +120,14 @@ Deep result:
 | Exit | Meaning | Action |
 |---|---|---|
 | `0` | Relay works | Do nothing |
-| `1` | Relay is not running | Restart it |
-| `2` | Relay listens but cannot reach Copilot | Run auth again |
+| `1` | Probe reports relay not running | Recheck local health; leave it running if HTTP 200 |
+| `2` | Health or upstream probe failed | Recheck local health; leave it running if HTTP 200 |
+| `124` | Diagnostic timed out | Stop only the diagnostic; recheck local health |
+| Other nonzero | Diagnostic failed | Recheck local health; leave it running if HTTP 200 |
+
+A failed deep check never restarts a locally healthy relay, even after repeated failures. Recovery runs only when the fresh local check is also unhealthy. The interval timestamp is written before the probe, so failure does not trigger paid requests every minute. Recovery checks local health only; the next deep probe waits for the normal interval.
+
+Failure logs keep the exit code, fresh local status, and allowlisted booleans, bounded timings, and HTTP codes from the same JSON probe. Raw details, credentials, paths, prompts, and stderr are never copied into the watchdog log. Invalid or missing JSON is logged as `diagnostic=unavailable` and does not change the recovery decision. Exit `2` is not assumed to be expired auth; check upstream availability and run auth again only when needed.
 
 Tune the deep check with:
 
