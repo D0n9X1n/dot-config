@@ -21,8 +21,7 @@ set -euo pipefail
 #   1  not running
 #   2  running but not usable (health probe or upstream round trip failed)
 #
-# 1 and 2 are logged distinctly: a restart fixes 1, but 2 is usually expired
-# auth, where the real fix is `copilot-relay auth` and a restart just loops.
+# Failed deep probes authorize recovery only when a fresh local health check also fails.
 #
 # Tuning (all optional env vars):
 #   COPILOT_RELAY_DEEP_INTERVAL   seconds between deep checks; 0 disables
@@ -144,8 +143,26 @@ deep_due() {
 }
 
 deep_status() {
-  local rc=0
-  run_with_timeout "$deep_max_time" copilot-relay status --deep >/dev/null 2>&1 || rc=$?
+  local rc=0 output
+  output="$(run_with_timeout "$deep_max_time" copilot-relay status --deep --json 2>/dev/null)" || rc=$?
+  deep_diagnostic=unavailable
+  if [ "$rc" -ne 0 ]; then
+    deep_diagnostic="$(printf '%s' "$output" | jq -ces '
+      def boolean: if type == "boolean" then . else null end;
+      def millis: if type == "number" and . >= 0 and . <= 3600000 then floor else null end;
+      def http:
+        if type == "string" then
+          (try (capture("^http (?<code>[1-5][0-9]{2})(:|$)") | .code | tonumber) catch null) // null
+        else null end;
+      if length != 1 then error("invalid diagnostic") else .[0] end
+      | if type != "object" or (.running | type) != "boolean" then error("invalid diagnostic") else . end
+      | {running: (.running | boolean),
+         health_ok: (.health.ok | boolean), health_ms: (.health.ms | millis),
+         health_http: (.health.detail | http),
+         deep_ok: (.deep.ok | boolean), deep_ms: (.deep.ms | millis),
+         deep_http: (.deep.detail | http)}
+    ' 2>/dev/null)" || deep_diagnostic=unavailable
+  fi
   return "$rc"
 }
 
@@ -179,34 +196,22 @@ deep_due || { cap_log; exit 0; }
 deep_rc=0
 deep_status || deep_rc=$?
 
-case "$deep_rc" in
-  0)
-    cap_log
-    exit 0
-    ;;
-  1)
-    log "copilot-relay deep check: not running; restarting ${label}"
-    ;;
-  2)
-    log "copilot-relay deep check: listening but cannot reach Copilot (likely expired auth — run 'copilot-relay auth' if this repeats); restarting ${label}"
-    ;;
-  124)
-    log "copilot-relay deep check: timed out after ${deep_max_time}s; restarting ${label}"
-    ;;
-  *)
-    log "copilot-relay deep check: exit ${deep_rc}; restarting ${label}"
-    ;;
-esac
+if [ "$deep_rc" -eq 0 ]; then
+  cap_log
+  exit 0
+fi
 
+code="$(health_code)"
+if [ "$code" = "200" ]; then
+  log "copilot-relay deep check: exit ${deep_rc}; local health 200; diagnostic=${deep_diagnostic}; leaving ${label} running"
+  cap_log
+  exit 0
+fi
+
+log "copilot-relay deep check: exit ${deep_rc}; local health ${code:-no_response}; diagnostic=${deep_diagnostic}; restarting ${label}"
 if kickstart_relay; then
   if wait_for_health; then
-    recheck_rc=0
-    deep_status || recheck_rc=$?
-    if [ "$recheck_rc" -eq 0 ]; then
-      log "copilot-relay recovered: deep check passed"
-    else
-      log "copilot-relay still cannot reach Copilot after restart (status --deep -> ${recheck_rc}); run 'copilot-relay auth'"
-    fi
+    log "copilot-relay recovered: local health 200; next deep check follows the normal interval"
   else
     log "copilot-relay still unhealthy after restart: GET $url -> $(health_code)"
   fi
