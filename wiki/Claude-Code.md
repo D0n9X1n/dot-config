@@ -72,6 +72,7 @@ The Sonnet-facing slot routes to GPT-6 Astra through `gptModel`; Opus stays on i
 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `16` |
 | `statusLine.refreshInterval` | `100` |
 | `theme` | `custom:apollo`; generated theme assets stay local |
+| `CLAUDE_CODE_TMUX_TRUECOLOR` | `"1"`; skip Claude's tmux 256-color cap |
 | `autoCompactEnabled` | `true` |
 | `autoCompactWindow` | `770000` before the output-token reserve |
 | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"100"`; targets compaction at 750,000 tokens with the default Sonnet output budget |
@@ -160,6 +161,12 @@ The tracked settings enable:
 The WakaTime marketplace points to the official `wakatime/claude-code-wakatime` Git repository.
 
 ## Common fixes
+
+### Colors differ inside RMUX
+
+Claude Code 2.1.278 caps color output at 256 colors when `TMUX` is present, even with `COLORTERM=truecolor` and `FORCE_COLOR=3`. RMUX exports `TMUX` for compatibility, but supports truecolor. The managed `env.CLAUDE_CODE_TMUX_TRUECOLOR: "1"` skips that client-side cap and keeps the Apollo palette unchanged. Without `TMUX`, native SonicTerm has no such cap to bypass.
+
+Start a new Claude Code process after applying the setting; an existing process has already initialized its colors. Keep `TERM=tmux-256color`, `TERM_PROGRAM=rmux`, and the private `rmux claude` teammate shim unchanged.
 
 ### Claude asks for onboarding every time
 

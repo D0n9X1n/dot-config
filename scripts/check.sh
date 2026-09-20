@@ -1300,6 +1300,8 @@ RMUX_THEME
     fi
     rmux -L "$socket" source-file config/rmux/rmux.conf
 
+    [ "$(rmux -L "$socket" show-options -sv extended-keys)" = "on" ]
+    [ "$(rmux -L "$socket" show-options -sv extended-keys-format)" = "csi-u" ]
     [ "$(rmux -L "$socket" show-options -gv prefix)" = "C-q" ]
     [ "$(rmux -L "$socket" show-options -gv mouse)" = "on" ]
     [ "$(rmux -L "$socket" show-options -gv history-limit)" = "100000" ]
@@ -1445,6 +1447,7 @@ RMUX_THEME
   )
 
   python3 scripts/rmux/test_tab_rename.py
+  python3 scripts/rmux/test_terminal_input.py
   echo "RMUX config/resume ok: C-q profile, Apollo status, app icons with title spacing, OSC 7 path relay, and stable main session across detach"
 }
 
@@ -1464,7 +1467,8 @@ run_apollo_smoke() {
   fi
   grep -Fq 'FAST_WORK_DIR' config/zsh/custom.zsh
   grep -Fq $'link\tconfig/zsh/themes/apollo.zsh-theme\t.oh-my-zsh/custom/themes/apollo.zsh-theme' config/manifest.tsv
-  jq -e '.theme == "custom:apollo"' config/claude/settings.json >/dev/null
+  jq -e '.theme == "custom:apollo" and .env.CLAUDE_CODE_TMUX_TRUECOLOR == "1"' \
+    config/claude/settings.json >/dev/null
   jq -e '.theme == "default"' config/copilot/settings.json >/dev/null
 
   if grep -En '#[0-9a-fA-F]{6}|38;2;|48;2;' \
