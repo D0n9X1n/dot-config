@@ -194,9 +194,9 @@ startup-item-names --rollback
 | `yanue.v2rayu.v2ray-core` | V2rayU V2Ray Proxy Core (Legacy) |
 | `yanue.v2rayu.xray-core` | V2rayU Xray Proxy Core |
 | `yanue.v2rayu.sing-box` | V2rayU sing-box Proxy Core |
-| `yanue.v2rayu.tun-helper`（系统） | V2rayU TUN Network Helper — 暂缓重命名 |
+| `yanue.v2rayu.tun-helper`（系统） | V2rayU TUN Network Helper — 单独管理员设置 |
 
-三个用户核心保留 `~/.V2rayU` 工作目录。系统 sing-box TUN 辅助程序缺少 root 配置，因此暂缓重命名，且不得为了调整名称而运行它。
+三个用户核心保留 `~/.V2rayU` 工作目录。系统 TUN 名称已在单独授权后验证：固定目标启动器安装在 `/Library/PrivilegedHelperTools/` 下并归 root 所有，用户覆盖工具不管理它。验证只执行二进制的 `version` 命令，没有启动 TUN。配置仍缺失，完整 TUN 功能未测试；不得为了调整名称而启用或启动它。已加载的定义可能在重新注册前仍保留旧可执行路径，V2rayU 更新也可能恢复旧设置。
 
 只有合法应用与辅助程序的 TeamID 匹配时，才关联 Adobe、Charles、AutoUpdate、iStat 安装器和 Steam 等已签名应用。系统范围的更改需单独由管理员审查，并使用 macOS 内置工具应用；不要提权运行此用户管理工具。
 

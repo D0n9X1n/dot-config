@@ -194,9 +194,9 @@ Apply and rollback are user-only; the tool refuses to run them as root. The revi
 | `yanue.v2rayu.v2ray-core` | V2rayU V2Ray Proxy Core (Legacy) |
 | `yanue.v2rayu.xray-core` | V2rayU Xray Proxy Core |
 | `yanue.v2rayu.sing-box` | V2rayU sing-box Proxy Core |
-| `yanue.v2rayu.tun-helper` (system) | V2rayU TUN Network Helper — rename deferred |
+| `yanue.v2rayu.tun-helper` (system) | V2rayU TUN Network Helper — separate administrator setup |
 
-The three user cores retain their `~/.V2rayU` working directory. The system sing-box TUN helper's root configuration is missing; its rename is deferred and the helper must not be run as part of naming work.
+The three user cores retain their `~/.V2rayU` working directory. The system TUN name was verified after a separately authorized, root-owned fixed-target launcher was installed under `/Library/PrivilegedHelperTools/`; the user overlay tool does not manage it. Validation used the binary's `version` command, not TUN startup. Its configuration remains absent and full TUN operation is untested; naming must not enable or start it. The loaded definition can retain the old executable until re-registration, and V2rayU updates may restore it.
 
 Signed app associations cover Adobe, Charles, AutoUpdate, the iStat installer, and Steam only when the legitimate app and helper TeamIDs match. System-scope changes require separate administrator review and application with macOS built-in tools, not elevated execution of this user-managed tool.
 
