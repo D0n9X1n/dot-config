@@ -14,6 +14,9 @@ run_bash_syntax() {
     echo "bash -n $file"
     bash -n "$file" || fail=1
   done < <(git ls-files '*.sh' | sort -u)
+  for file in "scripts/launchd/Copilot Relay" "scripts/launchd/Copilot Relay Health Check" "scripts/launchd/Weekly npm Cache Cleanup"; do
+    bash -n "$file" || fail=1
+  done
   [ "$fail" -eq 0 ]
 }
 
@@ -67,6 +70,7 @@ run_shellcheck() {
   # shellcheck disable=SC2086
   shellcheck -S error -e SC1090 -e SC1091 -e SC2155 -e SC2148 $files
   shellcheck -S error scripts/rmux/rmux-store
+  shellcheck -S error "scripts/launchd/Copilot Relay" "scripts/launchd/Copilot Relay Health Check" "scripts/launchd/Weekly npm Cache Cleanup"
 }
 
 run_zsh_syntax() {
@@ -1830,7 +1834,9 @@ run_smoke() {
   run_structure_smoke
   run_manifest_smoke
   run_launchd_template_smoke
-  python3 scripts/launchd/test_healthcheck.py
+  python3 -B scripts/launchd/test_healthcheck.py
+  python3 -B scripts/launchd/test_launcher_names.py
+  python3 -B scripts/launchd/test_vendor_names.py
   run_subagent_smoke
   run_claude_subagent_limit_smoke
   run_model_default_smoke

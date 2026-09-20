@@ -85,6 +85,18 @@ __REPO_ROOT__ 为仓库路径
 
 不要编辑渲染文件。下一次安装会替换它们。
 
+### 易读启动名称
+
+启动器使用易读名称改善 macOS 后台项目归属显示；不会重命名运行中的进程，也不改变任务标签、计划、参数或恢复行为：
+
+| 任务标签 | 启动器名称 |
+|---|---|
+| `com.d0n9x1n.copilot-relay` | Copilot Relay |
+| `com.d0n9x1n.copilot-relay-healthcheck` | Copilot Relay Health Check |
+| `com.d0n9x1n.npm-cache-clean` | Weekly npm Cache Cleanup |
+
+三个名称均已在后台任务管理（BTM）中验证。BTM 可以根据文件变更刷新名称，而 launchd 仍保留运行中任务的旧定义；这是两个独立状态。Relay 已加载的定义会在后续重新注册时更新，无需为了改名立即重启。用 `sfltool dumpbtm` 验证归属显示，不要仅凭文件名判断，也不要重置 BTM 来刷新名称。启动器链接依赖仓库保持在安装路径；移动仓库后需重新运行安装器。
+
 ## Relay 服务
 
 `com.d0n9x1n.copilot-relay` 在登录时启动 relay。Crash 后会再次启动，间隔至少十秒。
@@ -107,6 +119,8 @@ launchctl kickstart -k "gui/$(id -u)/com.d0n9x1n.copilot-relay"
 ## Relay 健康检查
 
 `com.d0n9x1n.copilot-relay-healthcheck` 在加载时运行，以后每 60 秒运行一次。
+
+可执行入口是 `~/.local/libexec/Copilot Relay Health Check`，它链接到 `scripts/launchd/` 中受版本控制的启动器。启动器用 `/bin/bash` 执行原有健康检查脚本并替换自身进程；任务标签、计划、参数和恢复策略保持不变。易读文件名用于 macOS 后台项目归属显示，不改变运行中的进程名称，后者仍是 Bash。安装后用 `sfltool dumpbtm` 验证当前 macOS 版本显示的名称；不要通过重置后台项目数据库来刷新名称。
 
 它有两个检查：
 
@@ -162,6 +176,33 @@ launchctl kickstart -k "gui/$(id -u)/com.d0n9x1n.npm-cache-clean"
 ```
 
 主日志是 `~/Library/Logs/npm-cache-clean.log`。脚本最多保留 500 行。
+
+## 第三方启动项目名称
+
+`startup-item-names` 是一次性审查工具，不是服务。默认只读预览；只有显式指定用户范围的应用或回滚才会写入覆盖层：
+
+```sh
+startup-item-names
+startup-item-names --apply
+startup-item-names --rollback
+```
+
+应用和回滚仅限用户范围；工具拒绝以 root 身份执行这两种操作。经审查的 V2rayU 映射为：
+
+| 任务标签 | 易读名称 |
+|---|---|
+| `yanue.v2rayu.v2ray-core` | V2rayU V2Ray Proxy Core (Legacy) |
+| `yanue.v2rayu.xray-core` | V2rayU Xray Proxy Core |
+| `yanue.v2rayu.sing-box` | V2rayU sing-box Proxy Core |
+| `yanue.v2rayu.tun-helper`（系统） | V2rayU TUN Network Helper — 单独管理员设置 |
+
+三个用户核心保留 `~/.V2rayU` 工作目录。系统 TUN 名称已在单独授权后验证：固定目标启动器安装在 `/Library/PrivilegedHelperTools/` 下并归 root 所有，用户覆盖工具不管理它。验证只执行二进制的 `version` 命令，没有启动 TUN。配置仍缺失，完整 TUN 功能未测试；不得为了调整名称而启用或启动它。已加载的定义可能在重新注册前仍保留旧可执行路径，V2rayU 更新也可能恢复旧设置。
+
+只有合法应用与辅助程序的 TeamID 匹配时，才关联 Adobe、Charles、AutoUpdate、iStat 安装器和 Steam 等已签名应用。系统范围的更改需单独由管理员审查，并使用 macOS 内置工具应用；不要提权运行此用户管理工具。
+
+应用和回滚保留原有的阻止/允许状态。工具不会重新加载服务、重置后台项目数据库或编辑已签名的应用包。备份仅保存在本机 `~/.local/state/dot-configs/startup-names/`，永远不进入仓库。第三方更新可能恢复旧名称，重新应用前必须再次审查；遇到冲突会拒绝操作，而不是静默覆盖。用 `sfltool dumpbtm` 验证实际归属显示；覆盖层不保证显示立即改变。
+
+并非所有详细名称都应修改：iStat daemon 和 TeamViewer 辅助程序已经有清晰的应用分组归属。Teams agent、CleanerOne 的 `TCLoginItemHelper` 以及 Quick Look/Spotlight 扩展使用第三方内部的已签名名称。应解释这些名称的用途，而不是覆盖它们。
 
 ## MCP 合并
 

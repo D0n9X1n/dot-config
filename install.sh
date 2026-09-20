@@ -938,10 +938,15 @@ install_copilot_relay_healthcheck() {
   local plist="${HOME}/Library/LaunchAgents/${label}.plist"
   local template=""
   local script="${scripts_root}/launchd/copilot-relay-healthcheck.sh"
+  local launcher_dest=".local/libexec/Copilot Relay Health Check"
+  local launcher=""
 
   template="$(manifest_source_for_destination render "Library/LaunchAgents/${label}.plist")"
-  [ -f "$template" ] && [ -f "$script" ] || return 0
+  launcher="$(manifest_source_for_destination link "$launcher_dest")"
+  [ -f "$template" ] && [ -f "$script" ] && [ -f "$launcher" ] || return 0
 
+  chmod +x "$launcher"
+  link_file "$launcher" "${HOME}/${launcher_dest}"
   chmod +x "$script" 2>/dev/null || true
   render_launchd_template "$template" "$plist"
 
@@ -958,6 +963,93 @@ install_copilot_relay_healthcheck() {
     echo "Loaded launchd agent $label (GET /healthz every 60s; logs: ~/Library/Logs/copilot-relay-healthcheck.log)"
   else
     echo "Warning: launchctl bootstrap failed for $label"
+  fi
+}
+
+install_copilot_relay() {
+  local uid="$1"
+  local mode="${2:-normal}"
+  local launchd_dest="${HOME}/Library/LaunchAgents/com.d0n9x1n.copilot-relay.plist"
+  local launchd_src=""
+  local launcher_dest=".local/libexec/Copilot Relay"
+  local launcher=""
+  local relay_ready=0 attempt=1
+
+  launchd_src="$(manifest_source_for_destination render Library/LaunchAgents/com.d0n9x1n.copilot-relay.plist)"
+  launcher="$(manifest_source_for_destination link "$launcher_dest")"
+  [ -f "$launchd_src" ] && [ -f "$launcher" ] || return 0
+
+  if [ "$mode" != "stage-only" ] && ! have_cmd copilot-relay; then
+    if [ "${SKIP_NPM_GLOBALS:-0}" = "1" ]; then
+      echo "Skipping copilot-relay launchd agent: SKIP_NPM_GLOBALS=1 and copilot-relay is not on PATH."
+    else
+      echo "Warning: copilot-relay not on PATH — skipping agent install (fix npm/global CLI install, then re-run install.sh)"
+    fi
+    return 0
+  fi
+
+  chmod +x "$launcher"
+  link_file "$launcher" "${HOME}/${launcher_dest}"
+  render_launchd_template "$launchd_src" "$launchd_dest"
+
+  # Scoped naming only stages the next launch; never recover or reload the relay.
+  if [ "$mode" = "stage-only" ]; then
+    return 0
+  fi
+
+  if [ ! -f "${HOME}/.copilot-relay/github_token" ]; then
+    if launchctl print "gui/${uid}/com.d0n9x1n.copilot-relay" >/dev/null 2>&1; then
+      launchctl bootout "gui/${uid}/com.d0n9x1n.copilot-relay" 2>/dev/null || true
+    fi
+    action_required "copilot-relay is installed but not authenticated."
+    action_required "Run 'npx copilot-relay auth', then re-run install.sh to start the launchd agent."
+  else
+    if copilot_relay_health_ok; then
+      echo "copilot-relay /healthz is healthy; leaving the running process untouched."
+    elif bootstrap_launchd_agent "$uid" "com.d0n9x1n.copilot-relay" "$launchd_dest" " after failed /healthz"; then
+      log_command launchctl kickstart -k "gui/${uid}/com.d0n9x1n.copilot-relay" || true
+      while [ "$attempt" -le 20 ]; do
+        if copilot_relay_health_ok; then
+          relay_ready=1
+          break
+        fi
+        sleep 1
+        attempt=$((attempt + 1))
+      done
+      if [ "$relay_ready" = "1" ]; then
+        echo "copilot-relay is healthy at http://127.0.0.1:4142/healthz"
+      else
+        echo "Warning: copilot-relay launchd agent loaded, but /healthz is not healthy yet"
+        echo "If authentication expired, run 'npx copilot-relay auth', then re-run install.sh."
+      fi
+      echo "Loaded launchd agent com.d0n9x1n.copilot-relay (logs: ~/Library/Logs/copilot-relay.{out,err}.log, ~/.copilot-relay/logs/copilot-relay.log)"
+    else
+      echo "Warning: launchctl bootstrap failed for com.d0n9x1n.copilot-relay"
+    fi
+  fi
+}
+
+install_npm_cache_clean() {
+  local uid="$1"
+  local npmclean_dest="${HOME}/Library/LaunchAgents/com.d0n9x1n.npm-cache-clean.plist"
+  local npmclean_src=""
+  local npmclean_script="${scripts_root}/launchd/clean-npm-caches.sh"
+  local launcher_dest=".local/libexec/Weekly npm Cache Cleanup"
+  local launcher=""
+
+  npmclean_src="$(manifest_source_for_destination render Library/LaunchAgents/com.d0n9x1n.npm-cache-clean.plist)"
+  launcher="$(manifest_source_for_destination link "$launcher_dest")"
+  if [ -f "$npmclean_src" ] && [ -f "$npmclean_script" ] && [ -f "$launcher" ]; then
+    chmod +x "$launcher"
+    link_file "$launcher" "${HOME}/${launcher_dest}"
+    chmod +x "$npmclean_script" 2>/dev/null || true
+    render_launchd_template "$npmclean_src" "$npmclean_dest"
+
+    if bootstrap_launchd_agent "$uid" "com.d0n9x1n.npm-cache-clean" "$npmclean_dest"; then
+      echo "Loaded launchd agent com.d0n9x1n.npm-cache-clean (weekly Sun 03:17; logs: ~/Library/Logs/npm-cache-clean.log)"
+    else
+      echo "Warning: launchctl bootstrap failed for com.d0n9x1n.npm-cache-clean"
+    fi
   fi
 }
 
@@ -1098,53 +1190,7 @@ if is_macos; then
   done
   uninstall_legacy_npm_binary copilot-bridge
 
-  launchd_dest="${HOME}/Library/LaunchAgents/com.d0n9x1n.copilot-relay.plist"
-  launchd_src="$(manifest_source_for_destination render Library/LaunchAgents/com.d0n9x1n.copilot-relay.plist)"
-  if [ -f "$launchd_src" ]; then
-    if ! have_cmd copilot-relay; then
-      if [ "${SKIP_NPM_GLOBALS:-0}" = "1" ]; then
-        echo "Skipping copilot-relay launchd agent: SKIP_NPM_GLOBALS=1 and copilot-relay is not on PATH."
-      else
-        echo "Warning: copilot-relay not on PATH — skipping agent install (fix npm/global CLI install, then re-run install.sh)"
-      fi
-    else
-      render_launchd_template "$launchd_src" "$launchd_dest"
-
-      if [ ! -f "${HOME}/.copilot-relay/github_token" ]; then
-        if launchctl print "gui/${uid}/com.d0n9x1n.copilot-relay" >/dev/null 2>&1; then
-          launchctl bootout "gui/${uid}/com.d0n9x1n.copilot-relay" 2>/dev/null || true
-        fi
-        action_required "copilot-relay is installed but not authenticated."
-        action_required "Run 'npx copilot-relay auth', then re-run install.sh to start the launchd agent."
-      else
-        if copilot_relay_health_ok; then
-          echo "copilot-relay /healthz is healthy; leaving the running process untouched."
-        elif bootstrap_launchd_agent "$uid" "com.d0n9x1n.copilot-relay" "$launchd_dest" " after failed /healthz"; then
-          log_command launchctl kickstart -k "gui/${uid}/com.d0n9x1n.copilot-relay" || true
-          relay_ready=0
-          attempt=1
-          while [ "$attempt" -le 20 ]; do
-            if copilot_relay_health_ok; then
-              relay_ready=1
-              break
-            fi
-            sleep 1
-            attempt=$((attempt + 1))
-          done
-          if [ "$relay_ready" = "1" ]; then
-            echo "copilot-relay is healthy at http://127.0.0.1:4142/healthz"
-          else
-            echo "Warning: copilot-relay launchd agent loaded, but /healthz is not healthy yet"
-            echo "If authentication expired, run 'npx copilot-relay auth', then re-run install.sh."
-          fi
-          echo "Loaded launchd agent com.d0n9x1n.copilot-relay (logs: ~/Library/Logs/copilot-relay.{out,err}.log, ~/.copilot-relay/logs/copilot-relay.log)"
-        else
-          echo "Warning: launchctl bootstrap failed for com.d0n9x1n.copilot-relay"
-        fi
-      fi
-    fi
-  fi
-
+  install_copilot_relay "$uid"
   install_copilot_relay_healthcheck "$uid"
 fi
 
@@ -1156,18 +1202,5 @@ fi
 # when content is unchanged, and replaces the agent when it differs.
 if is_macos; then
   uid="$(id -u)"
-  npmclean_dest="${HOME}/Library/LaunchAgents/com.d0n9x1n.npm-cache-clean.plist"
-  npmclean_src="$(manifest_source_for_destination render Library/LaunchAgents/com.d0n9x1n.npm-cache-clean.plist)"
-  npmclean_script="${scripts_root}/launchd/clean-npm-caches.sh"
-
-  if [ -f "$npmclean_src" ] && [ -f "$npmclean_script" ]; then
-    chmod +x "$npmclean_script" 2>/dev/null || true
-    render_launchd_template "$npmclean_src" "$npmclean_dest"
-
-    if bootstrap_launchd_agent "$uid" "com.d0n9x1n.npm-cache-clean" "$npmclean_dest"; then
-      echo "Loaded launchd agent com.d0n9x1n.npm-cache-clean (weekly Sun 03:17; logs: ~/Library/Logs/npm-cache-clean.log)"
-    else
-      echo "Warning: launchctl bootstrap failed for com.d0n9x1n.npm-cache-clean"
-    fi
-  fi
+  install_npm_cache_clean "$uid"
 fi

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
+import plistlib
 from pathlib import Path
 import subprocess
 import sys
@@ -9,6 +10,8 @@ import unittest
 
 
 SCRIPT = Path(__file__).with_name('copilot-relay-healthcheck.sh')
+LAUNCHER = SCRIPT.with_name('Copilot Relay Health Check')
+REPO = SCRIPT.parents[2]
 
 
 def stub(kind):
@@ -34,6 +37,77 @@ def stub(kind):
             raise SystemExit(0 if fixture.get('loaded', True) else 1)
     else:
         raise AssertionError(kind)
+
+
+class LauncherTests(unittest.TestCase):
+    def test_template_keeps_job_identity_and_schedule(self):
+        template = REPO / 'config/launchd/com.d0n9x1n.copilot-relay-healthcheck.plist'
+        job = plistlib.loads(template.read_bytes())
+        self.assertEqual(job['Label'], 'com.d0n9x1n.copilot-relay-healthcheck')
+        self.assertEqual(job['ProgramArguments'], [
+            '__HOME__/.local/libexec/Copilot Relay Health Check',
+            '__REPO_ROOT__/scripts/launchd/copilot-relay-healthcheck.sh'])
+        self.assertEqual(job['StartInterval'], 60)
+        self.assertIs(job['RunAtLoad'], True)
+        self.assertEqual(job['EnvironmentVariables']['PATH'],
+                         '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin')
+        self.assertEqual(job['WorkingDirectory'], '__HOME__')
+        self.assertEqual(job['ProcessType'], 'Background')
+        for key, suffix in [('StandardOutPath', 'out'), ('StandardErrorPath', 'err')]:
+            self.assertEqual(job[key], f'__HOME__/Library/Logs/copilot-relay-healthcheck.{suffix}.log')
+        self.assertIn('link\tscripts/launchd/Copilot Relay Health Check\t'
+                      '.local/libexec/Copilot Relay Health Check\n',
+                      (REPO / 'config/manifest.tsv').read_text())
+
+    def test_launcher_preserves_bash_arguments_exit_and_pid(self):
+        env = {k: v for k, v in os.environ.items() if k != 'BASH_ENV'}
+        process = subprocess.Popen([
+            str(LAUNCHER), '-c', 'printf "%s\\n" "$$" "$BASH" "$0" "$@"; exit 23',
+            'name with spaces', 'argument with spaces', '', '*literal*'],
+            env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate(timeout=5)
+        self.assertEqual(process.returncode, 23, stderr)
+        self.assertEqual(stdout.splitlines(), [str(process.pid), '/bin/bash',
+                         'name with spaces', 'argument with spaces', '', '*literal*'])
+
+    def test_scoped_install_twice_touches_only_healthcheck(self):
+        with tempfile.TemporaryDirectory(prefix='healthcheck-install-') as root:
+            home = Path(root) / 'home & space'
+            home.mkdir()
+            (home / '.copilot-relay').mkdir()
+            (home / '.copilot-relay/github_token').touch()
+            script = '''set -euo pipefail
+DOT_CONFIGS_INSTALL_LIB_ONLY=1 source "$1/install.sh"
+have_cmd() { return 0; }
+launchctl() {
+    printf '%s\\n' "$*" >>"$HOME/calls"
+    case "$1" in
+        print) test -f "$HOME/loaded" ;;
+        bootout) rm -f "$HOME/loaded" ;;
+        bootstrap) touch "$HOME/loaded" ;;
+        kickstart) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+install_copilot_relay_healthcheck 501
+install_copilot_relay_healthcheck 501
+'''
+            result = subprocess.run(['/bin/bash', '-c', script, 'test', str(REPO)],
+                                    env=dict(os.environ, HOME=str(home)), capture_output=True,
+                                    text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            installed = home / '.local/libexec/Copilot Relay Health Check'
+            self.assertTrue(installed.is_symlink())
+            self.assertEqual(installed.resolve(), LAUNCHER.resolve())
+            self.assertTrue(os.access(installed, os.X_OK))
+            job = plistlib.loads((home / 'Library/LaunchAgents/'
+                                  'com.d0n9x1n.copilot-relay-healthcheck.plist').read_bytes())
+            self.assertEqual(job['ProgramArguments'], [str(installed), str(SCRIPT)])
+            calls = (home / 'calls').read_text().splitlines()
+            self.assertEqual(sum(call.startswith('bootstrap ') for call in calls), 2)
+            self.assertEqual(sum(call.startswith('kickstart ') for call in calls), 2)
+            for call in calls:
+                self.assertIn('com.d0n9x1n.copilot-relay-healthcheck', call)
 
 
 class WatchdogTests(unittest.TestCase):
@@ -67,7 +141,7 @@ copilot-relay() { exec "$WATCHDOG_PYTHON" "$WATCHDOG_STUB" stub probe "$@"; }
     def run_watchdog(self, rc=2, health=None, **extra):
         fixture = dict(rc=rc, health=health or ['200'], **extra)
         (self.root / 'fixture.json').write_text(json.dumps(fixture))
-        result = subprocess.run(['/bin/bash', str(SCRIPT)], env=self.env, text=True,
+        result = subprocess.run([str(LAUNCHER), str(SCRIPT)], env=self.env, text=True,
                                 capture_output=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIsNone(self.work.poll(), 'in-flight work was terminated')

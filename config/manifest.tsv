@@ -25,6 +25,10 @@ link	scripts/rmux/store.py	.local/lib/rmux-store/store.py
 link	config/zsh/themes/apollo.zsh-theme	.oh-my-zsh/custom/themes/apollo.zsh-theme
 link	config/copilot-relay/config.yaml	.copilot-relay/config.yaml
 merge	config/mcp/mcp-shared.json	.config/github-copilot/mcp.json
+link	scripts/launchd/Copilot Relay	.local/libexec/Copilot Relay
 render	config/launchd/com.d0n9x1n.copilot-relay.plist	Library/LaunchAgents/com.d0n9x1n.copilot-relay.plist
+link	scripts/launchd/Copilot Relay Health Check	.local/libexec/Copilot Relay Health Check
 render	config/launchd/com.d0n9x1n.copilot-relay-healthcheck.plist	Library/LaunchAgents/com.d0n9x1n.copilot-relay-healthcheck.plist
+link	scripts/launchd/Weekly npm Cache Cleanup	.local/libexec/Weekly npm Cache Cleanup
 render	config/launchd/com.d0n9x1n.npm-cache-clean.plist	Library/LaunchAgents/com.d0n9x1n.npm-cache-clean.plist
+link	scripts/launchd/vendor_names.py	.local/bin/startup-item-names

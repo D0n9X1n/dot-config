@@ -13,7 +13,7 @@
 
   What the agent does once loaded:
     - Runs scripts/launchd/clean-npm-caches.sh every Sunday at 03:17 local time.
-    - That script: `npm cache clean --force` (empties ~/.npm/_cacache) and
+    - That script: forced npm cache clean (empties ~/.npm/_cacache) and
       prunes ~/.npm/_npx copies older than 14 days. It never touches
       ~/Library/Caches/ms-playwright (the downloaded browser binaries).
     - RunAtLoad is false: installing/logging in does NOT trigger a clean,
@@ -44,7 +44,7 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/bin/bash</string>
+        <string>__HOME__/.local/libexec/Weekly npm Cache Cleanup</string>
         <string>__REPO_ROOT__/scripts/launchd/clean-npm-caches.sh</string>
     </array>
 
