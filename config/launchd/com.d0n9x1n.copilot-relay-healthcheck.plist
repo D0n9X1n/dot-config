@@ -33,7 +33,7 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/bin/bash</string>
+        <string>__HOME__/.local/libexec/Copilot Relay Health Check</string>
         <string>__REPO_ROOT__/scripts/launchd/copilot-relay-healthcheck.sh</string>
     </array>
 

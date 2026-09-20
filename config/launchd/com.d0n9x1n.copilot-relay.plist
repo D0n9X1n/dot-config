@@ -42,7 +42,7 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/env</string>
+        <string>__HOME__/.local/libexec/Copilot Relay</string>
         <string>copilot-relay</string>
         <string>start</string>
     </array>

@@ -85,6 +85,18 @@ It writes the result under `~/Library/LaunchAgents/`, then runs `bootout` and `b
 
 Do not edit the rendered files. The next install will replace them.
 
+### Friendly startup names
+
+The launchers use descriptive names for macOS Background Items attribution; they do not rename running processes or change job labels, schedules, arguments, or recovery behavior:
+
+| Job label | Launcher name |
+|---|---|
+| `com.d0n9x1n.copilot-relay` | Copilot Relay |
+| `com.d0n9x1n.copilot-relay-healthcheck` | Copilot Relay Health Check |
+| `com.d0n9x1n.npm-cache-clean` | Weekly npm Cache Cleanup |
+
+All three names have been verified in Background Task Management (BTM). BTM can refresh a name from a changed file while launchd retains the running job's old definition; these are separate states. The loaded relay definition updates on later re-registration, without requiring an immediate restart for naming. Verify attribution with `sfltool dumpbtm`, not the filename alone, and never reset BTM to refresh names. These launcher links require the checkout to stay at its installed path; rerun the installer after moving it.
+
 ## Relay service
 
 `com.d0n9x1n.copilot-relay` starts the relay at login. It starts again after a crash, with a ten-second throttle.
@@ -107,6 +119,8 @@ Logs:
 ## Relay health check
 
 `com.d0n9x1n.copilot-relay-healthcheck` runs at load and every 60 seconds.
+
+Its executable entry point is `~/.local/libexec/Copilot Relay Health Check`, linked to the tracked launcher in `scripts/launchd/`. The launcher replaces itself with `/bin/bash` running the existing health-check script; the job label, schedule, arguments, and recovery policy stay unchanged. The descriptive filename targets macOS Background Items attribution, not the running process name, which remains Bash. Check `sfltool dumpbtm` after installing to verify the name on the current macOS version; do not reset the background-item database to refresh it.
 
 It has two checks:
 
@@ -162,6 +176,33 @@ launchctl kickstart -k "gui/$(id -u)/com.d0n9x1n.npm-cache-clean"
 ```
 
 Its main log is `~/Library/Logs/npm-cache-clean.log`. The script keeps at most 500 lines.
+
+## Vendor startup-item names
+
+`startup-item-names` is a one-shot review tool, not a service. Its default is a read-only preview; only an explicit user-scope apply or rollback writes an overlay:
+
+```sh
+startup-item-names
+startup-item-names --apply
+startup-item-names --rollback
+```
+
+Apply and rollback are user-only; the tool refuses to run them as root. The reviewed V2rayU mappings are:
+
+| Job label | Friendly name |
+|---|---|
+| `yanue.v2rayu.v2ray-core` | V2rayU V2Ray Proxy Core (Legacy) |
+| `yanue.v2rayu.xray-core` | V2rayU Xray Proxy Core |
+| `yanue.v2rayu.sing-box` | V2rayU sing-box Proxy Core |
+| `yanue.v2rayu.tun-helper` (system) | V2rayU TUN Network Helper — rename deferred |
+
+The three user cores retain their `~/.V2rayU` working directory. The system sing-box TUN helper's root configuration is missing; its rename is deferred and the helper must not be run as part of naming work.
+
+Signed app associations cover Adobe, Charles, AutoUpdate, the iStat installer, and Steam only when the legitimate app and helper TeamIDs match. System-scope changes require separate administrator review and application with macOS built-in tools, not elevated execution of this user-managed tool.
+
+Apply and rollback preserve blocked/allowed state. The tool does not reload services, reset the background-item database, or edit signed app bundles. Backups stay local under `~/.local/state/dot-configs/startup-names/`, never in the repository. Vendor updates may restore old names; review again before reapplying. Conflicting changes are refused, not silently overwritten. Verify actual attribution with `sfltool dumpbtm`; an overlay does not guarantee an immediate display change.
+
+Not every detail name should change: the iStat daemon and TeamViewer helpers already have meaningful grouped app associations. The Teams agent, CleanerOne `TCLoginItemHelper`, and Quick Look/Spotlight extensions use vendor-internal signed names. Map those names to their purpose rather than overwriting them.
 
 ## MCP merge
 
