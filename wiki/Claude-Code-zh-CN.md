@@ -72,6 +72,7 @@ Sonnet-facing 槽位通过 `gptModel` 路由到 GPT-6 Astra；Opus 仍使用独�
 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `16` |
 | `statusLine.refreshInterval` | `100` |
 | `theme` | `custom:apollo`；生成的主题资源仍保留在本机 |
+| `CLAUDE_CODE_TMUX_TRUECOLOR` | `"1"`；跳过 Claude 的 tmux 256 色限制 |
 | `autoCompactEnabled` | `true` |
 | `autoCompactWindow` | `770000`，尚未扣除输出 token 预留量 |
 | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"100"`；默认 Sonnet 输出预算下，目标是在 750,000 tokens 时触发压缩 |
@@ -160,6 +161,12 @@ Claude 与 Copilot 状态栏共享五行布局、本机生成的 Apollo 颜色�
 WakaTime marketplace 指向官方 `wakatime/claude-code-wakatime` Git 仓库。
 
 ## 常见问题
+
+### RMUX 内的颜色不同
+
+Claude Code 2.1.278 在存在 `TMUX` 时会把输出限制为 256 色，即使已设置 `COLORTERM=truecolor` 和 `FORCE_COLOR=3`。RMUX 为兼容性导出 `TMUX`，但支持真彩色。受管的 `env.CLAUDE_CODE_TMUX_TRUECOLOR: "1"` 跳过这个客户端限制，不改动 Apollo 配色。原生 SonicTerm 没有 `TMUX` 时，也没有这个限制需要绕过。
+
+应用设置后请启动新的 Claude Code 进程；已有进程已完成颜色初始化。可以用 `claude --continue` 恢复对话。不要重启 RMUX 服务器：它已经支持真彩色，重启会停止窗格内的应用。重载或重新连接 RMUX 不会重新初始化运行中 Claude 进程的颜色。保留 `TERM=tmux-256color`、`TERM_PROGRAM=rmux` 和 `rmux claude` 私有 teammate shim，不需要修改它们。
 
 ### Claude 每次都显示 onboarding
 

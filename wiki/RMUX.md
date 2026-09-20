@@ -56,6 +56,7 @@ The profile is adapted from RMUX's v0.10.0 human-friendly example and selected c
 | Titles | Automatic rename off by default; empty rename resets it for that window; `#S · #W` propagated outward |
 | Terminal identity | `TERM=tmux-256color`; `TERM_PROGRAM=rmux` is preserved |
 | Working directory | Active pane OSC 7 reports are relayed to SonicTerm |
+| Modified keys | Extended keys on; CSI-u output to requesting pane apps |
 
 The config clears stale `TERMINFO`, `TERMINFO_DIRS`, and `TERMCAP` inherited by a long-lived daemon, then sets `COLORTERM=truecolor` and `FORCE_COLOR=3`. It does not clear RMUX's own `TERM_PROGRAM` identity.
 
@@ -64,6 +65,12 @@ The config clears stale `TERMINFO`, `TERMINFO_DIRS`, and `TERMCAP` inherited by 
 The bottom bar shows a red, slanted session label and slanted, numbered window tabs on the left, with a plain `HH:MM` clock on the right. A one-cell gap separates the label and tabs. Session names are capped at 19 display cells so both sloped ends fit within the 24-cell label budget. Activity and bell colors remain visible. `PREFIX` appears while the prefix is active; `ZOOM` marks a zoomed window. Sloped ends use the same Powerline glyphs as bufferline's `slope` style (`U+E0BA` and `U+E0BC`), so the terminal font or its fallback must support them. The bar has no full date or decorative clock icon.
 
 The outer `xterm-256color` capability includes `osc7`, and `set-titles` is enabled. Oh My Zsh's `omz_termsupport_cwd` hook emits a host-qualified OSC 7 report at each prompt. RMUX records that report per pane and relays the active pane's path to SonicTerm, so relative file paths resolve against the correct directory. `#{pane_current_path}` is process metadata and does not replace the shell report. After changing `terminal-features`, reload the config and detach/reattach so the client capabilities are resolved again.
+
+### Shift+Enter
+
+`extended-keys on` lets RMUX request modified-key sequences from SonicTerm. Requesting pane apps receive Shift+Enter as CSI-u; without that request, RMUX 0.10 sends LF (`Ctrl+J`), Claude Code's newline shortcut. Plain Enter remains CR and normal text stays unchanged. This does not change `TERM`, `TERM_PROGRAM`, or the teammate launcher.
+
+After reloading with `prefix + r`, detach with `prefix + d` and reconnect with `rr <name>` so the outer keyboard protocol is negotiated. Detach leaves the pane apps running. A config reload alone does not renegotiate an already attached client's keyboard mode.
 
 ## Session helpers and resume
 

@@ -56,6 +56,7 @@ RMUX 使用 tmux 命令语法，不是 JSON、YAML 或 TOML。配置可以执行
 | 标题 | 默认禁用自动重命名；空名称为该窗口恢复自动命名；向外传播 `#S · #W` |
 | 终端身份 | `TERM=tmux-256color`；保留 `TERM_PROGRAM=rmux` |
 | 工作目录 | 把活动 pane 的 OSC 7 报告转发给 SonicTerm |
+| 修饰键 | 启用扩展按键；向请求该协议的窗格应用输出 CSI-u |
 
 配置会清除守护进程可能继承的陈旧 `TERMINFO`、`TERMINFO_DIRS` 和 `TERMCAP`，然后设置 `COLORTERM=truecolor` 与 `FORCE_COLOR=3`。它不会清除 RMUX 自己的 `TERM_PROGRAM` 身份。
 
@@ -64,6 +65,12 @@ RMUX 使用 tmux 命令语法，不是 JSON、YAML 或 TOML。配置可以执行
 底部状态栏左侧显示红色斜边会话标签和带编号的斜边窗口标签，右侧只显示 `HH:MM` 时钟。会话标签与窗口标签之间、各窗口标签之间均留一个字符的间距。会话名称最多占 19 个显示单元，确保两端斜边可完整放入 24 单元的标签宽度内。活动提醒和响铃颜色仍然可见。Prefix 生效时显示 `PREFIX`，窗口缩放时显示 `ZOOM`。斜边使用与 bufferline 的 `slope` 样式相同的 Powerline 字形（`U+E0BA` 和 `U+E0BC`），终端字体或后备字体须支持它们。不显示完整日期或装饰性时钟图标。
 
 外层 `xterm-256color` 能力包含 `osc7`，并且已启用 `set-titles`。Oh My Zsh 的 `omz_termsupport_cwd` hook 会在每次显示提示符时发出带主机名的 OSC 7 报告。RMUX 按 pane 记录该报告，并把活动 pane 的路径转发给 SonicTerm，因此相对文件路径会按正确目录解析。`#{pane_current_path}` 是进程 metadata，不能代替 shell 报告。修改 `terminal-features` 后，请重载配置并 detach/reattach，让客户端重新解析能力。
+
+### Shift+Enter
+
+`extended-keys on` 让 RMUX 向 SonicTerm 请求带修饰键的按键序列。请求扩展按键的窗格应用收到 CSI-u 格式的 Shift+Enter；没有请求时，RMUX 0.10 发送 LF（`Ctrl+J`），这是 Claude Code 的换行快捷键。普通 Enter 仍为 CR，文字输入不变，也不会修改 `TERM`、`TERM_PROGRAM` 或 teammate 启动器。
+
+用 `prefix + r` 重载后，按 `prefix + d` 分离，再用 `rr <名称>` 连接，以重新协商外层键盘协议。分离不会停止窗格中的应用。只重载配置不会重新协商已连接客户端的键盘模式。
 
 ## 会话助手与恢复
 
