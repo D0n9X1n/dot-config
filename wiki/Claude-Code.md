@@ -166,7 +166,7 @@ The WakaTime marketplace points to the official `wakatime/claude-code-wakatime` 
 
 Claude Code 2.1.278 caps color output at 256 colors when `TMUX` is present, even with `COLORTERM=truecolor` and `FORCE_COLOR=3`. RMUX exports `TMUX` for compatibility, but supports truecolor. The managed `env.CLAUDE_CODE_TMUX_TRUECOLOR: "1"` skips that client-side cap and keeps the Apollo palette unchanged. Without `TMUX`, native SonicTerm has no such cap to bypass.
 
-Start a new Claude Code process after applying the setting; an existing process has already initialized its colors. Keep `TERM=tmux-256color`, `TERM_PROGRAM=rmux`, and the private `rmux claude` teammate shim unchanged.
+Start a new Claude Code process after applying the setting; an existing process has already initialized its colors. You can use `claude --continue` to resume the conversation. Do not restart the RMUX server: it already supports truecolor, and restarting it stops pane applications. Reloading or reconnecting RMUX does not reinitialize a running Claude process. Keep `TERM=tmux-256color`, `TERM_PROGRAM=rmux`, and the private `rmux claude` teammate shim unchanged.
 
 ### Claude asks for onboarding every time
 
