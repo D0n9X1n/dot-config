@@ -50,6 +50,8 @@ The installer links the verified theme to `~/.config/tmux-apollo-theme/apollo.tm
 
 Use `prefix + n` or `prefix + ,`. The rename prompt starts in Vi insert mode. Ctrl+W deletes the previous word and Ctrl+U clears the entry. Ctrl+G cancels in insert mode. Escape enters Vi command mode; use `q` or Ctrl+C there to cancel.
 
+Prompt backgrounds fill the row with the current Apollo message color, so the tab title and clock do not show through while editing.
+
 The managed prompt keeps quotes, backslashes, `#{...}`, `#(...)`, and semicolons as title text rather than commands. It preserves the window selected when the prompt opened. An empty submitted name restores automatic app-based naming for that window; a later custom rename disables it again. The running-app icon remains visible.
 
 Native tmux stores escaped backslashes in its window-name field. The managed title display and prompt show one literal copy. Prefer the managed rename prompt when exact literal text matters; raw `tmux rename-window` has tmux's own format-expansion semantics.

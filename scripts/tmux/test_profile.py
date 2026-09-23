@@ -353,7 +353,10 @@ class ProfileTests(unittest.TestCase):
         red = re.search(r'bg=([^,]+)', bell).group(1)
         self.assertEqual(tm.option('status-style'), roles['status-style'])
         for name in ('pane-border-style', 'pane-active-border-style', 'message-style', 'message-command-style', 'mode-style'):
-            self.assertEqual(tm.option(name), roles[name])
+            expected = roles[name]
+            if name in ('message-style', 'message-command-style'):
+                expected += ',fill=' + re.search(r'bg=([^,]+)', roles[name]).group(1)
+            self.assertEqual(tm.option(name), expected)
         cap = f'#[fg={red},bg={bar},nobold]'
         for session, shown in [('profile', 'profile'), ('abcdefghijklmnopqrstuvwxyz', 'abcdefghijklmnopqrs'),
                                 ('界' * 12, '界' * 9)]:
@@ -431,6 +434,33 @@ class ProfileTests(unittest.TestCase):
             tm.send(b'q')
             tm.pump(0.05)
             self.assertEqual(tm.format('#{window_name}'), 'after C-g')
+
+    def test_prompt_fill_hides_status_after_editing(self):
+        tm = self.tmux
+        old_title = 'previous-window-title-' * 4
+        tm.command('rename-window', '-t', tm.window, old_title)
+        tm.command('set-option', '-g', 'status-right', 'OLD-STATUS-CLOCK')
+        tm.attach()
+        tm.prompt()
+        for keys, expected in ((b'\x15', b'(rename-window)'),
+                               (b'hello', b'(rename-window)hello'),
+                               (b'\x17', b'(rename-window)'),
+                               (b'world\x1b', b'(rename-window)world')):
+            tm.screen.clear()
+            tm.send(keys)
+            tm.wait(lambda: expected in tm.screen, 'prompt edit was not redrawn')
+            tm.pump(.05)
+            visible = re.sub(rb'\x1b\[[0-?]*[ -/]*[@-~]|\x1b\([A-Z]', b'', bytes(tm.screen))
+            self.assertNotIn(b'OLD-STATUS-CLOCK', visible, 'status clock leaked into prompt')
+            self.assertNotIn(b'window-title', visible, 'old window title leaked into prompt')
+            self.assertNotIn(''.encode(), visible, 'status tab slope leaked into prompt')
+        tm.send(b'q')
+        tm.wait(lambda: b'OLD-STATUS-CLOCK' in tm.screen, 'cancelling did not restore the status bar')
+        self.assertEqual(tm.format('#{window_name}'), old_title)
+        for option in ('message-style', 'message-command-style'):
+            style = tm.option(option)
+            background = re.search(r'(?:^|,)bg=([^,]+)', style).group(1)
+            self.assertIn('fill=' + background, style)
 
     def test_rename_targets_and_empty_reset(self):
         tm = self.tmux
