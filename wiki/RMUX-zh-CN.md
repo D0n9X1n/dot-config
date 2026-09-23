@@ -2,7 +2,7 @@
 
 [English](RMUX.md) | 简体中文
 
-本仓库使用 RMUX 0.10.x 作为终端复用器。受管源文件是 `config/rmux/rmux.conf`；`install.sh` 会把它链接到 `~/.rmux.conf`，并在新 Mac 上安装 Homebrew `rmux` formula。
+本仓库让 RMUX 0.10.x 与[原生 tmux](Tmux-zh-CN.md) 并存。两者使用相同的 Apollo 主题和状态栏样式，会话与状态各自独立。RMUX 源文件是 `config/rmux/rmux.conf`；`install.sh` 会把它链接到 `~/.rmux.conf`，并在新 Mac 上安装 Homebrew `rmux` formula。
 
 ## RMUX 是什么
 
@@ -36,7 +36,7 @@ $XDG_CONFIG_HOME/rmux/rmux.conf
 ~/.config/rmux/rmux.conf
 ```
 
-只有在没有加载任何原生配置时，RMUX 才可能回退到标准 tmux 配置路径。本仓库刻意避免这种回退：已归档的 tmux 配置包含可执行的 TPM 初始化命令。原生 `~/.rmux.conf` 可以让启动行为保持确定。诊断时也可设置 `RMUX_DISABLE_TMUX_FALLBACK=1` 禁用回退。
+只有在没有加载任何原生配置时，RMUX 才可能回退到标准 tmux 配置路径。本仓库刻意避免这种回退：`~/.tmux.conf` 现在属于原生 tmux，而不是 RMUX。已归档的 tmux 配置还包含可执行的 TPM 初始化命令。原生 `~/.rmux.conf` 让两个引擎保持独立。诊断时也可设置 `RMUX_DISABLE_TMUX_FALLBACK=1` 禁用回退。
 
 RMUX 使用 tmux 命令语法，不是 JSON、YAML 或 TOML。配置可以执行 `run-shell`、条件命令和其他 source 文件，因此必须把它当作可执行代码审查。
 
@@ -170,7 +170,7 @@ rmux claude --permission-mode bypassPermissions \
 
 `rmux claude` 会启用 Claude Code 的 tmux teammate mode，并在 Claude 进程的 `PATH` 前加入私有、进程级的 `tmux` shim，使 teammate 命令指向 RMUX。它不会替换系统全局的 `tmux`。本仓库不会运行 `rmux setup tmux-shim`。
 
-RMUX 窗格内同时提供原生变量和 tmux 兼容变量：`RMUX`、`RMUX_PANE`、`TMUX`、`TMUX_PANE`。`cc` 和 `gg` 在检测到 `RMUX` 时执行 `rmux rename-window`；它们不再调用旧 tmux 或 WezTerm CLI。
+RMUX 窗格内同时提供原生变量和 tmux 兼容变量：`RMUX`、`RMUX_PANE`、`TMUX`、`TMUX_PANE`。`cc` 和 `gg` 先检查 `RMUX`，并执行 `rmux rename-window`。只有原生 tmux 窗格才走独立的 `tmux-store` 当前窗口路径。不使用全局 shim 或 WezTerm CLI。
 
 Copilot CLI 尚不能识别所有 RMUX/SonicTerm 终端身份。因此仓库中的 `copilot` wrapper 和 `gg` 只为 Copilot 子进程设置 `TERM_PROGRAM=WezTerm`、`COLORTERM=truecolor` 和 `FORCE_COLOR=3`，使其选择已支持的 WezTerm/真彩色路径。外层 RMUX 窗格及其他程序仍然看到正确的 `TERM_PROGRAM=rmux`。
 
@@ -185,11 +185,15 @@ Copilot CLI 尚不能识别所有 RMUX/SonicTerm 终端身份。因此仓库中�
 
 测试和自动化应使用命名 socket，避免修改交互式默认 server。
 
-## 迁移边界
+## 并存与迁移
 
-已停用的 tmux 和 WezTerm 配置保留在 v2.4.0 的 Git 历史中。恢复方法见[仓库操作](Repository-Operations-zh-CN.md)。安装器不再安装这两个工具；用户自己的配置、`~/.tmux/plugins/` 和 resurrect 快照会保留。
+原生 tmux 与 RMUX 并存，不替代 RMUX。`rr`、`rl`、`rd`、`rh` 和 `rs` 保持原有行为。原生 `tt`/`tr`、`tl`、`td`、`th` 和 `ts` 使用独立 socket 和状态。`tt` 拒绝从 RMUX 内连接，请先分离。原生完整帮助见 [Tmux](Tmux-zh-CN.md)。
 
-TPM 插件没有迁移，因为 RMUX 不保证它们的行为。SonicTerm 是当前受管的外层终端。
+共享的 `exit`/`logout`/空提示符 Ctrl+D 分派器先检查 `RMUX`，再检查 `TMUX`，避免把 RMUX 的兼容环境送到原生 tmux 服务器。两个引擎都不会自动连接。安装不会重载或停止任一运行中的服务器，也绝不会自动运行 `rs` 或 `ts`。
+
+`~/.tmux.conf` 重新由 `config/tmux/tmux.conf` 管理。旧根目录受管链接会迁移；用户文件和外部链接先备份，名称不会冲突，所有已有 tmux 备份都会保留。不添加 TPM 或 plugin bootstrap。已有 `~/.tmux/plugins/` 和 resurrect 快照保持不动。旧 tmux 配置和停用的 WezTerm 配置仍在 v2.4.0 Git 历史中，见[仓库操作](Repository-Operations-zh-CN.md)。
+
+原生替代方案不修复 RMUX 尚未解决的[提示框问题 #60](https://github.com/D0n9X1n/dot-config/issues/60)。SonicTerm 仍是受管的外层终端。
 
 ## 验证
 

@@ -17,6 +17,8 @@
 - [Copilot CLI](Copilot-CLI-zh-CN.md) — 默认模型、全局规则、状态栏和 WakaTime。
 - [RMUX](RMUX-zh-CN.md) — 会话、窗格、恢复、剪贴板和 Claude teams。
 - [RMUX 按键表](RMUX-Keymap-zh-CN.md) — 全部 278 个生效按键。
+- [Tmux](Tmux-zh-CN.md) — 与 RMUX 并存的原生 tmux；Apollo 样式相同，会话独立。
+- [Tmux 按键表](Tmux-Keymap-zh-CN.md) — 原生 tmux 按键和提示框行为。
 - [SonicTerm 与 Shell](SonicTerm-and-Shell-zh-CN.md) — 终端文件、zsh 助手和启动器。
 
 ## 维护

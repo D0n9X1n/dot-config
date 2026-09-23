@@ -69,6 +69,7 @@ scripts/check.sh models
 scripts/check.sh mcp
 scripts/check.sh wiki
 scripts/check.sh rmux
+scripts/check.sh tmux
 ```
 
 `models` 断言受管模型选择器：Claude 设置和启动器 wrapper 中的原生客户端 ID、Copilot 自己的 GPT-6 Astra 设置，以及 relay 独立的 Opus 路由。`mcp` 检查共享 MCP 默认值：保留 Playwright，不配置重复的 GitHub 条目或 PAT 模板。
@@ -77,10 +78,12 @@ scripts/check.sh rmux
 
 CI 使用同一个脚本：
 
-- macOS 安装 RMUX 并运行 smoke checks；
+- macOS 安装原生 tmux 和 RMUX，要求两个引擎都可用，并运行 smoke checks；
 - Ubuntu 安装 ShellCheck 并运行 ShellCheck target。
 
 普通检查不会访问网络。`apollo-online` 是维护者专用检查，会下载所有固定的上游文件并验证 SHA-256。每次修改 `scripts/apollo-releases.tsv` 时都要运行它。
+
+修改配置后，先通过 `scripts/check.sh all` 和所需的 `apollo-online` 检查，再运行两次 `./install.sh` 并验证变更的链接。安装不得重载或停止运行中的 tmux 或 RMUX 服务器。不要把 `ts` 或 `rs` 当成安装或检查步骤；两者都是手动重启操作，会结束运行中的程序。
 
 检查失败时不要推送。
 

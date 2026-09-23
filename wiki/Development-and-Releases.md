@@ -69,6 +69,7 @@ scripts/check.sh models
 scripts/check.sh mcp
 scripts/check.sh wiki
 scripts/check.sh rmux
+scripts/check.sh tmux
 ```
 
 `models` asserts the tracked model selectors: native client ids in Claude settings and launcher wrappers, Copilot's own GPT-6 Astra settings, and the relay's separate Opus route. `mcp` checks shared MCP defaults: Playwright remains configured, with no duplicate GitHub entry or PAT template.
@@ -77,10 +78,12 @@ The status-line layout, cache, and generated palette are shared by both provider
 
 CI uses the same script:
 
-- macOS runs smoke checks and installs RMUX;
+- macOS installs native tmux and RMUX, requires both engines, and runs smoke checks;
 - Ubuntu installs ShellCheck and runs the ShellCheck target.
 
 Ordinary checks do not access the network. `apollo-online` is a maintainer-only check that downloads every pinned upstream file and verifies its SHA-256. Run it whenever `scripts/apollo-releases.tsv` changes.
+
+For a config change, pass `scripts/check.sh all` and any required `apollo-online` check, then run `./install.sh` twice and verify the changed links. Installation must not reload or stop live tmux or RMUX servers. Do not run `ts` or `rs` as an install or check step. Both restart helpers are manual and destructive to running programs.
 
 Do not push while checks are red.
 

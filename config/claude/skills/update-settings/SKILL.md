@@ -1,6 +1,6 @@
 ---
 name: update-settings
-description: Change or apply a setting in this dot-configs repo. Use the config manifest, update the matching English and Chinese Wiki pages, run checks, then run install.sh. TRIGGER for changes to Claude Code, Copilot CLI, RMUX, SonicTerm, zsh, copilot-relay, MCP, status lines, or launchd. SKIP for read-only questions and retired tmux or WezTerm settings in Git history.
+description: Change or apply a setting in this dot-configs repo. Use the config manifest, update the matching English and Chinese Wiki pages, run checks, then run install.sh. TRIGGER for changes to Claude Code, Copilot CLI, native tmux, RMUX, SonicTerm, zsh, copilot-relay, MCP, status lines, or launchd. SKIP for read-only questions and retired WezTerm or historical tmux settings in Git history.
 ---
 
 # Update settings
@@ -21,6 +21,9 @@ Never edit a managed file under `$HOME`.
 | Copilot global rules | `config/copilot/copilot-instructions.md` | `~/.copilot/copilot-instructions.md` |
 | Copilot status line | `config/copilot/statusline.sh` | `~/.copilot/statusline.sh` |
 | RMUX | `config/rmux/rmux.conf` | `~/.rmux.conf` |
+| Native tmux | `config/tmux/tmux.conf` | `~/.tmux.conf` |
+| Native tmux helpers | `config/zsh/zz-tmux.zsh` + `scripts/tmux/` | zsh custom files, `~/.local/bin/tmux-store`, and `~/.local/lib/tmux-store/` |
+| Shared workspace code | `scripts/mux/workspace.py` | `~/.local/lib/mux/workspace.py` |
 | SonicTerm | `config/sonicterm/` | `~/.sonicterm/` |
 | Zsh | `config/zsh/` | `~/.oh-my-zsh/custom/` |
 | Relay | `config/copilot-relay/config.yaml` | `~/.copilot-relay/config.yaml` |
@@ -59,18 +62,25 @@ Sonnet and Opus are separate families.
 
 Do not change both families when the task names one.
 
-### RMUX and terminal identity
+### Multiplexers and terminal identity
 
-- RMUX config uses tmux command syntax but is native RMUX config.
-- Test with a unique `-L` socket.
-- Do not add TPM or a global tmux shim.
-- SonicTerm uses `TERM_PROGRAM=SonicTerm`.
-- RMUX panes use `TERM_PROGRAM=rmux`.
+- Read `wiki/Tmux.md` for native tmux and `wiki/RMUX.md` for RMUX. Their configs, sockets, and state stay separate; Apollo theme and status style stay aligned.
+- RMUX config uses tmux command syntax but remains native RMUX config. Keep `~/.rmux.conf` separate from the active `~/.tmux.conf`.
+- Test each engine with a unique `-L` socket. Never test against a live user server.
+- Do not add TPM, plugin bootstrap, or a global tmux shim. Leave old plugins and resurrect data alone; preserve every tmux migration backup.
+- SonicTerm uses `TERM_PROGRAM=SonicTerm`; RMUX panes use `TERM_PROGRAM=rmux`; native tmux panes keep `TERM_PROGRAM=tmux`.
 - Only Copilot children get the WezTerm compatibility name.
-- `rr` attaches when a session exists and creates only when absent.
-- New tabs never auto-attach.
-- In RMUX, `exit`, `logout`, and empty-prompt Ctrl+D detach.
-- `rd` is the destructive session command.
+- `cc`/`gg` check RMUX first. Native tmux renames go through `tmux-store` on the current socket, without changing `PATH`. Keep RMUX's private teammate shim unchanged.
+- `rr` attaches when a session exists and creates only when absent. Keep `rr`/`rl`/`rd`/`rh`/`rs` behavior unchanged.
+- `tt` and interactive `tr NAME` attach to an exact native session or create it. `tr` sends only one non-option argument there; other forms and `command tr` use the text utility.
+- `tt`/`tr` start a new server detached and verify parent PID 1 before attaching. Reuse existing servers without restart or forced reparenting.
+- `tt` refuses attachment inside RMUX. Detach first. New tabs never auto-attach.
+- The one `exit`/`logout`/Ctrl+D dispatcher checks RMUX first, then native tmux. Empty-prompt Ctrl+D detaches; nonempty Ctrl+D keeps normal ZLE behavior.
+- `tl` lists without starting a server. `td` deletes an exact native session; `rd` is RMUX's destructive session command.
+- `ts` needs a stable valid snapshot, compatible binaries, successful preflight, and interactive `yes`. It restarts all sessions on the selected native socket as fresh shells, restoring workspace layout only. No process replay, history, or autosave.
+- RMUX retains its client/daemon pair. Native tmux references a compatible Homebrew executable, without binary relocation or a guarantee against arbitrary dependency cleanup.
+- Never run `ts` or `rs` automatically or merely to quit SonicTerm. PID 1 does not preserve live processes through crashes or reboot.
+- Native tmux 3.7 with `status-keys vi` uses Esc to change prompt mode and `C-g` to cancel. Native tmux does not fix RMUX issue #60.
 
 ### launchd
 
@@ -105,9 +115,10 @@ scripts/check.sh apollo
 scripts/check.sh instructions
 scripts/check.sh wiki
 scripts/check.sh rmux
+scripts/check.sh tmux
 ```
 
-Do not continue while checks fail.
+Run `scripts/check.sh apollo-online` whenever release pins change. Native tmux and RMUX must both pass on macOS CI. Do not continue while checks fail.
 
 ## Apply
 
@@ -121,13 +132,15 @@ The second run checks idempotence.
 Then verify the changed link or job. Useful checks:
 
 ```sh
-ls -l ~/.claude/settings.json ~/.copilot/settings.json ~/.rmux.conf
-zsh -ic 'type rr rd rl cc gg'
+ls -l ~/.claude/settings.json ~/.copilot/settings.json ~/.rmux.conf ~/.tmux.conf
+ls -l ~/.local/bin/tmux-store ~/.local/lib/tmux-store/store.py \
+  ~/.local/lib/mux/workspace.py ~/.config/tmux-apollo-theme/apollo.tmux
+zsh -ic 'type tt tr tl td th ts rr rd rl rh rs cc gg'
 grep -Fq 'term_program = "SonicTerm"' ~/.sonicterm/sonicterm.toml
 launchctl print "gui/$(id -u)/com.d0n9x1n.copilot-relay"
 ```
 
-Claude settings need a new Claude Code session. RMUX reloads with `prefix + r`. SonicTerm and copilot-relay can reload their config.
+Claude settings need a new Claude Code session. Installation never reloads or stops live tmux or RMUX servers. New servers read the installed config. Reload an existing server only when explicitly requested; see the engine's Wiki page. Do not use `ts` or `rs` to apply config. SonicTerm and copilot-relay can reload their config.
 
 ## Never
 

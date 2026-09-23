@@ -648,6 +648,7 @@ install_macos_deps() {
     node
     python
     rmux
+    tmux
     shellcheck
     zsh-completions
     zsh-fast-syntax-highlighting
@@ -737,9 +738,27 @@ link_file() {
   ln -s "$src" "$dest"
 }
 
+link_file_preserving_backups() {
+  local src="$1" dest="$2" backup suffix=0
+  if [ -L "$dest" ] && [ "$(readlink "$dest")" = "$src" ]; then
+    return 0
+  fi
+  if [ -e "$dest" ] || [ -L "$dest" ]; then
+    backup="${dest}.bak.${timestamp}"
+    while [ -e "$backup" ] || [ -L "$backup" ]; do
+      suffix=$((suffix + 1))
+      backup="${dest}.bak.${timestamp}.${suffix}"
+    done
+    mv "$dest" "$backup" || return 1
+  fi
+  mkdir -p "$(dirname "$dest")" || return 1
+  ln -s "$src" "$dest"
+}
+
 old_source_for_destination() {
   case "$1" in
     .rmux.conf) printf '%s\n' "${repo_root}/.rmux.conf" ;;
+    .tmux.conf) printf '%s\n' "${repo_root}/.tmux.conf" ;;
     .sonicterm/*) printf '%s\n' "${repo_root}/$1" ;;
     .claude/*) printf '%s\n' "${repo_root}/claude/${1#.claude/}" ;;
     .copilot/*) printf '%s\n' "${repo_root}/copilot/${1#.copilot/}" ;;
@@ -827,7 +846,11 @@ link_manifest_files() {
   while IFS=$'\t' read -r type source destination; do
     [ "$type" = "link" ] || continue
     migrate_managed_link "$destination"
-    link_file "${repo_root}/${source}" "${HOME}/${destination}"
+    case "$destination" in
+      .tmux.conf|.oh-my-zsh/custom/zz-tmux.zsh|.local/bin/tmux-store|.local/lib/tmux-store/*|.local/lib/mux/*)
+        link_file_preserving_backups "${repo_root}/${source}" "${HOME}/${destination}" ;;
+      *) link_file "${repo_root}/${source}" "${HOME}/${destination}" ;;
+    esac
     case "$source" in
       *.sh) chmod +x "${repo_root}/${source}" ;;
     esac
@@ -1088,7 +1111,6 @@ if is_macos && have_cmd python3 && have_cmd rmux; then
   }
 fi
 remove_repo_symlink "${HOME}/.gitignore" "${repo_root}/.gitignore" "old global Git ignore"
-remove_repo_symlink "${HOME}/.tmux.conf" "${repo_root}/.tmux.conf" "tmux config"
 remove_repo_symlink "${HOME}/.wezterm.lua" "${repo_root}/wezterm/wezterm.lua" "WezTerm config"
 remove_repo_symlink "${HOME}/.sonicterm/themes/wezterm.toml" \
   "${repo_root}/config/sonicterm/themes/wezterm.toml" "SonicTerm WezTerm theme"

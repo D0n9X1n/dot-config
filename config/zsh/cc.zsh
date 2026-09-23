@@ -33,6 +33,8 @@ function cc {
   print -Pn "\e]1;${title}\a"
   if [[ -n "$RMUX" ]] && (( $+commands[rmux] )); then
     command rmux rename-window -- "$title" 2>/dev/null
+  elif [[ -z "${RMUX:-}" && -n "${TMUX:-}" ]] && (( $+functions[_tmux_store] )); then
+    _tmux_store rename "$title" 2>/dev/null
   fi
   command claude --permission-mode bypassPermissions --model 'claude-sonnet-5[1m]' --effort high
   unset DISABLE_AUTO_TITLE

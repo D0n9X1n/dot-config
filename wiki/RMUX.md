@@ -2,7 +2,7 @@
 
 English | [简体中文](RMUX-zh-CN.md)
 
-This repository uses RMUX 0.10.x as its terminal multiplexer. The tracked source is `config/rmux/rmux.conf`; `install.sh` links it to `~/.rmux.conf` and installs the Homebrew `rmux` formula on new Macs.
+This repository supports RMUX 0.10.x alongside [native tmux](Tmux.md). Both use the same Apollo theme and status style, with separate sessions and state. The RMUX source is `config/rmux/rmux.conf`; `install.sh` links it to `~/.rmux.conf` and installs the Homebrew `rmux` formula on new Macs.
 
 ## What RMUX is
 
@@ -36,7 +36,7 @@ $XDG_CONFIG_HOME/rmux/rmux.conf
 ~/.config/rmux/rmux.conf
 ```
 
-If no native file loads, RMUX can fall back to standard tmux config locations. That fallback is intentionally avoided here: the archived tmux config contains executable TPM bootstrap commands. A native `~/.rmux.conf` makes startup deterministic. For diagnostics, `RMUX_DISABLE_TMUX_FALLBACK=1` also disables fallback.
+If no native file loads, RMUX can fall back to standard tmux config locations. That fallback is intentionally avoided here: `~/.tmux.conf` now belongs to native tmux, not RMUX. The archived tmux profile also contains executable TPM bootstrap commands. A native `~/.rmux.conf` keeps the engines separate. For diagnostics, `RMUX_DISABLE_TMUX_FALLBACK=1` also disables fallback.
 
 RMUX config is tmux command syntax, not JSON, YAML, or TOML. It can execute `run-shell`, conditionals, and sourced files, so treat it as executable code.
 
@@ -170,7 +170,7 @@ rmux claude --permission-mode bypassPermissions \
 
 `rmux claude` enables Claude Code's tmux teammate mode and prepends a private, process-scoped `tmux` shim so Claude's teammate commands target RMUX. It does not replace the global `tmux` executable. This repository deliberately does not run `rmux setup tmux-shim`.
 
-Inside RMUX panes, the daemon exports both RMUX-native and tmux-compatible environment names (`RMUX`, `RMUX_PANE`, `TMUX`, and `TMUX_PANE`). The `cc` and `gg` helpers use `rmux rename-window` when `RMUX` is present; they do not call legacy tmux or the WezTerm CLI.
+Inside RMUX panes, the daemon exports both RMUX-native and tmux-compatible environment names (`RMUX`, `RMUX_PANE`, `TMUX`, and `TMUX_PANE`). The `cc` and `gg` helpers check `RMUX` first and use `rmux rename-window`. Only a native tmux pane takes the separate `tmux-store` current-window path. No global shim or WezTerm CLI is used.
 
 Copilot CLI does not yet recognize every RMUX/SonicTerm identity. The repository's `copilot` wrapper and `gg` therefore launch only the Copilot process with `TERM_PROGRAM=WezTerm`, `COLORTERM=truecolor`, and `FORCE_COLOR=3`. This selects Copilot's supported WezTerm/true-color path while the surrounding RMUX pane and all other programs continue to see `TERM_PROGRAM=rmux`.
 
@@ -185,11 +185,15 @@ In addition to tmux-style commands, RMUX exposes automation helpers such as:
 
 Use a named socket for tests and automation so they cannot alter the interactive default server.
 
-## Migration boundaries
+## Coexistence and migration
 
-The retired tmux and WezTerm configs remain in v2.4.0 Git history. See [Repository operations](Repository-Operations.md) for recovery. The installer no longer installs those tools; user-owned config, `~/.tmux/plugins/`, and resurrect snapshots are preserved.
+Native tmux is active alongside RMUX, not a replacement for it. `rr`, `rl`, `rd`, `rh`, and `rs` keep their behavior. Native `tt`/`tr`, `tl`, `td`, `th`, and `ts` use separate sockets and state. `tt` refuses to attach from inside RMUX; detach first. Full native help is in [Tmux](Tmux.md).
 
-TPM plugins were not ported because RMUX does not guarantee their behavior. SonicTerm is the actively managed outer terminal.
+The shared `exit`/`logout`/empty-prompt Ctrl+D dispatcher checks `RMUX` before `TMUX`. This avoids sending RMUX's compatible environment to a native tmux server. Neither engine auto-attaches. Installation does not reload or stop either live server, and never runs `rs` or `ts` automatically.
+
+`~/.tmux.conf` is managed again from `config/tmux/tmux.conf`. The old root-managed link migrates; user files and foreign links get collision-safe backups, and all earlier tmux backups stay. No TPM or plugin bootstrap is added. Existing `~/.tmux/plugins/` and resurrect snapshots stay untouched. The old tmux profile and retired WezTerm config remain in v2.4.0 Git history; see [Repository operations](Repository-Operations.md).
+
+The native alternative does not fix RMUX's open [prompt issue #60](https://github.com/D0n9X1n/dot-config/issues/60). SonicTerm remains the managed outer terminal.
 
 ## Verification
 

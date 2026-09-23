@@ -11,14 +11,14 @@ Copilot uses its built-in GitHub integration; Claude uses authenticated `gh`. No
 On macOS, the installer can add:
 
 - Homebrew
-- RMUX
+- native tmux and RMUX
 - Claude Code from the Homebrew cask
 - Copilot CLI and copilot-relay from npm
 - oh-my-zsh
 - shell tools such as `eza`, `jq`, `neovim`, and autojump
 - Recursive and Nerd fonts
 - RecMono Baker and St.Helens fonts from the MOSconfig release
-- pinned Apollo theme releases for SonicTerm, RMUX, and eza
+- pinned Apollo theme releases for SonicTerm, RMUX, native tmux, and eza
 - local Apollo adapters for Claude, both status lines, and the shell prompt
 
 The required Claude Code version is v2.1.217 or later. eza v0.23.5 or later is required for `theme.yml`.
@@ -38,6 +38,18 @@ The install log is `~/Library/Logs/dot-configs-install.log`.
 `scripts/apollo-releases.tsv` pins exact upstream tags and SHA-256 values. The installer reuses verified local blobs, builds all files under one bundle hash derived from the release lock and adapter code, and changes the `current` symlink only after the complete set validates. A second install uses the existing bundle without downloading or rewriting it.
 
 A first install needs network access. Later installs work offline while the pinned blobs remain under `~/.local/share/dot-configs/apollo/`. A failed download or checksum keeps the previous bundle active. See [Apollo theme](Apollo-Theme.md).
+
+## Multiplexer lifetime
+
+Native tmux and RMUX use separate servers, helpers, and state. They share the Apollo theme and status style, not live sessions.
+
+`tt`/`tr` start a new native tmux server through a detached bootstrap and verify parent PID 1 before attaching. Existing servers are reused, not restarted or forcibly reparented. SonicTerm owns only the attached client. Closing its tab or quitting SonicTerm leaves the server and panes running; `ts` is not needed. `td` deliberately deletes a session. A server crash or reboot still loses live processes.
+
+Native tmux uses `~/.local/state/tmux-store/<socket-hash>/`. Helpers use the default socket outside tmux and the current native socket inside. RMUX keeps its existing state and retained client/daemon pair. Native `tmux-store` references a compatible Homebrew executable; it does not relocate binaries or guarantee that arbitrary Homebrew cleanup preserves all dependencies.
+
+`ts` saves every session on the selected native socket, including detached sessions. It refuses unknown or mismatched binaries, unstable or invalid snapshots, and failed preflight. An explicit interactive `yes` is required before stopping the server. Restore opens fresh shells with saved names, directories, layouts, dimensions, and active selections. It never replays processes, restores history, or autosaves.
+
+Installation does not reload or stop live tmux or RMUX servers. Never run `ts` or `rs` automatically. See [Tmux](Tmux.md) and [RMUX](RMUX.md) for manual upgrade and reload steps.
 
 ## copilot-relay
 

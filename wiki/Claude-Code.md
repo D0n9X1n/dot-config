@@ -119,7 +119,7 @@ The binary rejects `permissions.defaultMode: bypassPermissions` in settings. The
 
 Because `settings.json` is a symlink, CLI-persisted preferences can appear as source changes. Review `git diff -- config/claude/settings.json` before committing, reconcile only the changed keys with the supported settings above, and rerun `scripts/check.sh all`. Do not restore the whole file and lose other intentional edits.
 
-`cc [title]` sets the SonicTerm title, renames the RMUX window when present, and starts Claude Code with the same defaults.
+`cc [title]` sets the SonicTerm title and starts Claude Code with the same defaults. It checks RMUX first and renames its window directly. In native tmux, it uses `tmux-store` to rename the current window on the current socket, without a `PATH` shim. It does not replace the real global `tmux` executable. See [Tmux](Tmux.md).
 
 Use `rmux claude` only when Claude Code should create agent-team panes. RMUX gives that process a private tmux-compatible shim. No global tmux shim is installed.
 
