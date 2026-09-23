@@ -5,7 +5,7 @@
 [![Platform](https://img.shields.io/badge/platform-macOS-1d2021?logo=apple&logoColor=ebdbb2)](#)
 [![License](https://img.shields.io/github/license/D0n9X1n/dot-config?color=b8bb26)](./LICENSE)
 
-My macOS config for RMUX, SonicTerm, zsh, Claude Code, and GitHub Copilot CLI.
+My macOS config for native tmux and RMUX with the same Apollo style, plus SonicTerm, zsh, Claude Code, and GitHub Copilot CLI.
 
 ## Folders
 
@@ -32,8 +32,11 @@ The installer is for macOS. It is safe to run again.
 ## Daily use
 
 ```sh
+tt main          # exact attach or create native tmux session main
+tr main          # interactive shortcut for tt main
 rr main          # create or resume RMUX session main
-rl               # list RMUX sessions
+tl; rl           # list each engine's sessions
+td main          # delete exact native tmux session main
 rd main          # delete RMUX session main
 claude           # start Claude Code
 cc my-project    # Claude Code with a title
@@ -43,7 +46,7 @@ gg my-project    # Copilot with a title and YOLO permissions
 
 New SonicTerm tabs stay as normal shells.
 
-Inside RMUX, `exit`, `logout`, empty-prompt Ctrl+D, `Ctrl+q` then `d`, and closing the tab all detach. They keep the session alive while the RMUX daemon runs.
+Inside native tmux or RMUX, `exit`, `logout`, empty-prompt Ctrl+D, `Ctrl+q` then `d`, and closing the tab all detach. Sessions stay alive while their server runs. Detach from RMUX before using `tt`.
 
 ## Check
 
@@ -64,6 +67,7 @@ Start with:
 - [Getting started](wiki/Getting-Started.md)
 - [Repository operations](wiki/Repository-Operations.md)
 - [RMUX](wiki/RMUX.md)
+- [Tmux](wiki/Tmux.md)
 - [Claude Code](wiki/Claude-Code.md)
 - [Copilot CLI](wiki/Copilot-CLI.md)
 

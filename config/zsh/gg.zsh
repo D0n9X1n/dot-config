@@ -27,6 +27,8 @@ function gg {
   print -Pn "\e]1;${title}\a"
   if [[ -n "$RMUX" ]] && (( $+commands[rmux] )); then
     command rmux rename-window -- "$title" 2>/dev/null
+  elif [[ -z "${RMUX:-}" && -n "${TMUX:-}" ]] && (( $+functions[_tmux_store] )); then
+    _tmux_store rename "$title" 2>/dev/null
   fi
   TERM_PROGRAM=WezTerm COLORTERM=truecolor FORCE_COLOR=3 \
     command copilot --yolo --model gpt-6-astra --context long_context --effort high

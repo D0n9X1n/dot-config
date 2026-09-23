@@ -69,7 +69,7 @@ run_shellcheck() {
 
   # shellcheck disable=SC2086
   shellcheck -S error -e SC1090 -e SC1091 -e SC2155 -e SC2148 $files
-  shellcheck -S error scripts/rmux/rmux-store
+  shellcheck -S error scripts/rmux/rmux-store scripts/tmux/tmux-store
   shellcheck -S error "scripts/launchd/Copilot Relay" "scripts/launchd/Copilot Relay Health Check" "scripts/launchd/Weekly npm Cache Cleanup"
 }
 
@@ -578,6 +578,10 @@ run_wiki_smoke() {
     wiki/RMUX-zh-CN.md
     wiki/RMUX-Keymap.md
     wiki/RMUX-Keymap-zh-CN.md
+    wiki/Tmux.md
+    wiki/Tmux-zh-CN.md
+    wiki/Tmux-Keymap.md
+    wiki/Tmux-Keymap-zh-CN.md
     wiki/SonicTerm-and-Shell.md
     wiki/SonicTerm-and-Shell-zh-CN.md
     wiki/Services-and-Automation.md
@@ -771,14 +775,16 @@ run_manifest_smoke() {
     trap 'rm -rf "$test_root"' EXIT
     test_repo="$test_root/repo"
     test_home="$test_root/home"
-    mkdir -p "$test_repo/config/rmux" "$test_repo/config/claude" \
+    mkdir -p "$test_repo/config/rmux" "$test_repo/config/tmux" "$test_repo/config/claude" \
       "$test_repo/config/copilot" "$test_home/.claude" "$test_home/.copilot"
+    printf 'new tmux\n' >"$test_repo/config/tmux/tmux.conf"
     printf 'new rmux\n' >"$test_repo/config/rmux/rmux.conf"
     printf 'new claude\n' >"$test_repo/config/claude/settings.json"
     printf 'new copilot\n' >"$test_repo/config/copilot/settings.json"
     cat >"$test_repo/config/manifest.tsv" <<'TSV'
 # type	source	destination
 link	config/rmux/rmux.conf	.rmux.conf
+link	config/tmux/tmux.conf	.tmux.conf
 link	config/claude/settings.json	.claude/settings.json
 link	config/copilot/settings.json	.copilot/settings.json
 TSV
@@ -792,6 +798,9 @@ TSV
     [ "$(old_source_for_destination .copilot/cleanup-legacy.sh)" = "$test_repo/copilot/cleanup-legacy.sh" ]
 
     ln -s "$test_repo/.rmux.conf" "$test_home/.rmux.conf"
+    printf 'user tmux\n' >"$test_home/.tmux.conf"
+    printf 'older backup\n' >"$test_home/.tmux.conf.bak.19990101000000"
+    printf 'same timestamp backup\n' >"$test_home/.tmux.conf.bak.20000101000000"
     printf 'user settings\n' >"$test_home/.claude/settings.json"
     foreign="$test_root/foreign-copilot.json"
     printf 'foreign\n' >"$foreign"
@@ -799,6 +808,10 @@ TSV
 
     link_manifest_files
     [ "$(readlink "$test_home/.rmux.conf")" = "$test_repo/config/rmux/rmux.conf" ]
+    [ "$(readlink "$test_home/.tmux.conf")" = "$test_repo/config/tmux/tmux.conf" ]
+    grep -Fxq 'older backup' "$test_home/.tmux.conf.bak.19990101000000"
+    grep -Fxq 'same timestamp backup' "$test_home/.tmux.conf.bak.20000101000000"
+    grep -Fxq 'user tmux' "$test_home/.tmux.conf.bak.20000101000000.1"
     [ "$(readlink "$test_home/.claude/settings.json")" = "$test_repo/config/claude/settings.json" ]
     grep -Fq 'user settings' "$test_home/.claude/settings.json.bak.20000101000000"
     [ "$(readlink "$test_home/.copilot/settings.json.bak.20000101000000")" = "$foreign" ]
@@ -808,6 +821,16 @@ TSV
     link_manifest_files
     after="$(find "$test_home" -name '*.bak.*' -type f -o -name '*.bak.*' -type l | sort)"
     [ "$before" = "$after" ]
+
+    rm "$test_home/.tmux.conf"
+    ln -s "$test_repo/.tmux.conf" "$test_home/.tmux.conf"
+    link_manifest_files
+    [ "$(readlink "$test_home/.tmux.conf")" = "$test_repo/config/tmux/tmux.conf" ]
+    rm "$test_home/.tmux.conf"
+    ln -s "$foreign" "$test_home/.tmux.conf"
+    link_manifest_files
+    [ "$(readlink "$test_home/.tmux.conf.bak.20000101000000.2")" = "$foreign" ]
+    grep -Fxq 'user tmux' "$test_home/.tmux.conf.bak.20000101000000.1"
 
     printf 'config/claude/settings.json\n' >"$test_repo/config/extra.json"
     cat >"$test_repo/config/manifest.tsv" <<'TSV'
@@ -1001,6 +1024,7 @@ run_structure_smoke() {
 
   [ -f config/manifest.tsv ]
   [ -f config/rmux/rmux.conf ]
+  [ -f config/tmux/tmux.conf ]
   [ -f config/sonicterm/sonicterm.toml ]
   python3 - <<'PY'
 import pathlib
@@ -1218,17 +1242,17 @@ run_retired_config_migration_smoke() {
     other="$test_root/other"
     regular="$test_root/regular"
 
-    ln -s "$test_root/repo/.tmux.conf" "$exact"
-    remove_repo_symlink "$exact" "$test_root/repo/.tmux.conf" "test config" >/dev/null
+    ln -s "$test_root/repo/wezterm/wezterm.lua" "$exact"
+    remove_repo_symlink "$exact" "$test_root/repo/wezterm/wezterm.lua" "test config" >/dev/null
     [ ! -e "$exact" ] && [ ! -L "$exact" ]
-    remove_repo_symlink "$exact" "$test_root/repo/.tmux.conf" "test config" >/dev/null
+    remove_repo_symlink "$exact" "$test_root/repo/wezterm/wezterm.lua" "test config" >/dev/null
 
     ln -s "$test_root/user.conf" "$other"
-    remove_repo_symlink "$other" "$test_root/repo/.tmux.conf" "test config" >/dev/null
+    remove_repo_symlink "$other" "$test_root/repo/wezterm/wezterm.lua" "test config" >/dev/null
     [ -L "$other" ] && [ "$(readlink "$other")" = "$test_root/user.conf" ]
 
     printf 'keep\n' >"$regular"
-    remove_repo_symlink "$regular" "$test_root/repo/.tmux.conf" "test config" >/dev/null
+    remove_repo_symlink "$regular" "$test_root/repo/wezterm/wezterm.lua" "test config" >/dev/null
     grep -Fq 'keep' "$regular"
 
     for retired_source in config/copilot/AGENTS.md copilot/AGENTS.md; do
@@ -1246,24 +1270,22 @@ run_retired_config_migration_smoke() {
   grep -Fq '"${repo_root}/config/copilot/AGENTS.md"' install.sh
   grep -Fq '"${repo_root}/copilot/AGENTS.md"' install.sh
   grep -Eq '^[[:space:]]+rmux$' install.sh
-  if grep -Eq '^[[:space:]]+tmux$' install.sh; then
-    echo "installer still installs tmux" >&2
-    return 1
-  fi
+  grep -Eq '^[[:space:]]+tmux$' install.sh
+  grep -Fq $'link\tconfig/tmux/tmux.conf\t.tmux.conf' config/manifest.tsv
   if grep -Eq '^[[:space:]]+wezterm$|brew install --cask wezterm' install.sh; then
     echo "installer still installs WezTerm" >&2
     return 1
   fi
-  if grep -Eq 'command[[:space:]]+(tmux|wezterm)|wezterm cli' \
+  if grep -Eq 'command[[:space:]]+wezterm|wezterm cli' \
       config/zsh/cc.zsh config/zsh/gg.zsh; then
-    echo "active launchers still call retired tmux or WezTerm commands" >&2
+    echo "active launchers still call retired WezTerm commands" >&2
     return 1
   fi
   [ ! -e archive/tmux/.tmux.conf ]
   [ ! -e archive/wezterm/wezterm.lua ]
   [ ! -f .tmux.conf ]
   [ ! -f wezterm/wezterm.lua ]
-  echo "retired tmux/WezTerm link migration ok"
+  echo "native multiplexer install and retired WezTerm link boundaries ok"
 }
 
 run_rmux_smoke() {
@@ -1455,6 +1477,25 @@ RMUX_THEME
   echo "RMUX config/resume ok: C-q profile, Apollo status, app icons with title spacing, OSC 7 path relay, and stable main session across detach"
 }
 
+run_tmux_smoke() {
+  python3 -B scripts/tmux/test_helpers.py
+  bash -n scripts/tmux/tmux-store
+  if [ "$(uname -s)" = "Darwin" ] && command -v tmux >/dev/null 2>&1; then
+    TMUX_STORE_RUNTIME_TESTS=1 python3 -B -m unittest discover -s scripts/tmux -p 'test_store.py' -v
+  else
+    python3 -B -m unittest discover -s scripts/tmux -p 'test_store.py' -v
+  fi
+  if ! command -v tmux >/dev/null 2>&1; then
+    if [ "${CI:-}" = "true" ]; then
+      echo "tmux is required for CI runtime checks" >&2
+      return 1
+    fi
+    echo "tmux not found; skipping local native runtime check"
+    return 0
+  fi
+  python3 -B scripts/tmux/test_profile.py
+}
+
 run_apollo_smoke() {
   local test_root fixtures fake_bin test_home lock bad_lock first_current curl_count_before curl_count_after out
 
@@ -1464,6 +1505,7 @@ run_apollo_smoke() {
   [ ! -f config/sonicterm/themes/wezterm.toml ]
   grep -Fq 'theme = "apollo"' config/sonicterm/sonicterm.toml
   grep -Fq 'apollo-rmux.conf' config/rmux/rmux.conf
+  grep -Fq 'apollo.tmux' config/tmux/tmux.conf
   grep -Fq 'EZA_CONFIG_DIR' config/zsh/custom.zsh
   if grep -En '^[[:space:]]*((export|typeset)[[:space:]]+)?ZSH_THEME=' config/zsh/*.zsh; then
     echo "managed zsh helpers must leave theme selection to .zshrc" >&2
@@ -1479,8 +1521,8 @@ run_apollo_smoke() {
       config/claude/statusline.sh \
       config/copilot/statusline.sh \
       config/zsh/themes/apollo.zsh-theme || \
-      grep -Fxv "set -g window-status-current-style 'bg=#365b80,fg=#ffffff,bold'" config/rmux/rmux.conf | \
-        grep -En '#[0-9a-fA-F]{6}|38;2;|48;2;'; then
+      grep -hFxv "set -g window-status-current-style 'bg=#365b80,fg=#ffffff,bold'" \
+        config/rmux/rmux.conf config/tmux/tmux.conf | grep -En '#[0-9a-fA-F]{6}|38;2;|48;2;'; then
     echo "tracked active theme consumers contain embedded palette colors" >&2
     return 1
   fi
@@ -1549,6 +1591,7 @@ with open(sys.argv[1], "w", encoding="utf-8") as handle:
 PY
   printf 'name = "Apollo"\n' >"$fixtures/apollo.toml"
   printf 'set-option -g status-style "bg=default,fg=default"\n' >"$fixtures/apollo-rmux.conf"
+  printf 'set-option -g status-style "bg=default,fg=default"\n' >"$fixtures/apollo.tmux"
   printf 'colourful: true\n' >"$fixtures/theme.yml"
 
   {
@@ -1556,6 +1599,7 @@ PY
     printf 'palette\traw\texample/apollo-theme\tv1.0.0\tpalette/apollo.json\t%s\n' "$(shasum -a 256 "$fixtures/palette.json" | awk '{print $1}')"
     printf 'sonicterm\trelease\texample/sonicterm-apollo-theme\tv1.0.0\tapollo.toml\t%s\n' "$(shasum -a 256 "$fixtures/apollo.toml" | awk '{print $1}')"
     printf 'rmux\trelease\texample/rmux-apollo-theme\tv1.0.0\tapollo-rmux.conf\t%s\n' "$(shasum -a 256 "$fixtures/apollo-rmux.conf" | awk '{print $1}')"
+    printf 'tmux\trelease\texample/tmux-apollo-theme\tv1.0.0\tapollo.tmux\t%s\n' "$(shasum -a 256 "$fixtures/apollo.tmux" | awk '{print $1}')"
     printf 'eza\trelease\texample/eza-apollo-theme\tv1.0.0\ttheme.yml\t%s\n' "$(shasum -a 256 "$fixtures/theme.yml" | awk '{print $1}')"
   } >"$lock"
 
@@ -1576,6 +1620,7 @@ case "$url" in
   */palette/apollo.json) source_file="$APOLLO_TEST_FIXTURES/palette.json" ;;
   */apollo.toml) source_file="$APOLLO_TEST_FIXTURES/apollo.toml" ;;
   */apollo-rmux.conf) source_file="$APOLLO_TEST_FIXTURES/apollo-rmux.conf" ;;
+  */apollo.tmux) source_file="$APOLLO_TEST_FIXTURES/apollo.tmux" ;;
   */theme.yml) source_file="$APOLLO_TEST_FIXTURES/theme.yml" ;;
   *) exit 22 ;;
 esac
@@ -1643,6 +1688,8 @@ SH
   [ -L "$test_home/.sonicterm/themes/apollo.toml" ]
   grep -Fq 'user theme' "$test_home/.sonicterm/themes/apollo.toml.bak."*
   [ -L "$test_home/.config/rmux-apollo-theme/apollo-rmux.conf" ]
+  [ -L "$test_home/.config/tmux-apollo-theme/apollo.tmux" ]
+  cmp -s "$fixtures/apollo.tmux" "$test_home/.config/tmux-apollo-theme/apollo.tmux"
   [ -L "$test_home/.config/eza-apollo-theme/theme.yml" ]
   [ -L "$test_home/.claude/themes/apollo.json" ]
   jq -e '.keep == true and .theme == "custom:apollo"' "$test_home/.claude.json" >/dev/null
@@ -1850,6 +1897,7 @@ run_smoke() {
   run_rmux_keymap_docs_smoke
   run_retired_config_migration_smoke
   run_rmux_smoke
+  run_tmux_smoke
 }
 
 case "${1:-all}" in
@@ -1861,10 +1909,11 @@ case "${1:-all}" in
   mcp) run_mcp_default_smoke ;;
   wiki) run_wiki_smoke; run_pipeline_scripts_smoke; run_rmux_keymap_docs_smoke ;;
   rmux) run_rmux_helpers_smoke; run_rmux_store_tests; run_rmux_keymap_docs_smoke; run_retired_config_migration_smoke; run_rmux_smoke ;;
+  tmux) run_tmux_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;
   *)
-    echo "usage: $0 [smoke|apollo|apollo-online|instructions|models|mcp|wiki|rmux|shellcheck|all]" >&2
+    echo "usage: $0 [smoke|apollo|apollo-online|instructions|models|mcp|wiki|rmux|tmux|shellcheck|all]" >&2
     exit 2
     ;;
 esac

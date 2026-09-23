@@ -13,8 +13,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install RMUX
-        run: brew install rmux
+      - name: Install terminal multiplexers
+        run: brew install rmux tmux
 
       - name: Smoke checks
         run: bash scripts/check.sh smoke

@@ -17,6 +17,8 @@ The source is the flat `wiki/` folder. GitHub Actions publishes it to the GitHub
 - [Copilot CLI](Copilot-CLI.md) — model defaults, global rules, status line, and WakaTime.
 - [RMUX](RMUX.md) — sessions, panes, resume, clipboard, and Claude teams.
 - [RMUX keymap](RMUX-Keymap.md) — all 278 active bindings.
+- [Tmux](Tmux.md) — native tmux beside RMUX, with the same Apollo style and separate sessions.
+- [Tmux keymap](Tmux-Keymap.md) — native tmux bindings and prompt behavior.
 - [SonicTerm and shell](SonicTerm-and-Shell.md) — terminal files, zsh helpers, and launch wrappers.
 
 ## Work

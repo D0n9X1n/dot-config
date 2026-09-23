@@ -11,14 +11,14 @@ Copilot 使用内置 GitHub 集成；Claude 使用已认证的 `gh`。不需要�
 在 macOS 上，安装器可以添加：
 
 - Homebrew
-- RMUX
+- 原生 tmux 和 RMUX
 - Homebrew cask 中的 Claude Code
 - npm 中的 Copilot CLI 和 copilot-relay
 - oh-my-zsh
 - `eza`、`jq`、`neovim` 和 autojump 等 shell 工具
 - Recursive 和 Nerd 字体
 - MOSconfig release 中的 RecMono Baker 与 St.Helens 字体
-- SonicTerm、RMUX 和 eza 的固定 Apollo theme releases
+- SonicTerm、RMUX、原生 tmux 和 eza 的固定 Apollo theme releases
 - Claude、两个状态栏和 shell prompt 的本机 Apollo adapters
 
 Claude Code 需要 v2.1.217 或更高版本。`theme.yml` 需要 eza v0.23.5 或更高版本。
@@ -38,6 +38,18 @@ SKIP_OH_MY_ZSH=1 ./install.sh
 `scripts/apollo-releases.tsv` 固定精确的上游 tag 和 SHA-256。安装器会复用已验证本机 blobs，在一个由 release lock 和 adapter code 派生的 bundle hash 下构建全部文件，并且只在完整 set 通过检查后切换 `current` symlink。第二次安装会直接使用已有 bundle，不下载或重写。
 
 第一次安装需要网络。只要固定 blobs 仍位于 `~/.local/share/dot-configs/apollo/`，以后就能离线安装。下载失败或 checksum 不匹配时，旧 bundle 保持生效。请看 [Apollo 主题](Apollo-Theme-zh-CN.md)。
+
+## 复用器生命周期
+
+原生 tmux 和 RMUX 使用独立的服务器、助手和状态。两者共享 Apollo 主题及状态栏样式，不共享运行中的会话。
+
+`tt`/`tr` 通过分离的引导进程创建原生 tmux 服务器，并在连接前验证父 PID 为 1。已有服务器直接复用，不重启，也不强制更换父进程。SonicTerm 只拥有连接客户端。关闭标签页或退出 SonicTerm 后，服务器和窗格继续运行，不需要先执行 `ts`。`td` 用于主动删除会话。服务器崩溃或系统重启仍会丢失运行中的进程。
+
+原生 tmux 使用 `~/.local/state/tmux-store/<socket-hash>/`。助手在 tmux 外使用默认 socket，在原生 tmux 内使用当前 socket。RMUX 保留已有状态和配套客户端/守护进程。原生 `tmux-store` 引用兼容的 Homebrew 可执行文件，不搬移二进制，也不能保证任意 Homebrew 清理操作都会保留全部依赖。
+
+`ts` 保存所选原生 socket 的全部会话，包括已分离会话。遇到未知或不匹配的二进制、不稳定或无效快照、预检失败时会拒绝继续。停止服务器前必须交互式输入 `yes`。恢复仅用新 shell 重建保存的名称、目录、布局、尺寸和活动选择，不重放进程，不恢复历史，也不自动保存。
+
+安装不会重载或停止运行中的 tmux 或 RMUX 服务器。永远不要自动运行 `ts` 或 `rs`。手动升级和重载步骤见 [Tmux](Tmux-zh-CN.md) 和 [RMUX](RMUX-zh-CN.md)。
 
 ## copilot-relay
 

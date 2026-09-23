@@ -12,12 +12,15 @@ Apollo 是当前终端、multiplexer、shell、CLI 状态栏和文件列表共�
 |---|---|
 | SonicTerm | 带 tag 的 `sonicterm-apollo-theme` release asset |
 | RMUX | 带 tag 的 `rmux-apollo-theme` release asset |
+| 原生 tmux | `apollo-theme/tmux-apollo-theme` v0.1.0 release asset `apollo.tmux` |
 | eza | 带 tag 的 `eza-apollo-theme` release asset |
 | Claude Code UI | 从带 tag 的规范 palette 在本机生成 |
 | Claude 与 Copilot 状态栏 | 从规范 palette 生成一个本机共享 include |
 | Oh My Zsh prompt（可选） | 结构在本仓库；颜色在本机生成；仅通过 `.zshrc` 选择 |
 | fast-syntax-highlighting | 使用它的 Base16 主题和终端 ANSI palette |
 | Copilot CLI UI | 使用内置 `default` 主题和终端 ANSI palette |
+
+原生 tmux 和 RMUX 使用相同的 Apollo 主题及状态栏样式：斜边会话和窗口标签、应用图标、简洁时钟，以及 prefix/zoom 标记。两个引擎各用自己的官方 release asset。原生 tmux 主题不需要 TPM 或 plugin bootstrap。已有 tmux plugins 和 resurrect 文件保持不动。配置说明见 [Tmux](Tmux-zh-CN.md) 和 [RMUX](RMUX-zh-CN.md)。
 
 Neovim 在另一个仓库中管理。本安装器不会修改 Neovim 配置、plugins 或运行状态。
 
@@ -52,6 +55,7 @@ Bundle hash 包含 release lock 和 adapter code。安装器会先验证每个�
 ```text
 ~/.sonicterm/themes/apollo.toml
 ~/.config/rmux-apollo-theme/apollo-rmux.conf
+~/.config/tmux-apollo-theme/apollo.tmux
 ~/.config/eza-apollo-theme/theme.yml
 ~/.claude/themes/apollo.json
 ```
@@ -72,7 +76,9 @@ Bundle hash 包含 release lock 和 adapter code。安装器会先验证每个�
 4. 运行 `scripts/check.sh apollo-online`。
 5. 运行 `scripts/check.sh all`。
 6. 运行两次 `./install.sh`。
-7. 重载 SonicTerm 和 RMUX，然后启动新的 Claude 与 Copilot session。
+7. 准备好后重载 SonicTerm，再启动新的 Claude 与 Copilot session。
+
+安装不会重载或停止运行中的 tmux 或 RMUX 服务器。新服务器会读取配置。只有显式重载，才会把更改应用到已有服务器；请看 [Tmux](Tmux-zh-CN.md) 和 [RMUX](RMUX-zh-CN.md)。不要用 `ts` 或 `rs` 应用主题。
 
 不要把上游颜色复制到 config、scripts 或 Wiki 页面中。
 
@@ -82,4 +88,4 @@ Bundle hash 包含 release lock 和 adapter code。安装器会先验证每个�
 
 手动创建的 Vim、Neovim、VS Code、Windows Terminal 或 WezTerm 主题文件都属于用户，安装器永远不会删除。
 
-请看 [SonicTerm 与 Shell](SonicTerm-and-Shell-zh-CN.md)、[RMUX](RMUX-zh-CN.md)和[开发与发布](Development-and-Releases-zh-CN.md)。
+请看 [SonicTerm 与 Shell](SonicTerm-and-Shell-zh-CN.md)、[Tmux](Tmux-zh-CN.md)、[RMUX](RMUX-zh-CN.md)和[开发与发布](Development-and-Releases-zh-CN.md)。

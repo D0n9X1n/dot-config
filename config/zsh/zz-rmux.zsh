@@ -67,6 +67,9 @@ function exit {
   if [[ -n "${RMUX:-}" ]]; then
     _rmux_store client detach-client
     return $?
+  elif [[ -n "${TMUX:-}" ]] && (( $+functions[_tmux_store] )); then
+    _tmux_store client detach-client
+    return $?
   fi
   builtin exit "$@"
 }
@@ -76,6 +79,9 @@ function logout {
   if [[ -n "${RMUX:-}" ]]; then
     _rmux_store client detach-client
     return $?
+  elif [[ -n "${TMUX:-}" ]] && (( $+functions[_tmux_store] )); then
+    _tmux_store client detach-client
+    return $?
   fi
   builtin logout "$@"
 }
@@ -84,6 +90,9 @@ function _rmux_detach_or_delete_char {
   if [[ -n "${RMUX:-}" && -z "$BUFFER" ]]; then
     zle -I
     _rmux_store client detach-client
+  elif [[ -n "${TMUX:-}" && -z "$BUFFER" ]] && (( $+functions[_tmux_store] )); then
+    zle -I
+    _tmux_store client detach-client
   else
     zle .delete-char-or-list
   fi

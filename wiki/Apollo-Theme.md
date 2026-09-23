@@ -12,12 +12,15 @@ The canonical palette and application adapters live in the [Apollo Theme organiz
 |---|---|
 | SonicTerm | Tagged `sonicterm-apollo-theme` release asset |
 | RMUX | Tagged `rmux-apollo-theme` release asset |
+| Native tmux | `apollo-theme/tmux-apollo-theme` v0.1.0 release asset `apollo.tmux` |
 | eza | Tagged `eza-apollo-theme` release asset |
 | Claude Code UI | Generated locally from the tagged canonical palette |
 | Claude and Copilot status lines | One local include generated from the tagged canonical palette |
 | Oh My Zsh prompt (optional) | Structure in this repo; colors generated locally; selected only through `.zshrc` |
 | fast-syntax-highlighting | Its Base16 theme, using the terminal ANSI palette |
 | Copilot CLI UI | Built-in `default` theme, using the terminal ANSI palette |
+
+Native tmux and RMUX use the same Apollo theme and status style: sloped session and window tabs, app icons, a plain clock, and prefix/zoom indicators. Each engine uses its own official release asset. The native tmux asset needs no TPM or plugin bootstrap. Existing tmux plugins and resurrect files stay untouched. See [Tmux](Tmux.md) and [RMUX](RMUX.md) for their profiles.
 
 Neovim is managed in a different repository. This installer does not modify Neovim config, plugins, or runtime state.
 
@@ -52,6 +55,7 @@ Installed consumers link to `current`:
 ```text
 ~/.sonicterm/themes/apollo.toml
 ~/.config/rmux-apollo-theme/apollo-rmux.conf
+~/.config/tmux-apollo-theme/apollo.tmux
 ~/.config/eza-apollo-theme/theme.yml
 ~/.claude/themes/apollo.json
 ```
@@ -72,7 +76,9 @@ To update Apollo:
 4. Run `scripts/check.sh apollo-online`.
 5. Run `scripts/check.sh all`.
 6. Run `./install.sh` twice.
-7. Reload SonicTerm and RMUX, then start new Claude and Copilot sessions.
+7. Reload SonicTerm when ready, then start new Claude and Copilot sessions.
+
+Installation does not reload or stop live tmux or RMUX servers. A new server reads its config. Apply changes to an existing server only with an explicit reload; see [Tmux](Tmux.md) and [RMUX](RMUX.md). Do not run `ts` or `rs` to apply a theme.
 
 Do not copy colors from upstream into config, scripts, or Wiki pages.
 
@@ -82,4 +88,4 @@ The old `themes/apollo/` copies are gone. The installer removes the former Sonic
 
 Manual Vim, Neovim, VS Code, Windows Terminal, or WezTerm theme files are user-owned and are never removed.
 
-See [SonicTerm and shell](SonicTerm-and-Shell.md), [RMUX](RMUX.md), and [Development and releases](Development-and-Releases.md).
+See [SonicTerm and shell](SonicTerm-and-Shell.md), [Tmux](Tmux.md), [RMUX](RMUX.md), and [Development and releases](Development-and-Releases.md).

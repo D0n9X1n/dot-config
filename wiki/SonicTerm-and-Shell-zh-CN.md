@@ -43,7 +43,7 @@ config/sonicterm/keymaps/*.toml
 
 当前 keymap 是 `sonicterm-macos`；仓库也管理 `sonicterm-linux` 和 `sonicterm-windows`。它们的自定义按键保持不变。外观使用 `[appearance]`；已省去无效的旧 window 和 render 配置项。
 
-## RMUX 身份
+## 终端身份
 
 普通 SonicTerm shell 看到：
 
@@ -57,7 +57,7 @@ RMUX 中的 shell 看到：
 TERM_PROGRAM=rmux
 ```
 
-只有 Copilot 子进程会收到进程级 WezTerm 兼容名称。请看 [Copilot CLI](Copilot-CLI-zh-CN.md)。
+原生 tmux 窗格保留 `TERM_PROGRAM=tmux`，不冒充 RMUX。只有 Copilot 子进程会收到进程级 WezTerm 兼容名称，外层 shell 保留真实身份。请看 [Copilot CLI](Copilot-CLI-zh-CN.md) 和 [Tmux](Tmux-zh-CN.md)。
 
 RMUX 会向外层 SonicTerm 客户端声明 `xterm-256color:RGB:osc7`，并保持 `set-titles` 开启。Oh My Zsh 会在每次显示提示符时发出带主机名的 OSC 7 报告，因此 RMUX 可以把活动 pane 的准确工作目录转发给 SonicTerm。这样 SonicTerm 就能按正确 pane 解析相对路径和 bare file name。修改外层终端能力后，请重载 RMUX 并 detach/reattach。
 
@@ -75,7 +75,8 @@ RMUX 配置会明确保留条件式鼠标 bindings。Copilot 等支持鼠标的�
 | `cc.zsh` | 带标题的 Claude 启动器 |
 | `copilot.zsh` | allow-all Copilot alias、真彩色 wrapper 和清理 |
 | `gg.zsh` | 带标题、allow-all 的 Copilot 启动器 |
-| `zz-rmux.zsh` | RMUX 会话和安全分离助手；最后加载 |
+| `zz-rmux.zsh` | RMUX 助手和共享安全分离分派器；较晚加载 |
+| `zz-tmux.zsh` | 原生 tmux 会话助手和交互式 `tr` 分派 |
 
 ## 小 aliases
 
@@ -107,7 +108,7 @@ Proxy 地址是 `127.0.0.1:46971`。助手会修改 shell、Git 和 npm proxy �
 
 ## RMUX 助手
 
-`zz-rmux.zsh` 最后加载，所以它的函数会覆盖前面的 shell 定义。
+`zz-rmux.zsh` 较晚加载，所以它的函数会覆盖前面的 shell 定义。`rr`、`rl`、`rd`、`rh` 和 `rs` 保持原有行为。
 
 ```sh
 rr main       # main 存在时连接；只有不存在时才创建
@@ -119,29 +120,57 @@ rh            # 助手、父 PID 1、升级步骤
 
 它永远不会自动连接新标签页。`rr` 新启动的服务器必须在连接前具有父 PID 1；终端只拥有连接客户端。已有服务器保持不变。用 `brew upgrade rmux` 升级，准备好以新 shell 重建全部会话时再执行 `rs`。受管 `rmux` shell 函数会保留与当前服务器兼容的客户端版本。快照限制请看 [RMUX](RMUX-zh-CN.md)。
 
-在 RMUX 中：
+## 原生 tmux 助手
+
+`zz-tmux.zsh` 提供独立的一组助手：
+
+```sh
+tt main       # 按完整名称连接，仅在不存在时创建
+tr main       # 交互式 shell 中 tt main 的快捷方式
+tl            # 列出会话，不启动服务器
+td main       # 按完整名称删除会话
+th            # 帮助与重启警告
+ts            # 保存此 socket 的全部会话，确认后重启并恢复
+```
+
+`tr` 只在交互式 zsh 中定义为 shell 函数，不是可执行文件或 alias。恰好一个非选项参数会交给 `tt`。普通的双参数和选项形式仍调用文本工具。用 `command tr` 可显式调用文本工具。
+
+复用器之外，原生助手使用 tmux 默认 socket；原生 tmux 内使用当前 socket。`tt` 拒绝从 RMUX 嵌套连接，请先分离。两组助手都不会自动连接新标签页。
+
+`tt`/`tr` 以分离的引导进程创建新服务器，并在**连接前验证父 PID 为 1**。已有服务器直接复用，不重启，也不强制更换父进程。退出 SonicTerm 只会断开客户端，服务器继续运行，不需要先执行 `ts`。只有主动删除时才使用 `td`。父 PID 为 1 不能让运行中的进程跨服务器崩溃或系统重启保留。
+
+`ts` 影响所选 socket 的全部会话，包括已分离的会话。它需要稳定且有效的快照、兼容二进制、通过预检，并要求交互式输入 `yes`。恢复会用新 shell 重建保存的名称、目录、布局、尺寸和活动选择。不重放进程，不恢复历史，也没有自动保存。永远不要自动运行 `ts` 或 `rs`。完整的 socket 和升级规则见 [Tmux](Tmux-zh-CN.md)。
+
+## 安全分离
+
+`zz-rmux.zsh` 中已有的分派器处理两个引擎。因为 RMUX 也导出 `TMUX`，所以先检查 `RMUX`，再检查原生 tmux。
+
+在任一引擎中：
 
 - `exit` 会分离；
 - `logout` 会分离；
 - 空提示符上的 Ctrl+D 会分离；
 - 有文字时，Ctrl+D 保持正常 ZLE 行为。
 
-在 RMUX 外，`exit`、`logout` 和 Ctrl+D 保持普通 shell 行为。
+在两个引擎之外，`exit`、`logout` 和 Ctrl+D 保持普通 shell 行为。
 
 ## 标题
 
-`cc [标题]` 和 `gg [标题]` 会向 SonicTerm 发送 OSC 1 和 OSC 2 标题。在 RMUX 中，它们也会重命名 RMUX 窗口。没有标题时，它们使用当前路径。
+`cc [标题]` 和 `gg [标题]` 会向 SonicTerm 发送 OSC 1 和 OSC 2 标题。它们先检查 RMUX 并直接重命名其窗口；在原生 tmux 中，通过 `tmux-store` 重命名当前 socket 的当前窗口。没有标题时使用当前路径。
 
-CLI 运行时会设置 `DISABLE_AUTO_TITLE`，所以 oh-my-zsh 不会覆盖标题。
+原生路径不会修改 `PATH`，也不会替换全局 `tmux` 命令。RMUX 的私有 teammate shim 保持独立。CLI 运行时会设置 `DISABLE_AUTO_TITLE`，所以 oh-my-zsh 不会覆盖标题。
+
+原生 tmux 3.7 使用 `status-keys vi` 时，Esc 切换提示框模式，`C-g` 才是取消。这不修复 RMUX 独立的[提示框问题 #60](https://github.com/D0n9X1n/dot-config/issues/60)。请看[原生按键表](Tmux-Keymap-zh-CN.md)。
 
 ## 检查
 
 ```sh
 zsh -n config/zsh/*.zsh
-zsh -ic 'type rr rd rl cc gg; print -r -- "$ZSH_THEME $EZA_CONFIG_DIR $FAST_WORK_DIR"'
+zsh -ic 'type tt tr tl td th ts rr rd rl rh rs cc gg; print -r -- "$ZSH_THEME $EZA_CONFIG_DIR $FAST_WORK_DIR"'
 grep -F 'theme = "apollo"' ~/.sonicterm/sonicterm.toml
 ls -l ~/.sonicterm/themes/apollo.toml ~/.config/eza-apollo-theme/theme.yml
 scripts/check.sh rmux
+scripts/check.sh tmux
 ```
 
-会话模型请看 [RMUX](RMUX-zh-CN.md)。
+会话模型请看 [Tmux](Tmux-zh-CN.md) 和 [RMUX](RMUX-zh-CN.md)。

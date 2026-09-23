@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+set -euo pipefail
+exec python3 -B -c 'import os, runpy, sys; path = os.path.join(os.path.dirname(os.path.realpath(sys.argv.pop(1))), "store.py"); sys.argv[0] = path; runpy.run_path(path, run_name="__main__")' "${BASH_SOURCE[0]}" "$@"

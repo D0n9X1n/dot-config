@@ -65,7 +65,7 @@ apollo_validate_lock() {
       return 1
     }
     case "$id" in
-      palette|sonicterm|rmux|eza) ;;
+      palette|sonicterm|rmux|tmux|eza) ;;
       *) printf 'Error: unknown Apollo release id: %s\n' "$id" >&2; return 1 ;;
     esac
     case "$kind" in
@@ -105,7 +105,7 @@ apollo_validate_lock() {
     seen="${seen}${seen:+$'\n'}${id}"
   done <"$lock"
 
-  for id in palette sonicterm rmux eza; do
+  for id in palette sonicterm rmux tmux eza; do
     case $'\n'"$seen"$'\n' in
       *$'\n'"$id"$'\n'*) ;;
       *) printf 'Error: Apollo release lock is missing %s.\n' "$id" >&2; return 1 ;;
@@ -400,11 +400,12 @@ apollo_validate_bundle() {
   local bundle="$1" lock="$2" id file expected actual
   [ -f "${bundle}/.complete" ] || return 1
   apollo_validate_palette "${bundle}/palette/apollo.json" || return 1
-  for id in palette sonicterm rmux eza; do
+  for id in palette sonicterm rmux tmux eza; do
     case "$id" in
       palette) file="${bundle}/palette/apollo.json" ;;
       sonicterm) file="${bundle}/sonicterm/apollo.toml" ;;
       rmux) file="${bundle}/rmux/apollo-rmux.conf" ;;
+      tmux) file="${bundle}/tmux/apollo.tmux" ;;
       eza) file="${bundle}/eza/theme.yml" ;;
     esac
     expected="$(apollo_lock_sha "$id" "$lock")" || return 1
@@ -419,15 +420,16 @@ apollo_build_bundle() {
   local id kind repository tag artifact sha blob
 
   mkdir -p "${stage}/palette" "${stage}/sonicterm" "${stage}/rmux" \
-    "${stage}/eza" "${stage}/generated/claude"
+    "${stage}/tmux" "${stage}/eza" "${stage}/generated/claude"
 
-  for id in palette sonicterm rmux eza; do
+  for id in palette sonicterm rmux tmux eza; do
     IFS=$'\t' read -r id kind repository tag artifact sha <<<"$(apollo_lock_row "$id" "$lock")"
     blob="$(apollo_fetch_blob "$id" "$kind" "$repository" "$tag" "$artifact" "$sha")" || return 1
     case "$id" in
       palette) cp "$blob" "${stage}/palette/apollo.json" ;;
       sonicterm) cp "$blob" "${stage}/sonicterm/apollo.toml" ;;
       rmux) cp "$blob" "${stage}/rmux/apollo-rmux.conf" ;;
+      tmux) cp "$blob" "${stage}/tmux/apollo.tmux" ;;
       eza) cp "$blob" "${stage}/eza/theme.yml" ;;
     esac
   done
@@ -508,6 +510,7 @@ apollo_link_consumers() {
   local root="$1"
   link_file "${root}/current/sonicterm/apollo.toml" "${HOME}/.sonicterm/themes/apollo.toml" || return 1
   link_file "${root}/current/rmux/apollo-rmux.conf" "${HOME}/.config/rmux-apollo-theme/apollo-rmux.conf" || return 1
+  link_file_preserving_backups "${root}/current/tmux/apollo.tmux" "${HOME}/.config/tmux-apollo-theme/apollo.tmux" || return 1
   link_file "${root}/current/eza/theme.yml" "${HOME}/.config/eza-apollo-theme/theme.yml" || return 1
   link_file "${root}/current/generated/claude/apollo.json" "${HOME}/.claude/themes/apollo.json" || return 1
 }
