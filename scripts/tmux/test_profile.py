@@ -506,6 +506,39 @@ class ProfileTests(unittest.TestCase):
             tm.send(encoded('w', 5) + b'X\r')
             tm.wait(lambda: tm.format('#{window_name}') == 'one X', f'{protocol} Ctrl+W prompt editing failed')
 
+    def test_native_shell_exit_detaches_without_ending_pane(self):
+        tm = self.tmux
+        zsh = shutil.which('zsh')
+        if not zsh:
+            self.skipTest('zsh is required for the managed shell helpers')
+        installed = tm.home / '.local/bin/tmux-store'
+        installed.parent.mkdir(parents=True)
+        installed.symlink_to(ROOT / 'scripts/tmux/tmux-store')
+        (tm.home / '.zshrc').write_text(
+            'source ' + shlex.quote(str(ROOT / 'config/zsh/zz-rmux.zsh')) + '\n' +
+            'source ' + shlex.quote(str(ROOT / 'config/zsh/zz-tmux.zsh')) + '\n' +
+            "PROMPT='TMUX EXIT TEST> '\nRPROMPT=''\nprint -r -- EXIT_HELPER_READY\n")
+        tm.command('respawn-pane', '-k', '-t', tm.pane, zsh, '-di')
+        pane_pid = tm.format('#{pane_pid}')
+        server_pid = tm.format('#{pid}')
+        tm.attach()
+        tm.wait(lambda: b'EXIT_HELPER_READY' in tm.screen, 'managed shell helpers did not load')
+        tm.send(b'exit\r')
+        tm.wait(lambda: tm.format('#{session_attached}') == '0', 'exit did not detach the native client')
+        tm.client.wait(timeout=5)
+        self.assertEqual(tm.format('#{pane_pid}'), pane_pid, 'exit replaced or ended the shell')
+        self.assertEqual(tm.format('#{pid}'), server_pid, 'exit restarted the server')
+        self.assertEqual(tm.format('#{pane_dead}'), '0')
+        os.kill(int(pane_pid), 0)
+        os.close(tm.master)
+        tm.master = None
+        tm.screen.clear()
+        tm.attach()
+        tm.send(b'print -r -- EXIT_PANE_SURVIVED\r')
+        tm.wait(lambda: 'EXIT_PANE_SURVIVED' in tm.command('capture-pane', '-p', '-t', tm.pane),
+                'original shell did not survive reattachment')
+        self.assertEqual(tm.format('#{pane_pid}'), pane_pid)
+
     def test_keymap_docs_match_managed_bindings(self):
         tm = self.tmux
         for filename in ('Tmux-Keymap.md', 'Tmux-Keymap-zh-CN.md'):
