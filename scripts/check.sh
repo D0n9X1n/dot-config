@@ -230,7 +230,7 @@ run_model_default_smoke() {
   ' config/copilot/settings.json >/dev/null
 
   # Relay: Opus remains separate; every non-Opus route uses GPT-6 Astra.
-  grep -Eq '^opusModel:[[:space:]]*claude-opus-5$' config/copilot-relay/config.yaml
+  grep -Eq '^opusModel:[[:space:]]*claude-opus-5\.5$' config/copilot-relay/config.yaml
   grep -Eq '^gptModel:[[:space:]]*gpt-6-astra$' config/copilot-relay/config.yaml
   grep -Eq '^thinkEffort:[[:space:]]*medium$' config/copilot-relay/config.yaml
   grep -Eq '^upstreamTimeoutSeconds:[[:space:]]*600$' config/copilot-relay/config.yaml
@@ -328,7 +328,7 @@ SH
     fi
   )
 
-  echo "model defaults ok: native Sonnet/Haiku client ids, relay maps non-Opus to GPT-6 Astra"
+  echo "model defaults ok: native Sonnet/Haiku client ids, relay maps non-Opus to GPT-6 Astra and Opus to claude-opus-5.5"
 }
 
 run_mcp_default_smoke() {
@@ -459,7 +459,7 @@ run_global_instructions_smoke() {
     grep -Fq 'claude-haiku-4-5-20251001' "$file"
     grep -Fq 'gptModel' "$file"
     grep -Fq 'gpt-6-astra' "$file"
-    grep -Fq 'claude-opus-5' "$file"
+    grep -Fq 'claude-opus-5.5' "$file"
     grep -Fq 'display override' "$file"
     lines="$(wc -l <"$file" | tr -d ' ')"
     [ "$lines" -le 60 ] || {

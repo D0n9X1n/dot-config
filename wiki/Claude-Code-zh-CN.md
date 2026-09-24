@@ -41,7 +41,7 @@ Claude Code 保留原生客户端身份。名称中没有 `opus`，所以 copilo
 
 | Claude 端名称 | Relay lane | 上游 |
 |---|---|---|
-| `claude-opus-5[1m]` | `opusModel` | `claude-opus-5` |
+| `claude-opus-5[1m]` | `opusModel` | `claude-opus-5.5` |
 | `claude-haiku-4-5-20251001`（Haiku / small-fast） | `gptModel` | `gpt-6-astra` |
 
 客户端名称和上游模型是两层。客户端保留原生 Anthropic ID；上游模型由 relay 决定。不要把 GPT ID 或 `_NAME` / `_DESCRIPTION` 显示覆盖写进 Claude 端设置。
@@ -52,7 +52,9 @@ Claude Code 保留原生客户端身份。名称中没有 `opus`，所以 copilo
 
 切换模型前，运行 `copilot` 并输入 `/model`，检查账号可用性和 effort 选项。这是 Copilot 的选择器，不是 Claude Code 的选择器，也不是 relay 本地的 `/v1/models`。`scripts/check.sh all` 通过后，运行两次 `./install.sh` 应用配置，再启动新的 shell 和 Claude Code 会话。安装器会保留健康的 relay 进程；恢复不健康的 relay 时可能中断请求。
 
-Sonnet-facing 槽位通过 `gptModel` 路由到 GPT-6 Astra；Opus 仍使用独立的 `opusModel` 路由。任务只要求修改一条路由时，不要同时修改两条。
+Sonnet-facing 槽位通过 `gptModel` 路由到 GPT-6 Astra；Opus 仍使用独立的 `opusModel` 路由。仅升级 Opus 时，设置 `opusModel: claude-opus-5.5`，不加 `[1m]`；配置会热重载，无需重启 relay。客户端名称、启动默认值、effort 和 Astra WebSearch 后端保持不变。任务只要求修改一条路由时，不要同时修改两条。
+
+[上游 Opus 5.5 验证](https://github.com/D0n9X1n/copilot-relay/issues/81)确认自动工具调用可用，但强制指定 `tool_choice` 为 `tool` 或 `any` 会返回 HTTP 400。Relay 保留该错误，不会静默改成自动选择。
 
 ## 主要设置
 
