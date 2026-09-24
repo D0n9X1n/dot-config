@@ -27,32 +27,32 @@ The first Claude Code launch asks if the custom `dummy` API key is allowed. Choo
 The tracked default is:
 
 ```text
-Claude-facing name: claude-sonnet-5[1m]
-Picker name:        native Sonnet name
-Saved Sonnet effort: high
-Launcher effort:     high
-Relay route:        gptModel
-Upstream model:     gpt-6-astra
+Claude-facing name: claude-opus-5-5[1m]
+Picker alias:       opus[1m]
+Saved Opus effort:  xhigh
+Launcher effort:    xhigh
+Relay route:        opusModel
+Upstream model:     claude-opus-5.5
 ```
 
-Claude Code keeps its native client identity. The name has no `opus`, so copilot-relay sends it to `gptModel`.
+Claude Code keeps its native Opus 5.5 identity. The name contains `opus`, so copilot-relay sends it to `opusModel`. The client spelling uses hyphens; the Copilot upstream ID uses a dot. Do not interchange them.
 
 Other routes:
 
 | Claude-facing name | Relay lane | Upstream |
 |---|---|---|
-| `claude-opus-5[1m]` | `opusModel` | `claude-opus-5.5` |
+| `claude-sonnet-5[1m]` | `gptModel` | `gpt-6-astra` |
 | `claude-haiku-4-5-20251001` (Haiku / small-fast) | `gptModel` | `gpt-6-astra` |
 
 Client names and upstream models are separate layers. The client keeps native Anthropic ids; the relay decides the upstream model. Do not write a GPT id, or a `_NAME` / `_DESCRIPTION` display override, into Claude-facing settings.
 
-The `[1m]` suffix keeps Claude Code's one-million-token model context accounting; the relay sends canonical `gpt-6-astra` upstream. The Haiku id is the installed CLI's own small-fast id and takes no `[1m]` suffix. Automatic compaction is expected at 750,000 tokens on the default Sonnet path, below Astra's advertised 872,000-token prompt limit within its 1M total window. This does not retain a full 1M-token conversation history. Relay-side default thinking is `medium` in `config/copilot-relay/config.yaml`; the saved Sonnet preference is `high`, while the shell launchers explicitly request `high`.
+The `[1m]` suffix keeps Claude Code's one-million-token context accounting; the relay sends canonical `claude-opus-5.5` upstream without that suffix. Haiku keeps the installed CLI's small-fast ID without `[1m]`. Context accounting does not guarantee a full 1M-token conversation history; automatic compaction also depends on model and output budgets. Claude's saved Opus preference, launchers, and status-line effort fallback use `xhigh`, matching the relay's fallback in `config/copilot-relay/config.yaml`.
 
-Use a relay build with GPT-6 Astra support before relying on this setup (tracked in [copilot-relay issue #57](https://github.com/D0n9X1n/copilot-relay/issues/57)). Update model or effort defaults in `config/claude/settings.json`, `config/zsh/claude.zsh`, and `config/zsh/cc.zsh` together; the wrappers' `--model` and `--effort` flags override the settings. The relay's `gptModel` stays suffix-free. Its blank `webSearchBackend` also uses Astra. Keep the Opus route separate.
+The native Opus 5.5 identity is recognized by Claude Code 2.1.281. Update model and effort defaults in `config/claude/settings.json`, `config/zsh/claude.zsh`, and `config/zsh/cc.zsh` together; the wrappers' `--model` and `--effort` flags override saved settings. Keep relay `thinkEffort` aligned as the fallback for requests without effort. The separate `gptModel` stays `gpt-6-astra`, and the blank `webSearchBackend` still uses Astra.
 
 Run `copilot` and enter `/model` to check account availability and effort choices before changing models. That is Copilot's picker, not Claude Code's picker or the relay's local `/v1/models`. After `scripts/check.sh all` passes, apply through `./install.sh` twice and start a new shell and Claude Code session. The installer leaves a healthy relay running; recovery of an unhealthy relay may interrupt requests.
 
-The Sonnet-facing slot routes to GPT-6 Astra through `gptModel`; Opus stays on its separate `opusModel` route. The Opus-only upgrade sets `opusModel: claude-opus-5.5`, without `[1m]`, and hot-reloads without a relay restart. Client names, startup defaults, effort, and the Astra WebSearch backend stay unchanged. Do not change both routes when a task names only one.
+Changing only `opusModel` does not select Opus at startup. `ANTHROPIC_MODEL`, the saved `opus[1m]` choice, `ANTHROPIC_DEFAULT_OPUS_MODEL`, and both launchers now agree on native Opus 5.5. Sonnet and Haiku retain their separate Astra route; do not remap those identities to Opus. Relay route and effort changes hot-reload without a restart.
 
 [Upstream Opus 5.5 verification](https://github.com/D0n9X1n/copilot-relay/issues/81) found that automatic tool use works, but forced `tool_choice` values `tool` and `any` return HTTP 400. The relay preserves that error instead of silently switching to automatic selection.
 
@@ -64,29 +64,33 @@ The Sonnet-facing slot routes to GPT-6 Astra through `gptModel`; Opus stays on i
 |---|---|
 | `ANTHROPIC_BASE_URL` | `http://127.0.0.1:4142` |
 | `ANTHROPIC_AUTH_TOKEN` | local placeholder `dummy` |
-| `ANTHROPIC_MODEL` | `claude-sonnet-5[1m]` |
+| `ANTHROPIC_MODEL` | `claude-opus-5-5[1m]` |
+| `ANTHROPIC_DEFAULT_OPUS_MODEL` | `claude-opus-5-5[1m]`; resolves the native Opus alias |
 | `ANTHROPIC_DEFAULT_SONNET_MODEL` | `claude-sonnet-5[1m]` |
 | `ANTHROPIC_DEFAULT_HAIKU_MODEL` | `claude-haiku-4-5-20251001` |
 | `ANTHROPIC_SMALL_FAST_MODEL` | `claude-haiku-4-5-20251001` |
-| `model` | `sonnet`; the picker's own short alias |
-| `modelSettings.claude-sonnet-5.effortLevel` | `high`; Sonnet's saved effort preference |
-| `MODEL_REASONING_EFFORT` | `high`; status-line fallback aligned with the launchers' `--effort high` |
+| `model` | `opus[1m]`; the picker's native alias |
+| `modelSettings.claude-opus-5-5.effortLevel` | `xhigh`; Opus 5.5's saved effort preference |
+| `modelSettings.claude-sonnet-5.effortLevel` | `xhigh`; preserves the locally selected Sonnet preference |
+| `MODEL_REASONING_EFFORT` | `xhigh`; status-line fallback aligned with the launchers' `--effort xhigh` |
 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `16` |
 | `statusLine.refreshInterval` | `100` |
 | `theme` | `custom:apollo`; generated theme assets stay local |
 | `CLAUDE_CODE_TMUX_TRUECOLOR` | `"1"`; skip Claude's tmux 256-color cap |
 | `autoCompactEnabled` | `true` |
-| `autoCompactWindow` | `770000` before the output-token reserve |
-| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"100"`; targets compaction at 750,000 tokens with the default Sonnet output budget |
+| `autoCompactWindow` | `770000`; retained configured window, not a measured trigger |
+| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"100"`; retained percentage override |
 | `feedbackDrafts` | `off` |
 
-`refreshInterval` belongs inside `statusLine`. The saved Sonnet preference is `high`. `MODEL_REASONING_EFFORT` and both launchers use `high`; their explicit `--effort` flags override the saved preference unless you supply another effort flag. No top-level `effortLevel` is managed. `high` is the shared reasoning-effort default for Claude Code and [Copilot CLI](Copilot-CLI.md), not a model name.
+`refreshInterval` belongs inside `statusLine`. Saved Opus and Sonnet preferences use `xhigh`. `MODEL_REASONING_EFFORT` is a status-line fallback, not an API effort control. The launchers pass `--effort xhigh`; an explicit effort on the `claude` command overrides it. No top-level `effortLevel` is managed. [Copilot CLI](Copilot-CLI.md) keeps its separate Astra/`high` defaults.
 
-### 750k automatic-compaction target
+An isolated Claude Code 2.1.281 check verified settings-only, picker-alias, and wrapper launches send `model: claude-opus-5-5` with `output_config.effort: xhigh` and the 1M context beta. An explicit Sonnet/`low` override still wins. The check used a loopback mock, a temporary home, and a macOS sandbox blocking external networking and real-home/keychain access; it was not a paid model call or an upstream capacity test.
 
-The configured window is not the compaction trigger. Claude Code 2.1.261 subtracts its output-token reserve before applying the percentage. With the default native Sonnet output reserve, the selected settings calculate to `(770000 - 20000) × 100% = 750000`.
+### Automatic compaction
 
-This calculation gives an effective window of 750,000 tokens and an expected trigger of 750,000 tokens; it is not a fresh runtime measurement. This is a trigger, not a hard transcript-size cap; a turn can cross it before compaction runs. Other CLI versions, models, output budgets, or `CLAUDE_CODE_AUTO_COMPACT_WINDOW` overrides can change the calculation. Start a new Claude Code session after editing the source settings.
+The configured window is not the compaction trigger. `autoCompactWindow: 770000` and the `100` percentage override are retained. The earlier 750,000-token calculation used Claude Code 2.1.261's Sonnet output reserve; it is not a verified Opus 5.5 threshold. The current offline Opus request allowed 128,000 output tokens, but that request cap alone does not establish the compaction reserve or trigger.
+
+CLI version, model, output budgets, and environment overrides can change when compaction runs. A turn can cross a trigger before compaction starts. Do not treat these settings as a hard transcript-size limit or guaranteed retained history. Start a new Claude Code session after editing the source settings.
 
 `~/.claude/settings.json` and `~/.claude.json` are different files:
 
@@ -111,11 +115,18 @@ After a PR merges, the global rules require local cleanup before the task is cal
 
 ```text
 --permission-mode bypassPermissions
---model claude-sonnet-5[1m]
---effort high
+--model claude-opus-5-5[1m]
+--effort xhigh
 ```
 
 An explicit `--model`, `--model=`, `--effort`, or `--effort=` on the command line suppresses the matching default; the other default still applies.
+
+Open a new shell after installation, or reload both launchers at an idle shell prompt before starting a new Claude session:
+
+```zsh
+source ~/.oh-my-zsh/custom/claude.zsh
+source ~/.oh-my-zsh/custom/cc.zsh
+```
 
 The binary rejects `permissions.defaultMode: bypassPermissions` in settings. The command-line flag works. The wrapper also pins model and effort because Claude Code can rewrite settings at runtime.
 

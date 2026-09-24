@@ -173,6 +173,8 @@ ts            # 保存此 socket 的全部会话，确认后重启并恢复
 
 原生路径不会修改 `PATH`，也不会替换全局 `tmux` 命令。RMUX 的私有 teammate shim 保持独立。CLI 运行时会设置 `DISABLE_AUTO_TITLE`，所以 oh-my-zsh 不会覆盖标题。
 
+`claude` 和 `cc` 默认使用原生 `claude-opus-5-5[1m]` 与 `--effort xhigh`；relay 将其映射到 `claude-opus-5.5`。`gg` 保留独立的 Astra/`high` 默认值。安装后打开新 shell，或按 [Claude Code](Claude-Code-zh-CN.md) 中的步骤重载。
+
 原生 tmux 3.7 使用 `status-keys vi` 时，Esc 切换提示框模式，`C-g` 才是取消。这不修复 RMUX 独立的[提示框问题 #60](https://github.com/D0n9X1n/dot-config/issues/60)。请看[原生按键表](Tmux-Keymap-zh-CN.md)。
 
 ## 检查

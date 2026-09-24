@@ -27,32 +27,32 @@ Claude Code 第一次启动时会问是否允许自定义 `dummy` API key。请�
 受管默认值：
 
 ```text
-Claude 端名称： claude-sonnet-5[1m]
-Picker 名称：    原生 Sonnet 名称
-Sonnet 保存偏好：high
-启动器 effort：  high
-Relay 路由：     gptModel
-上游模型：       gpt-6-astra
+Claude 端名称： claude-opus-5-5[1m]
+Picker 别名：   opus[1m]
+Opus 保存偏好： xhigh
+启动器 effort： xhigh
+Relay 路由：    opusModel
+上游模型：      claude-opus-5.5
 ```
 
-Claude Code 保留原生客户端身份。名称中没有 `opus`，所以 copilot-relay 会把它发送到 `gptModel`。
+Claude Code 保留原生 Opus 5.5 身份。名称包含 `opus`，所以 copilot-relay 会把它发送到 `opusModel`。客户端拼写使用连字符，Copilot 上游 ID 使用小数点，两者不要混用。
 
 其他路由：
 
 | Claude 端名称 | Relay lane | 上游 |
 |---|---|---|
-| `claude-opus-5[1m]` | `opusModel` | `claude-opus-5.5` |
+| `claude-sonnet-5[1m]` | `gptModel` | `gpt-6-astra` |
 | `claude-haiku-4-5-20251001`（Haiku / small-fast） | `gptModel` | `gpt-6-astra` |
 
 客户端名称和上游模型是两层。客户端保留原生 Anthropic ID；上游模型由 relay 决定。不要把 GPT ID 或 `_NAME` / `_DESCRIPTION` 显示覆盖写进 Claude 端设置。
 
-`[1m]` 后缀让 Claude Code 使用一百万 token 的模型 context 计数；relay 向上游发送规范 ID `gpt-6-astra`。Haiku ID 是已安装 CLI 自身的 small-fast ID，不加 `[1m]` 后缀。默认 Sonnet 路径预计在 750,000 tokens 时触发自动压缩，低于 Astra 的 1M 总窗口内公布的 872,000-token prompt 上限。这并不意味着会保留完整的 1M-token 对话历史。Relay 端默认 thinking 在 `config/copilot-relay/config.yaml` 中设为 `medium`；Sonnet 保存的偏好为 `high`，shell 启动器显式请求 `high`。
+`[1m]` 后缀让 Claude Code 使用一百万 token 的 context 计数；relay 向上游发送不带该后缀的规范 ID `claude-opus-5.5`。Haiku 保留已安装 CLI 的 small-fast ID，不加 `[1m]`。Context 计数不保证保留完整的 1M-token 对话历史；自动压缩还取决于模型和输出预算。Claude 保存的 Opus 偏好、启动器和状态栏 effort 回退值都使用 `xhigh`，与 `config/copilot-relay/config.yaml` 中的 relay 回退值一致。
 
-使用本设置前，请先使用支持 GPT-6 Astra 的 relay 构建（见 [copilot-relay issue #57](https://github.com/D0n9X1n/copilot-relay/issues/57)）。修改模型或 effort 默认值时应同时更新 `config/claude/settings.json`、`config/zsh/claude.zsh` 和 `config/zsh/cc.zsh`；wrapper 的 `--model` 和 `--effort` flags 优先于设置文件。Relay 的 `gptModel` 不带后缀，空白的 `webSearchBackend` 也使用 Astra。Opus 路由保持独立。
+Claude Code 2.1.281 能识别原生 Opus 5.5 身份。修改模型和 effort 默认值时应同时更新 `config/claude/settings.json`、`config/zsh/claude.zsh` 和 `config/zsh/cc.zsh`；wrapper 的 `--model` 和 `--effort` flags 优先于保存的设置。Relay 的 `thinkEffort` 也应保持一致，作为未指定 effort 的请求回退值。独立的 `gptModel` 仍为 `gpt-6-astra`，空白的 `webSearchBackend` 仍使用 Astra。
 
 切换模型前，运行 `copilot` 并输入 `/model`，检查账号可用性和 effort 选项。这是 Copilot 的选择器，不是 Claude Code 的选择器，也不是 relay 本地的 `/v1/models`。`scripts/check.sh all` 通过后，运行两次 `./install.sh` 应用配置，再启动新的 shell 和 Claude Code 会话。安装器会保留健康的 relay 进程；恢复不健康的 relay 时可能中断请求。
 
-Sonnet-facing 槽位通过 `gptModel` 路由到 GPT-6 Astra；Opus 仍使用独立的 `opusModel` 路由。仅升级 Opus 时，设置 `opusModel: claude-opus-5.5`，不加 `[1m]`；配置会热重载，无需重启 relay。客户端名称、启动默认值、effort 和 Astra WebSearch 后端保持不变。任务只要求修改一条路由时，不要同时修改两条。
+只修改 `opusModel` 不会让启动时选用 Opus。现在 `ANTHROPIC_MODEL`、保存的 `opus[1m]` 选择、`ANTHROPIC_DEFAULT_OPUS_MODEL` 和两个启动器都指向原生 Opus 5.5。Sonnet 与 Haiku 保留独立的 Astra 路由，不要把这些身份重映射到 Opus。Relay 路由和 effort 修改会热重载，无需重启。
 
 [上游 Opus 5.5 验证](https://github.com/D0n9X1n/copilot-relay/issues/81)确认自动工具调用可用，但强制指定 `tool_choice` 为 `tool` 或 `any` 会返回 HTTP 400。Relay 保留该错误，不会静默改成自动选择。
 
@@ -64,29 +64,33 @@ Sonnet-facing 槽位通过 `gptModel` 路由到 GPT-6 Astra；Opus 仍使用独�
 |---|---|
 | `ANTHROPIC_BASE_URL` | `http://127.0.0.1:4142` |
 | `ANTHROPIC_AUTH_TOKEN` | 本机占位符 `dummy` |
-| `ANTHROPIC_MODEL` | `claude-sonnet-5[1m]` |
+| `ANTHROPIC_MODEL` | `claude-opus-5-5[1m]` |
+| `ANTHROPIC_DEFAULT_OPUS_MODEL` | `claude-opus-5-5[1m]`；解析原生 Opus 别名 |
 | `ANTHROPIC_DEFAULT_SONNET_MODEL` | `claude-sonnet-5[1m]` |
 | `ANTHROPIC_DEFAULT_HAIKU_MODEL` | `claude-haiku-4-5-20251001` |
 | `ANTHROPIC_SMALL_FAST_MODEL` | `claude-haiku-4-5-20251001` |
-| `model` | `sonnet`；选择器自身的短别名 |
-| `modelSettings.claude-sonnet-5.effortLevel` | `high`；Sonnet 保存的 effort 偏好 |
-| `MODEL_REASONING_EFFORT` | `high`；状态栏回退值与启动器的 `--effort high` 保持一致 |
+| `model` | `opus[1m]`；选择器的原生别名 |
+| `modelSettings.claude-opus-5-5.effortLevel` | `xhigh`；Opus 5.5 保存的 effort 偏好 |
+| `modelSettings.claude-sonnet-5.effortLevel` | `xhigh`；保留本机选择的 Sonnet 偏好 |
+| `MODEL_REASONING_EFFORT` | `xhigh`；状态栏回退值与启动器的 `--effort xhigh` 保持一致 |
 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `16` |
 | `statusLine.refreshInterval` | `100` |
 | `theme` | `custom:apollo`；生成的主题资源仍保留在本机 |
 | `CLAUDE_CODE_TMUX_TRUECOLOR` | `"1"`；跳过 Claude 的 tmux 256 色限制 |
 | `autoCompactEnabled` | `true` |
-| `autoCompactWindow` | `770000`，尚未扣除输出 token 预留量 |
-| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"100"`；默认 Sonnet 输出预算下，目标是在 750,000 tokens 时触发压缩 |
+| `autoCompactWindow` | `770000`；保留的配置窗口，不是实测触发阈值 |
+| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"100"`；保留的百分比覆盖值 |
 | `feedbackDrafts` | `off` |
 
-`refreshInterval` 必须放在 `statusLine` 里面。Sonnet 保存的偏好为 `high`。`MODEL_REASONING_EFFORT` 和两个启动器均为 `high`；除非显式提供其他 effort flag，否则启动器的 `--effort` 会覆盖保存的偏好。不管理顶层 `effortLevel`。`high` 是 Claude Code 和 [Copilot CLI](Copilot-CLI-zh-CN.md) 共同的默认推理强度，不是模型名称。
+`refreshInterval` 必须放在 `statusLine` 里面。保存的 Opus 与 Sonnet 偏好都使用 `xhigh`。`MODEL_REASONING_EFFORT` 是状态栏回退值，不控制 API effort。启动器传入 `--effort xhigh`；`claude` 命令上显式指定的 effort 会覆盖它。不管理顶层 `effortLevel`。[Copilot CLI](Copilot-CLI-zh-CN.md) 保留独立的 Astra/`high` 默认值。
 
-### 750k 自动压缩目标
+独立的 Claude Code 2.1.281 检查验证了仅使用设置、picker 别名和 wrapper 启动时，请求均发送 `model: claude-opus-5-5`、`output_config.effort: xhigh` 和 1M context beta。显式指定 Sonnet/`low` 仍优先。检查使用回环 mock、临时 home 和 macOS sandbox，阻止外部网络及真实 home/keychain 访问；没有付费模型调用，也不是上游容量测试。
 
-配置的窗口不等于压缩触发阈值。Claude Code 2.1.261 先扣除输出 token 预留量，再应用百分比。使用默认原生 Sonnet 输出预留量时，所选设置的计算结果为 `(770000 - 20000) × 100% = 750000`。
+### 自动压缩
 
-按此计算，有效窗口为 750,000 tokens，预期触发阈值为 750,000 tokens；这不是新的运行时测量结果。这是触发阈值，不是对话大小的硬上限；某一轮可能先越过阈值，再执行压缩。其他 CLI 版本、模型、输出预算或 `CLAUDE_CODE_AUTO_COMPACT_WINDOW` 覆盖值可能改变计算结果。编辑源设置后请启动新的 Claude Code 会话。
+配置窗口不等于压缩触发阈值。`autoCompactWindow: 770000` 和 `100` 百分比覆盖值保持不变。之前的 750,000-token 计算使用 Claude Code 2.1.261 的 Sonnet 输出预留量，不是已验证的 Opus 5.5 阈值。当前离线 Opus 请求允许 128,000 输出 tokens，但单凭请求上限不能确定压缩预留量或触发点。
+
+CLI 版本、模型、输出预算和环境覆盖都可能改变压缩时机；某一轮可能先越过触发点再开始压缩。不要把这些设置当作对话大小硬上限或历史保留保证。编辑源设置后请启动新的 Claude Code 会话。
 
 `~/.claude/settings.json` 和 `~/.claude.json` 是不同文件：
 
@@ -111,11 +115,18 @@ PR 合并后，全局规则要求先完成本机清理，再宣布任务完成�
 
 ```text
 --permission-mode bypassPermissions
---model claude-sonnet-5[1m]
---effort high
+--model claude-opus-5-5[1m]
+--effort xhigh
 ```
 
 命令行上显式给出 `--model`、`--model=`、`--effort` 或 `--effort=` 时，对应的默认值不再注入；另一个默认值仍然生效。
+
+安装后打开新 shell，或在空闲 shell 提示符中重新加载两个启动器，再启动新的 Claude 会话：
+
+```zsh
+source ~/.oh-my-zsh/custom/claude.zsh
+source ~/.oh-my-zsh/custom/cc.zsh
+```
 
 二进制会拒绝 settings 中的 `permissions.defaultMode: bypassPermissions`。命令行 flag 可以工作。Claude Code 可能在运行时重写 settings，所以 wrapper 也固定模型和 effort。
 
