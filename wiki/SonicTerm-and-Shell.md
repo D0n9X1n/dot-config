@@ -70,6 +70,7 @@ Files under `config/zsh/` install into `~/.oh-my-zsh/custom/`. Oh-my-zsh loads t
 | File | Work |
 |---|---|
 | `custom.zsh` | eza/Base16 paths, aliases, proxy helpers, completions, SDK paths |
+| `terminal-keys.zsh` | Exact terminal key sequences for ZLE prompt editing |
 | `themes/apollo.zsh-theme` | Prompt structure; sources locally generated Apollo colors |
 | `claude.zsh` | Claude wrapper and pinned launch flags |
 | `cc.zsh` | titled Claude launch |
@@ -77,6 +78,18 @@ Files under `config/zsh/` install into `~/.oh-my-zsh/custom/`. Oh-my-zsh loads t
 | `gg.zsh` | titled, allow-all Copilot launch |
 | `zz-rmux.zsh` | RMUX helpers and the shared safe-detach dispatcher; loads late |
 | `zz-tmux.zsh` | Native tmux session helpers and interactive `tr` dispatch |
+
+## Command-Backspace at the prompt
+
+`terminal-keys.zsh` binds SonicTerm's default Cmd+Backspace sequence, `ESC [ 127 ; 9 u`, to ZLE's built-in `backward-kill-line` in the `emacs` and `viins` keymaps. It deletes from the cursor back to the beginning of the current logical line and preserves text after the cursor. It does not switch your editing mode, change Ctrl+U / Option+Backspace / Ctrl+Backspace, or alter keys delivered to Vim, less, tmux, or RMUX.
+
+Open a new terminal tab after installation. To apply only this binding to an existing zsh prompt, run:
+
+```zsh
+source ~/.oh-my-zsh/custom/terminal-keys.zsh
+```
+
+This is a shell binding, not a SonicTerm encoder change or a fix for a multiplexer rename prompt. It covers the reported default terminal modes; DECBKM or modifyOtherKeys can produce different sequences. The regression uses a private real ZLE/PTY with mid-line, empty, Unicode and multiline buffers; it does not synthesize physical keyboard events.
 
 ## Small aliases
 
