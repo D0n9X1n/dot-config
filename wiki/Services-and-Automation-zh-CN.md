@@ -65,15 +65,15 @@ http://127.0.0.1:4142
 
 ```yaml
 claudeSetup: false
-thinkEffort: medium
+thinkEffort: xhigh
 upstreamTimeoutSeconds: 600
 gptModel: gpt-6-astra
 opusModel: claude-opus-5.5
 ```
 
-`opusModel` 使用规范上游 ID，不加 `[1m]`。修改后会热重载，无需重启 relay；非 Opus 路由和 Claude 启动默认值仍使用 Astra。Opus 工具选择限制见 [Claude Code](Claude-Code-zh-CN.md)。
+`opusModel` 使用规范上游 ID，不加 `[1m]`。Claude 以原生 `claude-opus-5-5[1m]` 启动，路由到 Opus 5.5。Sonnet/Haiku 请求及空白 WebSearch 后端仍使用 Astra。Opus 工具选择限制见 [Claude Code](Claude-Code-zh-CN.md)。
 
-`claudeSetup: false` 会阻止 relay 重写链接的 Claude settings。Relay 对未指定 effort 的请求仍回退到 `medium`。Claude 保存的 Sonnet 偏好和启动器使用 `high`，Copilot CLI 设置及 `gg` 启动器也使用 `high`；客户端显式指定的 effort 优先于 relay 回退值。`upstreamTimeoutSeconds: 600` 允许单个 Claude 请求的上游 Copilot 调用最多等待十分钟。
+`claudeSetup: false` 会阻止 relay 重写链接的 Claude settings。Relay 的 `thinkEffort` 回退值与 Claude 保存的 Opus 偏好、启动器和状态栏回退值都使用 `xhigh`；客户端显式指定的 effort 仍优先。Copilot CLI 和 `gg` 保留独立的 Astra/`high` 默认值。模型路由和 relay effort 会热重载，无需重启；已有 shell 需要重新加载 Claude 启动器或打开新 shell。`upstreamTimeoutSeconds: 600` 允许单个 Claude 请求的上游 Copilot 调用最多等待十分钟。
 
 登录一次：
 

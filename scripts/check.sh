@@ -185,12 +185,16 @@ SH
 
 run_model_default_smoke() {
   jq -e '
-    .env.ANTHROPIC_MODEL == "claude-sonnet-5[1m]" and
-    .model == "sonnet" and
+    .env.ANTHROPIC_MODEL == "claude-opus-5-5[1m]" and
+    .model == "opus[1m]" and
     (has("effortLevel") | not) and
-    .env.MODEL_REASONING_EFFORT == "high" and
-    .modelSettings["claude-sonnet-5"].effortLevel == "high" and
+    .env.MODEL_REASONING_EFFORT == "xhigh" and
+    .modelSettings["claude-opus-5-5"].effortLevel == "xhigh" and
+    .modelSettings["claude-sonnet-5"].effortLevel == "xhigh" and
+    .env.ANTHROPIC_DEFAULT_OPUS_MODEL == "claude-opus-5-5[1m]" and
     .env.ANTHROPIC_DEFAULT_SONNET_MODEL == "claude-sonnet-5[1m]" and
+    (.env | has("ANTHROPIC_DEFAULT_OPUS_MODEL_NAME") | not) and
+    (.env | has("ANTHROPIC_DEFAULT_OPUS_MODEL_DESCRIPTION") | not) and
     (.env | has("ANTHROPIC_DEFAULT_SONNET_MODEL_NAME") | not) and
     (.env | has("ANTHROPIC_DEFAULT_SONNET_MODEL_DESCRIPTION") | not) and
     .env.ANTHROPIC_DEFAULT_HAIKU_MODEL == "claude-haiku-4-5-20251001" and
@@ -200,7 +204,6 @@ run_model_default_smoke() {
     .autoCompactEnabled == true and
     .autoCompactWindow == 770000 and
     .env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE == "100" and
-    ((.autoCompactWindow - 20000) * (.env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE | tonumber) / 100) == 750000 and
     .feedbackDrafts == "off" and
     .skipDangerousModePermissionPrompt == true and
     .skipAutoPermissionPrompt == true and
@@ -232,15 +235,15 @@ run_model_default_smoke() {
   # Relay: Opus remains separate; every non-Opus route uses GPT-6 Astra.
   grep -Eq '^opusModel:[[:space:]]*claude-opus-5\.5$' config/copilot-relay/config.yaml
   grep -Eq '^gptModel:[[:space:]]*gpt-6-astra$' config/copilot-relay/config.yaml
-  grep -Eq '^thinkEffort:[[:space:]]*medium$' config/copilot-relay/config.yaml
+  grep -Eq '^thinkEffort:[[:space:]]*xhigh$' config/copilot-relay/config.yaml
   grep -Eq '^upstreamTimeoutSeconds:[[:space:]]*600$' config/copilot-relay/config.yaml
 
   grep -Fq $'link\tconfig/copilot-relay/config.yaml\t.copilot-relay/config.yaml' config/manifest.tsv
 
   # Launcher wrappers inject the same defaults (settings.json can be rewritten
   # at runtime, so the flags are the authoritative per-launch pin).
-  grep -Fq -- "--model 'claude-sonnet-5[1m]'" config/zsh/claude.zsh
-  grep -Fq -- "--model 'claude-sonnet-5[1m]' --effort high" config/zsh/cc.zsh
+  grep -Fq -- "--model 'claude-opus-5-5[1m]'" config/zsh/claude.zsh
+  grep -Fq -- "--model 'claude-opus-5-5[1m]' --effort xhigh" config/zsh/cc.zsh
   grep -Fq -- "--model gpt-6-astra --context long_context --effort high" config/zsh/gg.zsh
   if grep -Fq 'gpt-6-astra' config/zsh/claude.zsh config/zsh/cc.zsh; then
     echo "Claude launchers must not pin a GPT model id" >&2
@@ -265,12 +268,12 @@ SH
       zsh -c 'source config/zsh/claude.zsh; claude'
     args="$(sed -n '1p' "$capture")"
     case "$args" in
-      *"--model claude-sonnet-5[1m]"*) : ;;
-      *) echo "claude wrapper default lost the native Sonnet pin: $args" >&2; exit 1 ;;
+      *"--model claude-opus-5-5[1m]"*) : ;;
+      *) echo "claude wrapper default lost the native Opus pin: $args" >&2; exit 1 ;;
     esac
     case "$args" in
-      *'--effort high'*) : ;;
-      *) echo "claude wrapper default lost --effort high: $args" >&2; exit 1 ;;
+      *'--effort xhigh'*) : ;;
+      *) echo "claude wrapper default lost --effort xhigh: $args" >&2; exit 1 ;;
     esac
     case "$args" in
       *'--permission-mode bypassPermissions'*) : ;;
@@ -279,33 +282,35 @@ SH
 
     : >"$capture"
     PATH="$fake_bin:$PATH" CLAUDE_CAPTURE="$capture" \
-      zsh -c 'source config/zsh/claude.zsh; claude --model opus'
+      zsh -c 'source config/zsh/claude.zsh; claude --model sonnet'
     args="$(sed -n '1p' "$capture")"
-    case "$args" in
-      *'claude-sonnet-5'*) echo "explicit --model was overridden: $args" >&2; exit 1 ;;
-    esac
+    if [ "$args" != "--permission-mode bypassPermissions --effort xhigh --model sonnet" ]; then
+      echo "explicit --model was overridden or dropped the effort default: $args" >&2
+      exit 1
+    fi
 
     : >"$capture"
     PATH="$fake_bin:$PATH" CLAUDE_CAPTURE="$capture" \
-      zsh -c 'source config/zsh/claude.zsh; claude --model=opus'
+      zsh -c 'source config/zsh/claude.zsh; claude --model=sonnet'
     args="$(sed -n '1p' "$capture")"
-    case "$args" in
-      *'claude-sonnet-5'*) echo "explicit --model= was overridden: $args" >&2; exit 1 ;;
-    esac
+    if [ "$args" != "--permission-mode bypassPermissions --effort xhigh --model=sonnet" ]; then
+      echo "explicit --model= was overridden or dropped the effort default: $args" >&2
+      exit 1
+    fi
 
     : >"$capture"
     PATH="$fake_bin:$PATH" CLAUDE_CAPTURE="$capture" \
       zsh -c 'source config/zsh/claude.zsh; claude --effort low'
     args="$(sed -n '1p' "$capture")"
     case "$args" in
-      *'--effort high'*) echo "explicit --effort was overridden: $args" >&2; exit 1 ;;
+      *'--effort xhigh'*) echo "explicit --effort was overridden: $args" >&2; exit 1 ;;
     esac
     case "$args" in
       *'--effort low'*) : ;;
       *) echo "explicit --effort was not forwarded: $args" >&2; exit 1 ;;
     esac
     case "$args" in
-      *"--model claude-sonnet-5[1m]"*) : ;;
+      *"--model claude-opus-5-5[1m]"*) : ;;
       *) echo "explicit --effort dropped the model default: $args" >&2; exit 1 ;;
     esac
 
@@ -313,8 +318,17 @@ SH
     PATH="$fake_bin:$PATH" CLAUDE_CAPTURE="$capture" \
       zsh -c 'source config/zsh/claude.zsh; claude --effort=high'
     args="$(sed -n '1p' "$capture")"
-    if [ "$args" != "--permission-mode bypassPermissions --model claude-sonnet-5[1m] --effort=high" ]; then
+    if [ "$args" != "--permission-mode bypassPermissions --model claude-opus-5-5[1m] --effort=high" ]; then
       echo "explicit --effort= was overridden or dropped other defaults: $args" >&2
+      exit 1
+    fi
+
+    : >"$capture"
+    PATH="$fake_bin:$PATH" CLAUDE_CAPTURE="$capture" \
+      zsh -c 'source config/zsh/claude.zsh; claude --model sonnet --effort low --resume smoke-session'
+    args="$(sed -n '1p' "$capture")"
+    if [ "$args" != "--permission-mode bypassPermissions --model sonnet --effort low --resume smoke-session" ]; then
+      echo "explicit model/effort or remaining arguments were changed: $args" >&2
       exit 1
     fi
 
@@ -322,13 +336,13 @@ SH
     PATH="$fake_bin:$PATH" CLAUDE_CAPTURE="$capture" \
       zsh -c 'unset RMUX TMUX WEZTERM_PANE; source config/zsh/cc.zsh; cc model-smoke >/dev/null'
     args="$(sed -n '1p' "$capture")"
-    if [ "$args" != "--permission-mode bypassPermissions --model claude-sonnet-5[1m] --effort high" ]; then
-      echo "cc launcher lost the native model, high effort, or permission default: $args" >&2
+    if [ "$args" != "--permission-mode bypassPermissions --model claude-opus-5-5[1m] --effort xhigh" ]; then
+      echo "cc launcher lost the native model, xhigh effort, or permission default: $args" >&2
       exit 1
     fi
   )
 
-  echo "model defaults ok: native Sonnet/Haiku client ids, relay maps non-Opus to GPT-6 Astra and Opus to claude-opus-5.5"
+  echo "model defaults ok: native Opus 5.5 at xhigh; Sonnet/Haiku and Copilot retain their separate Astra routes"
 }
 
 run_mcp_default_smoke() {
@@ -455,6 +469,8 @@ run_global_instructions_smoke() {
     grep -Fq 'root README' "$file"
     grep -Fq 'globally synced' "$file"
     grep -Fq 'repo-only' "$file"
+    grep -Fq 'claude-opus-5-5[1m]' "$file"
+    grep -Fq 'xhigh' "$file"
     grep -Fq 'claude-sonnet-5' "$file"
     grep -Fq 'claude-haiku-4-5-20251001' "$file"
     grep -Fq 'gptModel' "$file"

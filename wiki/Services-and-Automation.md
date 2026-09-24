@@ -65,15 +65,15 @@ Important values:
 
 ```yaml
 claudeSetup: false
-thinkEffort: medium
+thinkEffort: xhigh
 upstreamTimeoutSeconds: 600
 gptModel: gpt-6-astra
 opusModel: claude-opus-5.5
 ```
 
-`opusModel` uses the canonical upstream ID without `[1m]`. Its change hot-reloads without restarting the relay; non-Opus routing and Claude startup defaults stay on Astra. See [Claude Code](Claude-Code.md) for the Opus tool-selection limit.
+`opusModel` uses the canonical upstream ID without `[1m]`. Claude starts with native `claude-opus-5-5[1m]` and routes to Opus 5.5. Sonnet/Haiku requests and the blank WebSearch backend still use Astra. See [Claude Code](Claude-Code.md) for the Opus tool-selection limit.
 
-`claudeSetup: false` stops the relay from rewriting the linked Claude settings. The relay fallback remains `medium` for requests that omit effort. Claude's saved Sonnet preference and launchers use `high`, as do Copilot CLI's settings and `gg` launcher; explicit client effort takes precedence over the relay fallback. `upstreamTimeoutSeconds: 600` allows up to ten minutes for a single Claude request's upstream Copilot calls.
+`claudeSetup: false` stops the relay from rewriting the linked Claude settings. The relay's `thinkEffort` fallback and Claude's saved Opus preference, launchers, and status-line fallback use `xhigh`. Explicit client effort still takes precedence. Copilot CLI and `gg` retain their separate Astra/`high` defaults. Model routes and relay effort hot-reload without a restart; existing shells need their Claude launchers reloaded or a new shell. `upstreamTimeoutSeconds: 600` allows up to ten minutes for a single Claude request's upstream Copilot calls.
 
 Login once:
 

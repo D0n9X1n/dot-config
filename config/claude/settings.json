@@ -2,11 +2,12 @@
   "env": {
     "ANTHROPIC_BASE_URL": "http://127.0.0.1:4142",
     "ANTHROPIC_AUTH_TOKEN": "dummy",
-    "ANTHROPIC_MODEL": "claude-sonnet-5[1m]",
+    "ANTHROPIC_MODEL": "claude-opus-5-5[1m]",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5-5[1m]",
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5[1m]",
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4-5-20251001",
     "ANTHROPIC_SMALL_FAST_MODEL": "claude-haiku-4-5-20251001",
-    "MODEL_REASONING_EFFORT": "high",
+    "MODEL_REASONING_EFFORT": "xhigh",
     "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "100",
     "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": "16",
     "CLAUDE_CODE_TMUX_TRUECOLOR": "1"
@@ -15,7 +16,7 @@
     "allow": [],
     "defaultMode": "auto"
   },
-  "model": "sonnet",
+  "model": "opus[1m]",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
@@ -40,7 +41,10 @@
   "feedbackDrafts": "off",
   "modelSettings": {
     "claude-sonnet-5": {
-      "effortLevel": "high"
+      "effortLevel": "xhigh"
+    },
+    "claude-opus-5-5": {
+      "effortLevel": "xhigh"
     }
   },
   "autoCompactWindow": 770000,

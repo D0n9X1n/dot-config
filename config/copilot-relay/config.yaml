@@ -25,7 +25,7 @@ logLevel: info
 logRetentionDays: 3
 
 # Fallback effort when the request omits it: low, medium, high, xhigh, max.
-thinkEffort: medium
+thinkEffort: xhigh
 
 # Max seconds for one request's upstream calls; 0 disables the relay deadline.
 upstreamTimeoutSeconds: 600
