@@ -70,6 +70,7 @@ RMUX 配置会明确保留条件式鼠标 bindings。Copilot 等支持鼠标的�
 | 文件 | 作用 |
 |---|---|
 | `custom.zsh` | eza/Base16 路径、aliases、proxy 助手、补全、SDK 路径 |
+| `terminal-keys.zsh` | ZLE 提示符编辑使用的精确终端按键序列 |
 | `themes/apollo.zsh-theme` | Prompt 结构；读取本机生成的 Apollo 颜色 |
 | `claude.zsh` | Claude wrapper 和固定启动 flags |
 | `cc.zsh` | 带标题的 Claude 启动器 |
@@ -77,6 +78,18 @@ RMUX 配置会明确保留条件式鼠标 bindings。Copilot 等支持鼠标的�
 | `gg.zsh` | 带标题、allow-all 的 Copilot 启动器 |
 | `zz-rmux.zsh` | RMUX 助手和共享安全分离分派器；较晚加载 |
 | `zz-tmux.zsh` | 原生 tmux 会话助手和交互式 `tr` 分派 |
+
+## 提示符中的 Command-Backspace
+
+`terminal-keys.zsh` 在 `emacs` 和 `viins` keymap 中，将 SonicTerm 默认的 Cmd+Backspace 序列 `ESC [ 127 ; 9 u` 绑定到 ZLE 内置的 `backward-kill-line`。它删除光标到当前逻辑行开头之间的文字，并保留光标右侧的内容。它不会切换编辑模式、修改 Ctrl+U / Option+Backspace / Ctrl+Backspace，也不会改变传给 Vim、less、tmux 或 RMUX 的按键。
+
+安装后打开新终端标签页即可生效。若只想在已有 zsh 提示符中应用这项绑定，请运行：
+
+```zsh
+source ~/.oh-my-zsh/custom/terminal-keys.zsh
+```
+
+这是 shell 绑定，不是 SonicTerm 编码器修改，也不修复复用器的重命名提示框。它覆盖已报告的默认终端模式；DECBKM 或 modifyOtherKeys 可能产生不同序列。回归测试使用独立的真实 ZLE/PTY，覆盖行中光标、空内容、Unicode 和多行缓冲区，不模拟物理键盘事件。
 
 ## 小 aliases
 

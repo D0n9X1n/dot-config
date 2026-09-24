@@ -1878,6 +1878,7 @@ run_smoke() {
   run_statusline_smoke
   bash -n install.sh
   run_zsh_syntax
+  python3 -B scripts/test-terminal-keys.py
   run_structure_smoke
   run_manifest_smoke
   run_launchd_template_smoke

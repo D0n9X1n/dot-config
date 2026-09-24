@@ -20,6 +20,7 @@ link	config/zsh/claude.zsh	.oh-my-zsh/custom/claude.zsh
 link	config/zsh/copilot.zsh	.oh-my-zsh/custom/copilot.zsh
 link	config/zsh/custom.zsh	.oh-my-zsh/custom/custom.zsh
 link	config/zsh/gg.zsh	.oh-my-zsh/custom/gg.zsh
+link	config/zsh/terminal-keys.zsh	.oh-my-zsh/custom/terminal-keys.zsh
 link	config/zsh/zz-rmux.zsh	.oh-my-zsh/custom/zz-rmux.zsh
 link	config/zsh/zz-tmux.zsh	.oh-my-zsh/custom/zz-tmux.zsh
 link	scripts/rmux/rmux-store	.local/bin/rmux-store
