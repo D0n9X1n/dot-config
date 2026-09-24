@@ -41,7 +41,7 @@ Other routes:
 
 | Claude-facing name | Relay lane | Upstream |
 |---|---|---|
-| `claude-opus-5[1m]` | `opusModel` | `claude-opus-5` |
+| `claude-opus-5[1m]` | `opusModel` | `claude-opus-5.5` |
 | `claude-haiku-4-5-20251001` (Haiku / small-fast) | `gptModel` | `gpt-6-astra` |
 
 Client names and upstream models are separate layers. The client keeps native Anthropic ids; the relay decides the upstream model. Do not write a GPT id, or a `_NAME` / `_DESCRIPTION` display override, into Claude-facing settings.
@@ -52,7 +52,9 @@ Use a relay build with GPT-6 Astra support before relying on this setup (tracked
 
 Run `copilot` and enter `/model` to check account availability and effort choices before changing models. That is Copilot's picker, not Claude Code's picker or the relay's local `/v1/models`. After `scripts/check.sh all` passes, apply through `./install.sh` twice and start a new shell and Claude Code session. The installer leaves a healthy relay running; recovery of an unhealthy relay may interrupt requests.
 
-The Sonnet-facing slot routes to GPT-6 Astra through `gptModel`; Opus stays on its separate `opusModel` route. Do not change both routes when a task names only one.
+The Sonnet-facing slot routes to GPT-6 Astra through `gptModel`; Opus stays on its separate `opusModel` route. The Opus-only upgrade sets `opusModel: claude-opus-5.5`, without `[1m]`, and hot-reloads without a relay restart. Client names, startup defaults, effort, and the Astra WebSearch backend stay unchanged. Do not change both routes when a task names only one.
+
+[Upstream Opus 5.5 verification](https://github.com/D0n9X1n/copilot-relay/issues/81) found that automatic tool use works, but forced `tool_choice` values `tool` and `any` return HTTP 400. The relay preserves that error instead of silently switching to automatic selection.
 
 ## Main settings
 

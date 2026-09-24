@@ -23,7 +23,7 @@ Tool-required files stay at fixed paths: `.claude/CLAUDE.md`, `.github/copilot-i
 
 Keep native client names. Claude Code uses `claude-sonnet-5[1m]` and `claude-haiku-4-5-20251001`.
 
-The relay maps every non-Opus route through `gptModel` to `gpt-6-astra`. Opus stays separate as `claude-opus-5`.
+The relay maps every non-Opus route through `gptModel` to `gpt-6-astra`. Opus stays separate as `claude-opus-5.5`.
 
 Do not replace a client identity with GPT. Never put a GPT id or a display override name back into Claude settings. Keep Sonnet and Opus model families separate.
 

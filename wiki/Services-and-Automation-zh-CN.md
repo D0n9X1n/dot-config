@@ -68,8 +68,10 @@ claudeSetup: false
 thinkEffort: medium
 upstreamTimeoutSeconds: 600
 gptModel: gpt-6-astra
-opusModel: claude-opus-5
+opusModel: claude-opus-5.5
 ```
+
+`opusModel` 使用规范上游 ID，不加 `[1m]`。修改后会热重载，无需重启 relay；非 Opus 路由和 Claude 启动默认值仍使用 Astra。Opus 工具选择限制见 [Claude Code](Claude-Code-zh-CN.md)。
 
 `claudeSetup: false` 会阻止 relay 重写链接的 Claude settings。Relay 对未指定 effort 的请求仍回退到 `medium`。Claude 保存的 Sonnet 偏好和启动器使用 `high`，Copilot CLI 设置及 `gg` 启动器也使用 `high`；客户端显式指定的 effort 优先于 relay 回退值。`upstreamTimeoutSeconds: 600` 允许单个 Claude 请求的上游 Copilot 调用最多等待十分钟。
 
