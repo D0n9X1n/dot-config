@@ -12,7 +12,7 @@ cd ~/Public/dot-configs
 ./install.sh
 ```
 
-The script can install Homebrew, native tmux, RMUX, Claude Code, Copilot CLI, copilot-relay, shell tools, fonts, and oh-my-zsh. It downloads and verifies the pinned Apollo theme releases, builds local adapters, then links the files listed in `config/manifest.tsv`.
+The script can install Homebrew, native tmux, Claude Code, Copilot CLI, copilot-relay, shell tools, fonts, and oh-my-zsh. It downloads and verifies the pinned Apollo theme releases, builds local adapters, then links the files listed in `config/manifest.tsv`.
 
 Native tmux and RMUX run side by side with the same Apollo theme and status style. They have separate sessions and state. The native profile targets tmux 3.7, already installed on this Mac.
 
@@ -55,9 +55,9 @@ tr main          # interactive shortcut for tt main
 tl               # list native tmux sessions; never start a server
 td main          # delete exact native tmux session main
 th               # native tmux help
-rr main          # create or resume RMUX session main
-rl               # list RMUX sessions
-rd main          # delete RMUX session main
+rr main          # same as tt main on macOS/Linux; RMUX on Windows
+rl               # same as tl on macOS/Linux
+rd main          # same as td main on macOS/Linux
 claude           # start Claude Code
 cc my-project    # start Claude Code with a window title
 copilot          # start Copilot CLI
@@ -80,7 +80,7 @@ Inside native tmux or RMUX, these actions detach and keep the session alive:
 
 Ctrl+D with text keeps normal editing behavior. Outside both engines, shell exit behavior is unchanged.
 
-Use `td <name>` for native tmux deletion and `rd <name>` for RMUX. Detach is not a backup: either engine loses its live sessions when its server stops or the Mac reboots. `ts` and `rs` are manual, confirmed all-session restarts that restore only workspace layout as fresh shells. They do not restore running programs or history. Never run them automatically.
+Use `td <name>` to delete a native tmux session. On macOS and Linux, `rd <name>` does the same; on Windows it deletes an RMUX session. Detach is not a backup: either engine loses its live sessions when its server stops or the Mac reboots. `ts` and `rs` are manual, confirmed all-session restarts that restore only workspace layout as fresh shells. They do not restore running programs or history. Never run them automatically.
 
 See [Tmux](Tmux.md), the [native tmux keymap](Tmux-Keymap.md), [RMUX](RMUX.md), and the [RMUX keymap](RMUX-Keymap.md).
 

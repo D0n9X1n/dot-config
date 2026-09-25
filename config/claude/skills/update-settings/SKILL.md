@@ -65,6 +65,7 @@ Do not change both families when the task names one.
 
 ### Multiplexers and terminal identity
 
+- Platform rule: Windows uses RMUX; macOS and Linux use native tmux. There, `rr`/`rl`/`rd`/`rh`/`rs` run `tt`/`tl`/`td`/`th`/`ts`, and no `rmux` function exists. Do not add `rmux` back to the macOS installer.
 - Read `wiki/Tmux.md` for native tmux and `wiki/RMUX.md` for RMUX. Their configs, sockets, and state stay separate; Apollo theme and status style stay aligned.
 - RMUX config uses tmux command syntax but remains native RMUX config. Keep `~/.rmux.conf` separate from the active `~/.tmux.conf`.
 - Test each engine with a unique `-L` socket. Never test against a live user server.
@@ -72,12 +73,12 @@ Do not change both families when the task names one.
 - SonicTerm uses `TERM_PROGRAM=SonicTerm`; RMUX panes use `TERM_PROGRAM=rmux`; native tmux panes keep `TERM_PROGRAM=tmux`.
 - Only Copilot children get the WezTerm compatibility name.
 - `cc`/`gg` check RMUX first. Native tmux renames go through `tmux-store` on the current socket, without changing `PATH`. Keep RMUX's private teammate shim unchanged.
-- `rr` attaches when a session exists and creates only when absent. Keep `rr`/`rl`/`rd`/`rh`/`rs` behavior unchanged.
+- On Windows, `rr` attaches when a session exists and creates only when absent. Keep the Windows `rr`/`rl`/`rd`/`rh`/`rs` RMUX behavior unchanged.
 - `tt` and interactive `tr NAME` attach to an exact native session or create it. `tr` sends only one non-option argument there; other forms and `command tr` use the text utility.
 - `tt`/`tr` start a new server detached and verify parent PID 1 before attaching. Reuse existing servers without restart or forced reparenting.
 - `tt` refuses attachment inside RMUX. Detach first. New tabs never auto-attach.
 - The one `exit`/`logout`/Ctrl+D dispatcher checks RMUX first, then native tmux. Empty-prompt Ctrl+D detaches; nonempty Ctrl+D keeps normal ZLE behavior.
-- `tl` lists without starting a server. `td` deletes an exact native session; `rd` is RMUX's destructive session command.
+- `tl` lists without starting a server. `td` deletes an exact native session; `rd` does the same on macOS/Linux and is RMUX's destructive session command on Windows.
 - `ts` needs a stable valid snapshot, compatible binaries, successful preflight, and interactive `yes`. It restarts all sessions on the selected native socket as fresh shells, restoring workspace layout only. No process replay, history, or autosave.
 - RMUX retains its client/daemon pair. Native tmux references a compatible Homebrew executable, without binary relocation or a guarantee against arbitrary dependency cleanup.
 - Never run `ts` or `rs` automatically or merely to quit SonicTerm. PID 1 does not preserve live processes through crashes or reboot.

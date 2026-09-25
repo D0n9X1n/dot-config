@@ -647,7 +647,6 @@ install_macos_deps() {
     neovim
     node
     python
-    rmux
     tmux
     shellcheck
     zsh-completions
@@ -1104,6 +1103,7 @@ fi
 validate_manifest
 install_apollo_themes
 link_manifest_files
+# RMUX is Windows-only. Keep retention while an older macOS install remains.
 if is_macos && have_cmd python3 && have_cmd rmux; then
   log_command python3 -B "${scripts_root}/rmux/store.py" prepare || {
     action_required "RMUX runtime retention failed; do not upgrade RMUX until this is resolved."

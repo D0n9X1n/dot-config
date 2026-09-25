@@ -34,7 +34,7 @@ Read the matching Wiki page:
 - config and links: `wiki/Repository-Operations.md`
 - Claude: `wiki/Claude-Code.md`
 - Copilot: `wiki/Copilot-CLI.md`
-- RMUX: `wiki/RMUX.md`
+- tmux and RMUX: `wiki/Tmux.md` and `wiki/RMUX.md`. Windows uses RMUX; macOS and Linux use native tmux, where `rr`/`rl`/`rd`/`rh`/`rs` run `tt`/`tl`/`td`/`th`/`ts`. Keep RMUX out of the macOS installer.
 - terminal and zsh: `wiki/SonicTerm-and-Shell.md`
 - services: `wiki/Services-and-Automation.md`
 - checks and release: `wiki/Development-and-Releases.md`

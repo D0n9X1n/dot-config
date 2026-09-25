@@ -477,6 +477,7 @@ run_global_instructions_smoke() {
     grep -Fq 'gpt-6-astra' "$file"
     grep -Fq 'claude-opus-5.5' "$file"
     grep -Fq 'display override' "$file"
+    grep -Fq 'Windows uses RMUX; macOS and Linux use native tmux' "$file"
     lines="$(wc -l <"$file" | tr -d ' ')"
     [ "$lines" -le 60 ] || {
       echo "$file must stay short" >&2
@@ -1136,7 +1137,7 @@ printf '%s\n' "$*" >>"$RMUX_CAPTURE"
 SH
     chmod +x "$fake_bin/rmux-store"
     PATH="$fake_bin:/usr/bin:/bin" RMUX_CAPTURE="$capture" zsh -f -c '
-      source config/zsh/zz-rmux.zsh
+      OSTYPE=msys; source config/zsh/zz-rmux.zsh
       rs
       rh
     '
@@ -1145,13 +1146,13 @@ SH
     : >"$capture"
 
     PATH="$fake_bin:/usr/bin:/bin" RMUX_CAPTURE="$capture" zsh -f -c '
-      source config/zsh/zz-rmux.zsh
+      OSTYPE=msys; source config/zsh/zz-rmux.zsh
       rr new >/dev/null
     '
     [ "$(sed -n '1p' "$capture")" = "rr new" ]
 
     RMUX_SESSION_EXISTS=1 PATH="$fake_bin:/usr/bin:/bin" RMUX_CAPTURE="$capture" zsh -f -c '
-      source config/zsh/zz-rmux.zsh
+      OSTYPE=msys; source config/zsh/zz-rmux.zsh
       rr main >/dev/null
       rd main
       rl
@@ -1169,13 +1170,13 @@ SH
 
     exit_status=0
     PATH="$fake_bin:/usr/bin:/bin" RMUX_CAPTURE="$capture" zsh -f -c '
-      source config/zsh/zz-rmux.zsh
+      OSTYPE=msys; source config/zsh/zz-rmux.zsh
       exit 7
     ' || exit_status=$?
     [ "$exit_status" = "7" ]
 
     PATH="$fake_bin:/usr/bin:/bin" RMUX_CAPTURE="$capture" zsh -f -c '
-      source config/zsh/zz-rmux.zsh
+      OSTYPE=msys; source config/zsh/zz-rmux.zsh
       rr >/dev/null 2>&1; [[ $? = 2 ]]
       rr one two >/dev/null 2>&1; [[ $? = 2 ]]
       rd >/dev/null 2>&1; [[ $? = 2 ]]
@@ -1187,13 +1188,35 @@ SH
     grep -Fxq 'client -V' "$capture"
 
     PATH="/usr/bin:/bin" zsh -f -c '
-      source config/zsh/zz-rmux.zsh
+      OSTYPE=msys; source config/zsh/zz-rmux.zsh
       rr main >/dev/null 2>&1; [[ $? = 127 ]]
       rd main >/dev/null 2>&1; [[ $? = 127 ]]
       rl >/dev/null 2>&1; [[ $? = 127 ]]
       RMUX=socket exit >/dev/null 2>&1; [[ $? = 127 ]]
       RMUX=socket logout >/dev/null 2>&1; [[ $? = 127 ]]
     '
+
+    # macOS and Linux: every rX helper runs its tX twin; no rmux wrapper.
+    cat >"$fake_bin/tmux-store" <<'SH'
+#!/bin/sh
+printf 'tmux-store %s\n' "$*" >>"$RMUX_CAPTURE"
+SH
+    chmod +x "$fake_bin/tmux-store"
+    local ostype
+    for ostype in darwin25.0 linux-gnu; do
+      : >"$capture"
+      PATH="$fake_bin:/usr/bin:/bin" RMUX_CAPTURE="$capture" OSTYPE_UNDER_TEST="$ostype" zsh -f -c '
+        OSTYPE=$OSTYPE_UNDER_TEST
+        source config/zsh/zz-rmux.zsh
+        source config/zsh/zz-tmux.zsh
+        (( ! $+functions[rmux] ))
+        rr main; rl; rd main; rh; rs
+        rr >/dev/null 2>&1; [[ $? = 2 ]]
+        rl extra >/dev/null 2>&1; [[ $? = 2 ]]
+      '
+      diff -u <(printf '%s\n' 'tmux-store attach main' 'tmux-store list' \
+        'tmux-store delete main' 'tmux-store help' 'tmux-store restart') "$capture"
+    done
   )
 
   grep -Fq '_rmux_store rr "$1"' config/zsh/zz-rmux.zsh
@@ -1202,7 +1225,7 @@ SH
   [ "$(grep -Fc '_rmux_store client detach-client' config/zsh/zz-rmux.zsh)" = "3" ]
   grep -Fq "bindkey -M emacs '^D' _rmux_detach_or_delete_char" config/zsh/zz-rmux.zsh
   grep -Fq "bindkey -M viins '^D' _rmux_detach_or_delete_char" config/zsh/zz-rmux.zsh
-  echo "RMUX helpers ok: rr/rd/rl and exit/logout/Ctrl-D detach protection"
+  echo "mux helpers ok: Windows rX uses RMUX; macOS/Linux rX runs tX; detach protection"
 }
 
 run_rmux_keymap_docs_smoke() {
@@ -1285,7 +1308,10 @@ run_retired_config_migration_smoke() {
 
   grep -Fq '"${repo_root}/config/copilot/AGENTS.md"' install.sh
   grep -Fq '"${repo_root}/copilot/AGENTS.md"' install.sh
-  grep -Eq '^[[:space:]]+rmux$' install.sh
+  if grep -Eq '^[[:space:]]+rmux$' install.sh; then
+    echo "installer still installs RMUX on macOS; RMUX is Windows-only" >&2
+    return 1
+  fi
   grep -Eq '^[[:space:]]+tmux$' install.sh
   grep -Fq $'link\tconfig/tmux/tmux.conf\t.tmux.conf' config/manifest.tsv
   if grep -Eq '^[[:space:]]+wezterm$|brew install --cask wezterm' install.sh; then

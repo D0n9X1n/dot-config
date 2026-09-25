@@ -29,6 +29,10 @@ Do not replace a client identity with GPT. Never put a GPT id or a display overr
 
 Copilot CLI keeps its own `gpt-6-astra` settings. Do not align it with the Claude client ids.
 
+## Multiplexer policy
+
+Windows uses RMUX; macOS and Linux use native tmux, where `rr`/`rl`/`rd`/`rh`/`rs` run `tt`/`tl`/`td`/`th`/`ts`. Keep RMUX out of the macOS installer. See `wiki/Tmux.md` and `wiki/RMUX.md`.
+
 ## Before an edit
 
 Read the matching Wiki page. Use `wiki/Development-and-Releases.md` for checks, Wiki publish, issues, tags, and releases.

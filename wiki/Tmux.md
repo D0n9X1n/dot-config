@@ -2,7 +2,7 @@
 
 English | [简体中文](Tmux-zh-CN.md)
 
-Native tmux runs alongside [RMUX](RMUX.md). It uses the same Apollo colors and bottom-tab style, but has its own server, sessions, and recovery state. The managed profile targets tmux 3.7c. `install.sh` installs Homebrew tmux and links `config/tmux/tmux.conf` to `~/.tmux.conf`.
+Native tmux is the multiplexer on macOS and Linux. [RMUX](RMUX.md) is for Windows only. Both use the same Apollo colors and bottom-tab style, with separate servers, sessions, and recovery state. The managed profile targets tmux 3.7c. `install.sh` installs Homebrew tmux and links `config/tmux/tmux.conf` to `~/.tmux.conf`.
 
 ## Start and reconnect
 
@@ -17,7 +17,7 @@ th            # helper help and recovery limits
 ts            # confirm, save, restart, and restore this server's workspace
 ```
 
-The RMUX helpers `rr`, `rl`, `rd`, `rh`, and `rs` stay available. New SonicTerm tabs still open a normal shell; neither engine auto-attaches.
+On macOS and Linux, each `rX` helper runs its `tX` twin: `rr` is `tt`, `rl` is `tl`, `rd` is `td`, `rh` is `th`, and `rs` is `ts`. There is no `rmux` shell function there. New SonicTerm tabs still open a normal shell; nothing auto-attaches.
 
 `tr NAME` is an interactive shortcut. Normal two-operand or option forms still use the system text utility. Use `command tr` or `/usr/bin/tr` to select that utility explicitly.
 

@@ -2,7 +2,7 @@
 
 English | [简体中文](RMUX-zh-CN.md)
 
-This repository supports RMUX 0.10.x alongside [native tmux](Tmux.md). Both use the same Apollo theme and status style, with separate sessions and state. The RMUX source is `config/rmux/rmux.conf`; `install.sh` links it to `~/.rmux.conf` and installs the Homebrew `rmux` formula on new Macs.
+**Platform rule:** Windows uses RMUX 0.10.x. macOS and Linux use [native tmux](Tmux.md). Both use the same Apollo theme and status style, with separate sessions and state. The RMUX source is `config/rmux/rmux.conf`; `install.sh` links it to `~/.rmux.conf`. The macOS installer no longer installs the `rmux` formula.
 
 ## What RMUX is
 
@@ -74,7 +74,7 @@ After reloading with `prefix + r`, detach with `prefix + d` and reconnect with `
 
 ## Session helpers and resume
 
-New SonicTerm tabs open normal shells. The late-loading `zz-rmux.zsh` file provides explicit helpers:
+New SonicTerm tabs open normal shells. On Windows zsh (`msys`, `cygwin`, or `win32`), the late-loading `zz-rmux.zsh` file provides these RMUX helpers. On macOS and Linux the same names run the native tmux helpers instead:
 
 ```sh
 rr main       # create or resume main
@@ -187,7 +187,7 @@ Use a named socket for tests and automation so they cannot alter the interactive
 
 ## Coexistence and migration
 
-Native tmux is active alongside RMUX, not a replacement for it. `rr`, `rl`, `rd`, `rh`, and `rs` keep their behavior. Native `tt`/`tr`, `tl`, `td`, `th`, and `ts` use separate sockets and state. `tt` refuses to attach from inside RMUX; detach first. Full native help is in [Tmux](Tmux.md).
+On macOS and Linux, native tmux replaces RMUX. `rr`, `rl`, `rd`, `rh`, and `rs` run `tt`, `tl`, `td`, `th`, and `ts`, and there is no `rmux` shell function. On Windows they keep their RMUX behavior. Native helpers use separate sockets and state. `tt` refuses to attach from inside a live RMUX session; detach first. Installation does not uninstall `rmux` or stop a server that is already running on a Mac. Full native help is in [Tmux](Tmux.md).
 
 The shared `exit`/`logout`/empty-prompt Ctrl+D dispatcher checks `RMUX` before `TMUX`. This avoids sending RMUX's compatible environment to a native tmux server. Neither engine auto-attaches. Installation does not reload or stop either live server, and never runs `rs` or `ts` automatically.
 

@@ -119,9 +119,21 @@ Proxy 地址是 `127.0.0.1:46971`。助手会修改 shell、Git 和 npm proxy �
 
 安装 fast-syntax-highlighting 后，安装器会在独立本机工作目录中准备它自带的 Base16 主题。语法颜色随后使用 SonicTerm 的 Apollo ANSI slots。`custom.zsh` 也会加载 autojump、添加 Homebrew 补全、在 `compinit -i` 前修复 group-writable 补全文件夹，并添加本机 .NET 与 Android SDK 路径。
 
-## RMUX 助手
+## rX 助手
 
-`zz-rmux.zsh` 较晚加载，所以它的函数会覆盖前面的 shell 定义。`rr`、`rl`、`rd`、`rh` 和 `rs` 保持原有行为。
+`zz-rmux.zsh` 较晚加载，所以它的函数会覆盖前面的 shell 定义。平台规则：Windows 使用 RMUX；macOS 和 Linux 使用原生 tmux。
+
+在 macOS 和 Linux 上，每个 `rX` 助手都运行对应的 `tX`。没有 `rmux` shell 函数。
+
+```sh
+rr main       # 等同于 tt main
+rl            # 等同于 tl
+rd main       # 等同于 td main
+rh            # 等同于 th
+rs            # 等同于 ts
+```
+
+在 Windows zsh（`msys`、`cygwin` 或 `win32`）上，助手保持 RMUX 行为：
 
 ```sh
 rr main       # main 存在时连接；只有不存在时才创建
@@ -131,7 +143,7 @@ rs            # 保存全部会话，确认重启后恢复
 rh            # 助手、父 PID 1、升级步骤
 ```
 
-它永远不会自动连接新标签页。`rr` 新启动的服务器必须在连接前具有父 PID 1；终端只拥有连接客户端。已有服务器保持不变。用 `brew upgrade rmux` 升级，准备好以新 shell 重建全部会话时再执行 `rs`。受管 `rmux` shell 函数会保留与当前服务器兼容的客户端版本。快照限制请看 [RMUX](RMUX-zh-CN.md)。
+所有助手都不会自动连接新标签页。`rr` 新启动的服务器必须在连接前具有父 PID 1；终端只拥有连接客户端。已有服务器保持不变。用 `brew upgrade rmux` 升级，准备好以新 shell 重建全部会话时再执行 `rs`。受管 `rmux` shell 函数会保留与当前服务器兼容的客户端版本。快照限制请看 [RMUX](RMUX-zh-CN.md)。
 
 ## 原生 tmux 助手
 
