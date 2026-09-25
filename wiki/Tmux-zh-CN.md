@@ -2,7 +2,7 @@
 
 [English](Tmux.md) | 简体中文
 
-原生 tmux 与 [RMUX](RMUX-zh-CN.md) 并存。两者使用相同的 Apollo 配色和底部标签样式，但服务器、会话和恢复状态各自独立。受管配置面向 tmux 3.7c。`install.sh` 安装 Homebrew tmux，并把 `config/tmux/tmux.conf` 链接到 `~/.tmux.conf`。
+原生 tmux 是 macOS 和 Linux 上的复用器。[RMUX](RMUX-zh-CN.md) 只用于 Windows。两者使用相同的 Apollo 配色和底部标签样式，服务器、会话和恢复状态各自独立。受管配置面向 tmux 3.7c。`install.sh` 安装 Homebrew tmux，并把 `config/tmux/tmux.conf` 链接到 `~/.tmux.conf`。
 
 ## 启动与重连
 
@@ -17,7 +17,7 @@ th            # 助手帮助和恢复限制
 ts            # 确认、保存、重启并恢复当前服务器的工作区
 ```
 
-RMUX 的 `rr`、`rl`、`rd`、`rh`、`rs` 保持可用。新的 SonicTerm 标签页仍打开普通 shell，不会自动连接任一复用器。
+在 macOS 和 Linux 上，每个 `rX` 助手都运行对应的 `tX`：`rr` 就是 `tt`，`rl` 就是 `tl`，`rd` 就是 `td`，`rh` 就是 `th`，`rs` 就是 `ts`。这些系统上没有 `rmux` shell 函数。新的 SonicTerm 标签页仍打开普通 shell，不会自动连接。
 
 `tr NAME` 是交互式快捷命令。普通双参数或带选项的调用仍使用系统文本工具。可用 `command tr` 或 `/usr/bin/tr` 明确选择系统工具。
 

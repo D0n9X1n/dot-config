@@ -12,7 +12,7 @@ cd ~/Public/dot-configs
 ./install.sh
 ```
 
-脚本可以安装 Homebrew、原生 tmux、RMUX、Claude Code、Copilot CLI、copilot-relay、shell 工具、字体和 oh-my-zsh。它会下载并验证固定的 Apollo theme releases，构建本机 adapters，然后链接 `config/manifest.tsv` 中列出的文件。
+脚本可以安装 Homebrew、原生 tmux、Claude Code、Copilot CLI、copilot-relay、shell 工具、字体和 oh-my-zsh。它会下载并验证固定的 Apollo theme releases，构建本机 adapters，然后链接 `config/manifest.tsv` 中列出的文件。
 
 原生 tmux 和 RMUX 并存，使用相同的 Apollo 主题和状态栏样式。会话与状态各自独立。原生配置面向 tmux 3.7，本机已经安装。
 
@@ -55,9 +55,9 @@ tr main          # 交互式 shell 中 tt main 的快捷方式
 tl               # 列出原生 tmux 会话，不启动服务器
 td main          # 按完整名称删除原生 tmux 会话 main
 th               # 原生 tmux 帮助
-rr main          # 创建或恢复 RMUX 会话 main
-rl               # 列出 RMUX 会话
-rd main          # 删除 RMUX 会话 main
+rr main          # macOS/Linux 上等同于 tt main；Windows 上用 RMUX
+rl               # macOS/Linux 上等同于 tl
+rd main          # macOS/Linux 上等同于 td main
 claude           # 启动 Claude Code
 cc my-project    # 启动 Claude Code 并设置窗口标题
 copilot          # 启动 Copilot CLI
@@ -80,7 +80,7 @@ gg my-project    # 启动 Copilot CLI 并设置窗口标题
 
 有文字时，Ctrl+D 保持正常编辑行为。两个引擎之外的 shell 退出行为不变。
 
-用 `td <名称>` 删除原生 tmux 会话，用 `rd <名称>` 删除 RMUX 会话。分离不是备份：服务器停止或 Mac 重启后，两个引擎都会失去运行中的会话。`ts` 和 `rs` 是手动、需确认的全部会话重启操作，只以新 shell 恢复工作区布局，不恢复运行中的程序或历史。永远不要自动运行它们。
+用 `td <名称>` 删除原生 tmux 会话。在 macOS 和 Linux 上，`rd <名称>` 作用相同；在 Windows 上它删除 RMUX 会话。分离不是备份：服务器停止或 Mac 重启后，两个引擎都会失去运行中的会话。`ts` 和 `rs` 是手动、需确认的全部会话重启操作，只以新 shell 恢复工作区布局，不恢复运行中的程序或历史。永远不要自动运行它们。
 
 请看 [Tmux](Tmux-zh-CN.md)、[原生 tmux 按键表](Tmux-Keymap-zh-CN.md)、[RMUX](RMUX-zh-CN.md) 和 [RMUX 按键表](RMUX-Keymap-zh-CN.md)。
 

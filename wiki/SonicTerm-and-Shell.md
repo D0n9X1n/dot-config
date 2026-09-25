@@ -119,9 +119,21 @@ Open a new shell to apply it, or run `export HOMEBREW_NO_AUTO_UPDATE=1` in an ex
 
 When fast-syntax-highlighting is installed, the installer prepares its shipped Base16 theme in an isolated local work folder. Syntax colors then use SonicTerm's Apollo ANSI slots. `custom.zsh` also loads autojump, adds Homebrew completions, fixes group-writable completion folders before `compinit -i`, and adds local .NET and Android SDK paths.
 
-## RMUX helpers
+## rX helpers
 
-`zz-rmux.zsh` loads late so its functions win over earlier shell definitions. The `rr`, `rl`, `rd`, `rh`, and `rs` commands keep their existing behavior.
+`zz-rmux.zsh` loads late so its functions win over earlier shell definitions. The platform rule: Windows uses RMUX; macOS and Linux use native tmux.
+
+On macOS and Linux, each `rX` helper runs its `tX` twin. There is no `rmux` shell function.
+
+```sh
+rr main       # same as tt main
+rl            # same as tl
+rd main       # same as td main
+rh            # same as th
+rs            # same as ts
+```
+
+On Windows zsh (`msys`, `cygwin`, or `win32`), the helpers keep their RMUX behavior:
 
 ```sh
 rr main       # attach if main exists; create only when absent
@@ -131,7 +143,7 @@ rs            # save all sessions, confirm restart, restore
 rh            # helpers, parent PID 1, upgrade steps
 ```
 
-It never auto-attaches a new tab. New servers started by `rr` must have parent PID 1 before attachment; the terminal owns only the attached client. Existing servers remain untouched. Upgrade with `brew upgrade rmux`, then run `rs` when ready to restart all sessions as fresh shells. The managed `rmux` shell function retains the client version compatible with the running server. See [RMUX](RMUX.md) for snapshot limits.
+No helper auto-attaches a new tab. New servers started by `rr` must have parent PID 1 before attachment; the terminal owns only the attached client. Existing servers remain untouched. Upgrade with `brew upgrade rmux`, then run `rs` when ready to restart all sessions as fresh shells. The managed `rmux` shell function retains the client version compatible with the running server. See [RMUX](RMUX.md) for snapshot limits.
 
 ## Native tmux helpers
 

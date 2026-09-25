@@ -36,8 +36,10 @@ with open(os.environ['MUX_CAPTURE'], 'a') as stream:
             executable.write_text(stub)
             executable.chmod(0o755)
 
-    def shell(self, code, interactive=False, **env):
-        result = subprocess.run(['/bin/zsh', '-fi' if interactive else '-f', '-c', SOURCE + code],
+    def shell(self, code, interactive=False, ostype=None, **env):
+        prelude = f'OSTYPE={shlex.quote(ostype)}; ' if ostype else ''
+        result = subprocess.run(['/bin/zsh', '-fi' if interactive else '-f', '-c',
+                                 prelude + SOURCE + code],
                                 cwd=ROOT, env=dict(self.env, **env), capture_output=True,
                                 text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -55,6 +57,25 @@ with open(os.environ['MUX_CAPTURE'], 'a') as stream:
         self.assertEqual(self.calls(), [['tmux-store', args] for args in
                          (['attach', 'main'], ['attach', 'work'], ['list'],
                           ['delete', 'work'], ['help'], ['restart'])])
+
+    def test_r_helpers_run_t_twins_on_macos_and_linux(self):
+        for ostype in ('darwin25.0', 'linux-gnu'):
+            with self.subTest(ostype=ostype):
+                self.capture.unlink(missing_ok=True)
+                self.shell('[[ $+functions[rmux] == 0 ]]; rr main; rl; rd main; rh; rs',
+                           ostype=ostype)
+                self.assertEqual(self.calls(), [['tmux-store', args] for args in
+                                 (['attach', 'main'], ['list'], ['delete', 'main'],
+                                  ['help'], ['restart'])])
+
+    def test_r_helpers_keep_rmux_on_windows(self):
+        for ostype in ('msys', 'cygwin', 'win32'):
+            with self.subTest(ostype=ostype):
+                self.capture.unlink(missing_ok=True)
+                self.shell('rr main; rl; rd main; rh; rs; rmux -V', ostype=ostype)
+                self.assertEqual(self.calls(), [['rmux-store', args] for args in
+                                 (['rr', 'main'], ['rl'], ['rd', 'main'], ['help'],
+                                  ['restart'], ['client', '-V'])])
 
     def test_translation_utility_stays_usable(self):
         output = self.shell("printf abc | tr a-z A-Z; print; printf abc | tr -d b; print; "

@@ -5,7 +5,7 @@
 [![Platform](https://img.shields.io/badge/platform-macOS-1d2021?logo=apple&logoColor=ebdbb2)](#)
 [![License](https://img.shields.io/github/license/D0n9X1n/dot-config?color=b8bb26)](./LICENSE)
 
-My macOS config for native tmux and RMUX with the same Apollo style, plus SonicTerm, zsh, Claude Code, and GitHub Copilot CLI.
+My macOS config for native tmux with the Apollo style, plus SonicTerm, zsh, Claude Code, and GitHub Copilot CLI. RMUX config stays for Windows only.
 
 ## Folders
 
@@ -34,10 +34,9 @@ The installer is for macOS. It is safe to run again.
 ```sh
 tt main          # exact attach or create native tmux session main
 tr main          # interactive shortcut for tt main
-rr main          # create or resume RMUX session main
-tl; rl           # list each engine's sessions
+tl               # list native tmux sessions
 td main          # delete exact native tmux session main
-rd main          # delete RMUX session main
+rr main          # same as tt main (rl=tl, rd=td, rh=th, rs=ts)
 claude           # start Claude Code
 cc my-project    # Claude Code with a title
 copilot          # start Copilot CLI

@@ -2,7 +2,7 @@
 
 [English](RMUX.md) | 简体中文
 
-本仓库让 RMUX 0.10.x 与[原生 tmux](Tmux-zh-CN.md) 并存。两者使用相同的 Apollo 主题和状态栏样式，会话与状态各自独立。RMUX 源文件是 `config/rmux/rmux.conf`；`install.sh` 会把它链接到 `~/.rmux.conf`，并在新 Mac 上安装 Homebrew `rmux` formula。
+**平台规则：** Windows 使用 RMUX 0.10.x。macOS 和 Linux 使用[原生 tmux](Tmux-zh-CN.md)。两者使用相同的 Apollo 主题和状态栏样式，会话与状态各自独立。RMUX 源文件是 `config/rmux/rmux.conf`；`install.sh` 会把它链接到 `~/.rmux.conf`。macOS 安装器不再安装 `rmux` formula。
 
 ## RMUX 是什么
 
@@ -74,7 +74,7 @@ RMUX 使用 tmux 命令语法，不是 JSON、YAML 或 TOML。配置可以执行
 
 ## 会话助手与恢复
 
-新的 SonicTerm 标签页会打开普通 shell。最后加载的 `zz-rmux.zsh` 提供显式助手：
+新的 SonicTerm 标签页会打开普通 shell。在 Windows zsh（`msys`、`cygwin` 或 `win32`）上，最后加载的 `zz-rmux.zsh` 提供下面的 RMUX 助手。在 macOS 和 Linux 上，同名命令改为运行原生 tmux 助手：
 
 ```sh
 rr main       # 创建或恢复 main
@@ -187,7 +187,7 @@ Copilot CLI 尚不能识别所有 RMUX/SonicTerm 终端身份。因此仓库中�
 
 ## 并存与迁移
 
-原生 tmux 与 RMUX 并存，不替代 RMUX。`rr`、`rl`、`rd`、`rh` 和 `rs` 保持原有行为。原生 `tt`/`tr`、`tl`、`td`、`th` 和 `ts` 使用独立 socket 和状态。`tt` 拒绝从 RMUX 内连接，请先分离。原生完整帮助见 [Tmux](Tmux-zh-CN.md)。
+在 macOS 和 Linux 上，原生 tmux 取代 RMUX。`rr`、`rl`、`rd`、`rh` 和 `rs` 运行 `tt`、`tl`、`td`、`th` 和 `ts`，并且没有 `rmux` shell 函数。在 Windows 上它们保持 RMUX 行为。原生助手使用独立 socket 和状态。`tt` 拒绝从运行中的 RMUX 会话内连接，请先分离。安装不会卸载 `rmux`，也不会停止 Mac 上已在运行的服务器。原生完整帮助见 [Tmux](Tmux-zh-CN.md)。
 
 共享的 `exit`/`logout`/空提示符 Ctrl+D 分派器先检查 `RMUX`，再检查 `TMUX`，避免把 RMUX 的兼容环境送到原生 tmux 服务器。两个引擎都不会自动连接。安装不会重载或停止任一运行中的服务器，也绝不会自动运行 `rs` 或 `ts`。
 
