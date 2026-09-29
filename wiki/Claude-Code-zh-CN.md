@@ -29,8 +29,8 @@ Claude Code 第一次启动时会问是否允许自定义 `dummy` API key。请�
 ```text
 Claude 端名称： claude-opus-5-5[1m]
 Picker 别名：   opus[1m]
-Opus 保存偏好： xhigh
-启动器 effort： xhigh
+Opus 保存偏好： high
+启动器 effort： high
 Relay 路由：    opusModel
 上游模型：      claude-opus-5.5
 ```
@@ -70,9 +70,9 @@ Claude Code 2.1.281 能识别原生 Opus 5.5 身份。修改模型和 effort 默
 | `ANTHROPIC_DEFAULT_HAIKU_MODEL` | `claude-haiku-4-5-20251001` |
 | `ANTHROPIC_SMALL_FAST_MODEL` | `claude-haiku-4-5-20251001` |
 | `model` | `opus[1m]`；选择器的原生别名 |
-| `modelSettings.claude-opus-5-5.effortLevel` | `xhigh`；Opus 5.5 保存的 effort 偏好 |
+| `modelSettings.claude-opus-5-5.effortLevel` | `high`；Opus 5.5 保存的 effort 偏好 |
 | `modelSettings.claude-sonnet-5.effortLevel` | `xhigh`；保留本机选择的 Sonnet 偏好 |
-| `MODEL_REASONING_EFFORT` | `xhigh`；状态栏回退值与启动器的 `--effort xhigh` 保持一致 |
+| `MODEL_REASONING_EFFORT` | `high`；状态栏回退值与启动器的 `--effort high` 保持一致 |
 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `16` |
 | `statusLine.refreshInterval` | `100` |
 | `theme` | `custom:apollo`；生成的主题资源仍保留在本机 |
@@ -82,9 +82,9 @@ Claude Code 2.1.281 能识别原生 Opus 5.5 身份。修改模型和 effort 默
 | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"100"`；保留的百分比覆盖值 |
 | `feedbackDrafts` | `off` |
 
-`refreshInterval` 必须放在 `statusLine` 里面。保存的 Opus 与 Sonnet 偏好都使用 `xhigh`。`MODEL_REASONING_EFFORT` 是状态栏回退值，不控制 API effort。启动器传入 `--effort xhigh`；`claude` 命令上显式指定的 effort 会覆盖它。不管理顶层 `effortLevel`。[Copilot CLI](Copilot-CLI-zh-CN.md) 保留独立的 Astra/`high` 默认值。
+`refreshInterval` 必须放在 `statusLine` 里面。保存的 Opus 偏好使用 `high`；保存的 Sonnet 偏好保留 `xhigh`。`MODEL_REASONING_EFFORT` 是状态栏回退值，不控制 API effort。启动器传入 `--effort high`；`claude` 命令上显式指定的 effort 会覆盖它。不管理顶层 `effortLevel`。[Copilot CLI](Copilot-CLI-zh-CN.md) 保留独立的 Astra/`high` 默认值。
 
-独立的 Claude Code 2.1.281 检查验证了仅使用设置、picker 别名和 wrapper 启动时，请求均发送 `model: claude-opus-5-5`、`output_config.effort: xhigh` 和 1M context beta。显式指定 Sonnet/`low` 仍优先。检查使用回环 mock、临时 home 和 macOS sandbox，阻止外部网络及真实 home/keychain 访问；没有付费模型调用，也不是上游容量测试。
+独立的 Claude Code 2.1.281 检查（在默认值为 `xhigh` 时运行）验证了仅使用设置、picker 别名和 wrapper 启动时，请求均发送 `model: claude-opus-5-5`、所配置的 `output_config.effort` 和 1M context beta。默认值现为 `high`；该检查未重新运行。显式指定 Sonnet/`low` 仍优先。检查使用回环 mock、临时 home 和 macOS sandbox，阻止外部网络及真实 home/keychain 访问；没有付费模型调用，也不是上游容量测试。
 
 ### 自动压缩
 
@@ -116,7 +116,7 @@ PR 合并后，全局规则要求先完成本机清理，再宣布任务完成�
 ```text
 --permission-mode bypassPermissions
 --model claude-opus-5-5[1m]
---effort xhigh
+--effort high
 ```
 
 命令行上显式给出 `--model`、`--model=`、`--effort` 或 `--effort=` 时，对应的默认值不再注入；另一个默认值仍然生效。

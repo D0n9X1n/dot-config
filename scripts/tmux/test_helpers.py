@@ -124,7 +124,7 @@ with open(os.environ['MUX_CAPTURE'], 'a') as stream:
         self.assertTrue(calls[0][1][1].endswith(title))
         self.assertTrue(calls[2][1][1].endswith(title))
         self.assertEqual(calls[1][1], ['--permission-mode', 'bypassPermissions', '--model',
-                                     'claude-opus-5-5[1m]', '--effort', 'xhigh'])
+                                     'claude-opus-5-5[1m]', '--effort', 'high'])
         self.assertEqual(calls[3][1], ['--yolo', '--model', 'gpt-6-astra',
                                      '--context', 'long_context', '--effort', 'high'])
 

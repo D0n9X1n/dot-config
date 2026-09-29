@@ -29,7 +29,7 @@ function claude {
 
   defaults=(--permission-mode bypassPermissions)
   (( has_model )) || defaults+=(--model 'claude-opus-5-5[1m]')
-  (( has_effort )) || defaults+=(--effort xhigh)
+  (( has_effort )) || defaults+=(--effort high)
 
   command claude "${defaults[@]}" "$@"
 }

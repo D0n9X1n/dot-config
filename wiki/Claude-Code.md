@@ -29,8 +29,8 @@ The tracked default is:
 ```text
 Claude-facing name: claude-opus-5-5[1m]
 Picker alias:       opus[1m]
-Saved Opus effort:  xhigh
-Launcher effort:    xhigh
+Saved Opus effort:  high
+Launcher effort:    high
 Relay route:        opusModel
 Upstream model:     claude-opus-5.5
 ```
@@ -70,9 +70,9 @@ Changing only `opusModel` does not select Opus at startup. `ANTHROPIC_MODEL`, th
 | `ANTHROPIC_DEFAULT_HAIKU_MODEL` | `claude-haiku-4-5-20251001` |
 | `ANTHROPIC_SMALL_FAST_MODEL` | `claude-haiku-4-5-20251001` |
 | `model` | `opus[1m]`; the picker's native alias |
-| `modelSettings.claude-opus-5-5.effortLevel` | `xhigh`; Opus 5.5's saved effort preference |
+| `modelSettings.claude-opus-5-5.effortLevel` | `high`; Opus 5.5's saved effort preference |
 | `modelSettings.claude-sonnet-5.effortLevel` | `xhigh`; preserves the locally selected Sonnet preference |
-| `MODEL_REASONING_EFFORT` | `xhigh`; status-line fallback aligned with the launchers' `--effort xhigh` |
+| `MODEL_REASONING_EFFORT` | `high`; status-line fallback aligned with the launchers' `--effort high` |
 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `16` |
 | `statusLine.refreshInterval` | `100` |
 | `theme` | `custom:apollo`; generated theme assets stay local |
@@ -82,9 +82,9 @@ Changing only `opusModel` does not select Opus at startup. `ANTHROPIC_MODEL`, th
 | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"100"`; retained percentage override |
 | `feedbackDrafts` | `off` |
 
-`refreshInterval` belongs inside `statusLine`. Saved Opus and Sonnet preferences use `xhigh`. `MODEL_REASONING_EFFORT` is a status-line fallback, not an API effort control. The launchers pass `--effort xhigh`; an explicit effort on the `claude` command overrides it. No top-level `effortLevel` is managed. [Copilot CLI](Copilot-CLI.md) keeps its separate Astra/`high` defaults.
+`refreshInterval` belongs inside `statusLine`. The saved Opus preference uses `high`; the saved Sonnet preference keeps `xhigh`. `MODEL_REASONING_EFFORT` is a status-line fallback, not an API effort control. The launchers pass `--effort high`; an explicit effort on the `claude` command overrides it. No top-level `effortLevel` is managed. [Copilot CLI](Copilot-CLI.md) keeps its separate Astra/`high` defaults.
 
-An isolated Claude Code 2.1.281 check verified settings-only, picker-alias, and wrapper launches send `model: claude-opus-5-5` with `output_config.effort: xhigh` and the 1M context beta. An explicit Sonnet/`low` override still wins. The check used a loopback mock, a temporary home, and a macOS sandbox blocking external networking and real-home/keychain access; it was not a paid model call or an upstream capacity test.
+An isolated Claude Code 2.1.281 check, run when the default was `xhigh`, verified settings-only, picker-alias, and wrapper launches send `model: claude-opus-5-5` with the configured `output_config.effort` and the 1M context beta. The default is now `high`; that check was not rerun. An explicit Sonnet/`low` override still wins. The check used a loopback mock, a temporary home, and a macOS sandbox blocking external networking and real-home/keychain access; it was not a paid model call or an upstream capacity test.
 
 ### Automatic compaction
 
@@ -116,7 +116,7 @@ After a PR merges, the global rules require local cleanup before the task is cal
 ```text
 --permission-mode bypassPermissions
 --model claude-opus-5-5[1m]
---effort xhigh
+--effort high
 ```
 
 An explicit `--model`, `--model=`, `--effort`, or `--effort=` on the command line suppresses the matching default; the other default still applies.

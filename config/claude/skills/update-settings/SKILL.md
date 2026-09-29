@@ -54,10 +54,10 @@ Keep provider metrics different: Claude shows cost; Copilot shows premium reques
 
 Sonnet and Opus are separate families.
 
-- Claude Code defaults to native `claude-opus-5-5[1m]` with `xhigh` effort. Keep settings, `claude`/`cc` launch flags, and the status-line effort fallback aligned.
+- Claude Code defaults to native `claude-opus-5-5[1m]` with `high` effort. Keep settings, `claude`/`cc` launch flags, and the status-line effort fallback aligned.
 - Preserve native `claude-sonnet-5[1m]` and `claude-haiku-4-5-20251001` identities; their non-Opus requests route through `gptModel` to `gpt-6-astra`.
 - Opus names route to `opusModel`, using upstream `claude-opus-5.5` without a context suffix.
-- Relay `thinkEffort` falls back to `xhigh`; explicit client effort wins. Copilot CLI and `gg` retain their separate Astra/`high` defaults.
+- Relay `thinkEffort` falls back to `high`; explicit client effort wins. Copilot CLI and `gg` retain their separate Astra/`high` defaults.
 - Keep `[1m]` on Claude-facing defaults that need one-million-token accounting. The Haiku id takes no suffix.
 - Do not put a GPT id, or a `_NAME` / `_DESCRIPTION` display override, into Claude settings.
 
