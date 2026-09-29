@@ -188,8 +188,8 @@ run_model_default_smoke() {
     .env.ANTHROPIC_MODEL == "claude-opus-5-5[1m]" and
     .model == "opus[1m]" and
     (has("effortLevel") | not) and
-    .env.MODEL_REASONING_EFFORT == "xhigh" and
-    .modelSettings["claude-opus-5-5"].effortLevel == "xhigh" and
+    .env.MODEL_REASONING_EFFORT == "high" and
+    .modelSettings["claude-opus-5-5"].effortLevel == "high" and
     .modelSettings["claude-sonnet-5"].effortLevel == "xhigh" and
     .env.ANTHROPIC_DEFAULT_OPUS_MODEL == "claude-opus-5-5[1m]" and
     .env.ANTHROPIC_DEFAULT_SONNET_MODEL == "claude-sonnet-5[1m]" and
@@ -235,15 +235,15 @@ run_model_default_smoke() {
   # Relay: Opus remains separate; every non-Opus route uses GPT-6 Astra.
   grep -Eq '^opusModel:[[:space:]]*claude-opus-5\.5$' config/copilot-relay/config.yaml
   grep -Eq '^gptModel:[[:space:]]*gpt-6-astra$' config/copilot-relay/config.yaml
-  grep -Eq '^thinkEffort:[[:space:]]*xhigh$' config/copilot-relay/config.yaml
-  grep -Eq '^upstreamTimeoutSeconds:[[:space:]]*600$' config/copilot-relay/config.yaml
+  grep -Eq '^thinkEffort:[[:space:]]*high$' config/copilot-relay/config.yaml
+  grep -Eq '^upstreamTimeoutSeconds:[[:space:]]*900$' config/copilot-relay/config.yaml
 
   grep -Fq $'link\tconfig/copilot-relay/config.yaml\t.copilot-relay/config.yaml' config/manifest.tsv
 
   # Launcher wrappers inject the same defaults (settings.json can be rewritten
   # at runtime, so the flags are the authoritative per-launch pin).
   grep -Fq -- "--model 'claude-opus-5-5[1m]'" config/zsh/claude.zsh
-  grep -Fq -- "--model 'claude-opus-5-5[1m]' --effort xhigh" config/zsh/cc.zsh
+  grep -Fq -- "--model 'claude-opus-5-5[1m]' --effort high" config/zsh/cc.zsh
   grep -Fq -- "--model gpt-6-astra --context long_context --effort high" config/zsh/gg.zsh
   if grep -Fq 'gpt-6-astra' config/zsh/claude.zsh config/zsh/cc.zsh; then
     echo "Claude launchers must not pin a GPT model id" >&2
@@ -272,8 +272,8 @@ SH
       *) echo "claude wrapper default lost the native Opus pin: $args" >&2; exit 1 ;;
     esac
     case "$args" in
-      *'--effort xhigh'*) : ;;
-      *) echo "claude wrapper default lost --effort xhigh: $args" >&2; exit 1 ;;
+      *'--effort high'*) : ;;
+      *) echo "claude wrapper default lost --effort high: $args" >&2; exit 1 ;;
     esac
     case "$args" in
       *'--permission-mode bypassPermissions'*) : ;;
@@ -284,7 +284,7 @@ SH
     PATH="$fake_bin:$PATH" CLAUDE_CAPTURE="$capture" \
       zsh -c 'source config/zsh/claude.zsh; claude --model sonnet'
     args="$(sed -n '1p' "$capture")"
-    if [ "$args" != "--permission-mode bypassPermissions --effort xhigh --model sonnet" ]; then
+    if [ "$args" != "--permission-mode bypassPermissions --effort high --model sonnet" ]; then
       echo "explicit --model was overridden or dropped the effort default: $args" >&2
       exit 1
     fi
@@ -293,7 +293,7 @@ SH
     PATH="$fake_bin:$PATH" CLAUDE_CAPTURE="$capture" \
       zsh -c 'source config/zsh/claude.zsh; claude --model=sonnet'
     args="$(sed -n '1p' "$capture")"
-    if [ "$args" != "--permission-mode bypassPermissions --effort xhigh --model=sonnet" ]; then
+    if [ "$args" != "--permission-mode bypassPermissions --effort high --model=sonnet" ]; then
       echo "explicit --model= was overridden or dropped the effort default: $args" >&2
       exit 1
     fi
@@ -303,7 +303,7 @@ SH
       zsh -c 'source config/zsh/claude.zsh; claude --effort low'
     args="$(sed -n '1p' "$capture")"
     case "$args" in
-      *'--effort xhigh'*) echo "explicit --effort was overridden: $args" >&2; exit 1 ;;
+      *'--effort high'*) echo "explicit --effort was overridden: $args" >&2; exit 1 ;;
     esac
     case "$args" in
       *'--effort low'*) : ;;
@@ -316,9 +316,9 @@ SH
 
     : >"$capture"
     PATH="$fake_bin:$PATH" CLAUDE_CAPTURE="$capture" \
-      zsh -c 'source config/zsh/claude.zsh; claude --effort=high'
+      zsh -c 'source config/zsh/claude.zsh; claude --effort=medium'
     args="$(sed -n '1p' "$capture")"
-    if [ "$args" != "--permission-mode bypassPermissions --model claude-opus-5-5[1m] --effort=high" ]; then
+    if [ "$args" != "--permission-mode bypassPermissions --model claude-opus-5-5[1m] --effort=medium" ]; then
       echo "explicit --effort= was overridden or dropped other defaults: $args" >&2
       exit 1
     fi
@@ -336,13 +336,13 @@ SH
     PATH="$fake_bin:$PATH" CLAUDE_CAPTURE="$capture" \
       zsh -c 'unset RMUX TMUX WEZTERM_PANE; source config/zsh/cc.zsh; cc model-smoke >/dev/null'
     args="$(sed -n '1p' "$capture")"
-    if [ "$args" != "--permission-mode bypassPermissions --model claude-opus-5-5[1m] --effort xhigh" ]; then
-      echo "cc launcher lost the native model, xhigh effort, or permission default: $args" >&2
+    if [ "$args" != "--permission-mode bypassPermissions --model claude-opus-5-5[1m] --effort high" ]; then
+      echo "cc launcher lost the native model, high effort, or permission default: $args" >&2
       exit 1
     fi
   )
 
-  echo "model defaults ok: native Opus 5.5 at xhigh; Sonnet/Haiku and Copilot retain their separate Astra routes"
+  echo "model defaults ok: native Opus 5.5 at high; Sonnet/Haiku and Copilot retain their separate Astra routes"
 }
 
 run_mcp_default_smoke() {
@@ -470,7 +470,7 @@ run_global_instructions_smoke() {
     grep -Fq 'globally synced' "$file"
     grep -Fq 'repo-only' "$file"
     grep -Fq 'claude-opus-5-5[1m]' "$file"
-    grep -Fq 'xhigh' "$file"
+    grep -Fq '`claude-opus-5-5[1m]` at `high`' "$file"
     grep -Fq 'claude-sonnet-5' "$file"
     grep -Fq 'claude-haiku-4-5-20251001' "$file"
     grep -Fq 'gptModel' "$file"
@@ -1049,8 +1049,8 @@ import re
 text = pathlib.Path('config/sonicterm/sonicterm.toml').read_text()
 window = re.search(r'^\[window\]\n(.*?)(?=^\[|\Z)', text, re.M | re.S).group(1)
 assert not re.search(r'^(opacity|blur)\s*=', window, re.M)
-assert re.search(r'^padding_top\s*=\s*4\s*$', window, re.M)
-assert re.search(r'^padding_bottom\s*=\s*0\s*$', window, re.M)
+assert re.search(r'^padding_top\s*=\s*2\s*$', window, re.M)
+assert re.search(r'^padding_bottom\s*=\s*2\s*$', window, re.M)
 assert not re.search(r'^\[render\]', text, re.M)
 assert 'keymap = "sonicterm-macos"' in text
 assert 'backdrop = "opaque"' in text and 'opacity = 1.0' in text
