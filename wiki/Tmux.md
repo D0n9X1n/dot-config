@@ -64,7 +64,7 @@ Panes retain native `TERM=tmux-256color` and `TERM_PROGRAM=tmux`. The profile re
 
 Extended-key negotiation keeps Shift+Enter distinct from Enter. Requesting pane apps receive extended Shift+Enter; the native profile sends Ctrl+J to nonrequesting apps. Ordinary Enter remains unchanged. After changing outer keyboard capabilities, reload and detach/reconnect the client to renegotiate.
 
-OSC 7 directory reports, titles, conditional mouse forwarding, `pbcopy`, and OSC 52 match the RMUX profile. Clipboard access trusts pane programs: `set-clipboard on` lets them update the host clipboard. Use `external` instead if your pane applications are untrusted.
+OSC 7 directory reports, OSC 8 links, titles, conditional mouse forwarding, `pbcopy`, and OSC 52 match the RMUX profile. Native tmux forwards OSC 8 links only because the outer `xterm-256color` capability includes `hyperlinks`; without it, SonicTerm cannot underline or preview a link such as a Claude Code Markdown link. Clipboard access trusts pane programs: `set-clipboard on` lets them update the host clipboard. Use `external` instead if your pane applications are untrusted.
 
 RMUX's private teammate shim stays process-scoped. Installing native tmux does not replace it. Actual model-backed teammate launches are not part of the offline configuration tests.
 

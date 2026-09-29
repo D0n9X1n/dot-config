@@ -310,7 +310,7 @@ class ProfileTests(unittest.TestCase):
                                'set-clipboard': 'on'}.items():
             self.assertEqual(tm.option(name, 's'), expected, name)
         features = tm.command('show-options', '-sv', 'terminal-features')
-        self.assertIn('xterm-256color:extkeys:RGB:osc7', features)
+        self.assertIn('xterm-256color:extkeys:RGB:osc7:hyperlinks', features)
         self.assertIn('Smulx=', tm.option('terminal-overrides', 's'))
         source = PROFILE.read_text()
         self.assertNotRegex(source, r'(?m)^\s*(?:run(?:-shell)?\b|.*@plugin|set-environment.*TERM_PROGRAM)')

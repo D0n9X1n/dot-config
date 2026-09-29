@@ -64,7 +64,7 @@ RMUX 使用 tmux 命令语法，不是 JSON、YAML 或 TOML。配置可以执行
 
 底部状态栏左侧显示红色斜边会话标签和带编号的斜边窗口标签，右侧只显示 `HH:MM` 时钟。会话标签与窗口标签之间、各窗口标签之间均留一个字符的间距。会话名称最多占 19 个显示单元，确保两端斜边可完整放入 24 单元的标签宽度内。活动提醒和响铃颜色仍然可见。Prefix 生效时显示 `PREFIX`，窗口缩放时显示 `ZOOM`。斜边使用与 bufferline 的 `slope` 样式相同的 Powerline 字形（`U+E0BA` 和 `U+E0BC`），终端字体或后备字体须支持它们。不显示完整日期或装饰性时钟图标。
 
-外层 `xterm-256color` 能力包含 `osc7`，并且已启用 `set-titles`。Oh My Zsh 的 `omz_termsupport_cwd` hook 会在每次显示提示符时发出带主机名的 OSC 7 报告。RMUX 按 pane 记录该报告，并把活动 pane 的路径转发给 SonicTerm，因此相对文件路径会按正确目录解析。`#{pane_current_path}` 是进程 metadata，不能代替 shell 报告。修改 `terminal-features` 后，请重载配置并 detach/reattach，让客户端重新解析能力。
+外层 `xterm-256color` 能力包含 `osc7` 与 `hyperlinks`，并且已启用 `set-titles`。`hyperlinks` 声明 SonicTerm 接受 OSC 8 链接；RMUX 0.10 即使没有它也会转发，原生 tmux 则不会。Oh My Zsh 的 `omz_termsupport_cwd` hook 会在每次显示提示符时发出带主机名的 OSC 7 报告。RMUX 按 pane 记录该报告，并把活动 pane 的路径转发给 SonicTerm，因此相对文件路径会按正确目录解析。`#{pane_current_path}` 是进程 metadata，不能代替 shell 报告。修改 `terminal-features` 后，请重载配置并 detach/reattach，让客户端重新解析能力。
 
 ### Shift+Enter
 

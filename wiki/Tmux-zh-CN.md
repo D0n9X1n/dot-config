@@ -64,7 +64,7 @@ ts            # 确认、保存、重启并恢复当前服务器的工作区
 
 扩展按键协商让 Shift+Enter 与 Enter 保持区别。请求该协议的窗格应用收到扩展 Shift+Enter；未请求的应用收到原生配置发送的 Ctrl+J。普通 Enter 不变。修改外层键盘能力后，请重载并分离/重连客户端，以重新协商。
 
-OSC 7 目录报告、标题、条件式鼠标转发、`pbcopy` 和 OSC 52 与 RMUX 配置一致。剪贴板权限信任窗格程序：`set-clipboard on` 允许它们更新主机剪贴板。如果窗格应用不可信，请改用 `external`。
+OSC 7 目录报告、OSC 8 链接、标题、条件式鼠标转发、`pbcopy` 和 OSC 52 与 RMUX 配置一致。原生 tmux 之所以转发 OSC 8 链接，是因为外层 `xterm-256color` 能力包含 `hyperlinks`；缺少它时，SonicTerm 无法为 Claude Code 的 Markdown 链接等添加下划线或显示预览。剪贴板权限信任窗格程序：`set-clipboard on` 允许它们更新主机剪贴板。如果窗格应用不可信，请改用 `external`。
 
 RMUX 的私有 teammate shim 仍只作用于对应进程。安装原生 tmux 不会替换它。离线配置测试不会运行真实模型驱动的 teammate 会话。
 

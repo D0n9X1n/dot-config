@@ -1437,7 +1437,7 @@ RMUX_THEME
     [ "$(rmux -L "$socket" show-options -gv set-titles)" = "on" ]
     [ "$(rmux -L "$socket" show-window-options -gv pane-base-index)" = "1" ]
     terminal_features="$(rmux -L "$socket" show-options -gv terminal-features)"
-    printf '%s\n' "$terminal_features" | grep -Fxq 'xterm-256color:RGB:osc7'
+    printf '%s\n' "$terminal_features" | grep -Fxq 'xterm-256color:RGB:osc7:hyperlinks'
 
     keys="$(rmux -L "$socket" list-keys -T prefix)"
     printf '%s\n' "$keys" | grep -Eq 'Tab[[:space:]]+last-window'
