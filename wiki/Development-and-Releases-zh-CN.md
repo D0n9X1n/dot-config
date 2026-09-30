@@ -78,10 +78,12 @@ scripts/check.sh tmux
 
 CI 使用同一个脚本：
 
-- macOS 安装原生 tmux 和 RMUX，要求两个引擎都可用，并运行 smoke checks；
+- macOS 安装原生 tmux 和 RMUX，要求两个引擎都可用，并运行 smoke checks；随后通过符号链接的检出目录，在设置了 `TMUX`、`TMUX_PANE`、`RMUX` 和 `RMUX_PANE` 的情况下再次运行 `scripts/check.sh rmux`；
 - Ubuntu 安装 ShellCheck 并运行 ShellCheck target。
 
 普通检查不会访问网络。`apollo-online` 是维护者专用检查，会下载所有固定的上游文件并验证 SHA-256。每次修改 `scripts/apollo-releases.tsv` 时都要运行它。
+
+`scripts/check.sh` 在运行任何检查前会清除 `TMUX`、`TMUX_PANE`、`RMUX` 和 `RMUX_PANE`，并解析检出目录的物理路径。否则，继承的 `TMUX` 会使 RMUX 拒绝 RMUX 检查启动的嵌套会话；继承的 `RMUX` 会使 helper 检查加载的 zsh `exit` 包装函数执行 detach 而不是退出；经符号链接到达的路径（例如 macOS 的 `/tmp`）也与 RMUX 报告的解析后路径不一致。
 
 修改配置后，先通过 `scripts/check.sh all` 和所需的 `apollo-online` 检查，再运行两次 `./install.sh` 并验证变更的链接。安装不得重载或停止运行中的 tmux 或 RMUX 服务器。不要把 `ts` 或 `rs` 当成安装或检查步骤；两者都是手动重启操作，会结束运行中的程序。
 

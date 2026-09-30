@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Use the physical path: RMUX reports resolved paths, which a checkout reached through a
+# symlink such as macOS /tmp would not match.
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$repo_root"
+# An inherited TMUX makes RMUX refuse the nested sessions the checks start, and an inherited RMUX
+# makes the sourced zsh exit wrapper detach instead of exiting, so clear the caller's variables.
+unset RMUX RMUX_PANE TMUX TMUX_PANE
 CHECK_STATE_DIR=""
 CHECK_EVENTS=""
 
