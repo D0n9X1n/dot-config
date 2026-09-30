@@ -29,7 +29,8 @@ The tracked config uses:
 | Font weight scale | 1 |
 | Line height | 1.1 |
 | New window grid | 80 × 40 |
-| Top / bottom padding | 4 / 0 logical pixels |
+| Top / bottom padding | 2 / 2 logical pixels |
+| Tab width | 240 to 320 logical pixels; while the tab bar has room, each tab sizes to its title in that range |
 | Scrollback | 1000 lines |
 | Keypad mode | `numeric`: ordinary digits, operators, and Enter in legacy input; Kitty protocol unchanged |
 | Cursor | block, no blink |
@@ -39,7 +40,9 @@ The tracked config uses:
 
 Use **Reload Config** from the SonicTerm command palette (`Cmd+Shift+R`) after a config change. Some native window changes may need a restart.
 
-Top padding is 4 logical pixels; zero bottom padding removes the configured margin above the native tab bar. A partial-row gap may remain because the terminal uses whole text rows; its size depends on the window height. `panel_padding` affects popup panels, not this gap.
+Top and bottom padding are 2 logical pixels each. A partial-row gap may remain because the terminal uses whole text rows; its size depends on the window height. `panel_padding` affects popup panels, not this gap.
+
+`tab_min_width` needs a SonicTerm build that sizes tabs to their titles. Earlier builds ignore it and share the tab bar evenly, up to `tab_max_width` per tab.
 
 The active keymap is `sonicterm-macos`; `sonicterm-linux` and `sonicterm-windows` are also managed. Their custom bindings stay unchanged. Appearance uses `[appearance]`; unused legacy window and render keys are omitted.
 

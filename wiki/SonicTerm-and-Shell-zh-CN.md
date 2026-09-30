@@ -29,7 +29,8 @@ config/sonicterm/keymaps/*.toml
 | 字重缩放 | 1 |
 | 行高 | 1.1 |
 | 新窗口网格 | 80 × 40 |
-| 顶部 / 底部留白 | 4 / 0 逻辑像素 |
+| 顶部 / 底部留白 | 2 / 2 逻辑像素 |
+| 标签宽度 | 240 到 320 逻辑像素；标签栏有空间时，每个标签页在此范围内按标题定宽 |
 | Scrollback | 1000 行 |
 | 数字键盘模式 | `numeric`：传统输入使用普通数字、运算符和回车；Kitty 协议保持不变 |
 | 光标 | block，不闪烁 |
@@ -39,7 +40,9 @@ config/sonicterm/keymaps/*.toml
 
 修改配置后，在 SonicTerm command palette 中使用 **Reload Config**（`Cmd+Shift+R`）。有些原生窗口修改可能需要重启。
 
-顶部留白为 4 逻辑像素；底部留白为零，去掉原生标签栏上方的配置边距。终端只能显示完整文字行，因此仍可能留下不足一行的空隙，其大小取决于窗口高度。`panel_padding` 只影响弹出面板，不影响这里的空隙。
+顶部和底部留白各为 2 逻辑像素。终端只能显示完整文字行，因此仍可能留下不足一行的空隙，其大小取决于窗口高度。`panel_padding` 只影响弹出面板，不影响这里的空隙。
+
+`tab_min_width` 需要按标题定宽标签页的 SonicTerm 版本。更早的版本会忽略它，并平分标签栏，每个标签页最宽为 `tab_max_width`。
 
 当前 keymap 是 `sonicterm-macos`；仓库也管理 `sonicterm-linux` 和 `sonicterm-windows`。它们的自定义按键保持不变。外观使用 `[appearance]`；已省去无效的旧 window 和 render 配置项。
 
