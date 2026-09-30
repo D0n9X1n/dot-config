@@ -78,10 +78,12 @@ The status-line layout, cache, and generated palette are shared by both provider
 
 CI uses the same script:
 
-- macOS installs native tmux and RMUX, requires both engines, and runs smoke checks;
+- macOS installs native tmux and RMUX, requires both engines, and runs smoke checks, then reruns `scripts/check.sh rmux` through a symlinked checkout with `TMUX`, `TMUX_PANE`, `RMUX` and `RMUX_PANE` set;
 - Ubuntu installs ShellCheck and runs the ShellCheck target.
 
 Ordinary checks do not access the network. `apollo-online` is a maintainer-only check that downloads every pinned upstream file and verifies its SHA-256. Run it whenever `scripts/apollo-releases.tsv` changes.
+
+`scripts/check.sh` clears `TMUX`, `TMUX_PANE`, `RMUX` and `RMUX_PANE` and resolves the checkout's physical path before it runs any check. Otherwise an inherited `TMUX` would make RMUX refuse the nested sessions that the RMUX checks start, an inherited `RMUX` would make the zsh `exit` wrapper that a helper check sources detach instead of exiting, and a path reached through a symlink, such as macOS `/tmp`, would not match the resolved paths that RMUX reports.
 
 For a config change, pass `scripts/check.sh all` and any required `apollo-online` check, then run `./install.sh` twice and verify the changed links. Installation must not reload or stop live tmux or RMUX servers. Do not run `ts` or `rs` as an install or check step. Both restart helpers are manual and destructive to running programs.
 

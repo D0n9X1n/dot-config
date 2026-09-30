@@ -19,6 +19,12 @@ jobs:
       - name: Smoke checks
         run: bash scripts/check.sh smoke
 
+      - name: RMUX checks through a symlink with pane variables set
+        run: |
+          ln -s "$GITHUB_WORKSPACE" "$RUNNER_TEMP/dot-configs-link"
+          TMUX="$RUNNER_TEMP/caller-tmux,1,0" TMUX_PANE=%0 RMUX="$RUNNER_TEMP/caller-rmux,1,0" RMUX_PANE=%0 \
+            bash "$RUNNER_TEMP/dot-configs-link/scripts/check.sh" rmux
+
   shellcheck:
     name: ShellCheck (errors only)
     runs-on: ubuntu-latest
