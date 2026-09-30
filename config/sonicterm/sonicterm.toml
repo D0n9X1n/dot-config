@@ -2,7 +2,8 @@ theme = "apollo"
 keymap = "sonicterm-macos"
 locale = ""
 quit_on_last_window_close = true
-tab_max_width = 240
+tab_min_width = 240
+tab_max_width = 320
 
 [font]
 family = "Rec Mono St.Helens"

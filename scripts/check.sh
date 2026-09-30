@@ -1053,6 +1053,8 @@ assert re.search(r'^padding_top\s*=\s*2\s*$', window, re.M)
 assert re.search(r'^padding_bottom\s*=\s*2\s*$', window, re.M)
 assert not re.search(r'^\[render\]', text, re.M)
 assert 'keymap = "sonicterm-macos"' in text
+assert re.search(r'^tab_min_width\s*=\s*240\s*$', text, re.M)
+assert re.search(r'^tab_max_width\s*=\s*320\s*$', text, re.M)
 assert 'backdrop = "opaque"' in text and 'opacity = 1.0' in text
 PY
   [ -f config/claude/settings.json ]
