@@ -46,7 +46,7 @@ Claude Code 保留原生 Opus 5.5 身份。名称包含 `opus`，所以 copilot-
 
 客户端名称和上游模型是两层。客户端保留原生 Anthropic ID；上游模型由 relay 决定。不要把 GPT ID 或 `_NAME` / `_DESCRIPTION` 显示覆盖写进 Claude 端设置。
 
-`[1m]` 后缀让 Claude Code 使用一百万 token 的 context 计数；relay 向上游发送不带该后缀的规范 ID `claude-opus-5.5`。Haiku 保留已安装 CLI 的 small-fast ID，不加 `[1m]`。Context 计数不保证保留完整的 1M-token 对话历史；自动压缩还取决于模型和输出预算。Claude 保存的 Opus 偏好、启动器和状态栏 effort 回退值都使用 `xhigh`，与 `config/copilot-relay/config.yaml` 中的 relay 回退值一致。
+`[1m]` 后缀让 Claude Code 使用一百万 token 的 context 计数；relay 向上游发送不带该后缀的规范 ID `claude-opus-5.5`。Haiku 保留已安装 CLI 的 small-fast ID，不加 `[1m]`。Context 计数不保证保留完整的 1M-token 对话历史；自动压缩还取决于模型和输出预算。Claude 保存的 Opus 和 Sonnet 偏好、启动器和状态栏 effort 回退值都使用 `high`，与 `config/copilot-relay/config.yaml` 中的 relay 回退值一致。
 
 Claude Code 2.1.281 能识别原生 Opus 5.5 身份。修改模型和 effort 默认值时应同时更新 `config/claude/settings.json`、`config/zsh/claude.zsh` 和 `config/zsh/cc.zsh`；wrapper 的 `--model` 和 `--effort` flags 优先于保存的设置。Relay 的 `thinkEffort` 也应保持一致，作为未指定 effort 的请求回退值。独立的 `gptModel` 仍为 `gpt-6-astra`，空白的 `webSearchBackend` 仍使用 Astra。
 
@@ -70,8 +70,9 @@ Claude Code 2.1.281 能识别原生 Opus 5.5 身份。修改模型和 effort 默
 | `ANTHROPIC_DEFAULT_HAIKU_MODEL` | `claude-haiku-4-5-20251001` |
 | `ANTHROPIC_SMALL_FAST_MODEL` | `claude-haiku-4-5-20251001` |
 | `model` | `opus[1m]`；选择器的原生别名 |
+| `modelPicker` | 只有 `Opus 5.5 (1M context)` 和 `Sonnet 5 (1M context)`；替换内置列表 |
 | `modelSettings.claude-opus-5-5.effortLevel` | `high`；Opus 5.5 保存的 effort 偏好 |
-| `modelSettings.claude-sonnet-5.effortLevel` | `xhigh`；保留本机选择的 Sonnet 偏好 |
+| `modelSettings.claude-sonnet-5.effortLevel` | `high`；Sonnet 5 保存的 effort 偏好 |
 | `MODEL_REASONING_EFFORT` | `high`；状态栏回退值与启动器的 `--effort high` 保持一致 |
 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `16` |
 | `statusLine.refreshInterval` | `100` |
@@ -82,7 +83,20 @@ Claude Code 2.1.281 能识别原生 Opus 5.5 身份。修改模型和 effort 默
 | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"100"`；保留的百分比覆盖值 |
 | `feedbackDrafts` | `off` |
 
-`refreshInterval` 必须放在 `statusLine` 里面。保存的 Opus 偏好使用 `high`；保存的 Sonnet 偏好保留 `xhigh`。`MODEL_REASONING_EFFORT` 是状态栏回退值，不控制 API effort。启动器传入 `--effort high`；`claude` 命令上显式指定的 effort 会覆盖它。不管理顶层 `effortLevel`。[Copilot CLI](Copilot-CLI-zh-CN.md) 保留独立的 Astra/`high` 默认值。
+`refreshInterval` 必须放在 `statusLine` 里面。保存的 Opus 和 Sonnet 偏好都使用 `high`。`MODEL_REASONING_EFFORT` 是状态栏回退值，不控制 API effort。启动器传入 `--effort high`；`claude` 命令上显式指定的 effort 会覆盖它。不管理顶层 `effortLevel`。[Copilot CLI](Copilot-CLI-zh-CN.md) 保留独立的 Astra/`high` 默认值。
+
+### 模型选择器
+
+`/model` 只提供 relay 映射的两个模型：
+
+| 行 | 模型 | 说明 |
+|---|---|---|
+| Opus 5.5 (1M context) | `opus[1m]` | Most capable for ambitious work |
+| Sonnet 5 (1M context) | `sonnet` | Best for everyday, complex tasks |
+
+`modelPicker.replaceBuiltInOptions` 隐藏内置行，包括 Haiku 和 `opusplan`。Claude Code 总会加上 **Default** 行；它解析为 Opus 5.5，不能隐藏。标签沿用 Claude Code 的内置名称。不要在这里写 GPT 名称。虽然 relay 用 `gpt-6-astra` 提供 Sonnet，Sonnet 行仍保留原生名称。
+
+这只改变选择器，不是硬性禁止。没有设置 `availableModels`，所以 Haiku 仍运行小型后台任务。`modelPicker` 需要 Claude Code 2.1.242 或更高版本。在 sandbox 中运行的 Claude Code 2.1.286 检查显示正好三行：使用保存的模型和使用 `cc` 启动参数时都一样。
 
 独立的 Claude Code 2.1.281 检查（在默认值为 `xhigh` 时运行）验证了仅使用设置、picker 别名和 wrapper 启动时，请求均发送 `model: claude-opus-5-5`、所配置的 `output_config.effort` 和 1M context beta。默认值现为 `high`；该检查未重新运行。显式指定 Sonnet/`low` 仍优先。检查使用回环 mock、临时 home 和 macOS sandbox，阻止外部网络及真实 home/keychain 访问；没有付费模型调用，也不是上游容量测试。
 

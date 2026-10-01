@@ -60,6 +60,7 @@ Sonnet and Opus are separate families.
 - Relay `thinkEffort` falls back to `high`; explicit client effort wins. Copilot CLI and `gg` retain their separate Astra/`high` defaults.
 - Keep `[1m]` on Claude-facing defaults that need one-million-token accounting. The Haiku id takes no suffix.
 - Do not put a GPT id, or a `_NAME` / `_DESCRIPTION` display override, into Claude settings.
+- `modelPicker` replaces the built-in `/model` list with the two mapped models: `opus[1m]` as `Opus 5.5 (1M context)` and `sonnet` as `Sonnet 5 (1M context)`. Use built-in Claude names only. Claude Code always adds Default. Do not add `availableModels`; Haiku still runs small background jobs.
 
 Do not change both families when the task names one.
 
