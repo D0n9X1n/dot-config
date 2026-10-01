@@ -40,12 +40,12 @@ config/copilot/statusline.sh
 
 保持相同五行布局、palette 和每目录 Git cache。Provider 字段保持不同：Claude 显示费用；Copilot 显示 premium 请求和自定义 live-subagent rows。
 
-模型家族保持分开：
+保持这些模型路由：
 
-- Sonnet 端默认值通过 `gptModel` 路由。
-- Opus 名称通过 `opusModel` 路由。
+- Opus 名称通过 `opusModel` 路由，保持原生。
+- 其他 Claude 槽位调用 `gpt-6-astra[1m]`，通过 `gptModel` 路由。
 
-任务只说一个家族时，不要修改两个。
+不要把 Opus 指向 GPT。
 
 任何用户可见或行为变化，都要在同一改动中更新对应英文和中文 Wiki 页面。根 README 保持简短。
 
@@ -72,7 +72,7 @@ scripts/check.sh rmux
 scripts/check.sh tmux
 ```
 
-`models` 断言受管模型选择器：Claude 设置和启动器 wrapper 中的原生客户端 ID、Copilot 自己的 GPT-6 Astra 设置，以及 relay 独立的 Opus 路由。`mcp` 检查共享 MCP 默认值：保留 Playwright，不配置重复的 GitHub 条目或 PAT 模板。
+`models` 断言受管模型选择器：作为 Claude 默认值和启动器 wrapper 中的原生 Opus 5.5、其他 Claude 槽位使用的 `gpt-6-astra[1m]`、两个选择器行、Copilot 自己的 GPT-6 Astra 设置，以及 relay 独立的 Opus 路由。`mcp` 检查共享 MCP 默认值：保留 Playwright，不配置重复的 GitHub 条目或 PAT 模板。
 
 状态栏布局、缓存和生成的 palette 由两个 provider 共享，所以修改任一脚本或生成器时，由 `apollo` 和 `smoke` 一起检查。provider 各自的强调仍然不同：Copilot 使用亮前景角色并保留实时 subagent 行，Claude 两者都不用。修改共享生成器时，保持 Claude 输出不变。
 

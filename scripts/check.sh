@@ -198,17 +198,14 @@ run_model_default_smoke() {
     .modelSettings["claude-sonnet-5"].effortLevel == "high" and
     .modelPicker.replaceBuiltInOptions == true and
     ([.modelPicker.options[] | [.model, .label]]
-      == [["opus[1m]", "Opus 5.5 (1M context)"], ["sonnet", "Sonnet 5 (1M context)"]]) and
+      == [["opus[1m]", "Opus 5.5 (1M context)"], ["gpt-6-astra[1m]", "GPT-6 Astra (1M context)"]]) and
+    .modelPicker.options[1].behavesAs == "claude-sonnet-5" and
     (.modelPicker.options | all(.description | type == "string" and length > 0)) and
     (has("availableModels") | not) and
     .env.ANTHROPIC_DEFAULT_OPUS_MODEL == "claude-opus-5-5[1m]" and
-    .env.ANTHROPIC_DEFAULT_SONNET_MODEL == "claude-sonnet-5[1m]" and
-    (.env | has("ANTHROPIC_DEFAULT_OPUS_MODEL_NAME") | not) and
-    (.env | has("ANTHROPIC_DEFAULT_OPUS_MODEL_DESCRIPTION") | not) and
-    (.env | has("ANTHROPIC_DEFAULT_SONNET_MODEL_NAME") | not) and
-    (.env | has("ANTHROPIC_DEFAULT_SONNET_MODEL_DESCRIPTION") | not) and
-    .env.ANTHROPIC_DEFAULT_HAIKU_MODEL == "claude-haiku-4-5-20251001" and
-    .env.ANTHROPIC_SMALL_FAST_MODEL == "claude-haiku-4-5-20251001" and
+    .env.ANTHROPIC_DEFAULT_SONNET_MODEL == "gpt-6-astra[1m]" and
+    .env.ANTHROPIC_DEFAULT_HAIKU_MODEL == "gpt-6-astra[1m]" and
+    .env.ANTHROPIC_SMALL_FAST_MODEL == "gpt-6-astra[1m]" and
     .env.ANTHROPIC_BASE_URL == "http://127.0.0.1:4142" and
     .env.CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS == "16" and
     .autoCompactEnabled == true and
@@ -224,15 +221,15 @@ run_model_default_smoke() {
     .enabledPlugins["swift-lsp@claude-plugins-official"] == true
   ' config/claude/settings.json >/dev/null
 
-  # No GPT identity may leak back into any Claude-facing selector or label.
+  # Opus stays native; every other Claude slot calls GPT-6 Astra directly.
   if jq -e '
       [(.env | to_entries[] | select(.key | test("^ANTHROPIC_.*MODEL")) | .value),
        .model,
-       (.modelPicker.options[]? | .model, .label, .description)]
+       (.modelPicker.options[]? | .model)]
       | map(select(type == "string") | ascii_downcase)
-      | any(test("gpt"))
+      | any(test("sonnet|haiku"))
     ' config/claude/settings.json >/dev/null; then
-    echo "config/claude/settings.json carries a GPT identity on a Claude selector" >&2
+    echo "config/claude/settings.json still selects a Claude Sonnet or Haiku id; use gpt-6-astra[1m]" >&2
     return 1
   fi
 
@@ -354,7 +351,7 @@ SH
     fi
   )
 
-  echo "model defaults ok: native Opus 5.5 at high; Sonnet/Haiku and Copilot retain their separate Astra routes"
+  echo "model defaults ok: Opus 5.5 at high by default; Sonnet, Haiku, and small-fast call GPT-6 Astra 1M directly"
 }
 
 run_mcp_default_smoke() {
@@ -483,12 +480,15 @@ run_global_instructions_smoke() {
     grep -Fq 'repo-only' "$file"
     grep -Fq 'claude-opus-5-5[1m]' "$file"
     grep -Fq '`claude-opus-5-5[1m]` at `high`' "$file"
-    grep -Fq 'claude-sonnet-5' "$file"
-    grep -Fq 'claude-haiku-4-5-20251001' "$file"
+    grep -Fq 'Opus 5.5 and GPT-6 Astra' "$file"
+    grep -Fq 'gpt-6-astra[1m]' "$file"
     grep -Fq 'gptModel' "$file"
     grep -Fq 'gpt-6-astra' "$file"
     grep -Fq 'claude-opus-5.5' "$file"
-    grep -Fq 'display override' "$file"
+    if grep -Fq 'Never put a GPT id' "$file"; then
+      echo "$file still carries the retired no-GPT rule" >&2
+      return 1
+    fi
     grep -Fq 'Windows uses RMUX; macOS and Linux use native tmux' "$file"
     lines="$(wc -l <"$file" | tr -d ' ')"
     [ "$lines" -le 60 ] || {
