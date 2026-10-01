@@ -21,11 +21,11 @@ Tool-required files stay at fixed paths: `.claude/CLAUDE.md`, `.github/copilot-i
 
 ## Model policy
 
-Keep native client names. Claude defaults to `claude-opus-5-5[1m]` at `high`; keep `claude-sonnet-5[1m]` and `claude-haiku-4-5-20251001` separate.
+Claude has two final choices: Opus 5.5 and GPT-6 Astra. Claude defaults to `claude-opus-5-5[1m]` at `high`. Sonnet, Haiku, and small-fast call `gpt-6-astra[1m]` directly; the `/model` picker labels both.
 
-The relay maps every non-Opus route through `gptModel` to `gpt-6-astra`. Opus stays separate as `claude-opus-5.5`.
+The relay sends Opus names to `opusModel` (`claude-opus-5.5`) and every other name to `gptModel` (`gpt-6-astra`).
 
-Do not replace a client identity with GPT. Never put a GPT id or a display override name back into Claude settings. Keep Sonnet and Opus model families separate.
+GPT ids and picker labels are allowed in Claude settings. Keep Opus native; never point Opus at GPT.
 
 Copilot CLI keeps its own `gpt-6-astra` settings. Do not align it with the Claude client ids.
 

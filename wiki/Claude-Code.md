@@ -41,18 +41,17 @@ Other routes:
 
 | Claude-facing name | Relay lane | Upstream |
 |---|---|---|
-| `claude-sonnet-5[1m]` | `gptModel` | `gpt-6-astra` |
-| `claude-haiku-4-5-20251001` (Haiku / small-fast) | `gptModel` | `gpt-6-astra` |
+| `gpt-6-astra[1m]` (Sonnet, Haiku, small-fast, GPT picker row) | `gptModel` | `gpt-6-astra` |
 
-Client names and upstream models are separate layers. The client keeps native Anthropic ids; the relay decides the upstream model. Do not write a GPT id, or a `_NAME` / `_DESCRIPTION` display override, into Claude-facing settings.
+Opus keeps its native Anthropic id. Every other slot calls `gpt-6-astra[1m]` directly, so the client name already matches the upstream model and nothing needs remapping. The `/model` picker shows readable labels. The relay still sends any non-Opus name to `gptModel`.
 
-The `[1m]` suffix keeps Claude Code's one-million-token context accounting; the relay sends canonical `claude-opus-5.5` upstream without that suffix. Haiku keeps the installed CLI's small-fast ID without `[1m]`. Context accounting does not guarantee a full 1M-token conversation history; automatic compaction also depends on model and output budgets. Claude's saved Opus and Sonnet preferences, launchers, and status-line effort fallback use `high`, matching the relay's fallback in `config/copilot-relay/config.yaml`.
+The `[1m]` suffix keeps Claude Code's one-million-token context accounting; the relay sends canonical `claude-opus-5.5` upstream without that suffix. Haiku and small-fast use `gpt-6-astra[1m]` too. Context accounting does not guarantee a full 1M-token conversation history; automatic compaction also depends on model and output budgets. Claude's saved Opus and Sonnet preferences, launchers, and status-line effort fallback use `high`, matching the relay's fallback in `config/copilot-relay/config.yaml`.
 
 The native Opus 5.5 identity is recognized by Claude Code 2.1.281. Update model and effort defaults in `config/claude/settings.json`, `config/zsh/claude.zsh`, and `config/zsh/cc.zsh` together; the wrappers' `--model` and `--effort` flags override saved settings. Keep relay `thinkEffort` aligned as the fallback for requests without effort. The separate `gptModel` stays `gpt-6-astra`, and the blank `webSearchBackend` still uses Astra.
 
 Run `copilot` and enter `/model` to check account availability and effort choices before changing models. That is Copilot's picker, not Claude Code's picker or the relay's local `/v1/models`. After `scripts/check.sh all` passes, apply through `./install.sh` twice and start a new shell and Claude Code session. The installer leaves a healthy relay running; recovery of an unhealthy relay may interrupt requests.
 
-Changing only `opusModel` does not select Opus at startup. `ANTHROPIC_MODEL`, the saved `opus[1m]` choice, `ANTHROPIC_DEFAULT_OPUS_MODEL`, and both launchers now agree on native Opus 5.5. Sonnet and Haiku retain their separate Astra route; do not remap those identities to Opus. Relay route and effort changes hot-reload without a restart.
+Changing only `opusModel` does not select Opus at startup. `ANTHROPIC_MODEL`, the saved `opus[1m]` choice, `ANTHROPIC_DEFAULT_OPUS_MODEL`, and both launchers now agree on native Opus 5.5. Sonnet, Haiku, and small-fast call GPT-6 Astra directly; never point Opus at GPT. Relay route and effort changes hot-reload without a restart.
 
 [Upstream Opus 5.5 verification](https://github.com/D0n9X1n/copilot-relay/issues/81) found that automatic tool use works, but forced `tool_choice` values `tool` and `any` return HTTP 400. The relay preserves that error instead of silently switching to automatic selection.
 
@@ -66,11 +65,11 @@ Changing only `opusModel` does not select Opus at startup. `ANTHROPIC_MODEL`, th
 | `ANTHROPIC_AUTH_TOKEN` | local placeholder `dummy` |
 | `ANTHROPIC_MODEL` | `claude-opus-5-5[1m]` |
 | `ANTHROPIC_DEFAULT_OPUS_MODEL` | `claude-opus-5-5[1m]`; resolves the native Opus alias |
-| `ANTHROPIC_DEFAULT_SONNET_MODEL` | `claude-sonnet-5[1m]` |
-| `ANTHROPIC_DEFAULT_HAIKU_MODEL` | `claude-haiku-4-5-20251001` |
-| `ANTHROPIC_SMALL_FAST_MODEL` | `claude-haiku-4-5-20251001` |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | `gpt-6-astra[1m]` |
+| `ANTHROPIC_DEFAULT_HAIKU_MODEL` | `gpt-6-astra[1m]` |
+| `ANTHROPIC_SMALL_FAST_MODEL` | `gpt-6-astra[1m]` |
 | `model` | `opus[1m]`; the picker's native alias |
-| `modelPicker` | only `Opus 5.5 (1M context)` and `Sonnet 5 (1M context)`; replaces the built-in list |
+| `modelPicker` | only `Opus 5.5 (1M context)` and `GPT-6 Astra (1M context)`; replaces the built-in list |
 | `modelSettings.claude-opus-5-5.effortLevel` | `high`; Opus 5.5's saved effort preference |
 | `modelSettings.claude-sonnet-5.effortLevel` | `high`; Sonnet 5's saved effort preference |
 | `MODEL_REASONING_EFFORT` | `high`; status-line fallback aligned with the launchers' `--effort high` |
@@ -87,16 +86,18 @@ Changing only `opusModel` does not select Opus at startup. `ANTHROPIC_MODEL`, th
 
 ### Model picker
 
-`/model` offers only the two models the relay maps:
+`/model` offers two final choices:
 
 | Row | Model | Description |
 |---|---|---|
 | Opus 5.5 (1M context) | `opus[1m]` | Most capable for ambitious work |
-| Sonnet 5 (1M context) | `sonnet` | Best for everyday, complex tasks |
+| GPT-6 Astra (1M context) | `gpt-6-astra[1m]` | GPT-6 Astra through copilot-relay |
 
-`modelPicker.replaceBuiltInOptions` hides the built-in rows, including Haiku and `opusplan`. Claude Code always adds a **Default** row; it resolves to Opus 5.5 and cannot be hidden. The labels copy Claude Code's built-in names. Never put a GPT name there. The Sonnet row keeps its native name even though the relay serves it with `gpt-6-astra`.
+`modelPicker.replaceBuiltInOptions` hides the built-in rows, including Haiku and `opusplan`. Claude Code always adds a **Default** row; it resolves to Opus 5.5 and cannot be hidden. The GPT row sets `behavesAs: claude-sonnet-5`, so Claude Code treats it like Sonnet 5 for effort and 1M context.
 
-This is a picker change, not a hard block. No `availableModels` list is set, so Haiku still runs small background jobs. `modelPicker` needs Claude Code 2.1.242 or later. A sandboxed Claude Code 2.1.286 check showed exactly three rows, both with the saved model and with the `cc` launch flags.
+This is a picker change, not a hard block. No `availableModels` list is set. `modelPicker` needs Claude Code 2.1.242 or later; `behavesAs` needs 2.1.257 or later.
+
+A sandboxed Claude Code 2.1.286 check showed exactly three rows. Against a local mock, the default sent `claude-opus-5-5`. `--model sonnet`, `--model haiku`, and the GPT row each sent `gpt-6-astra` with `high` effort, adaptive thinking, and the 1M context beta. Small real requests through the relay returned `ok` on each path.
 
 An isolated Claude Code 2.1.281 check, run when the default was `xhigh`, verified settings-only, picker-alias, and wrapper launches send `model: claude-opus-5-5` with the configured `output_config.effort` and the 1M context beta. The default is now `high`; that check was not rerun. An explicit Sonnet/`low` override still wins. The check used a loopback mock, a temporary home, and a macOS sandbox blocking external networking and real-home/keychain access; it was not a paid model call or an upstream capacity test.
 
@@ -205,7 +206,7 @@ The first prompt was answered no. In local `~/.claude.json`, move `dummy` from `
 
 ### Small jobs get `model_not_supported`
 
-Keep both the Haiku and small-fast aliases set to `claude-haiku-4-5-20251001`, the installed CLI's own small-fast id. Do not add a `[1m]` suffix there. Also check the relay base URL.
+Keep the Haiku and small-fast aliases set to `gpt-6-astra[1m]`, the same model as the GPT picker row. Check that `gptModel` is still `gpt-6-astra` and that the relay base URL is right.
 
 ### Relay rewrites settings
 

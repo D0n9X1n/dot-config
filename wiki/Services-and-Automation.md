@@ -72,7 +72,7 @@ opusModel: claude-opus-5.5
 claudeUpstreamApi: chat-completions
 ```
 
-`opusModel` uses the canonical upstream ID without `[1m]`. Claude starts with native `claude-opus-5-5[1m]` and routes to Opus 5.5. Sonnet/Haiku requests and the blank WebSearch backend still use Astra. See [Claude Code](Claude-Code.md) for the Opus tool-selection limit.
+`opusModel` uses the canonical upstream ID without `[1m]`. Claude starts with native `claude-opus-5-5[1m]` and routes to Opus 5.5. Sonnet, Haiku, and small-fast call `gpt-6-astra[1m]` directly, and the blank WebSearch backend uses Astra. See [Claude Code](Claude-Code.md) for the Opus tool-selection limit.
 
 `claudeUpstreamApi: chat-completions` keeps Claude requests on Copilot's chat-completions API. It is copilot-relay 0.4.0's default, written out so the tracked file matches the relay's own template. `auto` or `messages` would use Copilot's native Messages API instead.
 

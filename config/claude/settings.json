@@ -4,9 +4,9 @@
     "ANTHROPIC_AUTH_TOKEN": "dummy",
     "ANTHROPIC_MODEL": "claude-opus-5-5[1m]",
     "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5-5[1m]",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5[1m]",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4-5-20251001",
-    "ANTHROPIC_SMALL_FAST_MODEL": "claude-haiku-4-5-20251001",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-6-astra[1m]",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-6-astra[1m]",
+    "ANTHROPIC_SMALL_FAST_MODEL": "gpt-6-astra[1m]",
     "MODEL_REASONING_EFFORT": "high",
     "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "100",
     "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": "16",
@@ -25,9 +25,10 @@
         "description": "Most capable for ambitious work"
       },
       {
-        "model": "sonnet",
-        "label": "Sonnet 5 (1M context)",
-        "description": "Best for everyday, complex tasks"
+        "model": "gpt-6-astra[1m]",
+        "label": "GPT-6 Astra (1M context)",
+        "description": "GPT-6 Astra through copilot-relay",
+        "behavesAs": "claude-sonnet-5"
       }
     ],
     "replaceBuiltInOptions": true

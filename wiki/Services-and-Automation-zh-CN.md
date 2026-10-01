@@ -72,7 +72,7 @@ opusModel: claude-opus-5.5
 claudeUpstreamApi: chat-completions
 ```
 
-`opusModel` 使用规范上游 ID，不加 `[1m]`。Claude 以原生 `claude-opus-5-5[1m]` 启动，路由到 Opus 5.5。Sonnet/Haiku 请求及空白 WebSearch 后端仍使用 Astra。Opus 工具选择限制见 [Claude Code](Claude-Code-zh-CN.md)。
+`opusModel` 使用规范上游 ID，不加 `[1m]`。Claude 以原生 `claude-opus-5-5[1m]` 启动，路由到 Opus 5.5。Sonnet、Haiku 和 small-fast 直接调用 `gpt-6-astra[1m]`，空白 WebSearch 后端使用 Astra。Opus 工具选择限制见 [Claude Code](Claude-Code-zh-CN.md)。
 
 `claudeUpstreamApi: chat-completions` 让 Claude 请求继续使用 Copilot 的 chat-completions API。这是 copilot-relay 0.4.0 的默认值；明确写出后，受管文件与 relay 自带模板一致。`auto` 或 `messages` 会改用 Copilot 原生 Messages API。
 

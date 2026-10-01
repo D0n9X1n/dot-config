@@ -41,18 +41,17 @@ Claude Code 保留原生 Opus 5.5 身份。名称包含 `opus`，所以 copilot-
 
 | Claude 端名称 | Relay lane | 上游 |
 |---|---|---|
-| `claude-sonnet-5[1m]` | `gptModel` | `gpt-6-astra` |
-| `claude-haiku-4-5-20251001`（Haiku / small-fast） | `gptModel` | `gpt-6-astra` |
+| `gpt-6-astra[1m]`（Sonnet、Haiku、small-fast、GPT 选择器行） | `gptModel` | `gpt-6-astra` |
 
-客户端名称和上游模型是两层。客户端保留原生 Anthropic ID；上游模型由 relay 决定。不要把 GPT ID 或 `_NAME` / `_DESCRIPTION` 显示覆盖写进 Claude 端设置。
+Opus 保留原生 Anthropic ID。其他槽位直接调用 `gpt-6-astra[1m]`，客户端名称已与上游模型一致，不再需要重映射。`/model` 选择器显示易读的标签。Relay 仍会把任何非 Opus 名称发送到 `gptModel`。
 
-`[1m]` 后缀让 Claude Code 使用一百万 token 的 context 计数；relay 向上游发送不带该后缀的规范 ID `claude-opus-5.5`。Haiku 保留已安装 CLI 的 small-fast ID，不加 `[1m]`。Context 计数不保证保留完整的 1M-token 对话历史；自动压缩还取决于模型和输出预算。Claude 保存的 Opus 和 Sonnet 偏好、启动器和状态栏 effort 回退值都使用 `high`，与 `config/copilot-relay/config.yaml` 中的 relay 回退值一致。
+`[1m]` 后缀让 Claude Code 使用一百万 token 的 context 计数；relay 向上游发送不带该后缀的规范 ID `claude-opus-5.5`。Haiku 和 small-fast 也使用 `gpt-6-astra[1m]`。Context 计数不保证保留完整的 1M-token 对话历史；自动压缩还取决于模型和输出预算。Claude 保存的 Opus 和 Sonnet 偏好、启动器和状态栏 effort 回退值都使用 `high`，与 `config/copilot-relay/config.yaml` 中的 relay 回退值一致。
 
 Claude Code 2.1.281 能识别原生 Opus 5.5 身份。修改模型和 effort 默认值时应同时更新 `config/claude/settings.json`、`config/zsh/claude.zsh` 和 `config/zsh/cc.zsh`；wrapper 的 `--model` 和 `--effort` flags 优先于保存的设置。Relay 的 `thinkEffort` 也应保持一致，作为未指定 effort 的请求回退值。独立的 `gptModel` 仍为 `gpt-6-astra`，空白的 `webSearchBackend` 仍使用 Astra。
 
 切换模型前，运行 `copilot` 并输入 `/model`，检查账号可用性和 effort 选项。这是 Copilot 的选择器，不是 Claude Code 的选择器，也不是 relay 本地的 `/v1/models`。`scripts/check.sh all` 通过后，运行两次 `./install.sh` 应用配置，再启动新的 shell 和 Claude Code 会话。安装器会保留健康的 relay 进程；恢复不健康的 relay 时可能中断请求。
 
-只修改 `opusModel` 不会让启动时选用 Opus。现在 `ANTHROPIC_MODEL`、保存的 `opus[1m]` 选择、`ANTHROPIC_DEFAULT_OPUS_MODEL` 和两个启动器都指向原生 Opus 5.5。Sonnet 与 Haiku 保留独立的 Astra 路由，不要把这些身份重映射到 Opus。Relay 路由和 effort 修改会热重载，无需重启。
+只修改 `opusModel` 不会让启动时选用 Opus。现在 `ANTHROPIC_MODEL`、保存的 `opus[1m]` 选择、`ANTHROPIC_DEFAULT_OPUS_MODEL` 和两个启动器都指向原生 Opus 5.5。Sonnet、Haiku 和 small-fast 直接调用 GPT-6 Astra；不要把 Opus 指向 GPT。Relay 路由和 effort 修改会热重载，无需重启。
 
 [上游 Opus 5.5 验证](https://github.com/D0n9X1n/copilot-relay/issues/81)确认自动工具调用可用，但强制指定 `tool_choice` 为 `tool` 或 `any` 会返回 HTTP 400。Relay 保留该错误，不会静默改成自动选择。
 
@@ -66,11 +65,11 @@ Claude Code 2.1.281 能识别原生 Opus 5.5 身份。修改模型和 effort 默
 | `ANTHROPIC_AUTH_TOKEN` | 本机占位符 `dummy` |
 | `ANTHROPIC_MODEL` | `claude-opus-5-5[1m]` |
 | `ANTHROPIC_DEFAULT_OPUS_MODEL` | `claude-opus-5-5[1m]`；解析原生 Opus 别名 |
-| `ANTHROPIC_DEFAULT_SONNET_MODEL` | `claude-sonnet-5[1m]` |
-| `ANTHROPIC_DEFAULT_HAIKU_MODEL` | `claude-haiku-4-5-20251001` |
-| `ANTHROPIC_SMALL_FAST_MODEL` | `claude-haiku-4-5-20251001` |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | `gpt-6-astra[1m]` |
+| `ANTHROPIC_DEFAULT_HAIKU_MODEL` | `gpt-6-astra[1m]` |
+| `ANTHROPIC_SMALL_FAST_MODEL` | `gpt-6-astra[1m]` |
 | `model` | `opus[1m]`；选择器的原生别名 |
-| `modelPicker` | 只有 `Opus 5.5 (1M context)` 和 `Sonnet 5 (1M context)`；替换内置列表 |
+| `modelPicker` | 只有 `Opus 5.5 (1M context)` 和 `GPT-6 Astra (1M context)`；替换内置列表 |
 | `modelSettings.claude-opus-5-5.effortLevel` | `high`；Opus 5.5 保存的 effort 偏好 |
 | `modelSettings.claude-sonnet-5.effortLevel` | `high`；Sonnet 5 保存的 effort 偏好 |
 | `MODEL_REASONING_EFFORT` | `high`；状态栏回退值与启动器的 `--effort high` 保持一致 |
@@ -87,16 +86,18 @@ Claude Code 2.1.281 能识别原生 Opus 5.5 身份。修改模型和 effort 默
 
 ### 模型选择器
 
-`/model` 只提供 relay 映射的两个模型：
+`/model` 提供两个最终选择：
 
 | 行 | 模型 | 说明 |
 |---|---|---|
 | Opus 5.5 (1M context) | `opus[1m]` | Most capable for ambitious work |
-| Sonnet 5 (1M context) | `sonnet` | Best for everyday, complex tasks |
+| GPT-6 Astra (1M context) | `gpt-6-astra[1m]` | GPT-6 Astra through copilot-relay |
 
-`modelPicker.replaceBuiltInOptions` 隐藏内置行，包括 Haiku 和 `opusplan`。Claude Code 总会加上 **Default** 行；它解析为 Opus 5.5，不能隐藏。标签沿用 Claude Code 的内置名称。不要在这里写 GPT 名称。虽然 relay 用 `gpt-6-astra` 提供 Sonnet，Sonnet 行仍保留原生名称。
+`modelPicker.replaceBuiltInOptions` 隐藏内置行，包括 Haiku 和 `opusplan`。Claude Code 总会加上 **Default** 行；它解析为 Opus 5.5，不能隐藏。GPT 行设置 `behavesAs: claude-sonnet-5`，所以 Claude Code 在 effort 和 1M context 上把它当作 Sonnet 5。
 
-这只改变选择器，不是硬性禁止。没有设置 `availableModels`，所以 Haiku 仍运行小型后台任务。`modelPicker` 需要 Claude Code 2.1.242 或更高版本。在 sandbox 中运行的 Claude Code 2.1.286 检查显示正好三行：使用保存的模型和使用 `cc` 启动参数时都一样。
+这只改变选择器，不是硬性禁止。没有设置 `availableModels`。`modelPicker` 需要 Claude Code 2.1.242 或更高版本；`behavesAs` 需要 2.1.257 或更高版本。
+
+在 sandbox 中运行的 Claude Code 2.1.286 检查显示正好三行。对本机 mock，默认请求发送 `claude-opus-5-5`。`--model sonnet`、`--model haiku` 和 GPT 行都发送 `gpt-6-astra`，带 `high` effort、adaptive thinking 和 1M context beta。通过 relay 的小型真实请求在每条路径上都返回 `ok`。
 
 独立的 Claude Code 2.1.281 检查（在默认值为 `xhigh` 时运行）验证了仅使用设置、picker 别名和 wrapper 启动时，请求均发送 `model: claude-opus-5-5`、所配置的 `output_config.effort` 和 1M context beta。默认值现为 `high`；该检查未重新运行。显式指定 Sonnet/`low` 仍优先。检查使用回环 mock、临时 home 和 macOS sandbox，阻止外部网络及真实 home/keychain 访问；没有付费模型调用，也不是上游容量测试。
 
@@ -205,7 +206,7 @@ Claude Code 2.1.278 在存在 `TMUX` 时会把输出限制为 256 色，即使�
 
 ### 小任务出现 `model_not_supported`
 
-保持 Haiku 和 small-fast aliases 都是 `claude-haiku-4-5-20251001`，即已安装 CLI 自身的 small-fast ID。那里不要加 `[1m]` 后缀。同时检查 relay base URL。
+保持 Haiku 和 small-fast aliases 都是 `gpt-6-astra[1m]`，与 GPT 选择器行相同。检查 `gptModel` 仍是 `gpt-6-astra`，并确认 relay base URL 正确。
 
 ### Relay 重写 settings
 

@@ -52,17 +52,16 @@ Keep provider metrics different: Claude shows cost; Copilot shows premium reques
 
 ### Models
 
-Sonnet and Opus are separate families.
+Claude has two final choices: Opus 5.5 and GPT-6 Astra.
 
 - Claude Code defaults to native `claude-opus-5-5[1m]` with `high` effort. Keep settings, `claude`/`cc` launch flags, and the status-line effort fallback aligned.
-- Preserve native `claude-sonnet-5[1m]` and `claude-haiku-4-5-20251001` identities; their non-Opus requests route through `gptModel` to `gpt-6-astra`.
-- Opus names route to `opusModel`, using upstream `claude-opus-5.5` without a context suffix.
+- Sonnet, Haiku, and small-fast call `gpt-6-astra[1m]` directly. No Claude Sonnet or Haiku id remains in Claude settings.
+- Opus names route to `opusModel`, using upstream `claude-opus-5.5` without a context suffix. Every other name routes to `gptModel` (`gpt-6-astra`).
 - Relay `thinkEffort` falls back to `high`; explicit client effort wins. Copilot CLI and `gg` retain their separate Astra/`high` defaults.
-- Keep `[1m]` on Claude-facing defaults that need one-million-token accounting. The Haiku id takes no suffix.
-- Do not put a GPT id, or a `_NAME` / `_DESCRIPTION` display override, into Claude settings.
-- `modelPicker` replaces the built-in `/model` list with the two mapped models: `opus[1m]` as `Opus 5.5 (1M context)` and `sonnet` as `Sonnet 5 (1M context)`. Use built-in Claude names only. Claude Code always adds Default. Do not add `availableModels`; Haiku still runs small background jobs.
+- Keep `[1m]` on every Claude-facing default.
+- `modelPicker` replaces the built-in `/model` list with `Opus 5.5 (1M context)` (`opus[1m]`) and `GPT-6 Astra (1M context)` (`gpt-6-astra[1m]`, `behavesAs: claude-sonnet-5`). Claude Code always adds Default, which stays Opus. Do not add `availableModels`.
 
-Do not change both families when the task names one.
+Keep Opus native. Never point Opus at GPT.
 
 ### Multiplexers and terminal identity
 
