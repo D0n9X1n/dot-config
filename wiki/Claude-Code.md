@@ -46,7 +46,7 @@ Other routes:
 
 Client names and upstream models are separate layers. The client keeps native Anthropic ids; the relay decides the upstream model. Do not write a GPT id, or a `_NAME` / `_DESCRIPTION` display override, into Claude-facing settings.
 
-The `[1m]` suffix keeps Claude Code's one-million-token context accounting; the relay sends canonical `claude-opus-5.5` upstream without that suffix. Haiku keeps the installed CLI's small-fast ID without `[1m]`. Context accounting does not guarantee a full 1M-token conversation history; automatic compaction also depends on model and output budgets. Claude's saved Opus preference, launchers, and status-line effort fallback use `xhigh`, matching the relay's fallback in `config/copilot-relay/config.yaml`.
+The `[1m]` suffix keeps Claude Code's one-million-token context accounting; the relay sends canonical `claude-opus-5.5` upstream without that suffix. Haiku keeps the installed CLI's small-fast ID without `[1m]`. Context accounting does not guarantee a full 1M-token conversation history; automatic compaction also depends on model and output budgets. Claude's saved Opus and Sonnet preferences, launchers, and status-line effort fallback use `high`, matching the relay's fallback in `config/copilot-relay/config.yaml`.
 
 The native Opus 5.5 identity is recognized by Claude Code 2.1.281. Update model and effort defaults in `config/claude/settings.json`, `config/zsh/claude.zsh`, and `config/zsh/cc.zsh` together; the wrappers' `--model` and `--effort` flags override saved settings. Keep relay `thinkEffort` aligned as the fallback for requests without effort. The separate `gptModel` stays `gpt-6-astra`, and the blank `webSearchBackend` still uses Astra.
 
@@ -70,8 +70,9 @@ Changing only `opusModel` does not select Opus at startup. `ANTHROPIC_MODEL`, th
 | `ANTHROPIC_DEFAULT_HAIKU_MODEL` | `claude-haiku-4-5-20251001` |
 | `ANTHROPIC_SMALL_FAST_MODEL` | `claude-haiku-4-5-20251001` |
 | `model` | `opus[1m]`; the picker's native alias |
+| `modelPicker` | only `Opus 5.5 (1M context)` and `Sonnet 5 (1M context)`; replaces the built-in list |
 | `modelSettings.claude-opus-5-5.effortLevel` | `high`; Opus 5.5's saved effort preference |
-| `modelSettings.claude-sonnet-5.effortLevel` | `xhigh`; preserves the locally selected Sonnet preference |
+| `modelSettings.claude-sonnet-5.effortLevel` | `high`; Sonnet 5's saved effort preference |
 | `MODEL_REASONING_EFFORT` | `high`; status-line fallback aligned with the launchers' `--effort high` |
 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | `16` |
 | `statusLine.refreshInterval` | `100` |
@@ -82,7 +83,20 @@ Changing only `opusModel` does not select Opus at startup. `ANTHROPIC_MODEL`, th
 | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"100"`; retained percentage override |
 | `feedbackDrafts` | `off` |
 
-`refreshInterval` belongs inside `statusLine`. The saved Opus preference uses `high`; the saved Sonnet preference keeps `xhigh`. `MODEL_REASONING_EFFORT` is a status-line fallback, not an API effort control. The launchers pass `--effort high`; an explicit effort on the `claude` command overrides it. No top-level `effortLevel` is managed. [Copilot CLI](Copilot-CLI.md) keeps its separate Astra/`high` defaults.
+`refreshInterval` belongs inside `statusLine`. The saved Opus and Sonnet preferences both use `high`. `MODEL_REASONING_EFFORT` is a status-line fallback, not an API effort control. The launchers pass `--effort high`; an explicit effort on the `claude` command overrides it. No top-level `effortLevel` is managed. [Copilot CLI](Copilot-CLI.md) keeps its separate Astra/`high` defaults.
+
+### Model picker
+
+`/model` offers only the two models the relay maps:
+
+| Row | Model | Description |
+|---|---|---|
+| Opus 5.5 (1M context) | `opus[1m]` | Most capable for ambitious work |
+| Sonnet 5 (1M context) | `sonnet` | Best for everyday, complex tasks |
+
+`modelPicker.replaceBuiltInOptions` hides the built-in rows, including Haiku and `opusplan`. Claude Code always adds a **Default** row; it resolves to Opus 5.5 and cannot be hidden. The labels copy Claude Code's built-in names. Never put a GPT name there. The Sonnet row keeps its native name even though the relay serves it with `gpt-6-astra`.
+
+This is a picker change, not a hard block. No `availableModels` list is set, so Haiku still runs small background jobs. `modelPicker` needs Claude Code 2.1.242 or later. A sandboxed Claude Code 2.1.286 check showed exactly three rows, both with the saved model and with the `cc` launch flags.
 
 An isolated Claude Code 2.1.281 check, run when the default was `xhigh`, verified settings-only, picker-alias, and wrapper launches send `model: claude-opus-5-5` with the configured `output_config.effort` and the 1M context beta. The default is now `high`; that check was not rerun. An explicit Sonnet/`low` override still wins. The check used a loopback mock, a temporary home, and a macOS sandbox blocking external networking and real-home/keychain access; it was not a paid model call or an upstream capacity test.
 

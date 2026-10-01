@@ -17,6 +17,21 @@
     "defaultMode": "auto"
   },
   "model": "opus[1m]",
+  "modelPicker": {
+    "options": [
+      {
+        "model": "opus[1m]",
+        "label": "Opus 5.5 (1M context)",
+        "description": "Most capable for ambitious work"
+      },
+      {
+        "model": "sonnet",
+        "label": "Sonnet 5 (1M context)",
+        "description": "Best for everyday, complex tasks"
+      }
+    ],
+    "replaceBuiltInOptions": true
+  },
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
@@ -41,7 +56,7 @@
   "feedbackDrafts": "off",
   "modelSettings": {
     "claude-sonnet-5": {
-      "effortLevel": "xhigh"
+      "effortLevel": "high"
     },
     "claude-opus-5-5": {
       "effortLevel": "high"

@@ -195,7 +195,12 @@ run_model_default_smoke() {
     (has("effortLevel") | not) and
     .env.MODEL_REASONING_EFFORT == "high" and
     .modelSettings["claude-opus-5-5"].effortLevel == "high" and
-    .modelSettings["claude-sonnet-5"].effortLevel == "xhigh" and
+    .modelSettings["claude-sonnet-5"].effortLevel == "high" and
+    .modelPicker.replaceBuiltInOptions == true and
+    ([.modelPicker.options[] | [.model, .label]]
+      == [["opus[1m]", "Opus 5.5 (1M context)"], ["sonnet", "Sonnet 5 (1M context)"]]) and
+    (.modelPicker.options | all(.description | type == "string" and length > 0)) and
+    (has("availableModels") | not) and
     .env.ANTHROPIC_DEFAULT_OPUS_MODEL == "claude-opus-5-5[1m]" and
     .env.ANTHROPIC_DEFAULT_SONNET_MODEL == "claude-sonnet-5[1m]" and
     (.env | has("ANTHROPIC_DEFAULT_OPUS_MODEL_NAME") | not) and
@@ -222,7 +227,8 @@ run_model_default_smoke() {
   # No GPT identity may leak back into any Claude-facing selector or label.
   if jq -e '
       [(.env | to_entries[] | select(.key | test("^ANTHROPIC_.*MODEL")) | .value),
-       .model]
+       .model,
+       (.modelPicker.options[]? | .model, .label, .description)]
       | map(select(type == "string") | ascii_downcase)
       | any(test("gpt"))
     ' config/claude/settings.json >/dev/null; then
