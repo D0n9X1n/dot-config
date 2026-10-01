@@ -248,6 +248,7 @@ run_model_default_smoke() {
   grep -Eq '^gptModel:[[:space:]]*gpt-6-astra$' config/copilot-relay/config.yaml
   grep -Eq '^thinkEffort:[[:space:]]*high$' config/copilot-relay/config.yaml
   grep -Eq '^upstreamTimeoutSeconds:[[:space:]]*900$' config/copilot-relay/config.yaml
+  grep -Eq '^claudeUpstreamApi:[[:space:]]*chat-completions$' config/copilot-relay/config.yaml
 
   grep -Fq $'link\tconfig/copilot-relay/config.yaml\t.copilot-relay/config.yaml' config/manifest.tsv
 

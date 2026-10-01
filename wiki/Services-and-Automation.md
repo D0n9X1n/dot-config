@@ -69,9 +69,12 @@ thinkEffort: high
 upstreamTimeoutSeconds: 900
 gptModel: gpt-6-astra
 opusModel: claude-opus-5.5
+claudeUpstreamApi: chat-completions
 ```
 
 `opusModel` uses the canonical upstream ID without `[1m]`. Claude starts with native `claude-opus-5-5[1m]` and routes to Opus 5.5. Sonnet/Haiku requests and the blank WebSearch backend still use Astra. See [Claude Code](Claude-Code.md) for the Opus tool-selection limit.
+
+`claudeUpstreamApi: chat-completions` keeps Claude requests on Copilot's chat-completions API. It is copilot-relay 0.4.0's default, written out so the tracked file matches the relay's own template. `auto` or `messages` would use Copilot's native Messages API instead.
 
 `claudeSetup: false` stops the relay from rewriting the linked Claude settings. The relay's `thinkEffort` fallback and Claude's saved Opus preference, launchers, and status-line fallback use `high`. Explicit client effort still takes precedence. Copilot CLI and `gg` retain their separate Astra/`high` defaults. Model routes and relay effort hot-reload without a restart; existing shells need their Claude launchers reloaded or a new shell. `upstreamTimeoutSeconds: 900` allows up to fifteen minutes for a single Claude request's upstream Copilot calls.
 
