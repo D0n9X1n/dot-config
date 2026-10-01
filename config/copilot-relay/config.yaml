@@ -40,3 +40,6 @@ gptModel: gpt-6-astra
 
 # Upstream Copilot model used for requests containing "opus".
 opusModel: claude-opus-5.5
+
+# Claude upstream protocol: auto, messages, or chat-completions.
+claudeUpstreamApi: chat-completions

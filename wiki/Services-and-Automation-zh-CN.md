@@ -69,9 +69,12 @@ thinkEffort: high
 upstreamTimeoutSeconds: 900
 gptModel: gpt-6-astra
 opusModel: claude-opus-5.5
+claudeUpstreamApi: chat-completions
 ```
 
 `opusModel` 使用规范上游 ID，不加 `[1m]`。Claude 以原生 `claude-opus-5-5[1m]` 启动，路由到 Opus 5.5。Sonnet/Haiku 请求及空白 WebSearch 后端仍使用 Astra。Opus 工具选择限制见 [Claude Code](Claude-Code-zh-CN.md)。
+
+`claudeUpstreamApi: chat-completions` 让 Claude 请求继续使用 Copilot 的 chat-completions API。这是 copilot-relay 0.4.0 的默认值；明确写出后，受管文件与 relay 自带模板一致。`auto` 或 `messages` 会改用 Copilot 原生 Messages API。
 
 `claudeSetup: false` 会阻止 relay 重写链接的 Claude settings。Relay 的 `thinkEffort` 回退值与 Claude 保存的 Opus 偏好、启动器和状态栏回退值都使用 `high`；客户端显式指定的 effort 仍优先。Copilot CLI 和 `gg` 保留独立的 Astra/`high` 默认值。模型路由和 relay effort 会热重载，无需重启；已有 shell 需要重新加载 Claude 启动器或打开新 shell。`upstreamTimeoutSeconds: 900` 允许单个 Claude 请求的上游 Copilot 调用最多等待十五分钟。
 
