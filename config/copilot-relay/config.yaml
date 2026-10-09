@@ -43,3 +43,11 @@ opusModel: claude-opus-5.5
 
 # Claude upstream protocol: auto, messages, or chat-completions.
 claudeUpstreamApi: chat-completions
+
+# Key clients must send as x-api-key or Authorization: Bearer; empty disables it.
+# Set one before binding host beyond loopback.
+apiKey: 
+
+# Outbound proxy for Copilot and GitHub calls. Empty connects directly; env uses
+# HTTPS_PROXY, HTTP_PROXY and NO_PROXY; or a URL such as http://proxy.example:3128.
+upstreamProxy:
