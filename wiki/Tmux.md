@@ -85,6 +85,10 @@ Private state is stored under `~/.local/state/tmux-store/`, separately for each 
 
 Unlike RMUX's retained executable pair, native tmux uses a compatible installed Homebrew executable and its libraries. Missing or incompatible clients/dependencies fail safely. This does not guarantee reconnecting after arbitrary Homebrew dependency cleanup; no copied binary, dylib relocation, or global library-path override is installed.
 
+Homebrew cleanup can delete the old tmux while its server still runs. The helpers then adopt that server through the installed tmux, with no restart. They adopt it only when its PID, process start time, owner, socket, and version match the saved record. A replaced executable, another server, or a protocol error is still refused; nothing is started or stopped. Each decision is added to `recovery.log` in the private state folder, and an adoption prints one notice. Run `ts` later to move the sessions onto the new tmux.
+
+tmux 3.8 reports window layouts as JSON. The helpers convert them to the older layout string that `select-layout` still accepts, so `ts` saves and restores layouts on 3.7c and 3.8.
+
 ## Apply and verify
 
 ```sh
