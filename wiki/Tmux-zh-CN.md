@@ -2,7 +2,7 @@
 
 [English](Tmux.md) | 简体中文
 
-原生 tmux 是 macOS 和 Linux 上的复用器。[RMUX](RMUX-zh-CN.md) 只用于 Windows。两者使用相同的 Apollo 配色和底部标签样式，服务器、会话和恢复状态各自独立。受管配置面向 tmux 3.7c。`install.sh` 安装 Homebrew tmux，并把 `config/tmux/tmux.conf` 链接到 `~/.tmux.conf`。
+原生 tmux 是 macOS 和 Linux 上的复用器。[RMUX](RMUX-zh-CN.md) 只用于 Windows。两者使用相同的 Apollo 配色和底部标签样式，服务器、会话和恢复状态各自独立。受管配置面向 tmux 3.7c 和 3.8。`install.sh` 安装 Homebrew tmux，并把 `config/tmux/tmux.conf` 链接到 `~/.tmux.conf`。
 
 ## 启动与重连
 
@@ -49,6 +49,8 @@ ts            # 确认、保存、重启并恢复当前服务器的工作区
 ## 重命名与提示框输入
 
 使用 `prefix + n` 或 `prefix + ,`。提示框以 Vi 插入模式打开。Ctrl+W 删除前一个词，Ctrl+U 清空输入，Ctrl+G 在插入模式中取消。Escape 切换到 Vi 命令模式；在该模式用 `q` 或 Ctrl+C 取消。
+
+在 tmux 3.7c 和 3.8 上，输入的标题会原样保留，包括引号、`;`、`#` 和 `%`。tmux 3.8 在终端回复同步输出查询前，会把 Escape 保留 500 毫秒。如果 Escape 后立刻按的 `q` 被当作 Alt+Q，说明终端没有回复；稍等片刻或改用 Ctrl+C。
 
 提示框用当前 Apollo 消息背景色填满整行，避免编辑时透出标签标题和时钟。
 

@@ -2,7 +2,7 @@
 
 English | [简体中文](Tmux-zh-CN.md)
 
-Native tmux is the multiplexer on macOS and Linux. [RMUX](RMUX.md) is for Windows only. Both use the same Apollo colors and bottom-tab style, with separate servers, sessions, and recovery state. The managed profile targets tmux 3.7c. `install.sh` installs Homebrew tmux and links `config/tmux/tmux.conf` to `~/.tmux.conf`.
+Native tmux is the multiplexer on macOS and Linux. [RMUX](RMUX.md) is for Windows only. Both use the same Apollo colors and bottom-tab style, with separate servers, sessions, and recovery state. The managed profile targets tmux 3.7c and 3.8. `install.sh` installs Homebrew tmux and links `config/tmux/tmux.conf` to `~/.tmux.conf`.
 
 ## Start and reconnect
 
@@ -49,6 +49,8 @@ The installer links the verified theme to `~/.config/tmux-apollo-theme/apollo.tm
 ## Rename and prompt input
 
 Use `prefix + n` or `prefix + ,`. The rename prompt starts in Vi insert mode. Ctrl+W deletes the previous word and Ctrl+U clears the entry. Ctrl+G cancels in insert mode. Escape enters Vi command mode; use `q` or Ctrl+C there to cancel.
+
+The typed title is kept exactly as entered, including quotes, `;`, `#`, and `%`, on tmux 3.7c and 3.8. tmux 3.8 holds Escape for 500ms until the terminal answers its synchronized-output query. If `q` right after Escape is read as Alt+Q, the terminal did not answer; wait briefly or use Ctrl+C.
 
 Prompt backgrounds fill the row with the current Apollo message color, so the tab title and clock do not show through while editing.
 

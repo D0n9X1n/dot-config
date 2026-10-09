@@ -2,7 +2,7 @@
 
 English | [简体中文](Tmux-Keymap-zh-CN.md)
 
-These are the managed bindings for native tmux 3.7c. See [Tmux](Tmux.md) for setup, server lifetime, and recovery. RMUX remains separate; its [keymap](RMUX-Keymap.md) is not a list of native tmux defaults.
+These are the managed bindings for native tmux 3.7c and 3.8. See [Tmux](Tmux.md) for setup, server lifetime, and recovery. RMUX remains separate; its [keymap](RMUX-Keymap.md) is not a list of native tmux defaults.
 
 ## Sessions
 

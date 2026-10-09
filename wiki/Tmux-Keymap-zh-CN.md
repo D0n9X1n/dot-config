@@ -2,7 +2,7 @@
 
 [English](Tmux-Keymap.md) | 简体中文
 
-这里列出原生 tmux 3.7c 的受管按键。安装、服务器生命周期和恢复见 [Tmux](Tmux-zh-CN.md)。RMUX 保持独立；其[按键表](RMUX-Keymap-zh-CN.md)不是原生 tmux 默认按键列表。
+这里列出原生 tmux 3.7c 和 3.8 的受管按键。安装、服务器生命周期和恢复见 [Tmux](Tmux-zh-CN.md)。RMUX 保持独立；其[按键表](RMUX-Keymap-zh-CN.md)不是原生 tmux 默认按键列表。
 
 ## 会话
 
