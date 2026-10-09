@@ -80,6 +80,8 @@ class TerminalReplies:
         b'\x1b[18t': b'\x1b[8;40;160t',
         b'\x1b[14t': b'\x1b[4;640;1280t',
         b'\x1b[?996n': b'\x1b[?997;1n',
+        # tmux 3.8 holds Escape for 500ms until synchronized output (DECRQM 2026) is answered.
+        b'\x1b[?2026$p': b'\x1b[?2026;0$y',
         b'\x1b]10;?\x1b\\': b'\x1b]10;rgb:eeee/eeee/eeee\x1b\\',
         b'\x1b]11;?\x1b\\': b'\x1b]11;rgb:1111/1111/1111\x1b\\',
     }
@@ -269,6 +271,7 @@ class TerminalReplyTests(unittest.TestCase):
                    (b'\x1b[>q', b'\x1bP>|profile-test\x1b\\'),
                    (b'\x1b[6n', b'\x1b[1;1R'), (b'\x1b[18t', b'\x1b[8;40;160t'),
                    (b'\x1b[14t', b'\x1b[4;640;1280t'), (b'\x1b[?996n', b'\x1b[?997;1n'),
+                   (b'\x1b[?2026$p', b'\x1b[?2026;0$y'),
                    (b'\x1b]10;?\x1b\\', b'\x1b]10;rgb:eeee/eeee/eeee\x1b\\'),
                    (b'\x1b]11;?\x1b\\', b'\x1b]11;rgb:1111/1111/1111\x1b\\')]
         for query, reply in queries:
@@ -406,7 +409,8 @@ class ProfileTests(unittest.TestCase):
         marker = tm.root / 'injected'
         names = ['custom name', 'Unicode 界 é', '-leading', "quote ' and \" and semi ;", 'trailing\\',
                  r'back\\slash\"quote', '#{session_name}', f'#(touch {marker})', 'hash # ## #[fg=red] literal',
-                 '%1 %% %%%', 'comma,second', 'x" ; set-option -g @rename-injected yes ; rename-window "owned']
+                 '%1 %% %%%', 'comma,second', 'tilde ~ dollar $HOME semi;',
+                 'x" ; set-option -g @rename-injected yes ; rename-window "owned']
         for key in ('n', ','):
             for name in names:
                 with self.subTest(key=key, name=name):
