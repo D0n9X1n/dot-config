@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Native tmux: exact sessions and explicit workspace-only restart per socket."""
 import ctypes
+import errno
 import hashlib
 import json
 import os
@@ -27,6 +28,35 @@ PANE = {'session_name': 'text', 'window_index': 'int', 'pane_id': '%', 'pane_ind
         'pane_width': 'int', 'pane_height': 'int', 'pane_current_path': 'text',
         'pane_active': 'flag', 'pane_dead': 'flag'}
 SERVER = {'pid': 'int', 'socket_path': 'text', 'start_time': 'int', 'version': 'text'}
+
+
+def checksummed(body):
+    checksum = 0
+    for char in body:
+        checksum = (((checksum >> 1) | ((checksum & 1) << 15)) + ord(char)) & 0xffff
+    return f'{checksum:04x},{body}'
+
+
+def legacy_layout(value):
+    """tmux 3.8 reports JSON layouts; select-layout still takes the legacy string."""
+    try:
+        data = json.loads(value)
+    except ValueError as exc:
+        raise StoreError('invalid layout') from exc
+    require(isinstance(data, dict) and data.get('V') == 2, 'unsupported layout version')
+
+    def node(item, depth=0):
+        require(depth < 64 and isinstance(item, dict), 'invalid layout node')
+        w, h = (integer(item.get(key), 1, 10000) for key in ('w', 'h'))
+        x, y = (integer(item.get(key), 0, 10000) for key in ('x', 'y'))
+        rect = f'{w}x{h},{x},{y}'
+        if item.get('t') == 'p':
+            return f"{rect},{identifier(item.get('I'), '%')[1:]}"
+        require(item.get('t') in ('h', 'v') and isinstance(item.get('c'), list) and item['c'], 'invalid layout split')
+        opening, closing = ('{', '}') if item['t'] == 'h' else ('[', ']')
+        return rect + opening + ','.join(node(child, depth + 1) for child in item['c']) + closing
+
+    return checksummed(node(data.get('L')))
 
 
 def record_format(schema):
@@ -61,6 +91,8 @@ def decode_rows(output, schema):
             elif kind in ('$', '@', '%'):
                 identifier(value, kind)
             elif kind == 'layout':
+                if value.startswith('{'):
+                    value = legacy_layout(value)
                 parse_layout(value)
             else:
                 text(value)
@@ -91,10 +123,7 @@ def remap_layout(value, panes):
     ids = iter(identifier(pane, '%')[1:] for pane in panes)
     body = re.sub(r'(\d+x\d+,\d+,\d+),\d+(?=[,}\]]|$)',
                   lambda match: match.group(1) + ',' + next(ids), value[5:])
-    checksum = 0
-    for char in body:
-        checksum = (((checksum >> 1) | ((checksum & 1) << 15)) + ord(char)) & 0xffff
-    result = f'{checksum:04x},{body}'
+    result = checksummed(body)
     parse_layout(result)
     return result
 
@@ -203,6 +232,15 @@ class Store(PrivateState):
     def installed_runtime(self):
         return self.runtime_at(self.installed)
 
+    def runtime_missing(self, runtime):
+        require(isinstance(runtime, dict) and isinstance(runtime.get('path'), str) and os.path.isabs(runtime['path']),
+                'invalid native runtime metadata')
+        try:
+            Path(runtime['path']).resolve(strict=True)
+        except FileNotFoundError:
+            return True
+        return False
+
     def validate_runtime(self, runtime):
         require(isinstance(runtime, dict) and set(runtime) == {'path', 'hash', 'version'}, 'invalid native runtime metadata')
         require(isinstance(runtime['path'], str) and os.path.isabs(runtime['path']) and
@@ -246,12 +284,19 @@ class Store(PrivateState):
 
         lib = ctypes.CDLL('/usr/lib/libproc.dylib', use_errno=True)
         info, path = BSDInfo(), ctypes.create_string_buffer(4096)
-        require(lib.proc_pidinfo(pid, 3, 0, ctypes.byref(info), ctypes.sizeof(info)) == ctypes.sizeof(info)
-                and lib.proc_pidpath(pid, path, len(path)) > 0, 'cannot inspect native server generation')
+        require(lib.proc_pidinfo(pid, 3, 0, ctypes.byref(info), ctypes.sizeof(info)) == ctypes.sizeof(info),
+                'cannot inspect native server generation')
+        ctypes.set_errno(0)
+        if lib.proc_pidpath(pid, path, len(path)) > 0:
+            executable = os.fsdecode(path.value)
+        else:
+            # A running server whose Homebrew keg was deleted has no executable path.
+            require(ctypes.get_errno() == errno.ENOENT, 'cannot inspect native server generation')
+            executable = None
         require(info.pid == pid and info.uid == os.getuid(), 'native server is not owned by this user')
-        return {'ppid': info.ppid, 'start': f'{info.sec}.{info.usec:06d}', 'path': os.fsdecode(path.value)}
+        return {'ppid': info.ppid, 'start': f'{info.sec}.{info.usec:06d}', 'path': executable}
 
-    def probe(self, runtime):
+    def probe(self, runtime, known=None):
         result = self.run(runtime, ['display-message', '-p', record_format(SERVER)])
         if result.returncode:
             message = result.stderr.strip()
@@ -264,34 +309,78 @@ class Store(PrivateState):
         require(len(rows) == 1, 'invalid native server identity response')
         row = rows[0]
         require(canonical_socket(row['socket_path']) == self.socket, 'native server socket mismatch')
-        require(row['version'] == runtime['version'], 'native server/client version mismatch; refusing unknown server')
+        require(row['version'] == runtime['version'] or
+                known is not None and (row['pid'], row['version']) == (known['pid'], known['version']),
+                'native server/client version mismatch; refusing unknown server')
         process = self.process_info(row['pid'])
         return {'pid': row['pid'], 'socket': self.socket, 'start': process['start'],
                 'started': row['start_time'], 'version': row['version']}
 
-    def verify_process(self, runtime, server):
+    def verify_process(self, runtime, server, known=None):
         self.validate_runtime(runtime)
         info = self.process_info(server['pid'])
-        require(info['start'] == server['start'] and Path(info['path']).resolve() == Path(runtime['path']) and
-                server['socket'] == self.socket and server['version'] == runtime['version'],
-                'native executable or server generation changed; refusing unknown server')
+        if info['path'] is None:
+            # Deleted executable: trust only the generation recorded while it still existed.
+            require(server == known and info['start'] == server['start'] and server['socket'] == self.socket,
+                    'native executable or server generation changed; refusing unknown server')
+        else:
+            require(info['start'] == server['start'] and Path(info['path']).resolve() == Path(runtime['path']) and
+                    server['socket'] == self.socket and server['version'] == runtime['version'],
+                    'native executable or server generation changed; refusing unknown server')
         require(self.process_info(server['pid'])['start'] == server['start'], 'native generation changed during verification')
 
-    def record_active(self, runtime):
-        server = self.probe(runtime)
+    def record_active(self, runtime, known=None):
+        server = self.probe(runtime, known)
         if server:
-            self.verify_process(runtime, server)
+            self.verify_process(runtime, server, known)
         active = {'version': 1, 'runtime': runtime, 'server': server}
         self.write_json('active.json', active)
+        return active
+
+    def recovery_log(self, message):
+        fd = self.open_private(self.state / 'recovery.log', os.O_WRONLY | os.O_APPEND | os.O_CREAT)
+        try:
+            line = f"{time.strftime('%Y-%m-%dT%H:%M:%S%z')} {message}\n".encode()
+            require(os.write(fd, line) == len(line), 'incomplete recovery log write; refusing adoption')
+        finally:
+            os.close(fd)
+
+    def adopt(self, recorded, known):
+        context = f"recorded {recorded['version']} at {recorded['path']} is missing"
+        try:
+            runtime = self.installed_runtime()
+            context += f"; client {runtime['version']} at {runtime['path']}"
+            # Save exactly what was verified; a second probe could see a different server.
+            server = self.probe(runtime, known)
+            if server is None:
+                self.recovery_log(f'recorded server gone; {context}')
+            else:
+                require(known is not None and server == known, 'running server is not the recorded generation')
+                self.verify_process(runtime, server, known)
+                self.recovery_log(f"adopted server pid {server['pid']} version {server['version']} start {server['start']}; {context}")
+            active = {'version': 1, 'runtime': runtime, 'server': server}
+            self.write_json('active.json', active)
+        except (StoreError, OSError, subprocess.SubprocessError) as exc:
+            try:
+                self.recovery_log(f'refused adoption: {exc}; {context}')
+            except (StoreError, OSError):
+                pass
+            raise
+        if server is not None:
+            print(f"tmux-store: adopted running tmux {server['version']} server (pid {server['pid']}); "
+                  f"client now {runtime['version']}. Log: {self.state / 'recovery.log'}", file=sys.stderr)
         return active
 
     def ensure_active(self):
         active = self.read_json('active.json')
         if active is not None:
             validate_active_record(active)
+            known = active['server']
+            if self.runtime_missing(active['runtime']):
+                return self.adopt(active['runtime'], known)
             runtime = self.validate_runtime(active['runtime'])
-            if self.probe(runtime) is not None:
-                return self.record_active(runtime)
+            if self.probe(runtime, known) is not None:
+                return self.record_active(runtime, known)
         return self.record_active(self.installed_runtime())
 
     def prepare(self):
@@ -432,10 +521,10 @@ class Store(PrivateState):
             first = second
         raise StoreError('workspace changed during capture; retry when stable')
 
-    def wait_absent(self, runtime):
+    def wait_absent(self, runtime, known=None):
         deadline = time.monotonic() + 5
         while time.monotonic() < deadline:
-            if self.probe(runtime) is None:
+            if self.probe(runtime, known) is None:
                 return
             time.sleep(.05)
         raise StoreError('tmux server did not stop; refusing to start another')
@@ -536,8 +625,8 @@ class Store(PrivateState):
             if input('Type yes to continue: ').strip() != 'yes':
                 print('Cancelled; no server stopped.')
                 return
-            require(self.probe(active['runtime']) == active['server'], 'server generation changed before restart')
-            self.verify_process(active['runtime'], active['server'])
+            require(self.probe(active['runtime'], active['server']) == active['server'], 'server generation changed before restart')
+            self.verify_process(active['runtime'], active['server'], active['server'])
             require(self.capture(active['runtime']) == snapshot, 'workspace changed while confirming; retry')
             self.write_json('snapshot.json', snapshot, previous=True)
             operation = {'version': 1, 'id': uuid.uuid4().hex, 'phase': 'prepared', 'old': active,
@@ -552,7 +641,7 @@ class Store(PrivateState):
         if active is not None:
             validate_active_record(active)
         probe_runtime = self.validate_runtime(active['runtime']) if active is not None else runtime
-        require(self.probe(probe_runtime) is None,
+        require(self.probe(probe_runtime, active['server'] if active is not None else None) is None,
                 'unfinished restart kept original snapshot; server still runs. Inspect restart.log; stop partial sessions explicitly before ts retry')
         snapshot = validate_snapshot(self.read_json('snapshot.json'))
         require(snapshot_hash(snapshot) == operation['snapshot_hash'], 'snapshot generation changed')
@@ -597,16 +686,17 @@ class Store(PrivateState):
                 if operation['phase'] == 'prepared':
                     old = operation['old']
                     self.validate_runtime(old['runtime'])
-                    require(self.probe(old['runtime']) == old['server'], 'server PID or start generation changed; not stopped')
-                    self.verify_process(old['runtime'], old['server'])
+                    require(self.probe(old['runtime'], old['server']) == old['server'], 'server PID or start generation changed; not stopped')
+                    self.verify_process(old['runtime'], old['server'], old['server'])
                     require(self.capture(old['runtime']) == snapshot, 'workspace changed after confirmation; not stopped')
                     operation['phase'] = 'stopping'
                     self.write_json('operation.json', operation)
-                    require(self.probe(old['runtime']) == old['server'], 'server generation changed immediately before kill; not stopped')
-                    self.verify_process(old['runtime'], old['server'])
+                    require(self.probe(old['runtime'], old['server']) == old['server'],
+                            'server generation changed immediately before kill; not stopped')
+                    self.verify_process(old['runtime'], old['server'], old['server'])
                     stopped = True
                     self.command(old['runtime'], ['kill-server'])
-                    self.wait_absent(old['runtime'])
+                    self.wait_absent(old['runtime'], old['server'])
                 else:
                     require(self.probe(runtime) is None, 'retry server appeared; not stopped')
                 operation['phase'] = 'restoring'
@@ -636,8 +726,11 @@ HELP = '''Native tmux helpers
 
 Upgrade: brew upgrade tmux; then run ts when ready to stop running programs.
 The matching Homebrew Cellar executable is reused, NOT copied or retained.
-Keep its executable and dylibs installed until restart. Missing dependencies,
-unknown versions, protocol errors and missing runtimes fail without stopping.
+If Homebrew deletes the recorded executable, helpers adopt the still-running
+server through the installed client only when its PID, start time, owner,
+socket and version match the record; each decision goes to recovery.log.
+Replaced executables, unknown servers, missing dependencies and protocol
+errors fail without starting or stopping anything.
 New servers must have OS parent PID (PPID) 1 before attach. Existing servers
 are reused unchanged. Quit SonicTerm without ts; reconnect later with tt NAME.
 Attach from RMUX is refused: detach first. Native panes select their own socket;
@@ -648,7 +741,7 @@ choices only. No commands, environment, scrollback, processes or unsaved work ar
 saved or replayed. Missing cwd uses HOME. Linked/grouped, dead, zoomed, unstable
 or unrepresentable workspaces are refused before stop. No autosave/reboot restore.
 Private state: ~/.local/state/tmux-store/<socket-hash>/{snapshot.json,
-snapshot.json.prev,operation.json,restart.log}. Failed restore keeps the original
+snapshot.json.prev,operation.json,restart.log,recovery.log}. Failed restore keeps the original
 snapshot; inspect restart.log and explicitly stop partial sessions before retry.
 '''
 

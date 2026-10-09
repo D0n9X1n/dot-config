@@ -53,6 +53,23 @@ class FormatTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(store.StoreError):
                 store.decode_rows(framed([value]), {'active': 'flag'})
 
+    def test_tmux38_json_layout_reads_as_legacy_layout(self):
+        pane = lambda w, h, x, y, pid: {'t': 'p', 'w': w, 'h': h, 'x': x, 'y': y, 'i': 0, 'I': f'%{pid}'}
+        value = json.dumps({'V': 2, 'L': {'t': 'h', 'w': 80, 'h': 24, 'x': 0, 'y': 0, 'c': [
+            dict(pane(40, 24, 0, 0, 0), l=0),
+            {'t': 'v', 'w': 39, 'h': 24, 'x': 41, 'y': 0, 'c': [
+                dict(pane(39, 12, 41, 0, 1), a=True), pane(39, 11, 41, 13, 2)]}]}}, separators=(',', ':'))
+        rows = store.decode_rows(framed([value]), {'window_layout': 'layout'})
+        self.assertEqual(rows, [{'window_layout': layout('80x24,0,0{40x24,0,0,0,39x24,41,0[39x12,41,0,1,39x11,41,13,2]}')}])
+        root = {'t': 'p', 'w': 80, 'h': 24, 'x': 0, 'y': 0, 'I': '%3'}
+        self.assertEqual(store.decode_rows(framed([json.dumps({'V': 2, 'L': root})]), {'window_layout': 'layout'}),
+                         [{'window_layout': layout('80x24,0,0,3')}])
+        for bad in ['{', json.dumps({'V': 1, 'L': root}), json.dumps({'V': 2, 'L': dict(root, t='x')}),
+                    json.dumps({'V': 2, 'L': dict(root, I='3')}), json.dumps({'V': 2, 'L': dict(root, t='h', c=[])}),
+                    json.dumps({'V': 2, 'L': dict(root, w=True)}), json.dumps([2])]:
+            with self.subTest(bad=bad), self.assertRaises(store.StoreError):
+                store.decode_rows(framed([bad]), {'window_layout': 'layout'})
+
     def test_snapshot_whitelist_and_layout_remapping(self):
         saved = store.validate_snapshot(snapshot())
         value = store.remap_layout(saved['sessions'][0]['windows'][0]['layout'], ['%100', '%200'])
@@ -150,6 +167,210 @@ class StoreTests(unittest.TestCase):
             with self.assertRaises((store.StoreError, OSError)): self.manager.attach('work')
             bootstrap.assert_not_called()
             command.assert_not_called()
+
+    def deleted_keg(self):
+        old = self.home / 'old-tmux'
+        old.write_bytes(b'fixture-old-native-tmux')
+        old.chmod(0o700)
+        recorded = {'path': str(old), 'hash': store.digest(old), 'version': '3.7c'}
+        old.unlink()
+        self.upgraded = dict(self.runtime, version='3.8')
+        self.manager.write_json('active.json', {'version': 1, 'runtime': recorded, 'server': self.server})
+        return recorded
+
+    def serving(self, pid=42, version='3.7c'):
+        row = framed([str(pid), self.manager.socket, '100', version])
+        return patch.object(self.manager, 'run', return_value=subprocess.CompletedProcess([], 0, row, ''))
+
+    def orphan_process(self, start='100.000001'):
+        return patch.object(self.manager, 'process_info', return_value={'ppid': 1, 'start': start, 'path': None})
+
+    def recovery_log(self):
+        path = self.manager.state / 'recovery.log'
+        return path.read_text() if path.exists() else ''
+
+    def test_deleted_keg_adopts_exact_recorded_generation_with_log_and_notice(self):
+        self.deleted_keg()
+        with patch.object(self.manager, 'installed_runtime', return_value=self.upgraded), \
+             patch.object(self.manager, 'validate_runtime', side_effect=lambda runtime: runtime), \
+             self.serving(), self.orphan_process(), patch('sys.stderr', new_callable=io.StringIO) as err:
+            active = self.manager.ensure_active()
+        self.assertEqual(active, {'version': 1, 'runtime': self.upgraded, 'server': self.server})
+        self.assertEqual(self.manager.read_json('active.json'), active)
+        self.assertIn('adopted running tmux 3.7c server (pid 42); client now 3.8', err.getvalue())
+        self.assertIn(str(self.manager.state / 'recovery.log'), err.getvalue())
+        self.assertRegex(self.recovery_log(), r'^\S+ adopted server pid 42 .*3\.7c.*3\.8')
+        self.assertEqual((self.manager.state / 'recovery.log').stat().st_mode & 0o777, 0o600)
+        with patch.object(self.manager, 'validate_runtime', side_effect=lambda runtime: runtime), \
+             self.serving(), self.orphan_process(), patch('sys.stderr', new_callable=io.StringIO) as err:
+            self.assertEqual(self.manager.ensure_active(), active)
+        self.assertEqual(err.getvalue(), '', 'adopted record is reused without another adoption')
+
+    def test_deleted_keg_refuses_other_generations_and_logs(self):
+        for name, pid, start in [('pid', 43, '100.000001'), ('start', 42, '101.000001')]:
+            with self.subTest(changed=name):
+                recorded = self.deleted_keg()
+                with patch.object(self.manager, 'installed_runtime', return_value=self.upgraded), \
+                     patch.object(self.manager, 'validate_runtime', side_effect=lambda runtime: runtime), \
+                     self.serving(pid=pid), self.orphan_process(start=start), \
+                     patch.object(self.manager, 'bootstrap') as bootstrap, patch.object(self.manager, 'command') as command:
+                    with self.assertRaises(store.StoreError): self.manager.ensure_active()
+                    bootstrap.assert_not_called()
+                    command.assert_not_called()
+                self.assertEqual(self.manager.read_json('active.json')['runtime'], recorded)
+                self.assertIn('refused', self.recovery_log())
+
+    def test_deleted_keg_refuses_owner_socket_version_and_unrecorded_servers(self):
+        cases = [('owner', self.serving(), patch.object(self.manager, 'process_info',
+                  side_effect=store.StoreError('native server is not owned by this user')), self.server),
+                 ('socket', patch.object(self.manager, 'run', return_value=subprocess.CompletedProcess(
+                     [], 0, framed(['42', str(self.home / 'other'), '100', '3.7c']), '')), self.orphan_process(), self.server),
+                 ('version', self.serving(version='3.6'), self.orphan_process(), self.server),
+                 ('unrecorded old', self.serving(), self.orphan_process(), None),
+                 ('unrecorded new', self.serving(version='3.8'), self.orphan_process(), None)]
+        for name, run, process, server in cases:
+            with self.subTest(case=name):
+                recorded = self.deleted_keg()
+                self.manager.write_json('active.json', {'version': 1, 'runtime': recorded, 'server': server})
+                with patch.object(self.manager, 'installed_runtime', return_value=self.upgraded), \
+                     patch.object(self.manager, 'validate_runtime', side_effect=lambda runtime: runtime), run, process, \
+                     patch.object(self.manager, 'command') as command:
+                    with self.assertRaises(store.StoreError): self.manager.ensure_active()
+                    command.assert_not_called()
+                self.assertEqual(self.manager.read_json('active.json')['runtime'], recorded)
+
+    def test_deleted_keg_never_saves_a_server_from_a_later_probe(self):
+        self.deleted_keg()
+        other = subprocess.CompletedProcess([], 0, framed(['43', self.manager.socket, '200', '3.8']), '')
+        exact = subprocess.CompletedProcess([], 0, framed(['42', self.manager.socket, '100', '3.7c']), '')
+        gone = subprocess.CompletedProcess([], 1, '', f'no server running on {self.manager.socket}')
+        for first, expected in [(exact, self.server), (gone, None)]:
+            with self.subTest(expected=expected):
+                self.deleted_keg()
+                with patch.object(self.manager, 'installed_runtime', return_value=self.upgraded), \
+                     patch.object(self.manager, 'validate_runtime', side_effect=lambda runtime: runtime), \
+                     patch.object(self.manager, 'run', side_effect=[first, other]), self.orphan_process(), \
+                     patch('sys.stderr', new_callable=io.StringIO):
+                    self.assertEqual(self.manager.ensure_active()['server'], expected)
+                self.assertEqual(self.manager.read_json('active.json')['server'], expected)
+
+    def test_deleted_keg_logs_installed_runtime_failure(self):
+        recorded = self.deleted_keg()
+        with patch.object(self.manager, 'installed_runtime', side_effect=store.StoreError('dyld missing library')):
+            with self.assertRaisesRegex(store.StoreError, 'dyld'): self.manager.ensure_active()
+        self.assertIn('refused adoption: dyld missing library', self.recovery_log())
+        self.assertEqual(self.manager.read_json('active.json')['runtime'], recorded)
+
+    def test_deleted_keg_short_log_write_blocks_adoption(self):
+        recorded = self.deleted_keg()
+        with patch.object(self.manager, 'installed_runtime', return_value=self.upgraded), \
+             patch.object(self.manager, 'validate_runtime', side_effect=lambda runtime: runtime), \
+             self.serving(), self.orphan_process(), patch.object(store.os, 'write', return_value=1):
+            with self.assertRaisesRegex(store.StoreError, 'incomplete recovery log'): self.manager.ensure_active()
+        self.assertEqual(self.manager.read_json('active.json')['runtime'], recorded)
+
+    def test_adopted_server_is_known_to_wait_and_retry(self):
+        upgraded = dict(self.runtime, version='3.8')
+        alive = subprocess.CompletedProcess([], 0, framed(['42', self.manager.socket, '100', '3.7c']), '')
+        gone = subprocess.CompletedProcess([], 1, '', f'no server running on {self.manager.socket}')
+        with patch.object(self.manager, 'run', side_effect=[alive, gone]), self.orphan_process():
+            self.manager.wait_absent(upgraded, self.server)
+        operation = self.operation()
+        operation['phase'] = 'failed'
+        self.manager.write_json('operation.json', operation)
+        self.manager.write_json('active.json', {'version': 1, 'runtime': upgraded, 'server': self.server})
+        with patch.object(self.manager, 'validate_runtime', side_effect=lambda runtime: runtime), \
+             self.serving(), self.orphan_process(), patch.object(self.manager, 'command') as command:
+            with self.assertRaisesRegex(store.StoreError, 'still runs'): self.manager.restart()
+            command.assert_not_called()
+
+    def test_version_only_runtime_replacement_is_refused(self):
+        self.manager.write_json('active.json', dict(self.active, runtime=dict(self.runtime, version='3.6')))
+        with patch.object(store.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, 'tmux 3.7c\n', '')), \
+             patch.object(self.manager, 'installed_runtime') as installed:
+            with self.assertRaisesRegex(store.StoreError, 'fingerprint changed'): self.manager.ensure_active()
+            installed.assert_not_called()
+
+    def test_deleted_keg_with_recorded_server_gone_uses_installed_runtime(self):
+        self.deleted_keg()
+        gone = subprocess.CompletedProcess([], 1, '', f'no server running on {self.manager.socket}')
+        with patch.object(self.manager, 'installed_runtime', return_value=self.upgraded), \
+             patch.object(self.manager, 'run', return_value=gone):
+            self.assertEqual(self.manager.ensure_active(), {'version': 1, 'runtime': self.upgraded, 'server': None})
+        self.assertIn('gone', self.recovery_log())
+
+    def test_deleted_keg_adoption_needs_a_safe_log(self):
+        recorded = self.deleted_keg()
+        (self.manager.state / 'recovery.log').symlink_to(self.home / 'elsewhere')
+        with patch.object(self.manager, 'installed_runtime', return_value=self.upgraded), \
+             patch.object(self.manager, 'validate_runtime', side_effect=lambda runtime: runtime), \
+             self.serving(), self.orphan_process():
+            with self.assertRaises((store.StoreError, OSError)): self.manager.ensure_active()
+        self.assertEqual(self.manager.read_json('active.json')['runtime'], recorded)
+        self.assertFalse((self.home / 'elsewhere').exists())
+
+    def test_replaced_existing_runtime_is_still_refused(self):
+        self.manager.write_json('active.json', dict(self.active, runtime=dict(self.runtime, hash='0' * 64)))
+        output = subprocess.CompletedProcess([], 0, 'tmux 3.7c\n', '')
+        with patch.object(store.subprocess, 'run', return_value=output), \
+             patch.object(self.manager, 'installed_runtime') as installed:
+            with self.assertRaisesRegex(store.StoreError, 'fingerprint changed'): self.manager.ensure_active()
+            installed.assert_not_called()
+
+    def test_probe_accepts_version_skew_only_for_the_recorded_server(self):
+        upgraded = dict(self.runtime, version='3.8')
+        with self.serving(), self.orphan_process():
+            with self.assertRaisesRegex(store.StoreError, 'version mismatch'): self.manager.probe(upgraded)
+            self.assertEqual(self.manager.probe(upgraded, self.server), self.server)
+        with self.serving(pid=43), self.orphan_process():
+            with self.assertRaisesRegex(store.StoreError, 'version mismatch'): self.manager.probe(upgraded, self.server)
+
+    def test_deleted_executable_passes_only_for_the_recorded_generation(self):
+        with patch.object(self.manager, 'validate_runtime'), self.orphan_process():
+            self.manager.verify_process(self.runtime, self.server, self.server)
+            with self.assertRaisesRegex(store.StoreError, 'generation'): self.manager.verify_process(self.runtime, self.server)
+            with self.assertRaisesRegex(store.StoreError, 'generation'):
+                self.manager.verify_process(self.runtime, dict(self.server, start='101.000001'), self.server)
+
+    def test_process_info_tolerates_only_a_deleted_executable(self):
+        class Library:
+            def __init__(self, error): self.error = error
+            def proc_pidinfo(self, pid, flavor, arg, buffer, size):
+                info = buffer._obj
+                info.pid, info.uid, info.ppid, info.sec, info.usec = pid, os.getuid(), 1, 100, 1
+                return size
+            def proc_pidpath(self, pid, buffer, size):
+                store.ctypes.set_errno(self.error)
+                return 0
+        with patch.object(store.sys, 'platform', 'darwin'):
+            with patch.object(store.ctypes, 'CDLL', return_value=Library(store.errno.ENOENT)):
+                self.assertEqual(self.manager.process_info(42), {'ppid': 1, 'start': '100.000001', 'path': None})
+            with patch.object(store.ctypes, 'CDLL', return_value=Library(store.errno.EPERM)):
+                with self.assertRaisesRegex(store.StoreError, 'cannot inspect'): self.manager.process_info(42)
+
+    def test_restart_and_worker_stop_an_adopted_server(self):
+        adopted = {'version': 1, 'runtime': dict(self.runtime, version='3.8'), 'server': self.server}
+        with patch.object(self.manager, 'ensure_active', return_value=adopted), \
+             patch.object(self.manager, 'installed_runtime', return_value=adopted['runtime']), \
+             patch.object(self.manager, 'validate_runtime'), patch.object(self.manager, 'capture', return_value=snapshot()), \
+             patch.object(self.manager, 'preflight'), patch('sys.stdin.isatty', return_value=True), \
+             patch('builtins.input', return_value='yes'), self.serving(), self.orphan_process(), \
+             patch.object(self.manager, 'launch_worker') as launch, patch('sys.stdout', new_callable=io.StringIO):
+            self.manager.restart()
+            launch.assert_called_once()
+        operation = self.manager.read_json('operation.json')
+        self.assertEqual(operation['old'], adopted)
+        gone = subprocess.CompletedProcess([], 1, '', f'no server running on {self.manager.socket}')
+        alive = subprocess.CompletedProcess([], 0, framed(['42', self.manager.socket, '100', '3.7c']), '')
+        with patch.object(self.manager, 'validate_runtime', side_effect=lambda runtime: runtime), \
+             patch.object(self.manager, 'preflight'), patch.object(self.manager, 'capture', return_value=snapshot()), \
+             patch.object(self.manager, 'run', side_effect=[alive, alive, gone]), self.orphan_process(), \
+             patch.object(self.manager, 'command') as command, patch.object(self.manager, 'restore') as restore, \
+             patch('sys.stdout', new_callable=io.StringIO):
+            self.manager.worker(operation['id'])
+            command.assert_called_once_with(adopted['runtime'], ['kill-server'])
+            restore.assert_called_once()
+        self.assertEqual(self.manager.read_json('operation.json')['phase'], 'complete')
 
     def test_protocol_auth_and_wrong_socket_are_not_absence(self):
         for message in ['protocol version mismatch', 'permission denied', 'access not allowed',
@@ -405,6 +626,35 @@ class RuntimeTests(unittest.TestCase):
             second_client.terminate()
             second_client.wait(timeout=5)
         print(f'Private PTY close/reattach: server={server["pid"]} PPID=1, pane={pane_pid}, marker={marker_pid}; all unchanged.')
+
+    def test_private_deleted_executable_is_adopted_then_restarted(self):
+        import shutil
+        old = self.home / 'old-keg' / 'tmux'
+        old.parent.mkdir()
+        shutil.copy2(Path(BINARY).resolve(), old)
+        old_runtime = self.manager.runtime_at(old)
+        self.manager.bootstrap(old_runtime, 'kept', cwd=str(self.home))
+        recorded = self.manager.record_active(old_runtime)
+        old.unlink()
+        self.assertIsNone(self.manager.process_info(recorded['server']['pid'])['path'])
+        with patch('sys.stderr', new_callable=io.StringIO) as err:
+            active = self.manager.ensure_active()
+        self.assertEqual(active, {'version': 1, 'runtime': self.runtime, 'server': recorded['server']})
+        self.assertIn('adopted running tmux', err.getvalue())
+        self.assertIn('adopted server pid', (self.manager.state / 'recovery.log').read_text())
+        with patch('sys.stdout', new_callable=io.StringIO) as out:
+            self.manager.list_sessions()
+        self.assertIn('kept: 1 windows', out.getvalue())
+        with patch('sys.stdin.isatty', return_value=True), patch('builtins.input', return_value='yes'), \
+             patch.object(self.manager, 'launch_worker') as launch, patch('sys.stdout', new_callable=io.StringIO):
+            self.manager.restart()
+        with patch('sys.stdout', new_callable=io.StringIO):
+            self.manager.worker(launch.call_args.args[0]['id'])
+        self.assertEqual(self.manager.read_json('operation.json')['phase'], 'complete')
+        server = self.manager.probe(self.runtime)
+        self.assertNotEqual(server['pid'], recorded['server']['pid'])
+        self.assertEqual(Path(self.manager.process_info(server['pid'])['path']).resolve(), Path(self.runtime['path']))
+        self.assertIsNotNone(self.manager.session_id(self.runtime, 'kept'))
 
     def test_private_backslash_names_roundtrip_and_exact_delete(self):
         name = 'work\\path'
