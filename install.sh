@@ -596,6 +596,35 @@ ensure_copilot_wakatime_plugin() {
   fi
 }
 
+# Feature-Crew ships as one plugin from its own marketplace. Install or update
+# it in each CLI on PATH; settings.json also declares and enables it for Claude.
+ensure_feature_crew_plugin() {
+  local cli
+  if ! have_cmd jq; then
+    echo "feature-crew plugin: jq not found — skipping plugin setup"
+    return 0
+  fi
+  for cli in claude copilot; do
+    have_cmd "$cli" || continue
+    if "$cli" plugin marketplace list --json 2>/dev/null | jq -e 'any(.[]; .name == "feature-crew")' >/dev/null; then
+      log_command "$cli" plugin marketplace update feature-crew \
+        || echo "Warning: $cli feature-crew marketplace update failed"
+    else
+      log_command "$cli" plugin marketplace add D0n9X1n/feature-crew \
+        || { echo "Warning: $cli feature-crew marketplace add failed"; continue; }
+    fi
+    if "$cli" plugin list --json 2>/dev/null | jq -e --arg cli "$cli" 'any(.[];
+        (if $cli == "claude" then .id == "feature-crew@feature-crew"
+         else .name == "feature-crew" and .marketplace == "feature-crew" end) and .enabled == true)' >/dev/null; then
+      log_command "$cli" plugin update feature-crew@feature-crew \
+        || echo "Warning: $cli feature-crew plugin update failed"
+    else
+      log_command "$cli" plugin install feature-crew@feature-crew \
+        || echo "Warning: $cli feature-crew plugin install failed"
+    fi
+  done
+}
+
 cleanup_legacy_wakatime_mcp() {
   local wm_dest="${HOME}/.local/share/wakatime-mcp"
   local copilot_mcp_pre="${HOME}/.config/github-copilot/mcp.json"
@@ -1160,6 +1189,9 @@ cleanup_legacy_wakatime_mcp
 
 # The Copilot plugin manages its own WakaTime CLI on session start.
 ensure_copilot_wakatime_plugin
+
+# Feature-Crew: one plugin for Claude Code and Copilot CLI.
+ensure_feature_crew_plugin
 
 # Import Copilot's merged MCP server map into Claude Code's local state file.
 copilot_mcp="${HOME}/.config/github-copilot/mcp.json"

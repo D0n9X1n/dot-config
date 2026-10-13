@@ -141,6 +141,16 @@ wakatime/copilot-cli-wakatime
 
 安装器发现旧 WakaTime MCP、旧 Homebrew `wakatime-cli` 或旧第三方 npm plugin 时，会删除它们。
 
+## Feature-Crew
+
+`install.sh` 添加 Feature-Crew marketplace，并安装或更新它的 plugin：
+
+```text
+feature-crew@feature-crew  (marketplace D0n9X1n/feature-crew)
+```
+
+Claude Code 也执行同一步骤。技能保留 `/fc-*` 名称；代理注册为 `feature-crew:fc-*`。
+
 ## 检查
 
 ```sh

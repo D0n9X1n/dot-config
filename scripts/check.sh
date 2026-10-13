@@ -218,7 +218,9 @@ run_model_default_smoke() {
     .permissions.defaultMode == "auto" and
     .statusLine.command == "~/.claude/statusline.sh" and
     .enabledPlugins["clangd-lsp@claude-plugins-official"] == true and
-    .enabledPlugins["swift-lsp@claude-plugins-official"] == true
+    .enabledPlugins["swift-lsp@claude-plugins-official"] == true and
+    .enabledPlugins["feature-crew@feature-crew"] == true and
+    .extraKnownMarketplaces["feature-crew"].source == {"source": "github", "repo": "D0n9X1n/feature-crew"}
   ' config/claude/settings.json >/dev/null
 
   # Opus stays native; every other Claude slot calls GPT-6 Astra directly.
