@@ -34,6 +34,52 @@ run_statusline_smoke() {
   [ -n "$out" ] && echo "copilot statusline ok: ${#out} bytes"
 }
 
+run_statusline_plugin_smoke() {
+  local test_root home proj plugin out
+  test_root="$(mktemp -d)"
+  trap 'rm -rf "${test_root:-}"' RETURN
+  home="$test_root/home"
+  proj="$test_root/proj"
+  mkdir -p "$home/.claude/plugins" "$home/.copilot" "$proj" "$test_root/tmp"
+
+  # One enabled plugin with 2 skills + 1 agent, one disabled with 1 skill.
+  for plugin in on off; do
+    mkdir -p "$test_root/$plugin/skills/s1" "$test_root/$plugin/agents"
+    touch "$test_root/$plugin/skills/s1/SKILL.md"
+  done
+  mkdir -p "$test_root/on/skills/s2"
+  touch "$test_root/on/skills/s2/SKILL.md" "$test_root/on/agents/a.md"
+
+  printf '{"version":2,"plugins":{"on@m":[{"scope":"user","installPath":"%s"}],"off@m":[{"scope":"user","installPath":"%s"}]}}\n' \
+    "$test_root/on" "$test_root/off" >"$home/.claude/plugins/installed_plugins.json"
+  printf '{"enabledPlugins":{"on@m":true,"off@m":false}}\n' >"$home/.claude/settings.json"
+  out="$(cd "$proj" && printf '{}' | HOME="$home" TMPDIR="$test_root/tmp" \
+    CLAUDE_STATUSLINE_NO_COLOR=1 CLAUDE_STATUSLINE_NO_ICONS=1 bash "$OLDPWD/config/claude/statusline.sh")"
+  case "$out" in *"Skills 2"*"Agents 1"*) ;; *)
+    echo "claude statusline should count enabled plugin skills and agents: $out" >&2; return 1 ;;
+  esac
+
+  mkdir -p "$proj/.claude"
+  printf '{"enabledPlugins":{"on@m":false}}\n' >"$proj/.claude/settings.local.json"
+  out="$(cd "$proj" && printf '{}' | HOME="$home" TMPDIR="$test_root/tmp" \
+    CLAUDE_STATUSLINE_NO_COLOR=1 CLAUDE_STATUSLINE_NO_ICONS=1 bash "$OLDPWD/config/claude/statusline.sh")"
+  case "$out" in *Skills*|*Agents*)
+    echo "claude statusline should drop a plugin disabled in project settings: $out" >&2; return 1 ;;
+  esac
+
+  printf '// managed\n{"installedPlugins":[{"name":"on","cache_path":"%s","enabled":true},{"name":"off","cache_path":"%s","enabled":false}]}\n' \
+    "$test_root/on" "$test_root/off" >"$home/.copilot/config.json"
+  out="$(cd "$proj" && printf '{}' | HOME="$home" TMPDIR="$test_root/tmp" \
+    COPILOT_STATUSLINE_NO_COLOR=1 COPILOT_STATUSLINE_NO_ICONS=1 bash "$OLDPWD/config/copilot/statusline.sh")"
+  case "$out" in *"Skills 2"*"Agents 1"*) ;; *)
+    echo "copilot statusline should count enabled plugin skills and agents: $out" >&2; return 1 ;;
+  esac
+  rm -rf "$test_root"
+  test_root=""
+  trap - RETURN
+  echo "statusline plugin skill and agent counts ok"
+}
+
 run_shellcheck() {
   local files
   command -v shellcheck >/dev/null 2>&1 || {
@@ -1937,6 +1983,7 @@ run_smoke() {
   run_bash_syntax
   run_apollo_smoke
   run_statusline_smoke
+  run_statusline_plugin_smoke
   bash -n install.sh
   run_zsh_syntax
   python3 -B scripts/test-terminal-keys.py

@@ -176,6 +176,8 @@ Claude 与 Copilot 状态栏共享五行布局、本机生成的 Apollo 颜色�
 
 两个脚本读取同一个本机生成 Apollo 颜色 include。文件缺失或禁用颜色时，它们仍会输出可读的无色内容。Claude 自定义状态栏没有 live-subagent 数量或树，因为 Claude Code 已有原生 subagent UI。Copilot 保留自定义 rows。
 
+Skills 和 Agents 统计 user 和 project 文件，也统计每个已启用 plugin 的 skills 和 agents。脚本从 `~/.claude/plugins/installed_plugins.json` 读取 `installPath`，从 user、project 和 local settings 读取 `enabledPlugins`；后面的 scope 优先。它统计其中的 `skills/*/SKILL.md` 和 `agents/*.md`。plugin 数量按工作目录缓存，只在这些文件变化时重新计算。
+
 ## Plugins
 
 受管设置启用：

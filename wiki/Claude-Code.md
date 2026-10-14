@@ -176,6 +176,8 @@ Claude and Copilot status lines share the same five-line shape, locally generate
 
 Both scripts source the same generated Apollo color include. If it is missing or color is disabled, they remain readable without colors. Claude's custom status line has no live-subagent count or tree because Claude Code has native subagent UI. Copilot keeps the custom rows.
 
+Skills and Agents count user and project files plus the skills and agents of each enabled plugin. The script reads `installPath` from `~/.claude/plugins/installed_plugins.json` and `enabledPlugins` from user, project, and local settings; a later scope wins. It counts `skills/*/SKILL.md` and `agents/*.md` there. The plugin counts are cached per working directory and recomputed only when one of those files changes.
+
 ## Plugins
 
 The tracked settings enable:
