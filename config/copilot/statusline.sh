@@ -531,7 +531,43 @@ seg_subagents() {
   printf '%s%s%d%s' "$(label "$C_PURPLE" "$ICON_SUBAGENT" 'Tasks')" "$color" "$n" "$C_RESET"
 }
 
-# Agent — count Copilot custom agent definitions in user + project scope.
+# Plugin skills + agents — enabled plugins also load
+# <cache_path>/skills/<name>/SKILL.md and <cache_path>/agents/<name>.md.
+# ~/.copilot/config.json lists them in installedPlugins[] with cache_path and
+# enabled. The file starts with // comment lines, so strip them before jq.
+# Counts are cached by the file's mtime; jq runs only when plugins change.
+# Called once in the main shell before render: segments run in subshells.
+__PLUGIN_SKILLS=0
+__PLUGIN_AGENTS=0
+load_plugin_counts() {
+  local f="$HOME/.copilot/config.json"
+  [ -f "$f" ] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+  local cf="$CACHE_DIR/plugin_counts" sig cached_sig="" cached_skills="" cached_agents="" p g
+  local skills=0 agents=0
+  # GNU first: BSD stat rejects -c without printing anything.
+  sig="$(stat -L -c %Y "$f" 2>/dev/null || stat -L -f %m "$f" 2>/dev/null)"
+  if [ -n "$sig" ] && [ -f "$cf" ]; then
+    IFS='|' read -r cached_sig cached_skills cached_agents <"$cf" 2>/dev/null
+    if [ "$cached_sig" = "$sig" ]; then
+      __PLUGIN_SKILLS="${cached_skills:-0}"
+      __PLUGIN_AGENTS="${cached_agents:-0}"
+      return 0
+    fi
+  fi
+  while IFS= read -r p; do
+    [ -d "$p" ] || continue
+    for g in "$p"/skills/*/SKILL.md; do [ -f "$g" ] && skills=$((skills + 1)); done
+    for g in "$p"/agents/*.md; do [ -f "$g" ] && agents=$((agents + 1)); done
+  done < <(grep -v '^[[:space:]]*//' "$f" 2>/dev/null \
+    | jq -r '(.installedPlugins // [])[] | select(.enabled != false) | .cache_path // empty' 2>/dev/null)
+  __PLUGIN_SKILLS=$skills
+  __PLUGIN_AGENTS=$agents
+  [ -n "$sig" ] && printf '%s|%s|%s\n' "$sig" "$skills" "$agents" >"$cf" 2>/dev/null || true
+}
+
+# Agent — count Copilot custom agent definitions in user + project scope,
+# plus enabled plugins' agents.
 # This counts local profile files on disk, not currently running subagents.
 seg_agent() {
   local total=0 d count seen=""
@@ -545,10 +581,12 @@ seg_agent() {
     count="$(find "$d" -mindepth 1 -maxdepth 1 -type f -name '*.md' ! -name '.*' ! -iname 'README.md' 2>/dev/null | wc -l | tr -d ' ')"
     total=$((total + count))
   done
+  total=$((total + __PLUGIN_AGENTS))
   printf '%s%s%d%s' "$(label "$C_AQUA" "$ICON_AGENT" 'Agents')" "$C_FG" "$total" "$C_RESET"
 }
 
-# Skills — count user-scope + workspace-scope skill bundles.
+# Skills — count user-scope + workspace-scope skill bundles, plus enabled
+# plugins' skills.
 seg_skills() {
   local total=0 d count seen=""
   local project_root="${cwd:-$PWD}"
@@ -564,6 +602,7 @@ seg_skills() {
     count="$(find "$d" -mindepth 2 -maxdepth 2 -type f -name 'SKILL.md' 2>/dev/null | wc -l | tr -d ' ')"
     total=$((total + count))
   done
+  total=$((total + __PLUGIN_SKILLS))
   printf '%s%s%d%s' "$(label "$C_GREEN" "$ICON_SKILLS" 'Skills')" "$C_FG" "$total" "$C_RESET"
 }
 
@@ -1156,6 +1195,7 @@ render_subagents() {
 # substitution, so they inherit these already-loaded values instead of each
 # segment re-reading the git cache in its own subshell.
 load_git_state
+load_plugin_counts
 
 # Pre-compute hook-maintained subagent rows so seg_subagents (inline count)
 # and the bottom rows agree without scanning the session event log.

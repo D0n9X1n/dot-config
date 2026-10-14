@@ -90,6 +90,8 @@ The Copilot status line shares the five-line layout and locally generated Apollo
 
 It reads session JSON with one `jq` call. Both provider status scripts source the same generated Apollo color include and fall back to readable uncolored output when it is absent. Git data is cached for five seconds per working directory. GitHub auth data is cached for five minutes.
 
+Skills and Agents count user and project files plus the skills and agents of each enabled plugin. The script reads `installedPlugins[]` (`cache_path`, `enabled`) from `~/.copilot/config.json`, skipping its `//` comment lines, and counts `skills/*/SKILL.md` and `agents/*.md` there. The plugin counts are cached until that file changes.
+
 Copilot uses one extra color role from that shared include. Model, Effort, Path, and Branch print their values in the bright foreground role, so the identity of the session stands out from ordinary values. Their labels keep accent roles: Model is yellow, Path is aqua, Run is purple. Ordinary segment separators and the context capacity suffix use the dim foreground role rather than the plain dim attribute. The live-subagent rows and their separator are unchanged. Claude's status line does not use the bright role, so the shared generator does not change it.
 
 Useful environment switches:

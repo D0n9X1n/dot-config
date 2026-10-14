@@ -90,6 +90,8 @@ Copilot 状态栏与 Claude 共享五行布局和本机生成的 Apollo 颜色�
 
 它用一次 `jq` 读取 session JSON。两个 provider 状态脚本读取同一个本机生成 Apollo 颜色 include；文件缺失时会回退为可读的无色输出。Git 数据按工作目录缓存五秒。GitHub auth 数据缓存五分钟。
 
+Skills 和 Agents 统计 user 和 project 文件，也统计每个已启用 plugin 的 skills 和 agents。脚本从 `~/.copilot/config.json` 读取 `installedPlugins[]`（`cache_path`、`enabled`），跳过其中的 `//` 注释行，并统计其中的 `skills/*/SKILL.md` 和 `agents/*.md`。plugin 数量会缓存到该文件变化为止。
+
 Copilot 从该共享 include 中多用一个颜色角色。Model、Effort、Path 和 Branch 的值使用亮前景角色，让会话身份从普通值中突出。它们的标签保留强调色：Model 为黄色，Path 为青色，Run 为紫色。普通分隔符和 context 容量后缀改用暗前景角色，而不是纯 dim 属性。实时 subagent 行及其分隔线保持不变。Claude 状态栏不使用亮前景角色，所以共享生成器不会改变它。
 
 有用的环境变量：

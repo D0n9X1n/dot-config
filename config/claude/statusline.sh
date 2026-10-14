@@ -488,9 +488,62 @@ seg_vim() {
   printf -v __SEG '%s%s%s %s %s' "$__LBL" "$mode_bg" "$C_BG_FG" "$vim_mode" "$C_RESET"
 }
 
+# Plugin skills + agents — enabled plugins also load
+# <installPath>/skills/<name>/SKILL.md and <installPath>/agents/<name>.md.
+# installed_plugins.json maps each plugin to its installPath; enabledPlugins
+# in user, project, and local settings (later wins) turns it on. Counts are
+# cached per cwd, keyed by the mtimes of those files, so a render only runs
+# jq when a plugin is installed, updated, or toggled. Sets __PLUGIN_SKILLS
+# and __PLUGIN_AGENTS once per render; seg_skills and seg_agent share them.
+__PLUGIN_COUNTS_LOADED=0
+__PLUGIN_SKILLS=0
+__PLUGIN_AGENTS=0
+load_plugin_counts() {
+  [ "$__PLUGIN_COUNTS_LOADED" = 1 ] && return 0
+  __PLUGIN_COUNTS_LOADED=1
+  local registry="$HOME/.claude/plugins/installed_plugins.json"
+  [ -f "$registry" ] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+  local f files=() sig cf cached_sig="" cached_skills="" cached_agents="" p
+  local skills=0 agents=0
+  for f in "$HOME/.claude/settings.json" "$PWD/.claude/settings.json" "$PWD/.claude/settings.local.json"; do
+    [ -f "$f" ] && files+=("$f")
+  done
+  # No settings file means no plugin is enabled. This also keeps jq from
+  # reading stdin and keeps bash 3.2 `set -u` away from an empty array.
+  [ "${#files[@]}" -gt 0 ] || return 0
+  # -L follows the managed settings symlink to the tracked file's mtime.
+  # GNU first: BSD stat rejects -c without printing anything.
+  sig="$(stat -L -c %Y "$registry" "${files[@]}" 2>/dev/null || stat -L -f %m "$registry" "${files[@]}" 2>/dev/null)"
+  sig="${sig//$'\n'/,}"
+  cf="$CACHE_DIR/plugin_counts-${__cwd_hash}"
+  if [ -n "$sig" ] && [ -f "$cf" ]; then
+    IFS='|' read -r cached_sig cached_skills cached_agents <"$cf" 2>/dev/null
+    if [ "$cached_sig" = "$sig" ]; then
+      __PLUGIN_SKILLS="${cached_skills:-0}"
+      __PLUGIN_AGENTS="${cached_agents:-0}"
+      return 0
+    fi
+  fi
+  while IFS= read -r p; do
+    [ -d "$p" ] || continue
+    for f in "$p"/skills/*/SKILL.md; do [ -f "$f" ] && skills=$((skills + 1)); done
+    for f in "$p"/agents/*.md; do [ -f "$f" ] && agents=$((agents + 1)); done
+  done < <(jq -rn --arg cwd "$PWD" --slurpfile reg "$registry" '
+      (reduce inputs as $s ({}; . + ($s.enabledPlugins // {}))) as $on
+      | ($reg[0].plugins // {}) | to_entries[]
+      | select($on[.key] == true)
+      | ([.value[] | select(.projectPath == $cwd)] + [.value[] | select(.scope == "user")] + .value)[0].installPath // empty
+    ' "${files[@]}" 2>/dev/null)
+  __PLUGIN_SKILLS=$skills
+  __PLUGIN_AGENTS=$agents
+  [ -n "$sig" ] && printf '%s|%s|%s\n' "$sig" "$skills" "$agents" >"$cf" 2>/dev/null || true
+}
+
 # Agent — count *.md agent definitions in user + project scope. Claude
 # Code loads agents from ~/.claude/agents/<name>.md (user) and
-# <cwd>/.claude/agents/<name>.md (project). Mirrors seg_skills' shape.
+# <cwd>/.claude/agents/<name>.md (project), plus enabled plugins' agents.
+# Mirrors seg_skills' shape.
 # Note: this counts AVAILABLE agents (definitions on disk), not currently
 # running ones — the statusline JSON doesn't expose a runtime list.
 seg_agent() {
@@ -500,6 +553,8 @@ seg_agent() {
     count="$(find "$d" -mindepth 1 -maxdepth 1 -type f -name '*.md' ! -name '.*' 2>/dev/null | wc -l | tr -d ' ')"
     total=$((total + count))
   done
+  load_plugin_counts
+  total=$((total + __PLUGIN_AGENTS))
   is_pos_int "$total" || return 0
   label "$C_AQUA" "$ICON_AGENT" 'Agents'
   printf -v __SEG '%s%s%d%s' "$__LBL" "$C_FG" "$total" "$C_RESET"
@@ -701,7 +756,8 @@ seg_waka() {
 
 # Skills — count user-scope + workspace-scope skill bundles. Claude Code
 # loads skills from ~/.claude/skills/<name>/SKILL.md (user) and
-# <cwd>/.claude/skills/<name>/SKILL.md (project). The statusline JSON
+# <cwd>/.claude/skills/<name>/SKILL.md (project), plus enabled plugins'
+# skills (see load_plugin_counts). The statusline JSON
 # doesn't expose a count, so we compute it ourselves. Hidden dirs (the
 # .git inside .claude/skills, dotfiles) are excluded.
 seg_skills() {
@@ -711,6 +767,8 @@ seg_skills() {
     count="$(find "$d" -mindepth 1 -maxdepth 1 -type d ! -name '.*' 2>/dev/null | wc -l | tr -d ' ')"
     total=$((total + count))
   done
+  load_plugin_counts
+  total=$((total + __PLUGIN_SKILLS))
   is_pos_int "$total" || return 0
   label "$C_GREEN" "$ICON_SKILLS" 'Skills'
   printf -v __SEG '%s%s%d%s' "$__LBL" "$C_FG" "$total" "$C_RESET"
