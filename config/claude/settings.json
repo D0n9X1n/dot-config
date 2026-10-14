@@ -44,9 +44,16 @@
     "claude-code-wakatime@wakatime": true,
     "rust-analyzer-lsp@claude-plugins-official": true,
     "clangd-lsp@claude-plugins-official": true,
-    "swift-lsp@claude-plugins-official": true
+    "swift-lsp@claude-plugins-official": true,
+    "feature-crew@feature-crew": true
   },
   "extraKnownMarketplaces": {
+    "feature-crew": {
+      "source": {
+        "source": "github",
+        "repo": "D0n9X1n/feature-crew"
+      }
+    },
     "wakatime": {
       "source": {
         "source": "git",

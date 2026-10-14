@@ -143,6 +143,16 @@ It uses the API key from `~/.wakatime.cfg`. The plugin manages its own WakaTime 
 
 The installer removes the old WakaTime MCP, old Homebrew `wakatime-cli`, and old third-party npm plugin when found.
 
+## Feature-Crew
+
+`install.sh` adds the Feature-Crew marketplace and installs or updates its plugin:
+
+```text
+feature-crew@feature-crew  (marketplace D0n9X1n/feature-crew)
+```
+
+`config/copilot/settings.json` declares the marketplace in `extraKnownMarketplaces`, so later runs update it instead of re-adding it; re-adding would replace the settings link with a plain file. The same step runs for Claude Code. Skills keep their `/fc-*` names; agents register as `feature-crew:fc-*`.
+
 ## Check
 
 ```sh
