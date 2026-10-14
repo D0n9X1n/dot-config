@@ -66,5 +66,13 @@
     "openDiffOnEdit": true
   },
   "effortLevel": "high",
-  "showReasoning": false
+  "showReasoning": false,
+  "extraKnownMarketplaces": {
+    "feature-crew": {
+      "source": {
+        "source": "github",
+        "repo": "D0n9X1n/feature-crew"
+      }
+    }
+  }
 }

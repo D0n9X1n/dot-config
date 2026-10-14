@@ -149,7 +149,7 @@ The installer removes the old WakaTime MCP, old Homebrew `wakatime-cli`, and old
 feature-crew@feature-crew  (marketplace D0n9X1n/feature-crew)
 ```
 
-The same step runs for Claude Code. Skills keep their `/fc-*` names; agents register as `feature-crew:fc-*`.
+`config/copilot/settings.json` declares the marketplace in `extraKnownMarketplaces`, so later runs update it instead of re-adding it; re-adding would replace the settings link with a plain file. The same step runs for Claude Code. Skills keep their `/fc-*` names; agents register as `feature-crew:fc-*`.
 
 ## Check
 

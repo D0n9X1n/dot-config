@@ -235,11 +235,14 @@ run_model_default_smoke() {
     return 1
   fi
 
-  # Copilot CLI: GPT-6 Astra at the 1M context tier and high effort.
+  # Copilot CLI: GPT-6 Astra at the 1M context tier and high effort. It declares
+  # the Feature-Crew marketplace itself, so install.sh updates it rather than
+  # re-adding it, which would replace the settings link with a plain file.
   jq -e '
     .model == "gpt-6-astra" and
     .contextTier == "long_context" and
-    .effortLevel == "high"
+    .effortLevel == "high" and
+    .extraKnownMarketplaces["feature-crew"].source == {"source": "github", "repo": "D0n9X1n/feature-crew"}
   ' config/copilot/settings.json >/dev/null
 
   # Relay: Opus remains separate; every non-Opus route uses GPT-6 Astra.

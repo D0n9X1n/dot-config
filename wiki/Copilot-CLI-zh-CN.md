@@ -149,7 +149,7 @@ wakatime/copilot-cli-wakatime
 feature-crew@feature-crew  (marketplace D0n9X1n/feature-crew)
 ```
 
-Claude Code 也执行同一步骤。技能保留 `/fc-*` 名称；代理注册为 `feature-crew:fc-*`。
+`config/copilot/settings.json` 在 `extraKnownMarketplaces` 中声明这个 marketplace，因此之后的运行会更新它，而不是重新添加；重新添加会把设置链接替换成普通文件。Claude Code 也执行同一步骤。技能保留 `/fc-*` 名称；代理注册为 `feature-crew:fc-*`。
 
 ## 检查
 
