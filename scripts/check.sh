@@ -2022,6 +2022,43 @@ run_shell_update_smoke() {
     printf '%s\n' "$out" | grep -Fq 'already at'
     [ -f "$capture" ]
 
+    # A fork mirror tracks upstream; uu pushes the fast-forward to the fork without forcing.
+    local fork fwork
+    fork="$test_root/fork.git"
+    fwork="$test_root/fwork"
+    git clone -q --bare "$origin" "$fork"
+    git clone -q "$fork" "$fwork"
+    git -C "$fwork" remote add upstream "$origin"
+    git -C "$fwork" fetch -q upstream
+    git -C "$fwork" branch -q --set-upstream-to=upstream/main main
+    printf 'fork-sync\n' >>"$seed/notes.txt"
+    git -C "$seed" commit -q -am fork-sync
+    git -C "$seed" push -q "$origin" main
+    rm -f "$capture"
+    out="$(DOT_CONFIGS_DIR="$fwork" UU_CAPTURE="$capture" zsh -f -c 'source "$1"; uu' _ "$custom/uu.zsh")"
+    [ "$(git -C "$fwork" rev-parse HEAD)" = "$(git -C "$seed" rev-parse HEAD)" ]
+    [ "$(git -C "$fork" rev-parse main)" = "$(git -C "$seed" rev-parse HEAD)" ]
+    printf '%s\n' "$out" | grep -Fq 'pushed main to origin'
+    [ -f "$capture" ]
+    # A diverged fork is never forced: uu warns, still updates the checkout, and installs.
+    printf 'fork-only\n' >"$fwork/fork-only.txt"
+    git -C "$fwork" add fork-only.txt
+    git -C "$fwork" commit -q -m fork-only
+    git -C "$fwork" push -q origin main
+    git -C "$fwork" reset -q --hard upstream/main
+    printf 'after-diverge\n' >>"$seed/notes.txt"
+    git -C "$seed" commit -q -am after-diverge
+    git -C "$seed" push -q "$origin" main
+    local fork_before
+    fork_before="$(git -C "$fork" rev-parse main)"
+    rm -f "$capture"
+    out="$(DOT_CONFIGS_DIR="$fwork" UU_CAPTURE="$capture" zsh -f -c 'source "$1"; uu' _ "$custom/uu.zsh" 2>&1)"
+    [ "$(git -C "$fwork" rev-parse HEAD)" = "$(git -C "$seed" rev-parse HEAD)" ]
+    [ "$(git -C "$fork" rev-parse main)" = "$fork_before" ]
+    printf '%s\n' "$out" | grep -Fq 'could not push main to origin'
+    [ -f "$capture" ]
+    git -C "$work" pull -q --ff-only
+
     # uu never runs install.sh from a dirty tree, a detached HEAD, or a branch with no upstream.
     rm -f "$capture"
     printf 'local\n' >>"$work/notes.txt"
@@ -2047,7 +2084,7 @@ run_shell_update_smoke() {
       echo "uu ran after the branch diverged" >&2
       return 1
     fi
-    [ "$(git -C "$work" rev-list --count HEAD)" = 3 ]
+    [ "$(git -C "$work" rev-list --count HEAD)" = 5 ]
     git -C "$work" branch -q --unset-upstream
     if UU_CAPTURE="$capture" zsh -f -c 'source "$1"; uu' _ "$custom/uu.zsh" 2>/dev/null; then
       echo "uu ran without an upstream" >&2

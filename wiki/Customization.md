@@ -70,6 +70,7 @@ Keep your own notes here. The upstream Wiki check and the Wiki publisher read on
 | Private overlay repo (recommended) | a separate private Git repo | yes | `uu` |
 | Nested local repo | `local/` is its own Git repo | yes | `uu` |
 | Public fork | `local/` committed to your fork | no | Sync fork, then `uu` |
+| Fork mirror | untracked `local/` or a private overlay | yes | `uu` (also pushes to the fork) |
 
 This repository is public, so a fork is public too. Never commit tokens, keys, or auth files to a fork. Use a private overlay for anything private.
 
@@ -113,11 +114,26 @@ uu
 
 You can also press **Sync fork** on GitHub, or run `git pull upstream main` and push.
 
+### Fork mirror
+
+Keep your fork equal to upstream, and keep your files out of Git (an untracked `local/` or a private overlay). Clone the fork, then make `main` track upstream:
+
+```sh
+git clone git@github.com:YOU/dot-config.git ~/Public/dot-configs
+cd ~/Public/dot-configs
+git remote add upstream https://github.com/D0n9X1n/dot-config.git
+git fetch upstream
+git branch --set-upstream-to=upstream/main main
+echo local/ >> .git/info/exclude
+```
+
+`uu` then fast-forwards from upstream and pushes the same commits to `origin`, so both repos stay equal. Set `DOT_CONFIGS_FORK_REMOTE` when the fork remote has another name. The push never forces. When the fork has its own commits, `uu` warns, still updates the checkout, and installs; sync the fork once by hand.
+
 ## Update
 
 `uu` fast-forwards the checkout, then runs `./install.sh`. When the overlay folder has its own `.git`, `uu` checks it first and fast-forwards it too. A dirty tree, a detached HEAD, a missing upstream, or a branch that cannot fast-forward stops `uu` before either checkout moves.
 
-A fork's own commits make its `main` differ from upstream. Sync the fork on GitHub first; then `uu` can fast-forward.
+A fork's own commits make its `main` differ from upstream. Sync the fork on GitHub first; then `uu` can fast-forward. A fork mirror needs no extra step: `uu` pushes each fast-forward to the fork.
 
 ## Check
 

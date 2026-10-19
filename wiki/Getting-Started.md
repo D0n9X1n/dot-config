@@ -90,7 +90,7 @@ See [Tmux](Tmux.md), the [native tmux keymap](Tmux-Keymap.md), [RMUX](RMUX.md), 
 uu
 ```
 
-`uu` fast-forwards this checkout to its upstream branch, then runs `./install.sh`. It works from any folder, on Apple silicon and Intel Macs. Options pass through to `install.sh`, for example `SKIP_BREW=1 uu`. It stops without changes when the checkout has uncommitted changes, a detached HEAD, no upstream, or local commits that cannot fast-forward. Set `DOT_CONFIGS_DIR` to use another checkout. Open a new terminal tab afterwards to load updated shell files.
+`uu` fast-forwards this checkout to its upstream branch, then runs `./install.sh`. It works from any folder, on Apple silicon and Intel Macs. Options pass through to `install.sh`, for example `SKIP_BREW=1 uu`. It stops without changes when the checkout has uncommitted changes, a detached HEAD, no upstream, or local commits that cannot fast-forward. Set `DOT_CONFIGS_DIR` to use another checkout. When `main` tracks upstream and `origin` is your fork, `uu` also pushes the update to the fork without forcing, so both stay equal. Open a new terminal tab afterwards to load updated shell files.
 
 To add your own files without merge conflicts, see [Customization](Customization.md).
 

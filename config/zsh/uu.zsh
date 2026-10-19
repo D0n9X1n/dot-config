@@ -10,13 +10,16 @@
 #   own Git repo is fast-forwarded too. See the Customization Wiki page.
 # - Refuses a dirty tree, a detached HEAD, or a branch with no upstream, and
 #   never merges or rebases: local work is left untouched.
+# - A fork mirror (branch tracks upstream, DOT_CONFIGS_FORK_REMOTE or origin
+#   is your fork) gets the same commits pushed after the fast-forward, so both
+#   repos stay equal. The push never forces; a rejected push only warns.
 # - Works the same on Apple silicon and Intel Macs; install.sh finds Homebrew
 #   in /opt/homebrew or /usr/local.
 
 # While a file is sourced, zsh sets $0 to its path; :A resolves the link.
 typeset -g _DOT_CONFIGS_UU_ROOT="${0:A:h:h:h}"
 
-unfunction _dot_configs_uu_ready _dot_configs_uu_pull 2>/dev/null
+unfunction _dot_configs_uu_ready _dot_configs_uu_pull _dot_configs_uu_sync_fork 2>/dev/null
 
 # Check that a checkout can fast-forward safely; print why not.
 function _dot_configs_uu_ready {
@@ -56,6 +59,24 @@ function _dot_configs_uu_pull {
   fi
 }
 
+# After a fast-forward from upstream, push the branch to the fork remote so a
+# fork mirror stays equal to upstream. Skips when the branch already tracks the
+# fork remote or that remote is missing. Never forces; failures only warn.
+function _dot_configs_uu_sync_fork {
+  emulate -L zsh
+  local repo="$1" fork="${DOT_CONFIGS_FORK_REMOTE:-origin}" branch remote
+  branch="$(command git -C "$repo" symbolic-ref --quiet --short HEAD)" || return 0
+  remote="$(command git -C "$repo" config --get "branch.$branch.remote")" || return 0
+  [[ "$remote" == "$fork" ]] && return 0
+  command git -C "$repo" remote get-url "$fork" >/dev/null 2>&1 || return 0
+  if GIT_TERMINAL_PROMPT=0 command git -C "$repo" push --quiet "$fork" "HEAD:refs/heads/$branch" 2>/dev/null; then
+    print "uu: pushed $branch to $fork"
+  else
+    print -u2 "uu: warning: could not push $branch to $fork; the fork has its own commits or no access. Sync it once by hand."
+  fi
+  return 0
+}
+
 unalias uu 2>/dev/null
 unfunction uu 2>/dev/null
 function uu {
@@ -76,6 +97,7 @@ function uu {
     _dot_configs_uu_ready "$overlay" || return 1
   fi
   _dot_configs_uu_pull "$repo" || return 1
+  _dot_configs_uu_sync_fork "$repo"
   if [[ -n "$overlay" ]]; then
     _dot_configs_uu_pull "$overlay" || return 1
   fi
