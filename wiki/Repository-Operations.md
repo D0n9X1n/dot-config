@@ -10,6 +10,7 @@ This page explains where files live and how `install.sh` moves them into your ho
 config/   config used now
 scripts/  code that runs and external release pins
 wiki/     full help
+local/    your own files; upstream never tracks it
 ```
 
 These files stay at fixed paths because tools look for them there:
@@ -105,6 +106,8 @@ To add a managed file:
 6. Check the link or rendered file.
 
 A second install should make no unwanted change.
+
+For files only you use, do not edit the upstream manifest. Put them under `local/`; see [Customization](Customization.md).
 
 ## Installer switches
 

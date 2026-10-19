@@ -82,6 +82,7 @@ Files under `config/zsh/` install into `~/.oh-my-zsh/custom/`. Oh-my-zsh loads t
 | `uu.zsh` | `uu`: fast-forward this checkout, then run `install.sh` |
 | `zz-rmux.zsh` | RMUX helpers and the shared safe-detach dispatcher; loads late |
 | `zz-tmux.zsh` | Native tmux session helpers and interactive `tr` dispatch |
+| `zzz-local-*.zsh` | Your own `local/zsh/*.zsh` files; load last. See [Customization](Customization.md) |
 
 ## Command-Backspace at the prompt
 

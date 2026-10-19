@@ -13,6 +13,7 @@ My macOS config for native tmux with the Apollo style, plus SonicTerm, zsh, Clau
 config/   config used now
 scripts/  code and release pins
 wiki/     full help
+local/    your own files; upstream never tracks it
 ```
 
 `install.sh` links tracked files from `config/manifest.tsv` and installs verified Apollo runtime assets.
@@ -41,6 +42,7 @@ claude           # start Claude Code
 cc my-project    # Claude Code with a title
 copilot          # start Copilot CLI
 gg my-project    # Copilot with a title and YOLO permissions
+uu               # pull the latest commits, then run install.sh
 ```
 
 New SonicTerm tabs stay as normal shells.
@@ -65,6 +67,7 @@ Start with:
 
 - [Getting started](wiki/Getting-Started.md)
 - [Repository operations](wiki/Repository-Operations.md)
+- [Customization](wiki/Customization.md)
 - [RMUX](wiki/RMUX.md)
 - [Tmux](wiki/Tmux.md)
 - [Claude Code](wiki/Claude-Code.md)

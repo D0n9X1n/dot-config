@@ -9,6 +9,7 @@ The Wiki is the full source of truth for this repo. Do not copy its full help in
 - `config/` has config used now.
 - `scripts/` has code that runs and external release pins.
 - `wiki/` has all full help.
+- `local/` belongs to forks and private overlays. Upstream never tracks it; see `wiki/Customization.md`.
 - `install.sh` stays at the root.
 
 `config/manifest.tsv` is the install list. A new managed file needs a manifest row.

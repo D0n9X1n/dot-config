@@ -71,6 +71,7 @@ scripts/check.sh wiki
 scripts/check.sh rmux
 scripts/check.sh tmux
 scripts/check.sh shell
+scripts/check.sh local
 ```
 
 `models` 断言受管模型选择器：作为 Claude 默认值和启动器 wrapper 中的原生 Opus 5.5、其他 Claude 槽位使用的 `gpt-6-astra[1m]`、两个选择器行、Copilot 自己的 GPT-6 Astra 设置，以及 relay 独立的 Opus 路由。`mcp` 检查共享 MCP 默认值：保留 Playwright，不配置重复的 GitHub 条目或 PAT 模板。
@@ -81,7 +82,9 @@ CI 使用同一个脚本：
 
 - macOS 安装原生 tmux 和 RMUX，要求两个引擎都可用，并运行 smoke checks；随后通过符号链接的检出目录，在设置了 `TMUX`、`TMUX_PANE`、`RMUX` 和 `RMUX_PANE` 的情况下再次运行 `scripts/check.sh rmux`；
 - Apple silicon（`macos-latest`）和 Intel（`macos-15-intel`）上的 macOS 都运行 `scripts/check.sh shell`，安装 Homebrew autojump 和 fast-syntax-highlighting，并检查 `custom.zsh` 能从该 Mac 的 Homebrew 前缀加载两者；
-- Ubuntu 安装 ShellCheck 并运行 ShellCheck target。
+- Ubuntu 安装 ShellCheck 并运行 ShellCheck target；在上游仓库中还会检查 `local/` 保持未跟踪。
+
+`local` 会验证 fork 或私有 overlay，并运行它的 `local/check.sh`；上游没有 overlay，所以在上游什么也不做。上游 ShellCheck 会跳过 `local/`。请看 [自定义](Customization-zh-CN.md)。
 
 普通检查不会访问网络。`apollo-online` 是维护者专用检查，会下载所有固定的上游文件并验证 SHA-256。每次修改 `scripts/apollo-releases.tsv` 时都要运行它。
 

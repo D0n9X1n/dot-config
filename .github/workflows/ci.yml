@@ -60,3 +60,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Run shellcheck
         run: bash scripts/check.sh shellcheck
+
+      # local/ belongs to forks and private overlays. Upstream never tracks it,
+      # so a fork's local/ never conflicts with an upstream merge.
+      - name: Upstream keeps local/ untracked
+        if: github.repository == 'D0n9X1n/dot-config'
+        run: test -z "$(git ls-files local)"

@@ -10,6 +10,7 @@
 config/   现在使用的配置
 scripts/  会运行的代码和外部 release pins
 wiki/     完整说明
+local/    你自己的文件；上游从不跟踪
 ```
 
 这些文件必须留在固定位置，因为工具会在这里查找：
@@ -105,6 +106,8 @@ Apollo 主题文件不保存在 Git 中，也不作为 manifest source。`script
 6. 检查链接或渲染文件。
 
 第二次安装不应产生意外变化。
+
+只给你自己用的文件，不要修改上游清单。把它们放到 `local/` 下；请看 [自定义](Customization-zh-CN.md)。
 
 ## 安装器开关
 

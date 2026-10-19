@@ -10,6 +10,7 @@ The source is the flat `wiki/` folder. GitHub Actions publishes it to the GitHub
 
 - [Getting started](Getting-Started.md) — install the files and run the main tools.
 - [Repository operations](Repository-Operations.md) — learn the folders, manifest, links, and safe update flow.
+- [Customization](Customization.md) — add your own files in `local/` without upstream merge conflicts.
 
 ## Tools
 
@@ -34,6 +35,7 @@ The source is the flat `wiki/` folder. GitHub Actions publishes it to the GitHub
 | `config/` | Config used now |
 | `scripts/` | Code that runs and external release pins |
 | `wiki/` | Full help |
+| `local/` | Your own files; upstream never tracks it |
 
 `install.sh` stays at the root. It links tracked files from `config/manifest.tsv` and installs verified Apollo runtime assets.
 
@@ -47,6 +49,6 @@ npx copilot-relay auth
 ./install.sh
 ```
 
-Run `scripts/check.sh all` before a push.
+Update later with `uu`. Run `scripts/check.sh all` before a push.
 
 This is a public repository. Never add tokens, keys, auth files, logs, or runtime state.

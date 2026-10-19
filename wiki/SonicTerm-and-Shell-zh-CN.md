@@ -82,6 +82,7 @@ RMUX 配置会明确保留条件式鼠标 bindings。Copilot 等支持鼠标的�
 | `uu.zsh` | `uu`：fast-forward 本检出，然后运行 `install.sh` |
 | `zz-rmux.zsh` | RMUX 助手和共享安全分离分派器；较晚加载 |
 | `zz-tmux.zsh` | 原生 tmux 会话助手和交互式 `tr` 分派 |
+| `zzz-local-*.zsh` | 你自己的 `local/zsh/*.zsh` 文件；最后加载。请看 [自定义](Customization-zh-CN.md) |
 
 ## 提示符中的 Command-Backspace
 
