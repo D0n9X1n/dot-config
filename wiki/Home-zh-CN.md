@@ -10,6 +10,7 @@
 
 - [开始使用](Getting-Started-zh-CN.md) — 安装文件并运行常用工具。
 - [仓库操作](Repository-Operations-zh-CN.md) — 了解文件夹、清单、链接和安全更新流程。
+- [自定义](Customization-zh-CN.md) — 在 `local/` 中添加自己的文件，不与上游合并冲突。
 
 ## 工具
 
@@ -34,6 +35,7 @@
 | `config/` | 现在使用的配置 |
 | `scripts/` | 会运行的代码和外部 release pins |
 | `wiki/` | 完整说明 |
+| `local/` | 你自己的文件；上游从不跟踪 |
 
 `install.sh` 保留在根目录。它从 `config/manifest.tsv` 链接受管文件，并安装已验证的 Apollo 运行文件。
 

@@ -87,7 +87,7 @@ run_shellcheck() {
     return 1
   }
 
-  files="$(find . -path './.git' -prune -o -type f \( \
+  files="$(find . \( -path './.git' -o -path './local' \) -prune -o -type f \( \
     -name '*.bash' \
     -o -name '.bashrc' \
     -o -name 'bashrc' \
@@ -650,6 +650,8 @@ run_wiki_smoke() {
     wiki/Getting-Started-zh-CN.md
     wiki/Repository-Operations.md
     wiki/Repository-Operations-zh-CN.md
+    wiki/Customization.md
+    wiki/Customization-zh-CN.md
     wiki/Claude-Code.md
     wiki/Claude-Code-zh-CN.md
     wiki/Copilot-CLI.md
@@ -837,7 +839,7 @@ run_manifest_smoke() {
       return 1
     }
     config_files="$(find config -type f ! -path 'config/manifest.tsv' \
-      ! -path 'config/sonicterm/*.save.lock' -print | sort)"
+      ! -path 'config/sonicterm/*.save.lock' ! -name '.DS_Store' -print | sort)"
     manifest_config_files="$(grep -Ev '^(#|$)' config/manifest.tsv | cut -f2 | grep '^config/' | sort)"
     [ "$config_files" = "$manifest_config_files" ] || {
       echo "config/ files and manifest sources differ" >&2
@@ -2102,6 +2104,138 @@ run_shell_update_smoke() {
   )
 }
 
+# A fork or private overlay validates its local/manifest.tsv here and may add
+# its own checks in local/check.sh. Upstream has no overlay, so this is a no-op.
+run_local_checks() {
+  (
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    validate_local_overlay
+    if [ -f "$local_root/check.sh" ]; then
+      echo "local checks: $local_root/check.sh"
+      DOT_CONFIGS_LOCAL="$local_root" bash "$local_root/check.sh"
+    fi
+  )
+}
+
+run_local_overlay_smoke() {
+  (
+    local test_root overlay home custom out origin seed work
+    test_root="$(mktemp -d)"
+    trap 'rm -rf "$test_root"' EXIT
+    overlay="$test_root/overlay"
+    home="$test_root/home"
+    custom="$home/.oh-my-zsh/custom"
+    mkdir -p "$overlay/zsh" "$overlay/config" "$custom"
+    printf 'alias hi=echo\n' >"$overlay/zsh/aliases.zsh"
+    printf 'x\n' >"$overlay/config/tool.conf"
+    printf '# type\tsource\tdestination\nlink\tconfig/tool.conf\t.config/tool/tool.conf' >"$overlay/manifest.tsv"
+    printf 'echo fork-check-ran\n' >"$overlay/check.sh"
+
+    export HOME="$home" DOT_CONFIGS_LOCAL="$overlay"
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+
+    # A valid overlay links its rows and zsh files; a rerun changes nothing.
+    validate_local_overlay
+    link_local_overlay >/dev/null
+    link_local_overlay >/dev/null
+    [ "$(readlink "$home/.config/tool/tool.conf")" = "$overlay/config/tool.conf" ]
+    [ "$(readlink "$custom/zzz-local-aliases.zsh")" = "$overlay/zsh/aliases.zsh" ]
+    [ -z "$(find "$home" -name '*.bak.*' -print)" ]
+
+    # oh-my-zsh loads zzz-local-* after every upstream helper.
+    : >"$custom/zz-tmux.zsh"
+    [ "$(zsh -f -c 'files=("$1"/*.zsh); print -r -- "${files[-1]:t}"' _ "$custom")" = "zzz-local-aliases.zsh" ]
+
+    # Rows that are unsafe, clash with upstream, or use reserved names fail.
+    for row in \
+      $'merge\tconfig/tool.conf\t.config/tool/x.json' \
+      $'link\t../escape\t.config/x' \
+      $'link\t/etc/hosts\t.config/x' \
+      $'link\tconfig/tool.conf\t../x' \
+      $'link\tconfig/missing.conf\t.config/x' \
+      $'link\tconfig/tool.conf\t.tmux.conf' \
+      $'link\tconfig/tool.conf\t.oh-my-zsh/custom/zzz-local-x.zsh' \
+      $'link\tconfig/tool.conf\t.config/tool/tool.conf\nlink\tconfig/tool.conf\t.config/tool/tool.conf'; do
+      printf '%s\n' "$row" >"$overlay/manifest.tsv"
+      if validate_local_overlay 2>/dev/null; then
+        echo "local manifest accepted: $row" >&2
+        return 1
+      fi
+    done
+    if DOT_CONFIGS_LOCAL=relative/path validate_local_overlay 2>/dev/null; then
+      echo "relative DOT_CONFIGS_LOCAL accepted" >&2
+      return 1
+    fi
+
+    # A removed local zsh file drops its link; a user's own link stays.
+    rm -f "$overlay/manifest.tsv" "$overlay/zsh/aliases.zsh"
+    ln -s "$test_root/elsewhere.zsh" "$custom/my-link.zsh"
+    printf 'mine\n' >"$custom/zzz-local-mine.zsh"
+    link_local_overlay >/dev/null
+    [ ! -L "$custom/zzz-local-aliases.zsh" ]
+    [ -L "$custom/my-link.zsh" ]
+    [ -f "$custom/zzz-local-mine.zsh" ]
+
+    # The fork's check hook runs, and its failure fails the check.
+    out="$(run_local_checks)"
+    printf '%s\n' "$out" | grep -Fq 'fork-check-ran'
+    printf 'exit 3\n' >"$overlay/check.sh"
+    if run_local_checks >/dev/null 2>&1; then
+      echo "failing local check passed" >&2
+      return 1
+    fi
+
+    # uu also fast-forwards an overlay that is its own Git repo.
+    export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+    export GIT_AUTHOR_NAME=check GIT_AUTHOR_EMAIL=check@example.com
+    export GIT_COMMITTER_NAME=check GIT_COMMITTER_EMAIL=check@example.com
+    unset DOT_CONFIGS_DIR
+    for name in main overlay; do
+      git init -q --bare -b main "$test_root/$name.git"
+      git init -q -b main "$test_root/$name-seed"
+    done
+    mkdir -p "$test_root/main-seed/config/zsh"
+    cp config/zsh/uu.zsh "$test_root/main-seed/config/zsh/uu.zsh"
+    printf '#!/usr/bin/env bash\necho installed >"$UU_CAPTURE"\n' >"$test_root/main-seed/install.sh"
+    chmod +x "$test_root/main-seed/install.sh"
+    printf 'one\n' >"$test_root/overlay-seed/notes.txt"
+    for name in main overlay; do
+      seed="$test_root/$name-seed"
+      git -C "$seed" add -A
+      git -C "$seed" commit -q -m first
+      git -C "$seed" push -q "$test_root/$name.git" main
+      git clone -q "$test_root/$name.git" "$test_root/$name-work"
+    done
+    work="$test_root/main-work"
+    seed="$test_root/overlay-seed"
+    printf 'two\n' >>"$seed/notes.txt"
+    git -C "$seed" commit -q -am overlay-second
+    git -C "$seed" push -q "$test_root/overlay.git" main
+    UU_CAPTURE="$test_root/cap" DOT_CONFIGS_LOCAL="$test_root/overlay-work" \
+      zsh -f -c 'source "$1"; uu' _ "$work/config/zsh/uu.zsh" >/dev/null
+    [ "$(git -C "$test_root/overlay-work" rev-parse HEAD)" = "$(git -C "$seed" rev-parse HEAD)" ]
+    [ -f "$test_root/cap" ]
+
+    # A dirty overlay stops uu before either checkout moves.
+    rm -f "$test_root/cap"
+    printf 'dirty\n' >>"$test_root/overlay-work/notes.txt"
+    if UU_CAPTURE="$test_root/cap" DOT_CONFIGS_LOCAL="$test_root/overlay-work" \
+        zsh -f -c 'source "$1"; uu' _ "$work/config/zsh/uu.zsh" >/dev/null 2>&1; then
+      echo "uu ran with a dirty overlay" >&2
+      return 1
+    fi
+    [ ! -e "$test_root/cap" ]
+
+    # An untracked local/ folder in an upstream clone does not block uu.
+    git -C "$test_root/overlay-work" checkout -q -- notes.txt
+    mkdir -p "$work/local/zsh"
+    printf 'x\n' >"$work/local/zsh/mine.zsh"
+    UU_CAPTURE="$test_root/cap" DOT_CONFIGS_LOCAL= \
+      zsh -f -c 'unset DOT_CONFIGS_LOCAL; source "$1"; uu' _ "$work/config/zsh/uu.zsh" >/dev/null
+    [ -f "$test_root/cap" ]
+  )
+}
+
 run_smoke() {
   run_bash_syntax
   run_apollo_smoke
@@ -2131,6 +2265,8 @@ run_smoke() {
   run_rmux_smoke
   run_tmux_smoke
   run_shell_update_smoke
+  run_local_overlay_smoke
+  run_local_checks
 }
 
 case "${1:-all}" in
@@ -2143,11 +2279,12 @@ case "${1:-all}" in
   wiki) run_wiki_smoke; run_pipeline_scripts_smoke; run_rmux_keymap_docs_smoke ;;
   rmux) run_rmux_helpers_smoke; run_rmux_store_tests; run_rmux_keymap_docs_smoke; run_retired_config_migration_smoke; run_rmux_smoke ;;
   tmux) run_tmux_smoke ;;
-  shell) run_shell_update_smoke ;;
+  shell) run_shell_update_smoke; run_local_overlay_smoke ;;
+  local) run_local_checks ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;
   *)
-    echo "usage: $0 [smoke|apollo|apollo-online|instructions|models|mcp|wiki|rmux|tmux|shell|shellcheck|all]" >&2
+    echo "usage: $0 [smoke|apollo|apollo-online|instructions|models|mcp|wiki|rmux|tmux|shell|local|shellcheck|all]" >&2
     exit 2
     ;;
 esac

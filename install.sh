@@ -5,6 +5,10 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 config_root="${repo_root}/config"
 scripts_root="${repo_root}/scripts"
 manifest="${config_root}/manifest.tsv"
+# A fork or private overlay keeps its own files here. Upstream never tracks
+# local/, so these files never conflict with an upstream merge.
+local_root="${DOT_CONFIGS_LOCAL:-${repo_root}/local}"
+local_manifest="${local_root}/manifest.tsv"
 timestamp="$(date +"%Y%m%d%H%M%S")"
 install_log="${DOT_CONFIGS_INSTALL_LOG:-${HOME}/Library/Logs/dot-configs-install.log}"
 source "${scripts_root}/apollo-theme.sh"
@@ -886,6 +890,96 @@ validate_manifest() {
   done <"$manifest"
 }
 
+# local/manifest.tsv takes link rows only. Sources are relative to the
+# overlay; destinations may not reuse an upstream destination or the reserved
+# zzz-local-* zsh names.
+validate_local_overlay() {
+  local type source destination extra upstream_destinations
+  local seen_destinations=""
+
+  if [ -n "${DOT_CONFIGS_LOCAL:-}" ]; then
+    case "$DOT_CONFIGS_LOCAL" in
+      /*) ;;
+      *) echo "Error: DOT_CONFIGS_LOCAL must be an absolute path: $DOT_CONFIGS_LOCAL" >&2; return 1 ;;
+    esac
+    [ -d "$local_root" ] || {
+      echo "Error: DOT_CONFIGS_LOCAL folder not found: $local_root" >&2
+      return 1
+    }
+  fi
+  [ -f "$local_manifest" ] || return 0
+
+  upstream_destinations="$(grep -Ev '^(#|$)' "$manifest" | cut -f3)"
+  while IFS=$'\t' read -r type source destination extra || [ -n "$type" ]; do
+    case "$type" in
+      ''|'#'*) continue ;;
+      link) ;;
+      *) echo "Error: local manifest supports only link rows, not '$type'" >&2; return 1 ;;
+    esac
+    [ -z "$extra" ] || {
+      echo "Error: local manifest row has more than three fields: $source" >&2
+      return 1
+    }
+    [ -n "$source" ] && [ -n "$destination" ] || {
+      echo "Error: incomplete local manifest row" >&2
+      return 1
+    }
+    case "$source" in
+      /*|*'..'*) echo "Error: unsafe local manifest source: $source" >&2; return 1 ;;
+    esac
+    case "$destination" in
+      /*|*'..'*) echo "Error: unsafe local manifest destination: $destination" >&2; return 1 ;;
+      .oh-my-zsh/custom/zzz-local-*)
+        echo "Error: $destination is reserved for local/zsh/*.zsh" >&2
+        return 1
+        ;;
+    esac
+    [ -f "${local_root}/${source}" ] || {
+      echo "Error: missing local manifest source: ${local_root}/${source}" >&2
+      return 1
+    }
+    case $'\n'"${upstream_destinations}"$'\n' in
+      *$'\n'"${destination}"$'\n'*)
+        echo "Error: local manifest destination is managed upstream: $destination" >&2
+        return 1
+        ;;
+    esac
+    case $'\n'"${seen_destinations}"$'\n' in
+      *$'\n'"${destination}"$'\n'*) echo "Error: duplicate local manifest destination: $destination" >&2; return 1 ;;
+    esac
+    seen_destinations="${seen_destinations}${seen_destinations:+$'\n'}${destination}"
+  done <"$local_manifest"
+}
+
+# Link local/manifest.tsv rows, then local/zsh/*.zsh as zzz-local-NAME.zsh so
+# oh-my-zsh loads them after every upstream helper.
+link_local_overlay() {
+  local type source destination extra file dest name
+  local custom="${HOME}/.oh-my-zsh/custom"
+
+  # zzz-local-* links belong to the overlay: drop any that no longer match it.
+  for dest in "${custom}"/zzz-local-*.zsh; do
+    [ -L "$dest" ] || continue
+    name="${dest##*/zzz-local-}"
+    if [ "$(readlink "$dest")" != "${local_root}/zsh/${name}" ] || [ ! -f "${local_root}/zsh/${name}" ]; then
+      rm -f "$dest" && echo "Removed old local link: $dest"
+    fi
+  done
+  [ -d "$local_root" ] || return 0
+
+  if [ -f "$local_manifest" ]; then
+    while IFS=$'\t' read -r type source destination extra || [ -n "$type" ]; do
+      [ "$type" = "link" ] || continue
+      link_file "${local_root}/${source}" "${HOME}/${destination}"
+    done <"$local_manifest"
+  fi
+  for file in "${local_root}"/zsh/*.zsh; do
+    [ -f "$file" ] || continue
+    link_file "$file" "${custom}/zzz-local-${file##*/}"
+  done
+  echo "Linked local overlay from $local_root"
+}
+
 manifest_source_for_destination() {
   local expected_type="$1"
   local expected_destination="$2"
@@ -1163,8 +1257,10 @@ else
 fi
 
 validate_manifest
+validate_local_overlay
 install_apollo_themes
 link_manifest_files
+link_local_overlay
 # RMUX is Windows-only. Keep retention while an older macOS install remains.
 if is_macos && have_cmd python3 && have_cmd rmux; then
   log_command python3 -B "${scripts_root}/rmux/store.py" prepare || {
