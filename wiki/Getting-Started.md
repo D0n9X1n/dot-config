@@ -87,8 +87,16 @@ See [Tmux](Tmux.md), the [native tmux keymap](Tmux-Keymap.md), [RMUX](RMUX.md), 
 ## Update
 
 ```sh
+uu
+```
+
+`uu` fast-forwards this checkout to its upstream branch, then runs `./install.sh`. It works from any folder, on Apple silicon and Intel Macs. Options pass through to `install.sh`, for example `SKIP_BREW=1 uu`. It stops without changes when the checkout has uncommitted changes, a detached HEAD, no upstream, or local commits that cannot fast-forward. Set `DOT_CONFIGS_DIR` to use another checkout. Open a new terminal tab afterwards to load updated shell files.
+
+Before `uu` is installed, update by hand:
+
+```sh
 cd ~/Public/dot-configs
-git pull
+git pull --ff-only
 ./install.sh
 ```
 

@@ -189,7 +189,7 @@ The tracked settings enable:
 - `claude-code-wakatime@wakatime`
 - `feature-crew@feature-crew`
 
-The WakaTime marketplace points to the official `wakatime/claude-code-wakatime` Git repository. The Feature-Crew marketplace points to the GitHub repository `D0n9X1n/feature-crew`; `install.sh` also installs or updates that plugin in each CLI on PATH. An old script install of Feature-Crew in `~/.claude` would shadow the plugin: remove it once with `./install.sh` from a Feature-Crew clone.
+The WakaTime marketplace points to the official `wakatime/claude-code-wakatime` Git repository. The Feature-Crew marketplace points to the GitHub repository `D0n9X1n/feature-crew`; `install.sh` also installs or updates that plugin in each CLI on PATH. An old script install of Feature-Crew in `~/.claude` would shadow the plugin. After Claude Code lists the plugin enabled, `install.sh` removes the old `fc-*` agents in `~/.claude/agents/`, the old `fc-*` skills in `~/.claude/skills/`, and `~/.claude/feature-crew.sha256`. It removes only those exact names and skips a linked `agents` or `skills` folder. Older non-`fc-` files from very early releases are not removed; run `./install.sh` from a Feature-Crew clone for those.
 
 ## Common fixes
 

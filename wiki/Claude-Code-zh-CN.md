@@ -189,7 +189,7 @@ Skills 和 Agents 统计 user 和 project 文件，也统计每个已启用 plug
 - `claude-code-wakatime@wakatime`
 - `feature-crew@feature-crew`
 
-WakaTime marketplace 指向官方 `wakatime/claude-code-wakatime` Git 仓库。Feature-Crew marketplace 指向 GitHub 仓库 `D0n9X1n/feature-crew`；`install.sh` 也会在 PATH 上的每个 CLI 中安装或更新这个 plugin。`~/.claude` 中旧的 Feature-Crew 脚本安装会遮挡 plugin：在 Feature-Crew 克隆中运行一次 `./install.sh` 删除它。
+WakaTime marketplace 指向官方 `wakatime/claude-code-wakatime` Git 仓库。Feature-Crew marketplace 指向 GitHub 仓库 `D0n9X1n/feature-crew`；`install.sh` 也会在 PATH 上的每个 CLI 中安装或更新这个 plugin。`~/.claude` 中旧的 Feature-Crew 脚本安装会遮挡 plugin。Claude Code 列出该 plugin 已启用后，`install.sh` 会删除 `~/.claude/agents/` 中旧的 `fc-*` agent、`~/.claude/skills/` 中旧的 `fc-*` skill，以及 `~/.claude/feature-crew.sha256`。它只删除这些确切名称，并跳过链接形式的 `agents` 或 `skills` 文件夹。很早版本留下的非 `fc-` 文件不会被删除；对这些文件，请在 Feature-Crew 克隆中运行 `./install.sh`。
 
 ## 常见问题
 

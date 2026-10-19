@@ -625,6 +625,39 @@ ensure_feature_crew_plugin() {
   done
 }
 
+# An old script install of Feature-Crew put fc-* agents and skills in
+# ~/.claude, where they shadow the plugin. Remove those exact names once Claude
+# Code lists the plugin enabled; leave linked folders and other files alone.
+cleanup_legacy_feature_crew() {
+  local claude_dir="${HOME}/.claude" name path
+  local agents="fc-architect fc-developer fc-pm fc-qa-code fc-qa-spec fc-tech-lead"
+  local skills="fc-brainstorm fc-build-or-fix fc-debug fc-explain fc-grill-me fc-research fc-review fc-second-opinion fc-ship fc-update"
+  have_cmd claude && have_cmd jq || return 0
+  claude plugin list --json 2>/dev/null \
+    | jq -e 'any(.[]; .id == "feature-crew@feature-crew" and .enabled == true)' >/dev/null || return 0
+
+  if [ ! -L "${claude_dir}/agents" ]; then
+    for name in $agents; do
+      path="${claude_dir}/agents/${name}.md"
+      if [ -e "$path" ] || [ -L "$path" ]; then
+        rm -rf "$path" && echo "Removed old Feature-Crew file: $path"
+      fi
+    done
+  fi
+  if [ ! -L "${claude_dir}/skills" ]; then
+    for name in $skills; do
+      path="${claude_dir}/skills/${name}"
+      if [ -e "$path" ] || [ -L "$path" ]; then
+        rm -rf "$path" && echo "Removed old Feature-Crew skill: $path"
+      fi
+    done
+  fi
+  path="${claude_dir}/feature-crew.sha256"
+  if [ -e "$path" ] || [ -L "$path" ]; then
+    rm -f "$path" && echo "Removed old Feature-Crew file: $path"
+  fi
+}
+
 cleanup_legacy_wakatime_mcp() {
   local wm_dest="${HOME}/.local/share/wakatime-mcp"
   local copilot_mcp_pre="${HOME}/.config/github-copilot/mcp.json"
@@ -1192,6 +1225,7 @@ ensure_copilot_wakatime_plugin
 
 # Feature-Crew: one plugin for Claude Code and Copilot CLI.
 ensure_feature_crew_plugin
+cleanup_legacy_feature_crew
 
 # Import Copilot's merged MCP server map into Claude Code's local state file.
 copilot_mcp="${HOME}/.config/github-copilot/mcp.json"

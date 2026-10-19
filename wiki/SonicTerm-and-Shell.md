@@ -79,6 +79,7 @@ Files under `config/zsh/` install into `~/.oh-my-zsh/custom/`. Oh-my-zsh loads t
 | `cc.zsh` | titled Claude launch |
 | `copilot.zsh` | allow-all Copilot alias, true-color wrapper, and cleanup |
 | `gg.zsh` | titled, allow-all Copilot launch |
+| `uu.zsh` | `uu`: fast-forward this checkout, then run `install.sh` |
 | `zz-rmux.zsh` | RMUX helpers and the shared safe-detach dispatcher; loads late |
 | `zz-tmux.zsh` | Native tmux session helpers and interactive `tr` dispatch |
 
@@ -119,6 +120,8 @@ Open a new shell to apply it, or run `export HOMEBREW_NO_AUTO_UPDATE=1` in an ex
 ## Completions and paths
 
 `.zshrc` owns prompt theme selection through `ZSH_THEME`. Managed zsh helpers do not set or override it, and the installer does not edit `.zshrc`. Apollo remains available if selected there. `custom.zsh` points eza at the pinned upstream theme.
+
+Homebrew lives in `/opt/homebrew` on Apple silicon and `/usr/local` on Intel. `custom.zsh` and the installer look in `$HOMEBREW_PREFIX`, then `/opt/homebrew`, then `/usr/local`, so autojump (`j`) and fast-syntax-highlighting load on both.
 
 When fast-syntax-highlighting is installed, the installer prepares its shipped Base16 theme in an isolated local work folder. Syntax colors then use SonicTerm's Apollo ANSI slots. `custom.zsh` also loads autojump, adds Homebrew completions, fixes group-writable completion folders before `compinit -i`, and adds local .NET and Android SDK paths.
 
@@ -196,7 +199,7 @@ With native tmux 3.7 and `status-keys vi`, Esc changes prompt mode; `C-g` cancel
 
 ```sh
 zsh -n config/zsh/*.zsh
-zsh -ic 'type tt tr tl td th ts rr rd rl rh rs cc gg; print -r -- "$ZSH_THEME $EZA_CONFIG_DIR $FAST_WORK_DIR"'
+zsh -ic 'type tt tr tl td th ts rr rd rl rh rs cc gg uu j; print -r -- "$ZSH_THEME $EZA_CONFIG_DIR $FAST_WORK_DIR"'
 grep -F 'theme = "apollo"' ~/.sonicterm/sonicterm.toml
 ls -l ~/.sonicterm/themes/apollo.toml ~/.config/eza-apollo-theme/theme.yml
 scripts/check.sh rmux
