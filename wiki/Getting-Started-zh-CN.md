@@ -87,8 +87,16 @@ gg my-project    # 启动 Copilot CLI 并设置窗口标题
 ## 更新
 
 ```sh
+uu
+```
+
+`uu` 把本检出 fast-forward 到它的 upstream 分支，然后运行 `./install.sh`。它可在任意目录运行，支持 Apple silicon 和 Intel Mac。参数会传给 `install.sh`，例如 `SKIP_BREW=1 uu`。检出有未提交修改、处于 detached HEAD、没有 upstream，或本地提交无法 fast-forward 时，它不做任何修改并停止。设置 `DOT_CONFIGS_DIR` 可以使用其他检出。完成后打开新的终端标签页，以加载更新后的 shell 文件。
+
+安装 `uu` 之前，手动更新：
+
+```sh
 cd ~/Public/dot-configs
-git pull
+git pull --ff-only
 ./install.sh
 ```
 

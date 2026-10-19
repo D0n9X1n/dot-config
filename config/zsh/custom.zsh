@@ -7,7 +7,18 @@
 # - ignored by git by default
 #
 
-[ -f /opt/homebrew/etc/profile.d/autojump.sh ] && . /opt/homebrew/etc/profile.d/autojump.sh
+# Homebrew lives in /opt/homebrew on Apple silicon and /usr/local on Intel.
+_dot_configs_brew_prefix=""
+for _dot_configs_prefix in "${HOMEBREW_PREFIX:-}" /opt/homebrew /usr/local; do
+  if [ -n "$_dot_configs_prefix" ] && [ -x "$_dot_configs_prefix/bin/brew" ]; then
+    _dot_configs_brew_prefix="$_dot_configs_prefix"
+    break
+  fi
+done
+unset _dot_configs_prefix
+
+[ -n "$_dot_configs_brew_prefix" ] && [ -f "$_dot_configs_brew_prefix/etc/profile.d/autojump.sh" ] && \
+  . "$_dot_configs_brew_prefix/etc/profile.d/autojump.sh"
 
 export HOMEBREW_NO_AUTO_UPDATE=1
 export EZA_CONFIG_DIR="$HOME/.config/eza-apollo-theme"
@@ -76,8 +87,9 @@ alias unproxy="disable_proxy"
 ##############################################################################
 
 # Zsh syntax highlight
-[ -f /opt/homebrew/opt/zsh-fast-syntax-highlighting/share/zsh-fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh ] && \
-  source /opt/homebrew/opt/zsh-fast-syntax-highlighting/share/zsh-fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh
+_dot_configs_fsh="$_dot_configs_brew_prefix/opt/zsh-fast-syntax-highlighting/share/zsh-fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"
+[ -n "$_dot_configs_brew_prefix" ] && [ -f "$_dot_configs_fsh" ] && source "$_dot_configs_fsh"
+unset _dot_configs_fsh _dot_configs_brew_prefix
 
 # Zsh complete
 if type brew &>/dev/null; then

@@ -516,11 +516,19 @@ apollo_link_consumers() {
 }
 
 apollo_install_fsh_base16() {
-  local root="$1" plugin base work tmp stage theme staged_current staged_secondary
+  local root="$1" plugin base work tmp stage theme staged_current staged_secondary prefix
   [ "${APOLLO_SKIP_FSH:-0}" = "1" ] && return 0
   command -v zsh >/dev/null 2>&1 || return 0
 
-  plugin="${APOLLO_FSH_PLUGIN:-/opt/homebrew/opt/zsh-fast-syntax-highlighting/share/zsh-fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh}"
+  # Homebrew lives in /opt/homebrew on Apple silicon and /usr/local on Intel.
+  plugin="${APOLLO_FSH_PLUGIN:-}"
+  if [ -z "$plugin" ]; then
+    for prefix in "${HOMEBREW_PREFIX:-}" /opt/homebrew /usr/local; do
+      [ -n "$prefix" ] || continue
+      plugin="${prefix}/opt/zsh-fast-syntax-highlighting/share/zsh-fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"
+      [ -f "$plugin" ] && break
+    done
+  fi
   base="$(dirname "$plugin")"
   [ -f "$plugin" ] && [ -f "${base}/themes/base16.ini" ] || return 0
   work="${root}/fsh"

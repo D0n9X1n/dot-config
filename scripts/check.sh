@@ -1979,6 +1979,129 @@ BOUNDS
   echo "Apollo release bundle, generated adapters, and safe activation ok"
 }
 
+run_shell_update_smoke() {
+  (
+    local test_root origin seed work custom capture out fake_bin fake_brew test_home claude_dir
+    test_root="$(mktemp -d)"
+    trap 'rm -rf "$test_root"' EXIT
+    export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+    export GIT_AUTHOR_NAME=check GIT_AUTHOR_EMAIL=check@example.com
+    export GIT_COMMITTER_NAME=check GIT_COMMITTER_EMAIL=check@example.com
+    unset DOT_CONFIGS_DIR HOMEBREW_PREFIX
+
+    # uu: a clone behind its upstream fast-forwards, then runs install.sh with the given options.
+    origin="$test_root/origin.git"
+    seed="$test_root/seed"
+    work="$test_root/work"
+    custom="$test_root/home/.oh-my-zsh/custom"
+    capture="$test_root/install-args"
+    git init -q --bare -b main "$origin"
+    git init -q -b main "$seed"
+    mkdir -p "$seed/config/zsh" "$custom"
+    cp config/zsh/uu.zsh "$seed/config/zsh/uu.zsh"
+    printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >"$UU_CAPTURE"\n' >"$seed/install.sh"
+    chmod +x "$seed/install.sh"
+    printf 'one\n' >"$seed/notes.txt"
+    git -C "$seed" add -A
+    git -C "$seed" commit -q -m first
+    git -C "$seed" push -q "$origin" main
+    git clone -q "$origin" "$work"
+    printf 'two\n' >>"$seed/notes.txt"
+    git -C "$seed" commit -q -am second
+    git -C "$seed" push -q "$origin" main
+    ln -s "$work/config/zsh/uu.zsh" "$custom/uu.zsh"
+
+    out="$(UU_CAPTURE="$capture" zsh -f -c 'source "$1"; uu --flag' _ "$custom/uu.zsh")"
+    [ "$(git -C "$work" rev-parse HEAD)" = "$(git -C "$seed" rev-parse HEAD)" ]
+    [ "$(cat "$capture")" = "--flag" ]
+    printf '%s\n' "$out" | grep -Fq 'second'
+    rm -f "$capture"
+    out="$(UU_CAPTURE="$capture" zsh -f -c 'source "$1"; uu' _ "$custom/uu.zsh")"
+    printf '%s\n' "$out" | grep -Fq 'already at'
+    [ -f "$capture" ]
+
+    # uu never runs install.sh from a dirty tree, a detached HEAD, or a branch with no upstream.
+    rm -f "$capture"
+    printf 'local\n' >>"$work/notes.txt"
+    if UU_CAPTURE="$capture" zsh -f -c 'source "$1"; uu' _ "$custom/uu.zsh" 2>/dev/null; then
+      echo "uu ran from a dirty tree" >&2
+      return 1
+    fi
+    git -C "$work" checkout -q -- notes.txt
+    git -C "$work" checkout -q --detach
+    if UU_CAPTURE="$capture" zsh -f -c 'source "$1"; uu' _ "$custom/uu.zsh" 2>/dev/null; then
+      echo "uu ran from a detached HEAD" >&2
+      return 1
+    fi
+    git -C "$work" checkout -q main
+    # A local commit plus a new upstream commit cannot fast-forward; uu must not merge.
+    printf 'mine\n' >"$work/local.txt"
+    git -C "$work" add local.txt
+    git -C "$work" commit -q -m mine
+    printf 'three\n' >>"$seed/notes.txt"
+    git -C "$seed" commit -q -am third
+    git -C "$seed" push -q "$origin" main
+    if UU_CAPTURE="$capture" zsh -f -c 'source "$1"; uu' _ "$custom/uu.zsh" >/dev/null 2>&1; then
+      echo "uu ran after the branch diverged" >&2
+      return 1
+    fi
+    [ "$(git -C "$work" rev-list --count HEAD)" = 3 ]
+    git -C "$work" branch -q --unset-upstream
+    if UU_CAPTURE="$capture" zsh -f -c 'source "$1"; uu' _ "$custom/uu.zsh" 2>/dev/null; then
+      echo "uu ran without an upstream" >&2
+      return 1
+    fi
+    [ ! -e "$capture" ]
+
+    # Homebrew add-ons load from HOMEBREW_PREFIX, so an Intel /usr/local prefix works too.
+    fake_brew="$test_root/brew"
+    mkdir -p "$fake_brew/bin" "$fake_brew/etc/profile.d" \
+      "$fake_brew/opt/zsh-fast-syntax-highlighting/share/zsh-fast-syntax-highlighting"
+    printf '#!/bin/sh\n' >"$fake_brew/bin/brew"
+    chmod +x "$fake_brew/bin/brew"
+    printf 'typeset -g CHECK_AUTOJUMP=1\n' >"$fake_brew/etc/profile.d/autojump.sh"
+    printf 'typeset -g CHECK_FSH=1\n' \
+      >"$fake_brew/opt/zsh-fast-syntax-highlighting/share/zsh-fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"
+    HOME="$test_root/home" HOMEBREW_PREFIX="$fake_brew" zsh -f -c '
+      source config/zsh/custom.zsh
+      [[ "$CHECK_AUTOJUMP" = 1 && "$CHECK_FSH" = 1 && -z "${_dot_configs_brew_prefix+x}" ]]
+    '
+
+    # Old Feature-Crew script files go only after Claude Code lists the plugin enabled.
+    fake_bin="$test_root/bin"
+    test_home="$test_root/fc-home"
+    claude_dir="$test_home/.claude"
+    mkdir -p "$fake_bin" "$claude_dir/agents" "$claude_dir/skills/fc-review" \
+      "$claude_dir/skills/update-settings" "$claude_dir/skills/fc-mine"
+    printf '#!/bin/sh\nprintf "%%s\\n" "$CHECK_PLUGINS"\n' >"$fake_bin/claude"
+    chmod +x "$fake_bin/claude"
+    : >"$claude_dir/agents/fc-pm.md"
+    : >"$claude_dir/agents/my-agent.md"
+    : >"$claude_dir/feature-crew.sha256"
+    (
+      export HOME="$test_home" PATH="$fake_bin:$PATH"
+      DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+      CHECK_PLUGINS='[{"id":"feature-crew@feature-crew","enabled":false}]' cleanup_legacy_feature_crew >/dev/null
+      [ -e "$claude_dir/agents/fc-pm.md" ]
+      [ -d "$claude_dir/skills/fc-review" ]
+      CHECK_PLUGINS='[{"id":"feature-crew@feature-crew","enabled":true}]' cleanup_legacy_feature_crew >/dev/null
+      [ ! -e "$claude_dir/agents/fc-pm.md" ]
+      [ ! -e "$claude_dir/skills/fc-review" ]
+      [ ! -e "$claude_dir/feature-crew.sha256" ]
+      [ -e "$claude_dir/agents/my-agent.md" ]
+      [ -d "$claude_dir/skills/update-settings" ]
+      [ -d "$claude_dir/skills/fc-mine" ]
+
+      # A linked skills folder belongs to someone else: leave it alone.
+      mkdir -p "$test_root/shared-skills/fc-debug"
+      rm -rf "$claude_dir/skills"
+      ln -s "$test_root/shared-skills" "$claude_dir/skills"
+      CHECK_PLUGINS='[{"id":"feature-crew@feature-crew","enabled":true}]' cleanup_legacy_feature_crew >/dev/null
+      [ -d "$test_root/shared-skills/fc-debug" ]
+    )
+  )
+}
+
 run_smoke() {
   run_bash_syntax
   run_apollo_smoke
@@ -2007,6 +2130,7 @@ run_smoke() {
   run_retired_config_migration_smoke
   run_rmux_smoke
   run_tmux_smoke
+  run_shell_update_smoke
 }
 
 case "${1:-all}" in
@@ -2019,10 +2143,11 @@ case "${1:-all}" in
   wiki) run_wiki_smoke; run_pipeline_scripts_smoke; run_rmux_keymap_docs_smoke ;;
   rmux) run_rmux_helpers_smoke; run_rmux_store_tests; run_rmux_keymap_docs_smoke; run_retired_config_migration_smoke; run_rmux_smoke ;;
   tmux) run_tmux_smoke ;;
+  shell) run_shell_update_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;
   *)
-    echo "usage: $0 [smoke|apollo|apollo-online|instructions|models|mcp|wiki|rmux|tmux|shellcheck|all]" >&2
+    echo "usage: $0 [smoke|apollo|apollo-online|instructions|models|mcp|wiki|rmux|tmux|shell|shellcheck|all]" >&2
     exit 2
     ;;
 esac

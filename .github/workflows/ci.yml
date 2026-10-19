@@ -25,6 +25,32 @@ jobs:
           TMUX="$RUNNER_TEMP/caller-tmux,1,0" TMUX_PANE=%0 RMUX="$RUNNER_TEMP/caller-rmux,1,0" RMUX_PANE=%0 \
             bash "$RUNNER_TEMP/dot-configs-link/scripts/check.sh" rmux
 
+  shell:
+    name: Shell helpers (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # Apple silicon keeps Homebrew in /opt/homebrew; Intel keeps it in /usr/local.
+        runner: [macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Homebrew shell add-ons
+        run: brew install autojump zsh-fast-syntax-highlighting
+
+      - name: Shell update checks
+        run: bash scripts/check.sh shell
+
+      - name: Load add-ons from this Mac's Homebrew prefix
+        run: |
+          echo "arch=$(uname -m) prefix=$(brew --prefix)"
+          env -u HOMEBREW_PREFIX HOME="$RUNNER_TEMP/home" zsh -f -c '
+            source config/zsh/custom.zsh >/dev/null
+            [[ "$(whence -w j)" = "j: function" ]]
+            [[ "$(whence -w fast-theme)" = "fast-theme: function" ]]
+          '
+
   shellcheck:
     name: ShellCheck (errors only)
     runs-on: ubuntu-latest

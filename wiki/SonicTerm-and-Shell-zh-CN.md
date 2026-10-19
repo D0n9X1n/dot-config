@@ -79,6 +79,7 @@ RMUX 配置会明确保留条件式鼠标 bindings。Copilot 等支持鼠标的�
 | `cc.zsh` | 带标题的 Claude 启动器 |
 | `copilot.zsh` | allow-all Copilot alias、真彩色 wrapper 和清理 |
 | `gg.zsh` | 带标题、allow-all 的 Copilot 启动器 |
+| `uu.zsh` | `uu`：fast-forward 本检出，然后运行 `install.sh` |
 | `zz-rmux.zsh` | RMUX 助手和共享安全分离分派器；较晚加载 |
 | `zz-tmux.zsh` | 原生 tmux 会话助手和交互式 `tr` 分派 |
 
@@ -119,6 +120,8 @@ Proxy 地址是 `127.0.0.1:46971`。助手会修改 shell、Git 和 npm proxy �
 ## 补全与路径
 
 提示符主题由 `.zshrc` 中的 `ZSH_THEME` 选择。受管 zsh 助手不会设置或覆盖它，安装器也不会修改 `.zshrc`。需要时仍可在该文件中选择 Apollo。`custom.zsh` 会让 eza 使用固定的上游主题。
+
+Homebrew 在 Apple silicon 上位于 `/opt/homebrew`，在 Intel 上位于 `/usr/local`。`custom.zsh` 和安装器依次查找 `$HOMEBREW_PREFIX`、`/opt/homebrew`、`/usr/local`，所以 autojump（`j`）和 fast-syntax-highlighting 在两种 Mac 上都会加载。
 
 安装 fast-syntax-highlighting 后，安装器会在独立本机工作目录中准备它自带的 Base16 主题。语法颜色随后使用 SonicTerm 的 Apollo ANSI slots。`custom.zsh` 也会加载 autojump、添加 Homebrew 补全、在 `compinit -i` 前修复 group-writable 补全文件夹，并添加本机 .NET 与 Android SDK 路径。
 
@@ -196,7 +199,7 @@ ts            # 保存此 socket 的全部会话，确认后重启并恢复
 
 ```sh
 zsh -n config/zsh/*.zsh
-zsh -ic 'type tt tr tl td th ts rr rd rl rh rs cc gg; print -r -- "$ZSH_THEME $EZA_CONFIG_DIR $FAST_WORK_DIR"'
+zsh -ic 'type tt tr tl td th ts rr rd rl rh rs cc gg uu j; print -r -- "$ZSH_THEME $EZA_CONFIG_DIR $FAST_WORK_DIR"'
 grep -F 'theme = "apollo"' ~/.sonicterm/sonicterm.toml
 ls -l ~/.sonicterm/themes/apollo.toml ~/.config/eza-apollo-theme/theme.yml
 scripts/check.sh rmux
