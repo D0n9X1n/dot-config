@@ -12,7 +12,8 @@
 #   never merges or rebases: local work is left untouched.
 # - A fork mirror (branch tracks upstream, DOT_CONFIGS_FORK_REMOTE or origin
 #   is your fork) gets the same commits pushed after the fast-forward, so both
-#   repos stay equal. The push never forces; a rejected push only warns.
+#   repos stay equal. The push never forces or prompts; a failed push only
+#   warns. DOT_CONFIGS_FORK_REMOTE=none turns it off.
 # - Works the same on Apple silicon and Intel Macs; install.sh finds Homebrew
 #   in /opt/homebrew or /usr/local.
 
@@ -60,19 +61,28 @@ function _dot_configs_uu_pull {
 }
 
 # After a fast-forward from upstream, push the branch to the fork remote so a
-# fork mirror stays equal to upstream. Skips when the branch already tracks the
-# fork remote or that remote is missing. Never forces; failures only warn.
+# fork mirror stays equal to upstream. Skips when DOT_CONFIGS_FORK_REMOTE=none,
+# the branch already tracks the fork remote, or that remote is missing. Never
+# forces, never prompts; failures only warn.
 function _dot_configs_uu_sync_fork {
   emulate -L zsh
-  local repo="$1" fork="${DOT_CONFIGS_FORK_REMOTE:-origin}" branch remote
+  local repo="$1" fork="${DOT_CONFIGS_FORK_REMOTE:-origin}" branch remote err
+  local -a ssh_env
+  [[ "$fork" == none ]] && return 0
   branch="$(command git -C "$repo" symbolic-ref --quiet --short HEAD)" || return 0
   remote="$(command git -C "$repo" config --get "branch.$branch.remote")" || return 0
   [[ "$remote" == "$fork" ]] && return 0
   command git -C "$repo" remote get-url "$fork" >/dev/null 2>&1 || return 0
-  if GIT_TERMINAL_PROMPT=0 command git -C "$repo" push --quiet "$fork" "HEAD:refs/heads/$branch" 2>/dev/null; then
+  # Fail instead of waiting on an SSH passphrase or host prompt, unless the
+  # user already chose an SSH command.
+  if [[ -z "${GIT_SSH_COMMAND:-}" ]] && ! command git -C "$repo" config --get core.sshCommand >/dev/null; then
+    ssh_env=(GIT_SSH_COMMAND='ssh -o BatchMode=yes')
+  fi
+  if err="$(env GIT_TERMINAL_PROMPT=0 "${ssh_env[@]}" git -C "$repo" push --quiet "$fork" "HEAD:refs/heads/$branch" 2>&1)"; then
     print "uu: pushed $branch to $fork"
   else
-    print -u2 "uu: warning: could not push $branch to $fork; the fork has its own commits or no access. Sync it once by hand."
+    print -u2 "uu: warning: could not push $branch to $fork; sync the fork once by hand, or set DOT_CONFIGS_FORK_REMOTE=none"
+    [[ -n "$err" ]] && print -r -- "$err" | command sed 's/^/  /' >&2
   fi
   return 0
 }

@@ -127,7 +127,7 @@ git branch --set-upstream-to=upstream/main main
 echo local/ >> .git/info/exclude
 ```
 
-之后 `uu` 会从上游 fast-forward，并把同样的提交 push 到 `origin`，两个仓库保持一致。fork remote 使用其他名字时，设置 `DOT_CONFIGS_FORK_REMOTE`。push 从不强制。fork 有自己的提交时，`uu` 会给出警告，但仍更新检出并安装；请手动同步一次 fork。
+之后 `uu` 会从上游 fast-forward，并把同样的提交 push 到 `origin`，两个仓库保持一致。fork remote 使用其他名字时，设置 `DOT_CONFIGS_FORK_REMOTE`。push 从不强制，也不会等待密码或 SSH passphrase。push 失败时（例如 fork 有自己的提交），`uu` 会显示 Git 的错误，但仍更新检出并安装；请手动同步一次 fork。设置 `DOT_CONFIGS_FORK_REMOTE=none` 可关闭 push。
 
 ## 更新
 

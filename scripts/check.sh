@@ -2056,7 +2056,21 @@ run_shell_update_smoke() {
     [ "$(git -C "$fwork" rev-parse HEAD)" = "$(git -C "$seed" rev-parse HEAD)" ]
     [ "$(git -C "$fork" rev-parse main)" = "$fork_before" ]
     printf '%s\n' "$out" | grep -Fq 'could not push main to origin'
+    printf '%s\n' "$out" | grep -Fq 'rejected'
     [ -f "$capture" ]
+    # DOT_CONFIGS_FORK_REMOTE=none turns the push off.
+    git -C "$fwork" push -q --force origin upstream/main:main
+    printf 'no-push\n' >>"$seed/notes.txt"
+    git -C "$seed" commit -q -am no-push
+    git -C "$seed" push -q "$origin" main
+    fork_before="$(git -C "$fork" rev-parse main)"
+    out="$(DOT_CONFIGS_FORK_REMOTE=none DOT_CONFIGS_DIR="$fwork" UU_CAPTURE="$capture" zsh -f -c 'source "$1"; uu' _ "$custom/uu.zsh" 2>&1)"
+    [ "$(git -C "$fwork" rev-parse HEAD)" = "$(git -C "$seed" rev-parse HEAD)" ]
+    [ "$(git -C "$fork" rev-parse main)" = "$fork_before" ]
+    if printf '%s\n' "$out" | grep -Fq 'pushed main'; then
+      echo "uu pushed with DOT_CONFIGS_FORK_REMOTE=none" >&2
+      return 1
+    fi
     git -C "$work" pull -q --ff-only
 
     # uu never runs install.sh from a dirty tree, a detached HEAD, or a branch with no upstream.
@@ -2084,7 +2098,7 @@ run_shell_update_smoke() {
       echo "uu ran after the branch diverged" >&2
       return 1
     fi
-    [ "$(git -C "$work" rev-list --count HEAD)" = 5 ]
+    [ "$(git -C "$work" rev-list --count HEAD)" = 6 ]
     git -C "$work" branch -q --unset-upstream
     if UU_CAPTURE="$capture" zsh -f -c 'source "$1"; uu' _ "$custom/uu.zsh" 2>/dev/null; then
       echo "uu ran without an upstream" >&2

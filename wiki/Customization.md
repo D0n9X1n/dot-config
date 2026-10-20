@@ -127,7 +127,7 @@ git branch --set-upstream-to=upstream/main main
 echo local/ >> .git/info/exclude
 ```
 
-`uu` then fast-forwards from upstream and pushes the same commits to `origin`, so both repos stay equal. Set `DOT_CONFIGS_FORK_REMOTE` when the fork remote has another name. The push never forces. When the fork has its own commits, `uu` warns, still updates the checkout, and installs; sync the fork once by hand.
+`uu` then fast-forwards from upstream and pushes the same commits to `origin`, so both repos stay equal. Set `DOT_CONFIGS_FORK_REMOTE` when the fork remote has another name. The push never forces and never waits for a password or SSH passphrase. When it fails, for example because the fork has its own commits, `uu` shows Git's error, still updates the checkout, and installs; sync the fork once by hand. Set `DOT_CONFIGS_FORK_REMOTE=none` to turn the push off.
 
 ## Update
 
