@@ -225,7 +225,7 @@ Not every detail name should change: the iStat daemon and TeamViewer helpers alr
 
 `config/mcp/mcp-shared.json` contains only safe shared entries.
 
-The installer merges them into local Copilot MCP data and then imports the server map into `~/.claude.json`.
+The installer merges them into local Copilot MCP data and then imports the server map into `~/.claude.json`. When the map already matches (key order ignored), it leaves `~/.claude.json` alone and makes no backup.
 
 Keys and tokens for optional MCP servers stay in local `~/.config/github-copilot/mcp.json`. Never put them in the shared file.
 

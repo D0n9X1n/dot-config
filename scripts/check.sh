@@ -2287,6 +2287,77 @@ run_local_overlay_smoke() {
   )
 }
 
+# install.sh imports Copilot's MCP map into ~/.claude.json only when it
+# differs, so a rerun leaves no new backup.
+run_claude_mcp_import_smoke() {
+  (
+    local test_root
+    test_root="$(mktemp -d)"
+    trap 'rm -rf "$test_root"' EXIT
+    export HOME="$test_root"
+    mkdir -p "$HOME/.config/github-copilot"
+    printf '{"mcpServers":{"a":{"x":1},"b":{"y":2}}}\n' >"$HOME/.config/github-copilot/mcp.json"
+    printf '{"other":1,"mcpServers":{"b":{"y":2},"a":{"x":1}}}\n' >"$HOME/.claude.json"
+    cp "$HOME/.claude.json" "$test_root/before.json"
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+
+    # Same map in another key order: no backup, no rewrite.
+    timestamp=20260101000001
+    import_claude_mcp_servers >/dev/null
+    cmp -s "$HOME/.claude.json" "$test_root/before.json"
+    [ -z "$(find "$HOME" -maxdepth 1 -name '.claude.json.bak.*' -print)" ]
+
+    # A changed map is imported once, keeping other keys, with one backup.
+    printf '{"mcpServers":{"a":{"x":1},"c":{"z":3}}}\n' >"$HOME/.config/github-copilot/mcp.json"
+    timestamp=20260101000002
+    import_claude_mcp_servers >/dev/null
+    [ "$(jq -c '.mcpServers | keys' "$HOME/.claude.json")" = '["a","c"]' ]
+    [ "$(jq -c '.other' "$HOME/.claude.json")" = 1 ]
+    [ -f "$HOME/.claude.json.bak.20260101000002" ]
+    timestamp=20260101000003
+    import_claude_mcp_servers >/dev/null
+    [ ! -e "$HOME/.claude.json.bak.20260101000003" ]
+  )
+}
+
+# ~/.tmux.local.conf and ~/.rmux.local.conf load last, so a fork can set any
+# option, such as the active tab style, without editing upstream config.
+run_mux_local_override_smoke() {
+  local engine
+  for engine in tmux rmux; do
+    if ! command -v "$engine" >/dev/null 2>&1; then
+      if [ "${CI:-}" = "true" ] && [ "$(uname -s)" = "Darwin" ]; then
+        echo "$engine is required for CI runtime checks" >&2
+        return 1
+      fi
+      echo "$engine not found; skipping local override check"
+      continue
+    fi
+    (
+      local test_root socket conf style
+      test_root="$(mktemp -d)"
+      socket="dot-configs-override-$engine-$$"
+      trap '"$engine" -L "$socket" kill-server >/dev/null 2>&1 || true; rm -rf "$test_root"' EXIT
+      conf="$repo_root/config/$engine/$engine.conf"
+      export HOME="$test_root"
+      "$engine" -L "$socket" -f "$conf" new-session -d -s override
+      style="$("$engine" -L "$socket" show-options -gv window-status-current-style)"
+      [ "$style" = 'bg=#365b80,fg=#ffffff,bold' ] || {
+        echo "$engine default active tab style changed: $style" >&2
+        return 1
+      }
+      "$engine" -L "$socket" kill-server
+      printf "set -g window-status-current-style 'bg=#89b4fa,fg=#1e1e2e,bold'\n" >"$test_root/.$engine.local.conf"
+      "$engine" -L "$socket" -f "$conf" new-session -d -s override
+      style="$("$engine" -L "$socket" show-options -gv window-status-current-style)"
+      [ "$style" = 'bg=#89b4fa,fg=#1e1e2e,bold' ] || {
+        echo "$engine local override did not win: $style" >&2
+        return 1
+      }
+    ) || return 1
+  done
+}
+
 run_smoke() {
   run_bash_syntax
   run_apollo_smoke
@@ -2317,6 +2388,8 @@ run_smoke() {
   run_tmux_smoke
   run_shell_update_smoke
   run_local_overlay_smoke
+  run_claude_mcp_import_smoke
+  run_mux_local_override_smoke
   run_local_checks
 }
 
@@ -2326,10 +2399,10 @@ case "${1:-all}" in
   apollo-online) DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh; verify_apollo_release_pins ;;
   instructions) run_global_instructions_smoke ;;
   models) run_model_default_smoke ;;
-  mcp) run_mcp_default_smoke ;;
+  mcp) run_mcp_default_smoke; run_claude_mcp_import_smoke ;;
   wiki) run_wiki_smoke; run_pipeline_scripts_smoke; run_rmux_keymap_docs_smoke ;;
   rmux) run_rmux_helpers_smoke; run_rmux_store_tests; run_rmux_keymap_docs_smoke; run_retired_config_migration_smoke; run_rmux_smoke ;;
-  tmux) run_tmux_smoke ;;
+  tmux) run_tmux_smoke; run_mux_local_override_smoke ;;
   shell) run_shell_update_smoke; run_local_overlay_smoke ;;
   local) run_local_checks ;;
   shellcheck) run_shellcheck ;;
