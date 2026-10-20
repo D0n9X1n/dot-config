@@ -2306,6 +2306,44 @@ run_local_overlay_smoke() {
   )
 }
 
+# ~/.tmux.local.conf and ~/.rmux.local.conf load last, so a fork can set any
+# option, such as the active tab style, without editing upstream config.
+run_mux_local_override_smoke() {
+  local engine
+  for engine in tmux rmux; do
+    if ! command -v "$engine" >/dev/null 2>&1; then
+      if [ "${CI:-}" = "true" ] && [ "$(uname -s)" = "Darwin" ]; then
+        echo "$engine is required for CI runtime checks" >&2
+        return 1
+      fi
+      echo "$engine not found; skipping local override check"
+      continue
+    fi
+    (
+      local test_root socket conf style
+      test_root="$(mktemp -d)"
+      socket="dot-configs-override-$engine-$$"
+      trap '"$engine" -L "$socket" kill-server >/dev/null 2>&1 || true; rm -rf "$test_root"' EXIT
+      conf="$repo_root/config/$engine/$engine.conf"
+      export HOME="$test_root"
+      "$engine" -L "$socket" -f "$conf" new-session -d -s override
+      style="$("$engine" -L "$socket" show-options -gv window-status-current-style)"
+      [ "$style" = 'bg=#365b80,fg=#ffffff,bold' ] || {
+        echo "$engine default active tab style changed: $style" >&2
+        return 1
+      }
+      "$engine" -L "$socket" kill-server
+      printf "set -g window-status-current-style 'bg=#89b4fa,fg=#1e1e2e,bold'\n" >"$test_root/.$engine.local.conf"
+      "$engine" -L "$socket" -f "$conf" new-session -d -s override
+      style="$("$engine" -L "$socket" show-options -gv window-status-current-style)"
+      [ "$style" = 'bg=#89b4fa,fg=#1e1e2e,bold' ] || {
+        echo "$engine local override did not win: $style" >&2
+        return 1
+      }
+    ) || return 1
+  done
+}
+
 run_smoke() {
   run_bash_syntax
   run_apollo_smoke
@@ -2336,6 +2374,7 @@ run_smoke() {
   run_tmux_smoke
   run_shell_update_smoke
   run_local_overlay_smoke
+  run_mux_local_override_smoke
   run_local_checks
 }
 
@@ -2348,7 +2387,7 @@ case "${1:-all}" in
   mcp) run_mcp_default_smoke ;;
   wiki) run_wiki_smoke; run_pipeline_scripts_smoke; run_rmux_keymap_docs_smoke ;;
   rmux) run_rmux_helpers_smoke; run_rmux_store_tests; run_rmux_keymap_docs_smoke; run_retired_config_migration_smoke; run_rmux_smoke ;;
-  tmux) run_tmux_smoke ;;
+  tmux) run_tmux_smoke; run_mux_local_override_smoke ;;
   shell) run_shell_update_smoke; run_local_overlay_smoke ;;
   local) run_local_checks ;;
   shellcheck) run_shellcheck ;;

@@ -18,6 +18,10 @@
 .claude/*.local.json
 .claude/worktrees/
 
+# Your own overlay (wiki/Customization.md). Upstream never tracks it, and
+# ignoring it keeps `git status` clean so `uu` can fast-forward.
+/local/
+
 # Runtime folders left at the old config paths.
 .copilot-relay/
 .sonicterm/
