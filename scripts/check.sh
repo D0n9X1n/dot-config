@@ -416,6 +416,25 @@ run_mcp_default_smoke() {
     echo "installer still carries custom GitHub MCP setup" >&2
     return 1
   fi
+  (
+    local test_home
+    test_home="$(mktemp -d)"
+    trap 'rm -rf "$test_home"' EXIT
+    export HOME="$test_home"
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    mkdir -p "$HOME/.config/github-copilot"
+    printf '{"mcpServers":{"a":{"command":"x"},"b":{"command":"y"}}}\n' >"$HOME/.config/github-copilot/mcp.json"
+    printf '{"theme":"t","mcpServers":{"old":{}}}\n' >"$HOME/.claude.json"
+    # A different map is backed up once and replaced; other keys stay.
+    timestamp=1 import_copilot_mcp_into_claude >/dev/null
+    jq -e '.theme == "t" and (.mcpServers | keys) == ["a","b"]' "$HOME/.claude.json" >/dev/null
+    [ -f "$HOME/.claude.json.bak.1" ]
+    # The same map (any key order) is left alone: no rewrite, no new backup.
+    printf '{"theme":"t","mcpServers":{"b":{"command":"y"},"a":{"command":"x"}}}\n' >"$HOME/.claude.json"
+    timestamp=2 import_copilot_mcp_into_claude >/dev/null
+    [ ! -e "$HOME/.claude.json.bak.2" ]
+    grep -Fq '"b":{"command":"y"},"a"' "$HOME/.claude.json"
+  )
   echo "shared MCP defaults ok: Playwright retained, no duplicate GitHub setup"
 }
 
