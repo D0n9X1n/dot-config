@@ -662,47 +662,6 @@ cleanup_legacy_feature_crew() {
   fi
 }
 
-# Import Copilot's merged MCP server map into Claude Code's local state file.
-# Skip the backup and rewrite when .mcpServers already matches (key order
-# ignored), so a rerun leaves ~/.claude.json untouched.
-import_claude_mcp_servers() {
-  local copilot_mcp="${HOME}/.config/github-copilot/mcp.json"
-  local claude_user_json="${HOME}/.claude.json"
-  local src_mcp_json tmp_user
-  have_cmd jq && [ -f "$copilot_mcp" ] || return 0
-  src_mcp_json="$(jq -c '.mcpServers // {}' "$copilot_mcp" || echo '{}')"
-  [ "$src_mcp_json" != '{}' ] && [ "$src_mcp_json" != "null" ] || return 0
-
-  if [ -f "$claude_user_json" ] && \
-      jq -e --argjson src "$src_mcp_json" '(.mcpServers // {}) == $src' "$claude_user_json" >/dev/null 2>&1; then
-    echo "MCP servers in $claude_user_json already match $copilot_mcp"
-    return 0
-  fi
-
-  tmp_user="$(mktemp -t claude-user-json.XXXXXX)"
-  if [ -f "$claude_user_json" ]; then
-    if jq --argjson src "$src_mcp_json" '.mcpServers = $src' \
-        "$claude_user_json" >"$tmp_user"; then
-      if ! backup_path_once "$claude_user_json"; then
-        rm -f "$tmp_user"
-        echo "Warning: failed to back up $claude_user_json; MCP import skipped"
-      else
-        mv "$tmp_user" "$claude_user_json"
-        chmod 600 "$claude_user_json"
-        echo "Imported $(echo "$src_mcp_json" | jq 'length') MCP servers into $claude_user_json (from $copilot_mcp)"
-      fi
-    else
-      rm -f "$tmp_user"
-      echo "Warning: jq merge into $claude_user_json failed; MCP import skipped"
-    fi
-  else
-    printf '{"mcpServers":%s}\n' "$src_mcp_json" >"$tmp_user"
-    mv "$tmp_user" "$claude_user_json"
-    chmod 600 "$claude_user_json"
-    echo "Created $claude_user_json with $(echo "$src_mcp_json" | jq 'length') MCP servers (from $copilot_mcp)"
-  fi
-}
-
 cleanup_legacy_wakatime_mcp() {
   local wm_dest="${HOME}/.local/share/wakatime-mcp"
   local copilot_mcp_pre="${HOME}/.config/github-copilot/mcp.json"
@@ -1272,6 +1231,47 @@ install_npm_cache_clean() {
   fi
 }
 
+# Import Copilot's merged MCP server map into Claude Code's local state file.
+# Skips the backup and rewrite when .mcpServers already matches, so repeated
+# installs leave no new ~/.claude.json.bak.* behind.
+import_copilot_mcp_into_claude() {
+  local copilot_mcp="${HOME}/.config/github-copilot/mcp.json"
+  local claude_user_json="${HOME}/.claude.json"
+  local src_mcp_json tmp_user
+  have_cmd jq && [ -f "$copilot_mcp" ] || return 0
+  src_mcp_json="$(jq -c '.mcpServers // {}' "$copilot_mcp" || echo '{}')"
+  if [ "$src_mcp_json" = '{}' ] || [ "$src_mcp_json" = "null" ]; then
+    return 0
+  fi
+  if [ -f "$claude_user_json" ] &&
+      jq -e --argjson src "$src_mcp_json" '.mcpServers == $src' "$claude_user_json" >/dev/null 2>&1; then
+    echo "MCP servers in $claude_user_json already match $copilot_mcp"
+    return 0
+  fi
+  tmp_user="$(mktemp -t claude-user-json.XXXXXX)"
+  if [ -f "$claude_user_json" ]; then
+    if jq --argjson src "$src_mcp_json" '.mcpServers = $src' \
+        "$claude_user_json" >"$tmp_user"; then
+      if ! backup_path_once "$claude_user_json"; then
+        rm -f "$tmp_user"
+        echo "Warning: failed to back up $claude_user_json; MCP import skipped"
+      else
+        mv "$tmp_user" "$claude_user_json"
+        chmod 600 "$claude_user_json"
+        echo "Imported $(echo "$src_mcp_json" | jq 'length') MCP servers into $claude_user_json (from $copilot_mcp)"
+      fi
+    else
+      rm -f "$tmp_user"
+      echo "Warning: jq merge into $claude_user_json failed; MCP import skipped"
+    fi
+  else
+    printf '{"mcpServers":%s}\n' "$src_mcp_json" >"$tmp_user"
+    mv "$tmp_user" "$claude_user_json"
+    chmod 600 "$claude_user_json"
+    echo "Created $claude_user_json with $(echo "$src_mcp_json" | jq 'length') MCP servers (from $copilot_mcp)"
+  fi
+}
+
 if [ "${DOT_CONFIGS_INSTALL_LIB_ONLY:-0}" = "1" ]; then
   return 0 2>/dev/null || exit 0
 fi
@@ -1365,7 +1365,7 @@ ensure_feature_crew_plugin
 cleanup_legacy_feature_crew
 
 # Import Copilot's merged MCP server map into Claude Code's local state file.
-import_claude_mcp_servers
+import_copilot_mcp_into_claude
 
 # launchd agent: copilot-relay on login (macOS only). Renders the
 # template (substituting absolute $HOME paths — launchd doesn't expand
