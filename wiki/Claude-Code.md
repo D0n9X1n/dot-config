@@ -81,6 +81,10 @@ Changing only `opusModel` does not select Opus at startup. `ANTHROPIC_MODEL`, th
 | `autoCompactWindow` | `770000`; retained configured window, not a measured trigger |
 | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"100"`; retained percentage override |
 | `feedbackDrafts` | `off` |
+| `enableWorkflows` | `true`; enables multi-agent Workflow scripts |
+| `outputStyle` | `Concise`; short replies that lead with the result |
+| `crossSessionInbound` | `accept`; take messages from other local Claude sessions without a prompt |
+| `CLAUDE_CODE_AUTO_MODE_SERVER` | `"0"`; auto mode uses classifier requests from Claude Code itself instead of server-side review. Permission checks stay on |
 
 `refreshInterval` belongs inside `statusLine`. The saved Opus and Sonnet preferences both use `high`. `MODEL_REASONING_EFFORT` is a status-line fallback, not an API effort control. The launchers pass `--effort high`; an explicit effort on the `claude` command overrides it. No top-level `effortLevel` is managed. [Copilot CLI](Copilot-CLI.md) keeps its separate Astra/`high` defaults.
 

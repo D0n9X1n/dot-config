@@ -51,3 +51,6 @@ apiKey:
 # Outbound proxy for Copilot and GitHub calls. Empty connects directly; env uses
 # HTTPS_PROXY, HTTP_PROXY and NO_PROXY; or a URL such as http://proxy.example:3128.
 upstreamProxy:
+
+# Update Codex's config.toml and model list on start, when Codex is installed.
+codexSetup: true
