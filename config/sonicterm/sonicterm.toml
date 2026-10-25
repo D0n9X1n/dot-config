@@ -52,3 +52,7 @@ strong_focus = false
 [notifications]
 long_command = false
 threshold_secs = 10
+
+[status_line]
+enabled = true
+hide_sensitive = false
