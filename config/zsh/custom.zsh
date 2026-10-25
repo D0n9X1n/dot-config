@@ -121,6 +121,12 @@ if type brew &>/dev/null; then
   compinit -i
 fi
 
+# copilot-relay Tab completion, loaded after compinit as its docs require.
+# It comes from the installed relay, so a new shell after `uu` matches it.
+if (( $+commands[copilot-relay] && $+functions[compdef] )); then
+  eval "$(copilot-relay completion zsh 2>/dev/null)"
+fi
+
 
 # .net sdk
 export DOTNET_ROOT=$HOME/.dotnet
