@@ -77,6 +77,8 @@ codexSetup: true
 
 `claudeUpstreamApi: chat-completions` 让 Claude 请求继续使用 Copilot 的 chat-completions API。这是 copilot-relay 0.4.0 的默认值；明确写出后，受管文件与 relay 自带模板一致。`auto` 或 `messages` 会改用 Copilot 原生 Messages API。
 
+在 zsh 中，Tab 可补全 copilot-relay 的命令、参数和已配置模型；请看 [SonicTerm 与 Shell](SonicTerm-and-Shell-zh-CN.md)。`install.sh`（以及 `uu`）会把 relay 保持在 npm 最新版本。
+
 `codexSetup: true` 让 relay 在启动时更新 Codex 的 `config.toml` 和模型列表（已安装 Codex 时）。`claudeSetup: false` 会阻止 relay 重写链接的 Claude settings。Relay 的 `thinkEffort` 回退值与 Claude 保存的 Opus 偏好、启动器和状态栏回退值都使用 `high`；客户端显式指定的 effort 仍优先。Copilot CLI 和 `gg` 保留独立的 Astra/`high` 默认值。模型路由和 relay effort 会热重载，无需重启；已有 shell 需要重新加载 Claude 启动器或打开新 shell。`upstreamTimeoutSeconds: 900` 允许单个 Claude 请求的上游 Copilot 调用最多等待十五分钟。
 
 登录一次：

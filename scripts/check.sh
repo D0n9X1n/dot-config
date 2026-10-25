@@ -2349,6 +2349,40 @@ run_mux_local_override_smoke() {
   done
 }
 
+# custom.zsh loads copilot-relay's own zsh completion after compinit, and
+# stays quiet when the relay or compdef is missing.
+run_relay_completion_smoke() {
+  (
+    local test_root
+    test_root="$(mktemp -d)"
+    trap 'rm -rf "$test_root"' EXIT
+    mkdir -p "$test_root/bin" "$test_root/home"
+    cat >"$test_root/bin/copilot-relay" <<'SH'
+#!/bin/sh
+[ "$1 $2" = "completion zsh" ] || exit 2
+printf '_copilot_relay() { _arguments "1:command:(start stop status)" }\ncompdef _copilot_relay copilot-relay\n'
+SH
+    chmod +x "$test_root/bin/copilot-relay"
+    # With compinit done first, copilot-relay completes through the relay's function.
+    HOME="$test_root/home" PATH="$test_root/bin:/usr/bin:/bin" zsh -f -c '
+      autoload -Uz compinit && compinit -u -d "$HOME/.zcompdump"
+      source config/zsh/custom.zsh >/dev/null 2>&1
+      [[ "${_comps[copilot-relay]}" = _copilot_relay ]]
+    '
+    # Without compdef, or without the relay, nothing is loaded and nothing fails.
+    out="$(HOME="$test_root/home" PATH="$test_root/bin:/usr/bin:/bin" zsh -f -c '
+      source config/zsh/custom.zsh 2>&1 >/dev/null
+      (( ! $+functions[_copilot_relay] ))
+    ')"
+    [ -z "$out" ]
+    HOME="$test_root/home" PATH="/usr/bin:/bin" zsh -f -c '
+      autoload -Uz compinit && compinit -u -d "$HOME/.zcompdump"
+      source config/zsh/custom.zsh >/dev/null 2>&1
+      (( ! $+functions[_copilot_relay] ))
+    '
+  )
+}
+
 run_smoke() {
   run_bash_syntax
   run_apollo_smoke
@@ -2380,6 +2414,7 @@ run_smoke() {
   run_shell_update_smoke
   run_local_overlay_smoke
   run_mux_local_override_smoke
+  run_relay_completion_smoke
   run_local_checks
 }
 
@@ -2393,7 +2428,7 @@ case "${1:-all}" in
   wiki) run_wiki_smoke; run_pipeline_scripts_smoke; run_rmux_keymap_docs_smoke ;;
   rmux) run_rmux_helpers_smoke; run_rmux_store_tests; run_rmux_keymap_docs_smoke; run_retired_config_migration_smoke; run_rmux_smoke ;;
   tmux) run_tmux_smoke; run_mux_local_override_smoke ;;
-  shell) run_shell_update_smoke; run_local_overlay_smoke ;;
+  shell) run_shell_update_smoke; run_local_overlay_smoke; run_relay_completion_smoke ;;
   local) run_local_checks ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;

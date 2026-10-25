@@ -77,6 +77,8 @@ codexSetup: true
 
 `claudeUpstreamApi: chat-completions` keeps Claude requests on Copilot's chat-completions API. It is copilot-relay 0.4.0's default, written out so the tracked file matches the relay's own template. `auto` or `messages` would use Copilot's native Messages API instead.
 
+Tab completes copilot-relay commands, flags, and configured models in zsh; see [SonicTerm and shell](SonicTerm-and-Shell.md). `install.sh`, and so `uu`, keeps the relay at the latest npm version.
+
 `codexSetup: true` lets the relay update Codex's `config.toml` and model list on start, when Codex is installed. `claudeSetup: false` stops the relay from rewriting the linked Claude settings. The relay's `thinkEffort` fallback and Claude's saved Opus preference, launchers, and status-line fallback use `high`. Explicit client effort still takes precedence. Copilot CLI and `gg` retain their separate Astra/`high` defaults. Model routes and relay effort hot-reload without a restart; existing shells need their Claude launchers reloaded or a new shell. `upstreamTimeoutSeconds: 900` allows up to fifteen minutes for a single Claude request's upstream Copilot calls.
 
 Login once:

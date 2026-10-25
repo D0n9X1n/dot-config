@@ -124,7 +124,7 @@ Proxy 地址是 `127.0.0.1:46971`。助手会修改 shell、Git 和 npm proxy �
 
 Homebrew 在 Apple silicon 上位于 `/opt/homebrew`，在 Intel 上位于 `/usr/local`。`custom.zsh` 和安装器依次查找 `$HOMEBREW_PREFIX`、`/opt/homebrew`、`/usr/local`，所以 autojump（`j`）和 fast-syntax-highlighting 在两种 Mac 上都会加载。
 
-安装 fast-syntax-highlighting 后，安装器会在独立本机工作目录中准备它自带的 Base16 主题。语法颜色随后使用 SonicTerm 的 Apollo ANSI slots。`custom.zsh` 也会加载 autojump、添加 Homebrew 补全、在 `compinit -i` 前修复 group-writable 补全文件夹，并添加本机 .NET 与 Android SDK 路径。
+安装 fast-syntax-highlighting 后，安装器会在独立本机工作目录中准备它自带的 Base16 主题。语法颜色随后使用 SonicTerm 的 Apollo ANSI slots。`custom.zsh` 也会加载 autojump、添加 Homebrew 补全、在 `compinit -i` 前修复 group-writable 补全文件夹，并添加本机 .NET 与 Android SDK 路径。`compinit` 之后，它按 relay 文档建议用 `eval "$(copilot-relay completion zsh)"` 加载 copilot-relay 自带的 Tab 补全。脚本来自已安装的 relay，所以 `uu` 后新开的 shell 会与升级后的版本一致。它会让 shell 启动多约 0.15 秒；未安装 copilot-relay 时跳过。
 
 ## rX 助手
 

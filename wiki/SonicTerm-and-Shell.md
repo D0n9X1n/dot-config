@@ -124,7 +124,7 @@ Open a new shell to apply it, or run `export HOMEBREW_NO_AUTO_UPDATE=1` in an ex
 
 Homebrew lives in `/opt/homebrew` on Apple silicon and `/usr/local` on Intel. `custom.zsh` and the installer look in `$HOMEBREW_PREFIX`, then `/opt/homebrew`, then `/usr/local`, so autojump (`j`) and fast-syntax-highlighting load on both.
 
-When fast-syntax-highlighting is installed, the installer prepares its shipped Base16 theme in an isolated local work folder. Syntax colors then use SonicTerm's Apollo ANSI slots. `custom.zsh` also loads autojump, adds Homebrew completions, fixes group-writable completion folders before `compinit -i`, and adds local .NET and Android SDK paths.
+When fast-syntax-highlighting is installed, the installer prepares its shipped Base16 theme in an isolated local work folder. Syntax colors then use SonicTerm's Apollo ANSI slots. `custom.zsh` also loads autojump, adds Homebrew completions, fixes group-writable completion folders before `compinit -i`, and adds local .NET and Android SDK paths. After `compinit`, it loads copilot-relay's own Tab completion with `eval "$(copilot-relay completion zsh)"`, as the relay's docs advise. The script comes from the installed relay, so a new shell after `uu` matches the upgraded version. It adds about 0.15 s to shell start and is skipped when copilot-relay is not installed.
 
 ## rX helpers
 
