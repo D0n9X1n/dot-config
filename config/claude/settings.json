@@ -10,7 +10,10 @@
     "MODEL_REASONING_EFFORT": "high",
     "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "100",
     "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": "16",
-    "CLAUDE_CODE_TMUX_TRUECOLOR": "1"
+    "CLAUDE_CODE_TMUX_TRUECOLOR": "1",
+    "CLAUDE_CODE_MAX_CONTEXT_TOKENS": "1050000",
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "128000",
+    "CLAUDE_CODE_AUTO_MODE_SERVER": "0"
   },
   "permissions": {
     "allow": [],
@@ -33,6 +36,7 @@
     ],
     "replaceBuiltInOptions": true
   },
+  "enableWorkflows": true,
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
@@ -61,6 +65,7 @@
       }
     }
   },
+  "outputStyle": "Concise",
   "feedbackDrafts": "off",
   "modelSettings": {
     "claude-sonnet-5": {
@@ -74,5 +79,6 @@
   "skipDangerousModePermissionPrompt": true,
   "theme": "custom:apollo",
   "autoCompactEnabled": true,
-  "skipAutoPermissionPrompt": true
+  "skipAutoPermissionPrompt": true,
+  "crossSessionInbound": "accept"
 }

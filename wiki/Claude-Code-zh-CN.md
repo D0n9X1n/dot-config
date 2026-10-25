@@ -81,6 +81,10 @@ Claude Code 2.1.281 能识别原生 Opus 5.5 身份。修改模型和 effort 默
 | `autoCompactWindow` | `770000`；保留的配置窗口，不是实测触发阈值 |
 | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `"100"`；保留的百分比覆盖值 |
 | `feedbackDrafts` | `off` |
+| `enableWorkflows` | `true`；启用多 agent Workflow 脚本 |
+| `outputStyle` | `Concise`；简短回复，先给结果 |
+| `crossSessionInbound` | `accept`；无需确认即可接收本机其他 Claude 会话的消息 |
+| `CLAUDE_CODE_AUTO_MODE_SERVER` | `"0"`；auto 模式使用 Claude Code 自己发出的 classifier 请求，而不是服务端审查。权限检查仍然开启 |
 
 `refreshInterval` 必须放在 `statusLine` 里面。保存的 Opus 和 Sonnet 偏好都使用 `high`。`MODEL_REASONING_EFFORT` 是状态栏回退值，不控制 API effort。启动器传入 `--effort high`；`claude` 命令上显式指定的 effort 会覆盖它。不管理顶层 `effortLevel`。[Copilot CLI](Copilot-CLI-zh-CN.md) 保留独立的 Astra/`high` 默认值。
 
