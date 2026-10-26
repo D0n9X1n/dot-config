@@ -461,8 +461,8 @@ ensure_wakatime_cfg_api_key() {
   printf '%s' "$key"
 }
 
-install_recursive_code_config_fonts() {
-  local api_url="https://api.github.com/repos/MOSconfig/recursive-code-config/releases/latest"
+install_m_fonts() {
+  local api_url="https://api.github.com/repos/D0n9X1n/m-fonts/releases/latest"
   local fonts_dir="${HOME}/Library/Fonts"
   local release_json=""
   local tag=""
@@ -477,38 +477,53 @@ install_recursive_code_config_fonts() {
   local tmp_font=""
   local target=""
   local font_names=(
-    RecMonoBaker-Bold.ttf
-    RecMonoBaker-BoldItalic.ttf
-    RecMonoBaker-Italic.ttf
-    RecMonoBaker-Regular.ttf
     RecMonoSt.Helens-Bold.ttf
     RecMonoSt.Helens-BoldItalic.ttf
     RecMonoSt.Helens-Italic.ttf
     RecMonoSt.Helens-Regular.ttf
+    RecSansMt.Baker-Bold.ttf
+    RecSansMt.Baker-BoldItalic.ttf
+    RecSansMt.Baker-Italic.ttf
+    RecSansMt.Baker-Regular.ttf
+  )
+  # Fonts from the retired MOSconfig/recursive-code-config release
+  local retired_fonts=(
+    RecMonoBaker-Bold.ttf
+    RecMonoBaker-BoldItalic.ttf
+    RecMonoBaker-Italic.ttf
+    RecMonoBaker-Regular.ttf
   )
 
   if ! have_cmd curl; then
-    echo "Warning: curl not found; cannot download recursive-code-config fonts (skipping)"
+    echo "Warning: curl not found; cannot download m-fonts (skipping)"
     return 1
   fi
   if ! have_cmd jq; then
-    echo "Warning: jq not found; cannot parse recursive-code-config release (skipping)"
+    echo "Warning: jq not found; cannot parse m-fonts release (skipping)"
     return 1
   fi
 
   mkdir -p "$fonts_dir"
-  marker="${fonts_dir}/.recursive-code-config.version"
-  release_json="$(mktemp -t recursive-code-config-release.XXXXXX)"
+  rm -f "${fonts_dir}/.recursive-code-config.version"
+  for font in "${retired_fonts[@]}"; do
+    if [ -f "${fonts_dir}/${font}" ]; then
+      rm -f "${fonts_dir}/${font}"
+      echo "Removed retired font ${font}"
+    fi
+  done
+
+  marker="${fonts_dir}/.m-fonts.version"
+  release_json="$(mktemp -t m-fonts-release.XXXXXX)"
   if ! log_command curl -fsSL "$api_url" -o "$release_json"; then
     rm -f "$release_json"
-    echo "Warning: failed to fetch recursive-code-config latest release metadata (skipping)"
+    echo "Warning: failed to fetch m-fonts latest release metadata (skipping)"
     return 1
   fi
 
   tag="$(jq -r '.tag_name // empty' "$release_json")"
   if [ -z "$tag" ]; then
     rm -f "$release_json"
-    echo "Warning: recursive-code-config release metadata did not include tag_name (skipping)"
+    echo "Warning: m-fonts release metadata did not include tag_name (skipping)"
     return 1
   fi
 
@@ -523,23 +538,23 @@ install_recursive_code_config_fonts() {
   done
 
   if [ "$needs_install" = "0" ]; then
-    echo "recursive-code-config fonts are up to date ($tag)."
+    echo "m-fonts are up to date ($tag)."
     rm -f "$release_json"
     return 0
   fi
 
-  echo "Installing recursive-code-config fonts from MOSconfig release $tag."
+  echo "Installing m-fonts release $tag."
   for font in "${font_names[@]}"; do
     url="$(jq -r --arg name "$font" '.assets[] | select(.name == $name) | .browser_download_url // empty' "$release_json")"
     digest="$(jq -r --arg name "$font" '.assets[] | select(.name == $name) | .digest // empty' "$release_json")"
     target="${fonts_dir}/${font}"
 
     if [ -z "$url" ]; then
-      echo "Warning: recursive-code-config release $tag is missing asset $font"
+      echo "Warning: m-fonts release $tag is missing asset $font"
       continue
     fi
 
-    tmp_font="$(mktemp -t recursive-code-font.XXXXXX)"
+    tmp_font="$(mktemp -t m-fonts-font.XXXXXX)"
     if ! log_command curl -fL "$url" -o "$tmp_font"; then
       rm -f "$tmp_font"
       echo "Warning: failed to download $font"
@@ -565,9 +580,9 @@ install_recursive_code_config_fonts() {
   rm -f "$release_json"
   if [ "$installed" -eq "${#font_names[@]}" ]; then
     printf '%s\n' "$tag" >"$marker"
-    echo "Installed recursive-code-config font set $tag."
+    echo "Installed m-fonts $tag."
   else
-    echo "Warning: installed ${installed}/${#font_names[@]} recursive-code-config fonts"
+    echo "Warning: installed ${installed}/${#font_names[@]} m-fonts"
     return 1
   fi
 }
@@ -700,8 +715,6 @@ install_macos_deps() {
 
   local claude_min_version="2.1.217"
   local font_casks=(
-    font-recursive # Provides the Recursive Mono variable family (St.Helens, Casual, Linear, Duotone)
-    font-recursive-mono-nerd-font
     font-symbols-only-nerd-font
     font-noto-color-emoji
   )
@@ -736,7 +749,20 @@ install_macos_deps() {
   uninstall_npm_package_if_installed @anthropic-ai/claude-code
   ensure_claude_code_min_version "$claude_min_version" || exit 1
 
+  # Recursive casks retired in favor of m-fonts (Rec Mono St.Helens / Rec Sans Mt.Baker)
+  local retired_font_casks=(
+    font-recursive
+    font-recursive-mono-nerd-font
+  )
+
   local cask
+  for cask in "${retired_font_casks[@]}"; do
+    if brew list --cask "$cask" >/dev/null 2>&1; then
+      echo "Removing retired Homebrew cask '$cask'; m-fonts replaces it."
+      log_command brew uninstall --cask "$cask" || echo "Warning: failed to uninstall cask '$cask'"
+    fi
+  done
+
   for cask in "${font_casks[@]}"; do
     if brew list --cask "$cask" >/dev/null 2>&1; then
       echo "Homebrew cask '$cask' is already installed."
@@ -745,7 +771,7 @@ install_macos_deps() {
     log_command brew install --cask "$cask" || echo "Warning: failed to install cask '$cask' (skipping)"
   done
 
-  install_recursive_code_config_fonts || true
+  install_m_fonts || true
 }
 
 backup_path() {

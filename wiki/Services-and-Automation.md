@@ -16,8 +16,8 @@ On macOS, the installer can add:
 - Copilot CLI and copilot-relay from npm
 - oh-my-zsh
 - shell tools such as `eza`, `jq`, `neovim`, and autojump
-- Recursive and Nerd fonts
-- RecMono Baker and St.Helens fonts from the MOSconfig release
+- Nerd Font symbols and Noto Color Emoji
+- Rec Mono St.Helens and Rec Sans Mt.Baker from the [m-fonts](https://github.com/D0n9X1n/m-fonts) release; the installer removes the retired `font-recursive` casks and `RecMonoBaker-*` fonts
 - pinned Apollo theme releases for SonicTerm, RMUX, native tmux, and eza
 - local Apollo adapters for Claude, both status lines, and the shell prompt
 

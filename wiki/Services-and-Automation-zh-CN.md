@@ -16,8 +16,8 @@ Copilot 使用内置 GitHub 集成；Claude 使用已认证的 `gh`。不需要�
 - npm 中的 Copilot CLI 和 copilot-relay
 - oh-my-zsh
 - `eza`、`jq`、`neovim` 和 autojump 等 shell 工具
-- Recursive 和 Nerd 字体
-- MOSconfig release 中的 RecMono Baker 与 St.Helens 字体
+- Nerd Font 符号与 Noto Color Emoji
+- [m-fonts](https://github.com/D0n9X1n/m-fonts) release 中的 Rec Mono St.Helens 与 Rec Sans Mt.Baker；安装器会移除已停用的 `font-recursive` cask 与 `RecMonoBaker-*` 字体
 - SonicTerm、RMUX、原生 tmux 和 eza 的固定 Apollo theme releases
 - Claude、两个状态栏和 shell prompt 的本机 Apollo adapters
 
