@@ -74,5 +74,9 @@
         "repo": "D0n9X1n/feature-crew"
       }
     }
+  },
+  "enabledPlugins": {
+    "feature-crew@feature-crew": true,
+    "computer-use": true
   }
 }

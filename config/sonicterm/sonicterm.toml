@@ -57,5 +57,5 @@ threshold_secs = 10
 enabled = true
 hide_sensitive = false
 left = ["mode", "font", "scroll", "input", "paste", "ime", "zoom"]
-right = ["alerts", "clip", "health", "glyphs", "history", "mem", "frame", "tab_mem"]
+right = ["alerts", "clip", "mem", "frame"]
 font_scale = 0.85

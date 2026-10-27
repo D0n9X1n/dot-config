@@ -79,6 +79,6 @@
   "skipDangerousModePermissionPrompt": true,
   "theme": "custom:apollo",
   "autoCompactEnabled": true,
-  "skipAutoPermissionPrompt": true,
-  "crossSessionInbound": "accept"
+  "crossSessionInbound": "accept",
+  "skipAutoPermissionPrompt": true
 }
