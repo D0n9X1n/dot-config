@@ -27,6 +27,7 @@
 - [服务与自动化](Services-and-Automation-zh-CN.md) — 安装任务、relay 健康检查、MCP、WakaTime 和缓存清理。
 - [开发与发布](Development-and-Releases-zh-CN.md) — 检查、Wiki 发布、issues、tags 和 releases。
 - [Apollo 主题](Apollo-Theme-zh-CN.md) — 固定的上游 release 和本机运行 adapters。
+- [Firefox](Firefox-zh-CN.md) — 受管的 `user.js` 设置和 oh-my-firefox 主题，由 `uu` 保持最新。
 
 ## 主要文件夹
 

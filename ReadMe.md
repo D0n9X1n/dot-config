@@ -72,6 +72,7 @@ Start with:
 - [Tmux](wiki/Tmux.md)
 - [Claude Code](wiki/Claude-Code.md)
 - [Copilot CLI](wiki/Copilot-CLI.md)
+- [Firefox](wiki/Firefox.md)
 
 ## Safety
 

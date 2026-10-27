@@ -14,6 +14,7 @@
 - [Services and automation](Services-and-Automation.md)
 - [Development and releases](Development-and-Releases.md)
 - [Apollo theme](Apollo-Theme.md)
+- [Firefox](Firefox.md)
 
 ## 简体中文
 
@@ -31,3 +32,4 @@
 - [服务与自动化](Services-and-Automation-zh-CN.md)
 - [开发与发布](Development-and-Releases-zh-CN.md)
 - [Apollo 主题](Apollo-Theme-zh-CN.md)
+- [Firefox](Firefox-zh-CN.md)

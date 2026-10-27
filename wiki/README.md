@@ -27,6 +27,7 @@ The source is the flat `wiki/` folder. GitHub Actions publishes it to the GitHub
 - [Services and automation](Services-and-Automation.md) — installer jobs, relay health, MCP, WakaTime, and cache cleanup.
 - [Development and releases](Development-and-Releases.md) — checks, Wiki publish, issues, tags, and releases.
 - [Apollo theme](Apollo-Theme.md) — pinned upstream releases and local runtime adapters.
+- [Firefox](Firefox.md) — managed `user.js` prefs and the oh-my-firefox theme, kept current by `uu`.
 
 ## Main folders
 

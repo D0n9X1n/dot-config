@@ -72,6 +72,7 @@ scripts/check.sh rmux
 scripts/check.sh tmux
 scripts/check.sh shell
 scripts/check.sh local
+scripts/check.sh firefox
 ```
 
 `models` 断言受管模型选择器：作为 Claude 默认值和启动器 wrapper 中的原生 Opus 5.5、其他 Claude 槽位使用的 `gpt-6-astra[1m]`、两个选择器行、Copilot 自己的 GPT-6 Astra 设置，以及 relay 独立的 Opus 路由。`mcp` 检查共享 MCP 默认值：保留 Playwright，不配置重复的 GitHub 条目或 PAT 模板。

@@ -72,6 +72,7 @@ scripts/check.sh rmux
 scripts/check.sh tmux
 scripts/check.sh shell
 scripts/check.sh local
+scripts/check.sh firefox
 ```
 
 `models` asserts the tracked model selectors: native Opus 5.5 as the Claude default and in the launcher wrappers, `gpt-6-astra[1m]` for every other Claude slot, the two picker rows, Copilot's own GPT-6 Astra settings, and the relay's separate Opus route. `mcp` checks shared MCP defaults: Playwright remains configured, with no duplicate GitHub entry or PAT template.

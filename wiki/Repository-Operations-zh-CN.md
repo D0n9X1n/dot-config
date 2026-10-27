@@ -41,6 +41,7 @@ type<TAB>source<TAB>home destination
 | `link` | 在 `$HOME` 中创建符号链接 |
 | `merge` | 把安全共享数据合并到本机文件 |
 | `render` | 填充模板并写入本机文件 |
+| `firefox` | 在每个 Firefox 默认 profile 中创建符号链接；请看 [Firefox](Firefox-zh-CN.md) |
 
 安装器会检查每个源文件存在、每个目标唯一，并且每个源文件都在 `config/` 或 `scripts/` 下。
 

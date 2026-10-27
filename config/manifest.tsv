@@ -39,3 +39,4 @@ render	config/launchd/com.d0n9x1n.copilot-relay-healthcheck.plist	Library/Launch
 link	scripts/launchd/Weekly npm Cache Cleanup	.local/libexec/Weekly npm Cache Cleanup
 render	config/launchd/com.d0n9x1n.npm-cache-clean.plist	Library/LaunchAgents/com.d0n9x1n.npm-cache-clean.plist
 link	scripts/launchd/vendor_names.py	.local/bin/startup-item-names
+firefox	config/firefox/user.js	user.js
