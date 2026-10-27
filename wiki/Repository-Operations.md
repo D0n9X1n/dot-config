@@ -41,6 +41,7 @@ Types:
 | `link` | Make a symlink in `$HOME` |
 | `merge` | Merge safe shared data into a local file |
 | `render` | Fill a template and write a local file |
+| `firefox` | Make a symlink in each Firefox default profile; see [Firefox](Firefox.md) |
 
 The installer checks that every source exists, every destination is unique, and every source is under `config/` or `scripts/`.
 

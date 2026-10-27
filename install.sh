@@ -886,7 +886,7 @@ validate_manifest() {
   while IFS=$'\t' read -r type source destination extra; do
     case "$type" in
       ''|'#'*) continue ;;
-      link|merge|render) ;;
+      link|merge|render|firefox) ;;
       *) echo "Error: unknown manifest type '$type'" >&2; return 1 ;;
     esac
     [ -z "$extra" ] || {
@@ -935,7 +935,7 @@ validate_local_overlay() {
   fi
   [ -f "$local_manifest" ] || return 0
 
-  upstream_destinations="$(grep -Ev '^(#|$)' "$manifest" | cut -f3)"
+  upstream_destinations="$(grep -Ev '^(#|$)' "$manifest" | awk -F'\t' '$1 != "firefox" {print $3}')"
   while IFS=$'\t' read -r type source destination extra || [ -n "$type" ]; do
     case "$type" in
       ''|'#'*) continue ;;
@@ -1004,6 +1004,79 @@ link_local_overlay() {
     link_file "$file" "${custom}/zzz-local-${file##*/}"
   done
   echo "Linked local overlay from $local_root"
+}
+
+# Each Firefox install's default profile, one absolute path per line, from the
+# [Install*] sections of profiles.ini.
+firefox_profiles() {
+  local base="${HOME}/Library/Application Support/Firefox" rel
+  [ -f "${base}/profiles.ini" ] || return 0
+  awk -F= '/^\[/{install=($0 ~ /^\[Install/)} install && $1=="Default"{print $2}' "${base}/profiles.ini" \
+    | while IFS= read -r rel; do
+      case "$rel" in
+        ''|/*|*'..'*) continue ;;
+      esac
+      [ -d "${base}/${rel}" ] && printf '%s\n' "${base}/${rel}"
+    done
+}
+
+# Keep the oh-my-firefox theme in a profile's chrome/ folder current: clone it
+# when missing, fast-forward it when clean, and otherwise leave it alone.
+ensure_oh_my_firefox() {
+  local chrome="$1" origin branch tmp
+  local url="${DOT_CONFIGS_OH_MY_FIREFOX_URL:-https://github.com/MOSconfig/oh-my-firefox.git}"
+  local -a git_env=(GIT_TERMINAL_PROMPT=0)
+  [ -n "${GIT_SSH_COMMAND:-}" ] || git_env+=(GIT_SSH_COMMAND='ssh -o BatchMode=yes')
+
+  if [ ! -e "$chrome" ]; then
+    # Clone beside the profile, then move it in, so a failed clone never
+    # leaves a partial chrome/ behind.
+    tmp="$(mktemp -d "${chrome}.clone.XXXXXX")" || return 0
+    if env "${git_env[@]}" git clone --quiet "$url" "${tmp}/repo" 2>/dev/null \
+        && mv "${tmp}/repo" "$chrome"; then
+      echo "Cloned oh-my-firefox into $chrome"
+    else
+      echo "Warning: could not clone oh-my-firefox into $chrome"
+    fi
+    case "$tmp" in
+      "${chrome}".clone.??????) rm -rf -- "$tmp" ;;
+    esac
+    return 0
+  fi
+  if [ ! -d "${chrome}/.git" ]; then
+    echo "Leaving $chrome alone: it is not a Git checkout of oh-my-firefox."
+    return 0
+  fi
+  origin="$(git -C "$chrome" remote get-url origin 2>/dev/null || true)"
+  case "$origin" in
+    *[/:]MOSconfig/oh-my-firefox|*[/:]MOSconfig/oh-my-firefox.git|"$url") ;;
+    *) echo "Leaving $chrome alone: origin is ${origin:-missing}, not oh-my-firefox."; return 0 ;;
+  esac
+  if [ -n "$(git -C "$chrome" status --porcelain --untracked-files=no)" ] \
+      || ! branch="$(git -C "$chrome" symbolic-ref --quiet --short HEAD)" \
+      || ! git -C "$chrome" rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1; then
+    echo "Leaving $chrome alone: it has local changes, a detached HEAD, or no upstream."
+    return 0
+  fi
+  if env "${git_env[@]}" git -C "$chrome" pull --ff-only --quiet 2>/dev/null; then
+    echo "oh-my-firefox in $chrome is at $(git -C "$chrome" rev-parse --short HEAD) ($branch)"
+  else
+    echo "Warning: could not fast-forward oh-my-firefox in $chrome; update it by hand."
+  fi
+}
+
+# Link the managed user.js into every default profile and keep its theme
+# current. Firefox reads both at its next start.
+install_firefox_config() {
+  local profile source destination type
+  while IFS= read -r profile; do
+    while IFS=$'\t' read -r type source destination; do
+      [ "$type" = "firefox" ] || continue
+      link_file "${repo_root}/${source}" "${profile}/${destination}"
+    done <"$manifest"
+    ensure_oh_my_firefox "${profile}/chrome"
+    echo "Firefox profile configured: $profile"
+  done < <(firefox_profiles)
 }
 
 manifest_source_for_destination() {
@@ -1328,6 +1401,7 @@ validate_local_overlay
 install_apollo_themes
 link_manifest_files
 link_local_overlay
+install_firefox_config
 # RMUX is Windows-only. Keep retention while an older macOS install remains.
 if is_macos && have_cmd python3 && have_cmd rmux; then
   log_command python3 -B "${scripts_root}/rmux/store.py" prepare || {

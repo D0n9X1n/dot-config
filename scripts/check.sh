@@ -696,6 +696,8 @@ run_wiki_smoke() {
     wiki/Development-and-Releases-zh-CN.md
     wiki/Apollo-Theme.md
     wiki/Apollo-Theme-zh-CN.md
+    wiki/Firefox.md
+    wiki/Firefox-zh-CN.md
     wiki/_Sidebar.md
     scripts/wiki-render.sh
     scripts/wiki-publish.sh
@@ -2384,6 +2386,115 @@ SH
   )
 }
 
+# install.sh links the managed user.js into each Firefox install's default
+# profile and keeps oh-my-firefox current in chrome/ without touching local work.
+# Each profile below needs exactly one guard to be left alone.
+run_firefox_smoke() {
+  (
+    local test_root base ok_origin seed head p
+    test_root="$(mktemp -d)"
+    trap 'rm -rf "$test_root"' EXIT
+    export HOME="$test_root/home"
+    export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+    export GIT_AUTHOR_NAME=check GIT_AUTHOR_EMAIL=check@example.com
+    export GIT_COMMITTER_NAME=check GIT_COMMITTER_EMAIL=check@example.com
+    base="$HOME/Library/Application Support/Firefox"
+
+    # The managed prefs keep the theme switch on and carry no personal data.
+    grep -Fq 'user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);' config/firefox/user.js
+    if grep -Eiq 'newtabpage\.pinned|identity|sync|token|password|@' config/firefox/user.js; then
+      echo "config/firefox/user.js must not carry personal data" >&2
+      return 1
+    fi
+
+    # A stand-in oh-my-firefox origin with two tracked files.
+    ok_origin="$test_root/oh-my-firefox.git"
+    seed="$test_root/seed"
+    git init -q --bare -b master "$ok_origin"
+    git init -q -b master "$seed"
+    printf 'a{}\n' >"$seed/userChrome.css"
+    printf 'b{}\n' >"$seed/userContent.css"
+    git -C "$seed" add -A
+    git -C "$seed" commit -q -m one
+    git -C "$seed" push -q "$ok_origin" master
+    export DOT_CONFIGS_OH_MY_FIREFOX_URL="$ok_origin"
+
+    # ../../outside from the Firefox folder: a real folder outside it.
+    mkdir -p "$base/Profiles" "$HOME/Library/outside"
+    # new: no chrome/ yet. clean: a clean clone. dirty: a local edit to a file
+    # upstream does not change. ahead: a local commit, so only a merge could
+    # update it. plain: a hand-made chrome/ inside a repo whose origin is
+    # oh-my-firefox. unused: a profile no install uses.
+    for p in new clean dirty ahead plain unused; do mkdir -p "$base/Profiles/$p"; done
+    git clone -q "$ok_origin" "$base/Profiles/clean/chrome"
+    git clone -q "$ok_origin" "$base/Profiles/dirty/chrome"
+    printf 'mine\n' >>"$base/Profiles/dirty/chrome/userContent.css"
+    git clone -q "$ok_origin" "$base/Profiles/ahead/chrome"
+    printf 'local\n' >"$base/Profiles/ahead/chrome/local.css"
+    git -C "$base/Profiles/ahead/chrome" add local.css
+    git -C "$base/Profiles/ahead/chrome" commit -q -m local
+    rmdir "$base/Profiles/plain"
+    git clone -q "$ok_origin" "$base/Profiles/plain"
+    mkdir -p "$base/Profiles/plain/chrome"
+    printf 'hand\n' >"$base/Profiles/plain/chrome/userChrome.css"
+    printf 'user_pref("old", 1);\n' >"$base/Profiles/clean/user.js"
+    cat >"$base/profiles.ini" <<INI
+[Profile0]
+Name=unused
+IsRelative=1
+Path=Profiles/unused
+Default=Profiles/unused
+[InstallA]
+Default=Profiles/new
+[InstallB]
+Default=Profiles/clean
+[InstallC]
+Default=Profiles/dirty
+[InstallD]
+Default=Profiles/ahead
+[InstallE]
+Default=Profiles/plain
+[InstallF]
+Default=../../outside
+[General]
+StartWithLastProfile=1
+INI
+    printf 'a2{}\n' >"$seed/userChrome.css"
+    git -C "$seed" commit -q -am two
+    git -C "$seed" push -q "$ok_origin" master
+    head="$(git -C "$seed" rev-parse HEAD)"
+
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    [ "$(firefox_profiles | sed 's#.*/##' | sort | tr '\n' ' ')" = "ahead clean dirty new plain " ]
+    install_firefox_config >/dev/null
+    install_firefox_config >/dev/null
+
+    # user.js is linked into every install default, with one backup of the old file.
+    for p in new clean dirty ahead plain; do
+      [ "$(readlink "$base/Profiles/$p/user.js")" = "$repo_root/config/firefox/user.js" ]
+    done
+    [ ! -e "$base/Profiles/unused/user.js" ]
+    [ ! -e "$HOME/Library/outside/user.js" ]
+    [ "$(find "$base/Profiles/clean" -maxdepth 1 -name 'user.js.bak.*' | wc -l | tr -d ' ')" = 1 ]
+
+    # Missing chrome/ is cloned and a clean clone fast-forwards.
+    [ "$(git -C "$base/Profiles/new/chrome" rev-parse HEAD)" = "$head" ]
+    [ "$(git -C "$base/Profiles/clean/chrome" rev-parse HEAD)" = "$head" ]
+    [ -z "$(find "$base/Profiles" -maxdepth 1 -name '*.clone.*' -print)" ]
+    # Local work is never moved: dirty, ahead, and hand-made chrome/ stay put.
+    [ "$(git -C "$base/Profiles/dirty/chrome" rev-parse HEAD)" != "$head" ]
+    grep -Fq mine "$base/Profiles/dirty/chrome/userContent.css"
+    [ "$(git -C "$base/Profiles/ahead/chrome" log -1 --format=%s)" = local ]
+    [ "$(git -C "$base/Profiles/ahead/chrome" rev-list --count HEAD)" = 2 ]
+    [ "$(cat "$base/Profiles/plain/chrome/userChrome.css")" = hand ]
+    [ "$(git -C "$base/Profiles/plain" rev-list --count HEAD)" = 1 ]
+
+    # Without Firefox nothing happens.
+    mv "$base" "$test_root/gone"
+    [ -z "$(install_firefox_config)" ]
+  )
+}
+
 run_smoke() {
   run_bash_syntax
   run_apollo_smoke
@@ -2416,6 +2527,7 @@ run_smoke() {
   run_local_overlay_smoke
   run_mux_local_override_smoke
   run_relay_completion_smoke
+  run_firefox_smoke
   run_local_checks
 }
 
@@ -2431,10 +2543,11 @@ case "${1:-all}" in
   tmux) run_tmux_smoke; run_mux_local_override_smoke ;;
   shell) run_shell_update_smoke; run_local_overlay_smoke; run_relay_completion_smoke ;;
   local) run_local_checks ;;
+  firefox) run_firefox_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;
   *)
-    echo "usage: $0 [smoke|apollo|apollo-online|instructions|models|mcp|wiki|rmux|tmux|shell|local|shellcheck|all]" >&2
+    echo "usage: $0 [smoke|apollo|apollo-online|instructions|models|mcp|wiki|rmux|tmux|shell|local|firefox|shellcheck|all]" >&2
     exit 2
     ;;
 esac
