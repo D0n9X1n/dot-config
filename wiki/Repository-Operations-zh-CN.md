@@ -44,7 +44,7 @@ type<TAB>source<TAB>home destination
 
 安装器会检查每个源文件存在、每个目标唯一，并且每个源文件都在 `config/` 或 `scripts/` 下。
 
-清单检查会排除 SonicTerm 的 `*.save.lock` 运行时文件。保留这些已忽略的锁文件，不要加入清单或 Git。
+清单检查会排除 SonicTerm 的 `*.save.lock` 运行时文件，以及 Copilot CLI 通过链接更新设置文件时在旁边写入的 `config/copilot/*.json.lock` 文件。保留这些已忽略的锁文件，不要加入清单或 Git。
 
 ## 生效路径
 

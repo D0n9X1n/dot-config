@@ -44,7 +44,7 @@ Types:
 
 The installer checks that every source exists, every destination is unique, and every source is under `config/` or `scripts/`.
 
-The manifest check excludes SonicTerm `*.save.lock` runtime files. Leave these ignored locks in place; never add them to the manifest or Git.
+The manifest check excludes SonicTerm `*.save.lock` runtime files and the `config/copilot/*.json.lock` files Copilot CLI writes beside a settings file it updates through the link. Leave these ignored locks in place; never add them to the manifest or Git.
 
 ## Active paths
 

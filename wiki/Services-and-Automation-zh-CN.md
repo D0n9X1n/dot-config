@@ -90,6 +90,16 @@ npx copilot-relay auth
 
 认证和日志保留在本机 `~/.copilot-relay/` 中。
 
+### Claude app
+
+Claude app（第三方模式，`~/Library/Application Support/Claude-3p/`）把 relay 用作网关，提供两个模型：Claude Opus 5.5（`claude-opus-5.5`）和 GPT-6 Astra，后者以路由名 `claude-sonnet-relay` 列出。app 会拒绝看起来属于其他厂商的模型名（例如 `gpt-6-astra`），并在关闭模型发现时标记 `sonnet` 这类纯别名，所以 GPT-6 Astra 使用这个 Claude 风格的路由名；relay 会把所有不含 "opus" 的名称发往 `gptModel`。
+
+这份配置不在本仓库中跟踪：它包含网关密钥和按机器生成的文件名。请改用 relay 的设置来恢复。先退出 app，因为它运行时会重写这些文件：
+
+```sh
+copilot-relay setup claude-code-app
+```
+
 ## launchd 文件
 
 `config/launchd/` 下的文件是模板。它们不是符号链接。

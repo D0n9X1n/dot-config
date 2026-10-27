@@ -90,6 +90,16 @@ npx copilot-relay auth
 
 Auth and logs stay local under `~/.copilot-relay/`.
 
+### Claude app
+
+The Claude app (third-party mode, `~/Library/Application Support/Claude-3p/`) uses the relay as its gateway with two models: Claude Opus 5.5 (`claude-opus-5.5`) and GPT-6 Astra, listed under the route name `claude-sonnet-relay`. The app rejects a model name that looks like another vendor's, such as `gpt-6-astra`, and flags a bare alias such as `sonnet` while model discovery is off, so GPT-6 Astra uses that Claude-style route; the relay sends every name without "opus" to `gptModel`.
+
+That config is not tracked here: it holds the gateway key and a per-machine file name. Restore it from the relay's settings instead. Quit the app first, because it rewrites these files while it runs:
+
+```sh
+copilot-relay setup claude-code-app
+```
+
 ## launchd files
 
 Files under `config/launchd/` are templates. They are not symlinks.

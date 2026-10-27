@@ -863,7 +863,8 @@ run_manifest_smoke() {
       return 1
     }
     config_files="$(find config -type f ! -path 'config/manifest.tsv' \
-      ! -path 'config/sonicterm/*.save.lock' ! -name '.DS_Store' -print | sort)"
+      ! -path 'config/sonicterm/*.save.lock' ! -path 'config/copilot/*.json.lock' \
+      ! -name '.DS_Store' -print | sort)"
     manifest_config_files="$(grep -Ev '^(#|$)' config/manifest.tsv | cut -f2 | grep '^config/' | sort)"
     [ "$config_files" = "$manifest_config_files" ] || {
       echo "config/ files and manifest sources differ" >&2

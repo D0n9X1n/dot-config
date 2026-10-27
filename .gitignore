@@ -4,6 +4,7 @@
 *.swp
 *.swo
 *.save.lock
+config/copilot/*.json.lock
 *~
 *.bak.*
 .copilot-cli.ts
