@@ -5,15 +5,21 @@ user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);
 
 // Fonts used by the oh-my-firefox theme and for page text.
 user_pref("font.language.group", "x-western");
-user_pref("font.name.serif.x-western", "Resource Han Rounded CN");
-user_pref("font.name.serif.zh-CN", "Resource Han Rounded CN");
-user_pref("font.name.sans-serif.ar", "Resource Han Rounded CN");
+user_pref("font.name.serif.x-western", "Rec Sans Mt.Baker");
+user_pref("font.name.serif.zh-CN", "Rec Sans Mt.Baker");
+user_pref("font.name.sans-serif.x-western", "Rec Sans Mt.Baker");
+user_pref("font.name.sans-serif.zh-CN", "Rec Sans Mt.Baker");
+user_pref("font.name.sans-serif.ar", "Rec Sans Mt.Baker");
 user_pref("font.name.monospace.x-western", "Rec Mono St.Helens");
 user_pref("font.name.monospace.zh-CN", "Rec Mono St.Helens");
 user_pref("font.size.variable.x-western", 15);
 user_pref("font.size.variable.zh-CN", 14);
 user_pref("font.size.variable.ar", 14);
 user_pref("font.size.monospace.zh-CN", 14);
+
+// Fingerprinting protection hides fonts in ~/Library/Fonts from pages by
+// default. Drop only that target so pages can use the fonts above.
+user_pref("privacy.fingerprintingProtection.overrides", "-FontVisibilityLangPack");
 
 // No search or URL-bar suggestions, and no new-tab page.
 user_pref("browser.search.suggest.enabled", false);

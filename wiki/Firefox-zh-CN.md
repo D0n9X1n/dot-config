@@ -17,7 +17,8 @@ Firefox 每次启动都会读取 `user.js`，并覆盖 `about:config` 中的值�
 | 设置 | 值 |
 |---|---|
 | `toolkit.legacyUserProfileCustomizations.stylesheets` | `true`；主题需要 |
-| `font.*` | 正文使用 Resource Han Rounded CN，等宽使用 Rec Mono St.Helens，以及对应字号 |
+| `font.*` | 正文使用 Rec Sans Mt.Baker，等宽使用 Rec Mono St.Helens，以及对应字号 |
+| `privacy.fingerprintingProtection.overrides` | `-FontVisibilityLangPack`；否则指纹保护会让网页看不到 `~/Library/Fonts` 中的字体。其他保护仍然开启。Mozilla 针对个别网站的覆盖规则仍可能在这些网站上隐藏它们 |
 | `browser.search.suggest.enabled`、`browser.urlbar.suggest.*` | `false`；不显示搜索、热门、赞助或常用网站建议 |
 | `browser.newtabpage.*` | `false`；不显示新标签页、推荐内容或常用网站 |
 
