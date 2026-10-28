@@ -17,7 +17,7 @@ On macOS, the installer can add:
 - oh-my-zsh
 - shell tools such as `eza`, `jq`, `neovim`, and autojump
 - Nerd Font symbols and Noto Color Emoji
-- Rec Mono St.Helens and Rec Sans Mt.Baker from the [m-fonts](https://github.com/D0n9X1n/m-fonts) release; the installer removes the retired `font-recursive` casks and `RecMonoBaker-*` fonts
+- Rec Mono St.Helens and Rec Sans Mt.Baker from the [Rec Mountain Fonts](https://github.com/D0n9X1n/rec-mountain-fonts) release; the installer removes the retired `font-recursive` casks and `RecMonoBaker-*` fonts
 - pinned Apollo theme releases for SonicTerm, RMUX, native tmux, and eza
 - local Apollo adapters for Claude, both status lines, and the shell prompt
 
