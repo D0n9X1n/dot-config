@@ -461,8 +461,8 @@ ensure_wakatime_cfg_api_key() {
   printf '%s' "$key"
 }
 
-install_m_fonts() {
-  local api_url="https://api.github.com/repos/D0n9X1n/m-fonts/releases/latest"
+install_rec_mountain_fonts() {
+  local api_url="https://api.github.com/repos/D0n9X1n/rec-mountain-fonts/releases/latest"
   local fonts_dir="${HOME}/Library/Fonts"
   local release_json=""
   local tag=""
@@ -495,16 +495,16 @@ install_m_fonts() {
   )
 
   if ! have_cmd curl; then
-    echo "Warning: curl not found; cannot download m-fonts (skipping)"
+    echo "Warning: curl not found; cannot download Rec Mountain Fonts (skipping)"
     return 1
   fi
   if ! have_cmd jq; then
-    echo "Warning: jq not found; cannot parse m-fonts release (skipping)"
+    echo "Warning: jq not found; cannot parse Rec Mountain Fonts release (skipping)"
     return 1
   fi
 
   mkdir -p "$fonts_dir"
-  rm -f "${fonts_dir}/.recursive-code-config.version"
+  rm -f "${fonts_dir}/.recursive-code-config.version" "${fonts_dir}/.m-fonts.version"
   for font in "${retired_fonts[@]}"; do
     if [ -f "${fonts_dir}/${font}" ]; then
       rm -f "${fonts_dir}/${font}"
@@ -512,18 +512,18 @@ install_m_fonts() {
     fi
   done
 
-  marker="${fonts_dir}/.m-fonts.version"
-  release_json="$(mktemp -t m-fonts-release.XXXXXX)"
+  marker="${fonts_dir}/.rec-mountain-fonts.version"
+  release_json="$(mktemp -t rec-mountain-fonts-release.XXXXXX)"
   if ! log_command curl -fsSL "$api_url" -o "$release_json"; then
     rm -f "$release_json"
-    echo "Warning: failed to fetch m-fonts latest release metadata (skipping)"
+    echo "Warning: failed to fetch Rec Mountain Fonts latest release metadata (skipping)"
     return 1
   fi
 
   tag="$(jq -r '.tag_name // empty' "$release_json")"
   if [ -z "$tag" ]; then
     rm -f "$release_json"
-    echo "Warning: m-fonts release metadata did not include tag_name (skipping)"
+    echo "Warning: Rec Mountain Fonts release metadata did not include tag_name (skipping)"
     return 1
   fi
 
@@ -538,23 +538,23 @@ install_m_fonts() {
   done
 
   if [ "$needs_install" = "0" ]; then
-    echo "m-fonts are up to date ($tag)."
+    echo "Rec Mountain Fonts are up to date ($tag)."
     rm -f "$release_json"
     return 0
   fi
 
-  echo "Installing m-fonts release $tag."
+  echo "Installing Rec Mountain Fonts release $tag."
   for font in "${font_names[@]}"; do
     url="$(jq -r --arg name "$font" '.assets[] | select(.name == $name) | .browser_download_url // empty' "$release_json")"
     digest="$(jq -r --arg name "$font" '.assets[] | select(.name == $name) | .digest // empty' "$release_json")"
     target="${fonts_dir}/${font}"
 
     if [ -z "$url" ]; then
-      echo "Warning: m-fonts release $tag is missing asset $font"
+      echo "Warning: Rec Mountain Fonts release $tag is missing asset $font"
       continue
     fi
 
-    tmp_font="$(mktemp -t m-fonts-font.XXXXXX)"
+    tmp_font="$(mktemp -t rec-mountain-fonts-font.XXXXXX)"
     if ! log_command curl -fL "$url" -o "$tmp_font"; then
       rm -f "$tmp_font"
       echo "Warning: failed to download $font"
@@ -580,9 +580,9 @@ install_m_fonts() {
   rm -f "$release_json"
   if [ "$installed" -eq "${#font_names[@]}" ]; then
     printf '%s\n' "$tag" >"$marker"
-    echo "Installed m-fonts $tag."
+    echo "Installed Rec Mountain Fonts $tag."
   else
-    echo "Warning: installed ${installed}/${#font_names[@]} m-fonts"
+    echo "Warning: installed ${installed}/${#font_names[@]} Rec Mountain Fonts"
     return 1
   fi
 }
@@ -749,7 +749,7 @@ install_macos_deps() {
   uninstall_npm_package_if_installed @anthropic-ai/claude-code
   ensure_claude_code_min_version "$claude_min_version" || exit 1
 
-  # Recursive casks retired in favor of m-fonts (Rec Mono St.Helens / Rec Sans Mt.Baker)
+  # Recursive casks retired in favor of Rec Mountain Fonts (Rec Mono St.Helens / Rec Sans Mt.Baker)
   local retired_font_casks=(
     font-recursive
     font-recursive-mono-nerd-font
@@ -758,7 +758,7 @@ install_macos_deps() {
   local cask
   for cask in "${retired_font_casks[@]}"; do
     if brew list --cask "$cask" >/dev/null 2>&1; then
-      echo "Removing retired Homebrew cask '$cask'; m-fonts replaces it."
+      echo "Removing retired Homebrew cask '$cask'; Rec Mountain Fonts replaces it."
       log_command brew uninstall --cask "$cask" || echo "Warning: failed to uninstall cask '$cask'"
     fi
   done
@@ -771,7 +771,7 @@ install_macos_deps() {
     log_command brew install --cask "$cask" || echo "Warning: failed to install cask '$cask' (skipping)"
   done
 
-  install_m_fonts || true
+  install_rec_mountain_fonts || true
 }
 
 backup_path() {
