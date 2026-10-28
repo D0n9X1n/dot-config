@@ -415,7 +415,8 @@ run_mcp_default_smoke() {
     (has("_github_template") | not) and
     (.mcpServers | has("github") | not) and
     .mcpServers.playwright.type == "stdio" and
-    .mcpServers.playwright.command == "npx"
+    .mcpServers.playwright.command == "npx" and
+    (.mcpServers.playwright.args | index("--headless") != null)
   ' config/mcp/mcp-shared.json >/dev/null
   if grep -Fq 'warn_claude_github_mcp_overrides' install.sh; then
     echo "installer still carries custom GitHub MCP setup" >&2
@@ -440,7 +441,7 @@ run_mcp_default_smoke() {
     [ ! -e "$HOME/.claude.json.bak.2" ]
     grep -Fq '"b":{"command":"y"},"a"' "$HOME/.claude.json"
   )
-  echo "shared MCP defaults ok: Playwright retained, no duplicate GitHub setup"
+  echo "shared MCP defaults ok: Playwright retained and headless, no duplicate GitHub setup"
 }
 
 run_copilot_terminal_smoke() {

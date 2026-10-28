@@ -75,7 +75,7 @@ scripts/check.sh local
 scripts/check.sh firefox
 ```
 
-`models` asserts the tracked model selectors: native Opus 5.5 as the Claude default and in the launcher wrappers, `gpt-6-astra[1m]` for every other Claude slot, the two picker rows, Copilot's own GPT-6 Astra settings, and the relay's separate Opus route. `mcp` checks shared MCP defaults: Playwright remains configured, with no duplicate GitHub entry or PAT template.
+`models` asserts the tracked model selectors: native Opus 5.5 as the Claude default and in the launcher wrappers, `gpt-6-astra[1m]` for every other Claude slot, the two picker rows, Copilot's own GPT-6 Astra settings, and the relay's separate Opus route. `mcp` checks shared MCP defaults: Playwright remains configured and headless, with no duplicate GitHub entry or PAT template.
 
 The status-line layout, cache, and generated palette are shared by both providers, so a change to either script or to the generator is checked by `apollo` and `smoke` together. Provider-specific emphasis still differs: Copilot uses the bright foreground role and keeps the live-subagent rows, Claude does neither. Keep Claude's output unchanged when editing the shared generator.
 

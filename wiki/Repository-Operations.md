@@ -141,6 +141,8 @@ Tokens and API keys for optional MCP servers belong only in the local Copilot MC
 
 Copilot includes `github-mcp-server` and uses its existing GitHub login. Claude uses authenticated `gh` for GitHub work. This repo does not provision a separate GitHub MCP entry or PAT; shared MCP sync remains in place for Playwright and other configured servers.
 
+Playwright runs headless (`--headless`): its Chromium works in the background and never opens a window, so browser checks run without interrupting you. To watch a session, add a local Copilot MCP entry under another name without the flag; a local `playwright` entry is replaced by the shared one.
+
 Claude's local-scope entries live under `projects[].mcpServers` in `~/.claude.json`. They replace same-name user entries; headers are not merged. The MCP import leaves these local entries untouched.
 
 ## Multiplexer lifecycle

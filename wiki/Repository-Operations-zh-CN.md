@@ -141,6 +141,8 @@ DOT_CONFIGS_INSTALL_LOG=/tmp/install.log ./install.sh
 
 Copilot 内置 `github-mcp-server`，使用已有的 GitHub 登录。Claude 通过已认证的 `gh` 处理 GitHub 工作。本仓库不再配置单独的 GitHub MCP 条目或 PAT；共享 MCP 同步仍服务于 Playwright 和其他已配置的 server。
 
+Playwright 以无头模式运行（`--headless`）：它的 Chromium 在后台工作，从不打开窗口，所以浏览器检查不会打断你。需要观察某次会话时，用另一个名字添加不带此参数的本地 Copilot MCP 条目；名为 `playwright` 的本地条目会被共享条目替换。
+
 Claude 的 local scope 条目位于 `~/.claude.json` 的 `projects[].mcpServers` 下。它们替换同名用户级条目，不会合并 header。MCP 导入会保留这些本机条目。
 
 ## 复用器生命周期
