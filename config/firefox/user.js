@@ -3,10 +3,11 @@
 // The oh-my-firefox theme in the profile's chrome/ folder needs the first one.
 user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);
 
-// Fonts used by the oh-my-firefox theme and for page text.
+// Fonts used by the oh-my-firefox theme and for page text. Pages that ask for
+// serif get Rec Serif Mt.Adams; everything else uses Rec Sans Mt.Baker.
 user_pref("font.language.group", "x-western");
-user_pref("font.name.serif.x-western", "Rec Sans Mt.Baker");
-user_pref("font.name.serif.zh-CN", "Rec Sans Mt.Baker");
+user_pref("font.name.serif.x-western", "Rec Serif Mt.Adams");
+user_pref("font.name.serif.zh-CN", "Rec Serif Mt.Adams");
 user_pref("font.name.sans-serif.x-western", "Rec Sans Mt.Baker");
 user_pref("font.name.sans-serif.zh-CN", "Rec Sans Mt.Baker");
 user_pref("font.name.sans-serif.ar", "Rec Sans Mt.Baker");
