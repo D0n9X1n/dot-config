@@ -17,7 +17,7 @@ Firefox reads `user.js` at every start and applies it over `about:config`. The m
 | Prefs | Value |
 |---|---|
 | `toolkit.legacyUserProfileCustomizations.stylesheets` | `true`; required by the theme |
-| `font.*` | Rec Sans Mt.Baker for page text, Rec Mono St.Helens for monospace, and their sizes |
+| `font.*` | Rec Sans Mt.Baker for page text, Rec Serif Mt.Adams for serif, Rec Mono St.Helens for monospace, and their sizes |
 | `privacy.fingerprintingProtection.overrides` | `-FontVisibilityLangPack`; fingerprinting protection otherwise hides fonts in `~/Library/Fonts` from pages. Its other protections stay on. Mozilla's per-site overrides can still hide them on some sites |
 | `browser.search.suggest.enabled`, `browser.urlbar.suggest.*` | `false`; no search, trending, sponsored, or top-site suggestions |
 | `browser.newtabpage.*` | `false`; no new-tab page, stories, or top sites |
