@@ -485,6 +485,10 @@ install_rec_mountain_fonts() {
     RecSansMt.Baker-BoldItalic.ttf
     RecSansMt.Baker-Italic.ttf
     RecSansMt.Baker-Regular.ttf
+    RecSerifMt.Adams-Bold.ttf
+    RecSerifMt.Adams-BoldItalic.ttf
+    RecSerifMt.Adams-Italic.ttf
+    RecSerifMt.Adams-Regular.ttf
   )
   # Fonts from the retired MOSconfig/recursive-code-config release
   local retired_fonts=(
@@ -749,7 +753,7 @@ install_macos_deps() {
   uninstall_npm_package_if_installed @anthropic-ai/claude-code
   ensure_claude_code_min_version "$claude_min_version" || exit 1
 
-  # Recursive casks retired in favor of Rec Mountain Fonts (Rec Mono St.Helens / Rec Sans Mt.Baker)
+  # Recursive casks retired in favor of Rec Mountain Fonts (Rec Mono St.Helens / Rec Sans Mt.Baker / Rec Serif Mt.Adams)
   local retired_font_casks=(
     font-recursive
     font-recursive-mono-nerd-font
