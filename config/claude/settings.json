@@ -49,13 +49,20 @@
     "rust-analyzer-lsp@claude-plugins-official": true,
     "clangd-lsp@claude-plugins-official": true,
     "swift-lsp@claude-plugins-official": true,
-    "feature-crew@feature-crew": true
+    "feature-crew@feature-crew": true,
+    "mermaid-tty@mermaid-tty": true
   },
   "extraKnownMarketplaces": {
     "feature-crew": {
       "source": {
         "source": "github",
         "repo": "D0n9X1n/feature-crew"
+      }
+    },
+    "mermaid-tty": {
+      "source": {
+        "source": "github",
+        "repo": "D0n9X1n/mermaid-tty"
       }
     },
     "wakatime": {

@@ -1459,6 +1459,30 @@ if have_cmd jq && [ -f "$shared_mcp" ]; then
 fi
 
 # The official Copilot plugin supersedes the old vendored WakaTime MCP.
+# mermaid-tty is a Claude Code plugin that draws mermaid fences as box-drawing
+# diagrams. Install or update it in Claude Code; settings.json declares and enables it.
+ensure_mermaid_tty_plugin() {
+  if ! have_cmd jq; then
+    echo "mermaid-tty plugin: jq not found — skipping plugin setup"
+    return 0
+  fi
+  have_cmd claude || return 0
+  if claude plugin marketplace list --json 2>/dev/null | jq -e 'any(.[]; .name == "mermaid-tty")' >/dev/null; then
+    log_command claude plugin marketplace update mermaid-tty \
+      || echo "Warning: claude mermaid-tty marketplace update failed"
+  else
+    log_command claude plugin marketplace add D0n9X1n/mermaid-tty \
+      || { echo "Warning: claude mermaid-tty marketplace add failed"; return 0; }
+  fi
+  if claude plugin list --json 2>/dev/null | jq -e 'any(.[]; .id == "mermaid-tty@mermaid-tty" and .enabled == true)' >/dev/null; then
+    log_command claude plugin update mermaid-tty@mermaid-tty \
+      || echo "Warning: claude mermaid-tty plugin update failed"
+  else
+    log_command claude plugin install mermaid-tty@mermaid-tty \
+      || echo "Warning: claude mermaid-tty plugin install failed"
+  fi
+}
+
 cleanup_legacy_wakatime_mcp
 
 # The Copilot plugin manages its own WakaTime CLI on session start.
@@ -1467,6 +1491,9 @@ ensure_copilot_wakatime_plugin
 # Feature-Crew: one plugin for Claude Code and Copilot CLI.
 ensure_feature_crew_plugin
 cleanup_legacy_feature_crew
+
+# mermaid-tty: Mermaid diagrams drawn in the terminal, for Claude Code.
+ensure_mermaid_tty_plugin
 
 # Import Copilot's merged MCP server map into Claude Code's local state file.
 import_copilot_mcp_into_claude
