@@ -196,7 +196,7 @@ Skills 和 Agents 统计 user 和 project 文件，也统计每个已启用 plug
 
 WakaTime marketplace 指向官方 `wakatime/claude-code-wakatime` Git 仓库。Feature-Crew marketplace 指向 GitHub 仓库 `D0n9X1n/feature-crew`；`install.sh` 也会在 PATH 上的每个 CLI 中安装或更新这个 plugin。`~/.claude` 中旧的 Feature-Crew 脚本安装会遮挡 plugin。Claude Code 列出该 plugin 已启用后，`install.sh` 会删除 `~/.claude/agents/` 中旧的 `fc-*` agent、`~/.claude/skills/` 中旧的 `fc-*` skill，以及 `~/.claude/feature-crew.sha256`。它只删除这些确切名称，并跳过链接形式的 `agents` 或 `skills` 文件夹。很早版本留下的非 `fc-` 文件不会被删除；对这些文件，请在 Feature-Crew 克隆中运行 `./install.sh`。
 
-mermaid-tty marketplace 指向 GitHub 仓库 `D0n9X1n/mermaid-tty`。这个 plugin 会把 Claude 回复中已闭合的 `mermaid` 代码块重绘为彩色的制表符图表；凡是无法精确绘制的内容，都显示源码。`install.sh` 会在 Claude Code 中安装或更新它。它使用默认主题，跟随 Claude Code 主题；`/mermaid-tty source` 可把图表显示为源码。
+mermaid-tty marketplace 指向 GitHub 仓库 `D0n9X1n/mermaid-tty`。这个 plugin 会把 Claude 回复中已闭合的 `mermaid` 代码块重绘为彩色的制表符图表；凡是无法精确绘制的内容，都显示源码。`install.sh` 会在 Claude Code 中安装或更新它。除非已设置主题，它会保存默认主题（跟随 Claude Code 主题），因此 Claude Code 不会提示该选项未设置；`/mermaid-tty source` 可把图表显示为源码。
 
 ## 常见问题
 

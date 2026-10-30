@@ -1478,8 +1478,14 @@ ensure_mermaid_tty_plugin() {
     log_command claude plugin update mermaid-tty@mermaid-tty \
       || echo "Warning: claude mermaid-tty plugin update failed"
   else
-    log_command claude plugin install mermaid-tty@mermaid-tty \
+    log_command claude plugin install mermaid-tty@mermaid-tty --config theme=default \
       || echo "Warning: claude mermaid-tty plugin install failed"
+  fi
+  # Claude Code reports an option as not yet set until a value is saved, so save the
+  # default theme once; a theme the user chose is kept.
+  if ! claude plugin configure mermaid-tty@mermaid-tty --json 2>/dev/null | jq -e '.inputs.theme' >/dev/null; then
+    echo '{"theme":"default"}' | log_command claude plugin configure mermaid-tty@mermaid-tty --values-stdin \
+      || echo "Warning: claude mermaid-tty theme setup failed"
   fi
 }
 
