@@ -619,31 +619,32 @@ ensure_copilot_wakatime_plugin() {
   fi
 }
 
-# Feature-Crew ships as one plugin from its own marketplace. Install or update
-# it in each CLI on PATH; settings.json also declares and enables it for Claude.
-ensure_feature_crew_plugin() {
-  local cli
+# Feature-Crew and mux-agents each ship as one plugin from a marketplace of the
+# same name. Install or update one in each CLI on PATH; both settings files also
+# declare the marketplace, so later runs update it instead of re-adding it.
+ensure_cli_plugin() {
+  local name="$1" repo="$2" cli
   if ! have_cmd jq; then
-    echo "feature-crew plugin: jq not found — skipping plugin setup"
+    echo "$name plugin: jq not found — skipping plugin setup"
     return 0
   fi
   for cli in claude copilot; do
     have_cmd "$cli" || continue
-    if "$cli" plugin marketplace list --json 2>/dev/null | jq -e 'any(.[]; .name == "feature-crew")' >/dev/null; then
-      log_command "$cli" plugin marketplace update feature-crew \
-        || echo "Warning: $cli feature-crew marketplace update failed"
+    if "$cli" plugin marketplace list --json 2>/dev/null | jq -e --arg name "$name" 'any(.[]; .name == $name)' >/dev/null; then
+      log_command "$cli" plugin marketplace update "$name" \
+        || echo "Warning: $cli $name marketplace update failed"
     else
-      log_command "$cli" plugin marketplace add D0n9X1n/feature-crew \
-        || { echo "Warning: $cli feature-crew marketplace add failed"; continue; }
+      log_command "$cli" plugin marketplace add "$repo" \
+        || { echo "Warning: $cli $name marketplace add failed"; continue; }
     fi
-    if "$cli" plugin list --json 2>/dev/null | jq -e --arg cli "$cli" 'any(.[];
-        (if $cli == "claude" then .id == "feature-crew@feature-crew"
-         else .name == "feature-crew" and .marketplace == "feature-crew" end) and .enabled == true)' >/dev/null; then
-      log_command "$cli" plugin update feature-crew@feature-crew \
-        || echo "Warning: $cli feature-crew plugin update failed"
+    if "$cli" plugin list --json 2>/dev/null | jq -e --arg cli "$cli" --arg name "$name" 'any(.[];
+        (if $cli == "claude" then .id == "\($name)@\($name)"
+         else .name == $name and .marketplace == $name end) and .enabled == true)' >/dev/null; then
+      log_command "$cli" plugin update "$name@$name" \
+        || echo "Warning: $cli $name plugin update failed"
     else
-      log_command "$cli" plugin install feature-crew@feature-crew \
-        || echo "Warning: $cli feature-crew plugin install failed"
+      log_command "$cli" plugin install "$name@$name" \
+        || echo "Warning: $cli $name plugin install failed"
     fi
   done
 }
@@ -1495,11 +1496,14 @@ cleanup_legacy_wakatime_mcp
 ensure_copilot_wakatime_plugin
 
 # Feature-Crew: one plugin for Claude Code and Copilot CLI.
-ensure_feature_crew_plugin
+ensure_cli_plugin feature-crew D0n9X1n/feature-crew
 cleanup_legacy_feature_crew
 
 # mermaid-tty: Mermaid diagrams drawn in the terminal, for Claude Code.
 ensure_mermaid_tty_plugin
+
+# mux-agents: helper agents in tmux or RMUX panes, for Claude Code and Copilot CLI.
+ensure_cli_plugin mux-agents D0n9X1n/mux-agents
 
 # Import Copilot's merged MCP server map into Claude Code's local state file.
 import_copilot_mcp_into_claude

@@ -73,10 +73,17 @@
         "source": "github",
         "repo": "D0n9X1n/feature-crew"
       }
+    },
+    "mux-agents": {
+      "source": {
+        "source": "github",
+        "repo": "D0n9X1n/mux-agents"
+      }
     }
   },
   "enabledPlugins": {
     "feature-crew@feature-crew": true,
+    "mux-agents@mux-agents": true,
     "computer-use": true
   }
 }

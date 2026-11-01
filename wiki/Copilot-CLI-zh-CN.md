@@ -153,6 +153,16 @@ feature-crew@feature-crew  (marketplace D0n9X1n/feature-crew)
 
 `config/copilot/settings.json` 在 `extraKnownMarketplaces` 中声明这个 marketplace，因此之后的运行会更新它，而不是重新添加；重新添加会把设置链接替换成普通文件。Claude Code 也执行同一步骤。技能保留 `/fc-*` 名称；代理注册为 `feature-crew:fc-*`。
 
+## mux-agents
+
+`install.sh` 添加 mux-agents marketplace，并安装或更新它的 plugin：
+
+```text
+mux-agents@mux-agents  (marketplace D0n9X1n/mux-agents)
+```
+
+这个 plugin 会在 tmux 或 RMUX pane 中启动 Copilot CLI 和 Claude Code 辅助代理，并在侧边栏中显示它们。要使用它，请在 tmux 3.2+ 或 RMUX 0.10+ 中启动 Copilot。`config/copilot/settings.json` 也声明了这个 marketplace，因此之后的运行会更新它，而不是重新添加。Claude Code 也执行同一步骤。
+
 ## 检查
 
 ```sh
