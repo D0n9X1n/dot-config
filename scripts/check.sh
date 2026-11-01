@@ -2215,17 +2215,32 @@ EOF
       CHECK_MARKETPLACES='[]' CHECK_PLUGINS='[]' \
         ensure_cli_plugin mux-agents D0n9X1n/mux-agents >/dev/null
       [ "$(cat "$plugin_log")" = "claude plugin marketplace add D0n9X1n/mux-agents
-claude plugin install mux-agents@mux-agents
+claude plugin install mux-agents@mux-agents --scope user
 copilot plugin marketplace add D0n9X1n/mux-agents
 copilot plugin install mux-agents@mux-agents" ]
       : >"$plugin_log"
       CHECK_MARKETPLACES='[{"name":"mux-agents"}]' \
-        CHECK_PLUGINS='[{"id":"mux-agents@mux-agents","name":"mux-agents","marketplace":"mux-agents","enabled":true}]' \
+        CHECK_PLUGINS='[{"id":"mux-agents@mux-agents","name":"mux-agents","marketplace":"mux-agents","enabled":true,"scope":"user"}]' \
         ensure_cli_plugin mux-agents D0n9X1n/mux-agents >/dev/null
       [ "$(cat "$plugin_log")" = "claude plugin marketplace update mux-agents
-claude plugin update mux-agents@mux-agents
+claude plugin update mux-agents@mux-agents --scope user
 copilot plugin marketplace update mux-agents
 copilot plugin update mux-agents@mux-agents" ]
+
+      # Claude touches only the user copy: a project or local copy alone means
+      # the user copy is still missing.
+      : >"$plugin_log"
+      CHECK_MARKETPLACES='[{"name":"mux-agents"}]' \
+        CHECK_PLUGINS='[{"id":"mux-agents@mux-agents","name":"mux-agents","marketplace":"mux-agents","enabled":true,"scope":"local"}]' \
+        ensure_cli_plugin mux-agents D0n9X1n/mux-agents >/dev/null
+      [ "$(sed -n 2p "$plugin_log")" = "claude plugin install mux-agents@mux-agents --scope user" ]
+
+      # A failed plugin update only warns; the next CLI still runs.
+      : >"$plugin_log"
+      CHECK_FAIL='plugin update mux-agents@mux-agents --scope user' CHECK_MARKETPLACES='[{"name":"mux-agents"}]' \
+        CHECK_PLUGINS='[{"id":"mux-agents@mux-agents","name":"mux-agents","marketplace":"mux-agents","enabled":true,"scope":"user"}]' \
+        ensure_cli_plugin mux-agents D0n9X1n/mux-agents >/dev/null
+      [ "$(tail -1 "$plugin_log")" = "copilot plugin update mux-agents@mux-agents" ]
 
       # A failed marketplace add skips that CLI's install and only warns.
       : >"$plugin_log"
@@ -2268,6 +2283,19 @@ claude plugin update claude-code-wakatime@wakatime --scope user" ]
       : >"$plugin_log"
       CHECK_FAIL='plugin list --json' update_claude_plugins >/dev/null
       [ "$(cat "$plugin_log")" = "claude plugin marketplace update" ]
+
+      # A failed marketplace refresh or plugin update only warns; the rest still update.
+      : >"$plugin_log"
+      CHECK_FAIL='plugin update swift-lsp@claude-plugins-official --scope user' \
+        CHECK_PLUGINS='[{"id":"swift-lsp@claude-plugins-official","enabled":true,"scope":"user"},
+          {"id":"claude-code-wakatime@wakatime","enabled":true,"scope":"user"}]' \
+        update_claude_plugins >/dev/null
+      [ "$(cat "$plugin_log")" = "claude plugin marketplace update
+claude plugin update claude-code-wakatime@wakatime --scope user" ]
+      : >"$plugin_log"
+      CHECK_FAIL='plugin marketplace update' CHECK_PLUGINS='[{"id":"swift-lsp@claude-plugins-official","enabled":true,"scope":"user"}]' \
+        update_claude_plugins >/dev/null
+      [ "$(cat "$plugin_log")" = "claude plugin update swift-lsp@claude-plugins-official --scope user" ]
     )
   )
 }

@@ -624,12 +624,16 @@ ensure_copilot_wakatime_plugin() {
 # declare the marketplace, so later runs update it instead of re-adding it.
 ensure_cli_plugin() {
   local name="$1" repo="$2" cli
+  local -a scope
   if ! have_cmd jq; then
     echo "$name plugin: jq not found — skipping plugin setup"
     return 0
   fi
   for cli in claude copilot; do
     have_cmd "$cli" || continue
+    # Claude Code can hold a project or local copy too; manage only the user copy.
+    scope=()
+    [ "$cli" = claude ] && scope=(--scope user)
     if "$cli" plugin marketplace list --json 2>/dev/null | jq -e --arg name "$name" 'any(.[]; .name == $name)' >/dev/null; then
       log_command "$cli" plugin marketplace update "$name" \
         || echo "Warning: $cli $name marketplace update failed"
@@ -638,12 +642,12 @@ ensure_cli_plugin() {
         || { echo "Warning: $cli $name marketplace add failed"; continue; }
     fi
     if "$cli" plugin list --json 2>/dev/null | jq -e --arg cli "$cli" --arg name "$name" 'any(.[];
-        (if $cli == "claude" then .id == "\($name)@\($name)"
+        (if $cli == "claude" then .id == "\($name)@\($name)" and .scope == "user"
          else .name == $name and .marketplace == $name end) and .enabled == true)' >/dev/null; then
-      log_command "$cli" plugin update "$name@$name" \
+      log_command "$cli" plugin update "$name@$name" ${scope[@]+"${scope[@]}"} \
         || echo "Warning: $cli $name plugin update failed"
     else
-      log_command "$cli" plugin install "$name@$name" \
+      log_command "$cli" plugin install "$name@$name" ${scope[@]+"${scope[@]}"} \
         || echo "Warning: $cli $name plugin install failed"
     fi
   done
@@ -1493,11 +1497,11 @@ ensure_mermaid_tty_plugin() {
     log_command claude plugin marketplace add D0n9X1n/mermaid-tty \
       || { echo "Warning: claude mermaid-tty marketplace add failed"; return 0; }
   fi
-  if claude plugin list --json 2>/dev/null | jq -e 'any(.[]; .id == "mermaid-tty@mermaid-tty" and .enabled == true)' >/dev/null; then
-    log_command claude plugin update mermaid-tty@mermaid-tty \
+  if claude plugin list --json 2>/dev/null | jq -e 'any(.[]; .id == "mermaid-tty@mermaid-tty" and .scope == "user" and .enabled == true)' >/dev/null; then
+    log_command claude plugin update mermaid-tty@mermaid-tty --scope user \
       || echo "Warning: claude mermaid-tty plugin update failed"
   else
-    log_command claude plugin install mermaid-tty@mermaid-tty --config theme=default \
+    log_command claude plugin install mermaid-tty@mermaid-tty --scope user --config theme=default \
       || echo "Warning: claude mermaid-tty plugin install failed"
   fi
   # Claude Code reports an option as not yet set until a value is saved, so save the
