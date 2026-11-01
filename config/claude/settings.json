@@ -50,7 +50,8 @@
     "clangd-lsp@claude-plugins-official": true,
     "swift-lsp@claude-plugins-official": true,
     "feature-crew@feature-crew": true,
-    "mermaid-tty@mermaid-tty": true
+    "mermaid-tty@mermaid-tty": true,
+    "mux-agents@mux-agents": true
   },
   "extraKnownMarketplaces": {
     "feature-crew": {
@@ -69,6 +70,12 @@
       "source": {
         "source": "git",
         "url": "https://github.com/wakatime/claude-code-wakatime.git"
+      }
+    },
+    "mux-agents": {
+      "source": {
+        "source": "github",
+        "repo": "D0n9X1n/mux-agents"
       }
     }
   },

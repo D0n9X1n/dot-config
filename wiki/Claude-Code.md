@@ -193,10 +193,15 @@ The tracked settings enable:
 - `claude-code-wakatime@wakatime`
 - `feature-crew@feature-crew`
 - `mermaid-tty@mermaid-tty`
+- `mux-agents@mux-agents`
 
 The WakaTime marketplace points to the official `wakatime/claude-code-wakatime` Git repository. The Feature-Crew marketplace points to the GitHub repository `D0n9X1n/feature-crew`; `install.sh` also installs or updates that plugin in each CLI on PATH. An old script install of Feature-Crew in `~/.claude` would shadow the plugin. After Claude Code lists the plugin enabled, `install.sh` removes the old `fc-*` agents in `~/.claude/agents/`, the old `fc-*` skills in `~/.claude/skills/`, and `~/.claude/feature-crew.sha256`. It removes only those exact names and skips a linked `agents` or `skills` folder. Older non-`fc-` files from very early releases are not removed; run `./install.sh` from a Feature-Crew clone for those.
 
 The mermaid-tty marketplace points to the GitHub repository `D0n9X1n/mermaid-tty`. The plugin redraws closed `mermaid` fences in Claude's replies as colored box-drawing diagrams, and shows the source for anything it can't draw exactly. `install.sh` installs or updates it in Claude Code. It saves the default theme, which follows the Claude Code theme, unless a theme is already set, so Claude Code does not report the option as unset; `/mermaid-tty source` shows diagrams as source.
+
+The mux-agents marketplace points to the GitHub repository `D0n9X1n/mux-agents`. The plugin starts Claude Code and Copilot CLI helper agents in tmux or RMUX panes, shows what each is doing in a side bar, and passes messages through mailbox files. Start Claude inside tmux 3.2+ or RMUX 0.10+ to use it. `install.sh` installs or updates it in each CLI on PATH, like Feature-Crew.
+
+Every `install.sh` run, and so every `uu`, also refreshes all Claude Code marketplaces and updates each enabled user plugin, including the official LSP and WakaTime plugins. Project and local plugins are left to their repos. A plugin update applies after Claude Code restarts.
 
 ## Common fixes
 

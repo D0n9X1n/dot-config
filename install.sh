@@ -619,32 +619,86 @@ ensure_copilot_wakatime_plugin() {
   fi
 }
 
-# Feature-Crew ships as one plugin from its own marketplace. Install or update
-# it in each CLI on PATH; settings.json also declares and enables it for Claude.
-ensure_feature_crew_plugin() {
-  local cli
+# Feature-Crew and mux-agents each ship as one plugin from a marketplace of the
+# same name. Install or update one in each CLI on PATH; both settings files also
+# declare the marketplace, so later runs update it instead of re-adding it.
+ensure_cli_plugin() {
+  local name="$1" repo="$2" cli
+  local -a scope
   if ! have_cmd jq; then
-    echo "feature-crew plugin: jq not found — skipping plugin setup"
+    echo "$name plugin: jq not found — skipping plugin setup"
     return 0
   fi
   for cli in claude copilot; do
     have_cmd "$cli" || continue
-    if "$cli" plugin marketplace list --json 2>/dev/null | jq -e 'any(.[]; .name == "feature-crew")' >/dev/null; then
-      log_command "$cli" plugin marketplace update feature-crew \
-        || echo "Warning: $cli feature-crew marketplace update failed"
+    # Claude Code can hold a project or local copy too; manage only the user copy.
+    scope=()
+    [ "$cli" = claude ] && scope=(--scope user)
+    if "$cli" plugin marketplace list --json 2>/dev/null | jq -e --arg name "$name" 'any(.[]; .name == $name)' >/dev/null; then
+      log_command "$cli" plugin marketplace update "$name" \
+        || echo "Warning: $cli $name marketplace update failed"
     else
-      log_command "$cli" plugin marketplace add D0n9X1n/feature-crew \
-        || { echo "Warning: $cli feature-crew marketplace add failed"; continue; }
+      log_command "$cli" plugin marketplace add "$repo" \
+        || { echo "Warning: $cli $name marketplace add failed"; continue; }
     fi
-    if "$cli" plugin list --json 2>/dev/null | jq -e --arg cli "$cli" 'any(.[];
-        (if $cli == "claude" then .id == "feature-crew@feature-crew"
-         else .name == "feature-crew" and .marketplace == "feature-crew" end) and .enabled == true)' >/dev/null; then
-      log_command "$cli" plugin update feature-crew@feature-crew \
-        || echo "Warning: $cli feature-crew plugin update failed"
+    if "$cli" plugin list --json 2>/dev/null | jq -e --arg cli "$cli" --arg name "$name" 'any(.[];
+        (if $cli == "claude" then .id == "\($name)@\($name)" and .scope == "user"
+         else .name == $name and .marketplace == $name end) and .enabled == true)' >/dev/null; then
+      log_command "$cli" plugin update "$name@$name" ${scope[@]+"${scope[@]}"} \
+        || echo "Warning: $cli $name plugin update failed"
     else
-      log_command "$cli" plugin install feature-crew@feature-crew \
-        || echo "Warning: $cli feature-crew plugin install failed"
+      log_command "$cli" plugin install "$name@$name" ${scope[@]+"${scope[@]}"} \
+        || echo "Warning: $cli $name plugin install failed"
     fi
+  done
+}
+
+# mermaid-tty is a Claude Code plugin that draws mermaid fences as box-drawing
+# diagrams. Install or update it in Claude Code; settings.json declares and enables it.
+ensure_mermaid_tty_plugin() {
+  if ! have_cmd jq; then
+    echo "mermaid-tty plugin: jq not found — skipping plugin setup"
+    return 0
+  fi
+  have_cmd claude || return 0
+  if claude plugin marketplace list --json 2>/dev/null | jq -e 'any(.[]; .name == "mermaid-tty")' >/dev/null; then
+    log_command claude plugin marketplace update mermaid-tty \
+      || echo "Warning: claude mermaid-tty marketplace update failed"
+  else
+    log_command claude plugin marketplace add D0n9X1n/mermaid-tty \
+      || { echo "Warning: claude mermaid-tty marketplace add failed"; return 0; }
+  fi
+  if claude plugin list --json 2>/dev/null | jq -e 'any(.[]; .id == "mermaid-tty@mermaid-tty" and .scope == "user" and .enabled == true)' >/dev/null; then
+    log_command claude plugin update mermaid-tty@mermaid-tty --scope user \
+      || echo "Warning: claude mermaid-tty plugin update failed"
+  else
+    log_command claude plugin install mermaid-tty@mermaid-tty --scope user --config theme=default \
+      || echo "Warning: claude mermaid-tty plugin install failed"
+  fi
+  # Claude Code reports an option as not yet set until a value is saved, so save the
+  # default theme once; a theme the user chose is kept.
+  if ! claude plugin configure mermaid-tty@mermaid-tty --json 2>/dev/null | jq -e '.inputs.theme' >/dev/null; then
+    echo '{"theme":"default"}' | log_command claude plugin configure mermaid-tty@mermaid-tty --values-stdin \
+      || echo "Warning: claude mermaid-tty theme setup failed"
+  fi
+}
+
+# uu runs install.sh, so refresh every Claude Code marketplace and update each
+# enabled user plugin too, such as the official LSP and WakaTime plugins. Project
+# and local plugins belong to their repos and are left alone.
+update_claude_plugins() {
+  local ids id
+  have_cmd claude && have_cmd jq || return 0
+  log_command claude plugin marketplace update \
+    || echo "Warning: claude plugin marketplace update failed"
+  if ! ids="$(claude plugin list --json 2>/dev/null \
+      | jq -r '.[] | select(.enabled == true and .scope == "user") | .id')"; then
+    echo "Warning: claude plugin list failed; skipping plugin updates"
+    return 0
+  fi
+  for id in $ids; do
+    log_command claude plugin update "$id" --scope user \
+      || echo "Warning: claude $id plugin update failed"
   done
 }
 
@@ -1459,47 +1513,23 @@ if have_cmd jq && [ -f "$shared_mcp" ]; then
 fi
 
 # The official Copilot plugin supersedes the old vendored WakaTime MCP.
-# mermaid-tty is a Claude Code plugin that draws mermaid fences as box-drawing
-# diagrams. Install or update it in Claude Code; settings.json declares and enables it.
-ensure_mermaid_tty_plugin() {
-  if ! have_cmd jq; then
-    echo "mermaid-tty plugin: jq not found — skipping plugin setup"
-    return 0
-  fi
-  have_cmd claude || return 0
-  if claude plugin marketplace list --json 2>/dev/null | jq -e 'any(.[]; .name == "mermaid-tty")' >/dev/null; then
-    log_command claude plugin marketplace update mermaid-tty \
-      || echo "Warning: claude mermaid-tty marketplace update failed"
-  else
-    log_command claude plugin marketplace add D0n9X1n/mermaid-tty \
-      || { echo "Warning: claude mermaid-tty marketplace add failed"; return 0; }
-  fi
-  if claude plugin list --json 2>/dev/null | jq -e 'any(.[]; .id == "mermaid-tty@mermaid-tty" and .enabled == true)' >/dev/null; then
-    log_command claude plugin update mermaid-tty@mermaid-tty \
-      || echo "Warning: claude mermaid-tty plugin update failed"
-  else
-    log_command claude plugin install mermaid-tty@mermaid-tty --config theme=default \
-      || echo "Warning: claude mermaid-tty plugin install failed"
-  fi
-  # Claude Code reports an option as not yet set until a value is saved, so save the
-  # default theme once; a theme the user chose is kept.
-  if ! claude plugin configure mermaid-tty@mermaid-tty --json 2>/dev/null | jq -e '.inputs.theme' >/dev/null; then
-    echo '{"theme":"default"}' | log_command claude plugin configure mermaid-tty@mermaid-tty --values-stdin \
-      || echo "Warning: claude mermaid-tty theme setup failed"
-  fi
-}
-
 cleanup_legacy_wakatime_mcp
 
 # The Copilot plugin manages its own WakaTime CLI on session start.
 ensure_copilot_wakatime_plugin
 
 # Feature-Crew: one plugin for Claude Code and Copilot CLI.
-ensure_feature_crew_plugin
+ensure_cli_plugin feature-crew D0n9X1n/feature-crew
 cleanup_legacy_feature_crew
 
 # mermaid-tty: Mermaid diagrams drawn in the terminal, for Claude Code.
 ensure_mermaid_tty_plugin
+
+# mux-agents: helper agents in tmux or RMUX panes, for Claude Code and Copilot CLI.
+ensure_cli_plugin mux-agents D0n9X1n/mux-agents
+
+# Every other enabled Claude Code plugin.
+update_claude_plugins
 
 # Import Copilot's merged MCP server map into Claude Code's local state file.
 import_copilot_mcp_into_claude

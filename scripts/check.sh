@@ -270,7 +270,11 @@ run_model_default_smoke() {
     .enabledPlugins["clangd-lsp@claude-plugins-official"] == true and
     .enabledPlugins["swift-lsp@claude-plugins-official"] == true and
     .enabledPlugins["feature-crew@feature-crew"] == true and
-    .extraKnownMarketplaces["feature-crew"].source == {"source": "github", "repo": "D0n9X1n/feature-crew"}
+    .extraKnownMarketplaces["feature-crew"].source == {"source": "github", "repo": "D0n9X1n/feature-crew"} and
+    .enabledPlugins["mermaid-tty@mermaid-tty"] == true and
+    .extraKnownMarketplaces["mermaid-tty"].source == {"source": "github", "repo": "D0n9X1n/mermaid-tty"} and
+    .enabledPlugins["mux-agents@mux-agents"] == true and
+    .extraKnownMarketplaces["mux-agents"].source == {"source": "github", "repo": "D0n9X1n/mux-agents"}
   ' config/claude/settings.json >/dev/null
 
   # Opus stays native; every other Claude slot calls GPT-6 Astra directly.
@@ -286,13 +290,16 @@ run_model_default_smoke() {
   fi
 
   # Copilot CLI: GPT-6 Astra at the 1M context tier and high effort. It declares
-  # the Feature-Crew marketplace itself, so install.sh updates it rather than
-  # re-adding it, which would replace the settings link with a plain file.
+  # the Feature-Crew and mux-agents marketplaces itself, so install.sh updates them
+  # rather than re-adding them, which would replace the settings link with a plain file.
   jq -e '
     .model == "gpt-6-astra" and
     .contextTier == "long_context" and
     .effortLevel == "high" and
-    .extraKnownMarketplaces["feature-crew"].source == {"source": "github", "repo": "D0n9X1n/feature-crew"}
+    .enabledPlugins["feature-crew@feature-crew"] == true and
+    .extraKnownMarketplaces["feature-crew"].source == {"source": "github", "repo": "D0n9X1n/feature-crew"} and
+    .enabledPlugins["mux-agents@mux-agents"] == true and
+    .extraKnownMarketplaces["mux-agents"].source == {"source": "github", "repo": "D0n9X1n/mux-agents"}
   ' config/copilot/settings.json >/dev/null
 
   # Relay: Opus remains separate; every non-Opus route uses GPT-6 Astra.
@@ -2179,6 +2186,143 @@ run_shell_update_smoke() {
       ln -s "$test_root/shared-skills" "$claude_dir/skills"
       CHECK_PLUGINS='[{"id":"feature-crew@feature-crew","enabled":true}]' cleanup_legacy_feature_crew >/dev/null
       [ -d "$test_root/shared-skills/fc-debug" ]
+    )
+
+    # Each CLI on PATH adds a missing marketplace and plugin, and updates listed ones.
+    plugin_bin="$test_root/plugin-bin"
+    plugin_log="$test_root/plugin.log"
+    mkdir -p "$plugin_bin"
+    for cli in claude copilot; do
+      cat >"$plugin_bin/$cli" <<EOF
+#!/bin/sh
+[ "\$*" = "\${CHECK_FAIL:-}" ] && exit 1
+case "\$*" in
+  "plugin marketplace list --json") printf '%s\n' "\$CHECK_MARKETPLACES" ;;
+  "plugin list --json") printf '%s\n' "\$CHECK_PLUGINS" ;;
+  *) printf '$cli %s\n' "\$*" >>"$plugin_log" ;;
+esac
+EOF
+      chmod +x "$plugin_bin/$cli"
+    done
+    plugin_bin_nojq="$test_root/plugin-bin-nojq"
+    mkdir -p "$plugin_bin_nojq"
+    cp "$plugin_bin/claude" "$plugin_bin/copilot" "$plugin_bin_nojq/"
+    ln -s "$(command -v jq)" "$plugin_bin/jq"
+    (
+      # Only the fakes and system tools: a real claude or copilot must never run here.
+      export PATH="$plugin_bin:/usr/bin:/bin"
+      DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+      CHECK_MARKETPLACES='[]' CHECK_PLUGINS='[]' \
+        ensure_cli_plugin mux-agents D0n9X1n/mux-agents >/dev/null
+      [ "$(cat "$plugin_log")" = "claude plugin marketplace add D0n9X1n/mux-agents
+claude plugin install mux-agents@mux-agents --scope user
+copilot plugin marketplace add D0n9X1n/mux-agents
+copilot plugin install mux-agents@mux-agents" ]
+      : >"$plugin_log"
+      CHECK_MARKETPLACES='[{"name":"mux-agents"}]' \
+        CHECK_PLUGINS='[{"id":"mux-agents@mux-agents","name":"mux-agents","marketplace":"mux-agents","enabled":true,"scope":"user"}]' \
+        ensure_cli_plugin mux-agents D0n9X1n/mux-agents >/dev/null
+      [ "$(cat "$plugin_log")" = "claude plugin marketplace update mux-agents
+claude plugin update mux-agents@mux-agents --scope user
+copilot plugin marketplace update mux-agents
+copilot plugin update mux-agents@mux-agents" ]
+
+      # Claude touches only the user copy: a project or local copy alone means
+      # the user copy is still missing.
+      : >"$plugin_log"
+      CHECK_MARKETPLACES='[{"name":"mux-agents"}]' \
+        CHECK_PLUGINS='[{"id":"mux-agents@mux-agents","name":"mux-agents","marketplace":"mux-agents","enabled":true,"scope":"local"}]' \
+        ensure_cli_plugin mux-agents D0n9X1n/mux-agents >/dev/null
+      [ "$(sed -n 2p "$plugin_log")" = "claude plugin install mux-agents@mux-agents --scope user" ]
+
+      # A failed marketplace refresh still updates the plugin; a failed install
+      # only warns and the next CLI still runs.
+      : >"$plugin_log"
+      CHECK_FAIL='plugin marketplace update mux-agents' CHECK_MARKETPLACES='[{"name":"mux-agents"}]' \
+        CHECK_PLUGINS='[{"id":"mux-agents@mux-agents","name":"mux-agents","marketplace":"mux-agents","enabled":true,"scope":"user"}]' \
+        ensure_cli_plugin mux-agents D0n9X1n/mux-agents >/dev/null
+      [ "$(head -1 "$plugin_log")" = "claude plugin update mux-agents@mux-agents --scope user" ]
+      : >"$plugin_log"
+      CHECK_FAIL='plugin install mux-agents@mux-agents --scope user' CHECK_MARKETPLACES='[{"name":"mux-agents"}]' \
+        CHECK_PLUGINS='[]' ensure_cli_plugin mux-agents D0n9X1n/mux-agents >/dev/null
+      [ "$(tail -1 "$plugin_log")" = "copilot plugin install mux-agents@mux-agents" ]
+
+      # mermaid-tty is Claude-only: install the user copy with the default theme,
+      # and update only a user copy.
+      : >"$plugin_log"
+      CHECK_MARKETPLACES='[]' CHECK_PLUGINS='[{"id":"mermaid-tty@mermaid-tty","enabled":true,"scope":"local"}]' \
+        ensure_mermaid_tty_plugin >/dev/null
+      [ "$(sed -n 1,2p "$plugin_log")" = "claude plugin marketplace add D0n9X1n/mermaid-tty
+claude plugin install mermaid-tty@mermaid-tty --scope user --config theme=default" ]
+      : >"$plugin_log"
+      CHECK_MARKETPLACES='[{"name":"mermaid-tty"}]' \
+        CHECK_PLUGINS='[{"id":"mermaid-tty@mermaid-tty","enabled":true,"scope":"user"}]' \
+        ensure_mermaid_tty_plugin >/dev/null
+      [ "$(sed -n 1,2p "$plugin_log")" = "claude plugin marketplace update mermaid-tty
+claude plugin update mermaid-tty@mermaid-tty --scope user" ]
+      ! grep -q copilot "$plugin_log"
+
+      # A failed plugin update only warns; the next CLI still runs.
+      : >"$plugin_log"
+      CHECK_FAIL='plugin update mux-agents@mux-agents --scope user' CHECK_MARKETPLACES='[{"name":"mux-agents"}]' \
+        CHECK_PLUGINS='[{"id":"mux-agents@mux-agents","name":"mux-agents","marketplace":"mux-agents","enabled":true,"scope":"user"}]' \
+        ensure_cli_plugin mux-agents D0n9X1n/mux-agents >/dev/null
+      [ "$(tail -1 "$plugin_log")" = "copilot plugin update mux-agents@mux-agents" ]
+
+      # A failed marketplace add skips that CLI's install and only warns.
+      : >"$plugin_log"
+      CHECK_FAIL='plugin marketplace add D0n9X1n/mux-agents' CHECK_MARKETPLACES='[]' CHECK_PLUGINS='[]' \
+        ensure_cli_plugin mux-agents D0n9X1n/mux-agents >/dev/null
+      [ ! -s "$plugin_log" ]
+
+      # Without jq the step says so and returns 0.
+      [ "$(PATH="$plugin_bin_nojq" ensure_cli_plugin mux-agents D0n9X1n/mux-agents)" \
+        = "mux-agents plugin: jq not found — skipping plugin setup" ]
+
+      # A missing CLI is skipped; the other one still gets the plugin.
+      : >"$plugin_log"
+      rm "$plugin_bin/claude"
+      hash -r
+      CHECK_MARKETPLACES='[]' CHECK_PLUGINS='[]' \
+        ensure_cli_plugin feature-crew D0n9X1n/feature-crew >/dev/null
+      [ "$(cat "$plugin_log")" = "copilot plugin marketplace add D0n9X1n/feature-crew
+copilot plugin install feature-crew@feature-crew" ]
+    )
+    # uu runs install.sh, which refreshes every Claude marketplace and updates each
+    # enabled user plugin; disabled and project or local plugins are left alone.
+    (
+      export PATH="$plugin_bin:/usr/bin:/bin"
+      DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+      : >"$plugin_log"
+      cp "$plugin_bin/copilot" "$plugin_bin/claude"
+      sed -i.bak 's/copilot %s/claude %s/' "$plugin_bin/claude"
+      rm -f "$plugin_bin/claude.bak"
+      hash -r
+      CHECK_PLUGINS='[{"id":"swift-lsp@claude-plugins-official","enabled":true,"scope":"user"},
+        {"id":"claude-code-wakatime@wakatime","enabled":true,"scope":"user"},
+        {"id":"off@claude-plugins-official","enabled":false,"scope":"user"},
+        {"id":"mine@team","enabled":true,"scope":"project"}]' \
+        update_claude_plugins >/dev/null
+      [ "$(cat "$plugin_log")" = "claude plugin marketplace update
+claude plugin update swift-lsp@claude-plugins-official --scope user
+claude plugin update claude-code-wakatime@wakatime --scope user" ]
+      set -euo pipefail
+      : >"$plugin_log"
+      CHECK_FAIL='plugin list --json' update_claude_plugins >/dev/null
+      [ "$(cat "$plugin_log")" = "claude plugin marketplace update" ]
+
+      # A failed marketplace refresh or plugin update only warns; the rest still update.
+      : >"$plugin_log"
+      CHECK_FAIL='plugin update swift-lsp@claude-plugins-official --scope user' \
+        CHECK_PLUGINS='[{"id":"swift-lsp@claude-plugins-official","enabled":true,"scope":"user"},
+          {"id":"claude-code-wakatime@wakatime","enabled":true,"scope":"user"}]' \
+        update_claude_plugins >/dev/null
+      [ "$(cat "$plugin_log")" = "claude plugin marketplace update
+claude plugin update claude-code-wakatime@wakatime --scope user" ]
+      : >"$plugin_log"
+      CHECK_FAIL='plugin marketplace update' CHECK_PLUGINS='[{"id":"swift-lsp@claude-plugins-official","enabled":true,"scope":"user"}]' \
+        update_claude_plugins >/dev/null
+      [ "$(cat "$plugin_log")" = "claude plugin update swift-lsp@claude-plugins-official --scope user" ]
     )
   )
 }
