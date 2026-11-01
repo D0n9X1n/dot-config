@@ -653,6 +653,36 @@ ensure_cli_plugin() {
   done
 }
 
+# mermaid-tty is a Claude Code plugin that draws mermaid fences as box-drawing
+# diagrams. Install or update it in Claude Code; settings.json declares and enables it.
+ensure_mermaid_tty_plugin() {
+  if ! have_cmd jq; then
+    echo "mermaid-tty plugin: jq not found — skipping plugin setup"
+    return 0
+  fi
+  have_cmd claude || return 0
+  if claude plugin marketplace list --json 2>/dev/null | jq -e 'any(.[]; .name == "mermaid-tty")' >/dev/null; then
+    log_command claude plugin marketplace update mermaid-tty \
+      || echo "Warning: claude mermaid-tty marketplace update failed"
+  else
+    log_command claude plugin marketplace add D0n9X1n/mermaid-tty \
+      || { echo "Warning: claude mermaid-tty marketplace add failed"; return 0; }
+  fi
+  if claude plugin list --json 2>/dev/null | jq -e 'any(.[]; .id == "mermaid-tty@mermaid-tty" and .scope == "user" and .enabled == true)' >/dev/null; then
+    log_command claude plugin update mermaid-tty@mermaid-tty --scope user \
+      || echo "Warning: claude mermaid-tty plugin update failed"
+  else
+    log_command claude plugin install mermaid-tty@mermaid-tty --scope user --config theme=default \
+      || echo "Warning: claude mermaid-tty plugin install failed"
+  fi
+  # Claude Code reports an option as not yet set until a value is saved, so save the
+  # default theme once; a theme the user chose is kept.
+  if ! claude plugin configure mermaid-tty@mermaid-tty --json 2>/dev/null | jq -e '.inputs.theme' >/dev/null; then
+    echo '{"theme":"default"}' | log_command claude plugin configure mermaid-tty@mermaid-tty --values-stdin \
+      || echo "Warning: claude mermaid-tty theme setup failed"
+  fi
+}
+
 # uu runs install.sh, so refresh every Claude Code marketplace and update each
 # enabled user plugin too, such as the official LSP and WakaTime plugins. Project
 # and local plugins belong to their repos and are left alone.
@@ -1481,36 +1511,6 @@ if have_cmd jq && [ -f "$shared_mcp" ]; then
     fi
   fi
 fi
-
-# mermaid-tty is a Claude Code plugin that draws mermaid fences as box-drawing
-# diagrams. Install or update it in Claude Code; settings.json declares and enables it.
-ensure_mermaid_tty_plugin() {
-  if ! have_cmd jq; then
-    echo "mermaid-tty plugin: jq not found — skipping plugin setup"
-    return 0
-  fi
-  have_cmd claude || return 0
-  if claude plugin marketplace list --json 2>/dev/null | jq -e 'any(.[]; .name == "mermaid-tty")' >/dev/null; then
-    log_command claude plugin marketplace update mermaid-tty \
-      || echo "Warning: claude mermaid-tty marketplace update failed"
-  else
-    log_command claude plugin marketplace add D0n9X1n/mermaid-tty \
-      || { echo "Warning: claude mermaid-tty marketplace add failed"; return 0; }
-  fi
-  if claude plugin list --json 2>/dev/null | jq -e 'any(.[]; .id == "mermaid-tty@mermaid-tty" and .scope == "user" and .enabled == true)' >/dev/null; then
-    log_command claude plugin update mermaid-tty@mermaid-tty --scope user \
-      || echo "Warning: claude mermaid-tty plugin update failed"
-  else
-    log_command claude plugin install mermaid-tty@mermaid-tty --scope user --config theme=default \
-      || echo "Warning: claude mermaid-tty plugin install failed"
-  fi
-  # Claude Code reports an option as not yet set until a value is saved, so save the
-  # default theme once; a theme the user chose is kept.
-  if ! claude plugin configure mermaid-tty@mermaid-tty --json 2>/dev/null | jq -e '.inputs.theme' >/dev/null; then
-    echo '{"theme":"default"}' | log_command claude plugin configure mermaid-tty@mermaid-tty --values-stdin \
-      || echo "Warning: claude mermaid-tty theme setup failed"
-  fi
-}
 
 # The official Copilot plugin supersedes the old vendored WakaTime MCP.
 cleanup_legacy_wakatime_mcp

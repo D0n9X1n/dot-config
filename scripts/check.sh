@@ -2235,6 +2235,33 @@ copilot plugin update mux-agents@mux-agents" ]
         ensure_cli_plugin mux-agents D0n9X1n/mux-agents >/dev/null
       [ "$(sed -n 2p "$plugin_log")" = "claude plugin install mux-agents@mux-agents --scope user" ]
 
+      # A failed marketplace refresh still updates the plugin; a failed install
+      # only warns and the next CLI still runs.
+      : >"$plugin_log"
+      CHECK_FAIL='plugin marketplace update mux-agents' CHECK_MARKETPLACES='[{"name":"mux-agents"}]' \
+        CHECK_PLUGINS='[{"id":"mux-agents@mux-agents","name":"mux-agents","marketplace":"mux-agents","enabled":true,"scope":"user"}]' \
+        ensure_cli_plugin mux-agents D0n9X1n/mux-agents >/dev/null
+      [ "$(head -1 "$plugin_log")" = "claude plugin update mux-agents@mux-agents --scope user" ]
+      : >"$plugin_log"
+      CHECK_FAIL='plugin install mux-agents@mux-agents --scope user' CHECK_MARKETPLACES='[{"name":"mux-agents"}]' \
+        CHECK_PLUGINS='[]' ensure_cli_plugin mux-agents D0n9X1n/mux-agents >/dev/null
+      [ "$(tail -1 "$plugin_log")" = "copilot plugin install mux-agents@mux-agents" ]
+
+      # mermaid-tty is Claude-only: install the user copy with the default theme,
+      # and update only a user copy.
+      : >"$plugin_log"
+      CHECK_MARKETPLACES='[]' CHECK_PLUGINS='[{"id":"mermaid-tty@mermaid-tty","enabled":true,"scope":"local"}]' \
+        ensure_mermaid_tty_plugin >/dev/null
+      [ "$(sed -n 1,2p "$plugin_log")" = "claude plugin marketplace add D0n9X1n/mermaid-tty
+claude plugin install mermaid-tty@mermaid-tty --scope user --config theme=default" ]
+      : >"$plugin_log"
+      CHECK_MARKETPLACES='[{"name":"mermaid-tty"}]' \
+        CHECK_PLUGINS='[{"id":"mermaid-tty@mermaid-tty","enabled":true,"scope":"user"}]' \
+        ensure_mermaid_tty_plugin >/dev/null
+      [ "$(sed -n 1,2p "$plugin_log")" = "claude plugin marketplace update mermaid-tty
+claude plugin update mermaid-tty@mermaid-tty --scope user" ]
+      ! grep -q copilot "$plugin_log"
+
       # A failed plugin update only warns; the next CLI still runs.
       : >"$plugin_log"
       CHECK_FAIL='plugin update mux-agents@mux-agents --scope user' CHECK_MARKETPLACES='[{"name":"mux-agents"}]' \
