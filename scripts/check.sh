@@ -296,6 +296,7 @@ run_model_default_smoke() {
     .model == "gpt-6-astra" and
     .contextTier == "long_context" and
     .effortLevel == "high" and
+    .enabledPlugins["feature-crew@feature-crew"] == true and
     .extraKnownMarketplaces["feature-crew"].source == {"source": "github", "repo": "D0n9X1n/feature-crew"} and
     .enabledPlugins["mux-agents@mux-agents"] == true and
     .extraKnownMarketplaces["mux-agents"].source == {"source": "github", "repo": "D0n9X1n/mux-agents"}
@@ -2194,6 +2195,7 @@ run_shell_update_smoke() {
     for cli in claude copilot; do
       cat >"$plugin_bin/$cli" <<EOF
 #!/bin/sh
+[ "\$*" = "\${CHECK_FAIL:-}" ] && exit 1
 case "\$*" in
   "plugin marketplace list --json") printf '%s\n' "\$CHECK_MARKETPLACES" ;;
   "plugin list --json") printf '%s\n' "\$CHECK_PLUGINS" ;;
@@ -2202,6 +2204,9 @@ esac
 EOF
       chmod +x "$plugin_bin/$cli"
     done
+    plugin_bin_nojq="$test_root/plugin-bin-nojq"
+    mkdir -p "$plugin_bin_nojq"
+    cp "$plugin_bin/claude" "$plugin_bin/copilot" "$plugin_bin_nojq/"
     ln -s "$(command -v jq)" "$plugin_bin/jq"
     (
       # Only the fakes and system tools: a real claude or copilot must never run here.
@@ -2221,6 +2226,16 @@ copilot plugin install mux-agents@mux-agents" ]
 claude plugin update mux-agents@mux-agents
 copilot plugin marketplace update mux-agents
 copilot plugin update mux-agents@mux-agents" ]
+
+      # A failed marketplace add skips that CLI's install and only warns.
+      : >"$plugin_log"
+      CHECK_FAIL='plugin marketplace add D0n9X1n/mux-agents' CHECK_MARKETPLACES='[]' CHECK_PLUGINS='[]' \
+        ensure_cli_plugin mux-agents D0n9X1n/mux-agents >/dev/null
+      [ ! -s "$plugin_log" ]
+
+      # Without jq the step says so and returns 0.
+      [ "$(PATH="$plugin_bin_nojq" ensure_cli_plugin mux-agents D0n9X1n/mux-agents)" \
+        = "mux-agents plugin: jq not found — skipping plugin setup" ]
 
       # A missing CLI is skipped; the other one still gets the plugin.
       : >"$plugin_log"
@@ -2247,8 +2262,12 @@ copilot plugin install feature-crew@feature-crew" ]
         {"id":"mine@team","enabled":true,"scope":"project"}]' \
         update_claude_plugins >/dev/null
       [ "$(cat "$plugin_log")" = "claude plugin marketplace update
-claude plugin update swift-lsp@claude-plugins-official
-claude plugin update claude-code-wakatime@wakatime" ]
+claude plugin update swift-lsp@claude-plugins-official --scope user
+claude plugin update claude-code-wakatime@wakatime --scope user" ]
+      set -euo pipefail
+      : >"$plugin_log"
+      CHECK_FAIL='plugin list --json' update_claude_plugins >/dev/null
+      [ "$(cat "$plugin_log")" = "claude plugin marketplace update" ]
     )
   )
 }

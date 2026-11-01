@@ -653,16 +653,19 @@ ensure_cli_plugin() {
 # enabled user plugin too, such as the official LSP and WakaTime plugins. Project
 # and local plugins belong to their repos and are left alone.
 update_claude_plugins() {
-  local id
+  local ids id
   have_cmd claude && have_cmd jq || return 0
   log_command claude plugin marketplace update \
     || echo "Warning: claude plugin marketplace update failed"
-  claude plugin list --json 2>/dev/null \
-    | jq -r '.[] | select(.enabled == true and .scope == "user") | .id' \
-    | while IFS= read -r id; do
-        log_command claude plugin update "$id" </dev/null \
-          || echo "Warning: claude $id plugin update failed"
-      done
+  if ! ids="$(claude plugin list --json 2>/dev/null \
+      | jq -r '.[] | select(.enabled == true and .scope == "user") | .id')"; then
+    echo "Warning: claude plugin list failed; skipping plugin updates"
+    return 0
+  fi
+  for id in $ids; do
+    log_command claude plugin update "$id" --scope user \
+      || echo "Warning: claude $id plugin update failed"
+  done
 }
 
 # An old script install of Feature-Crew put fc-* agents and skills in
