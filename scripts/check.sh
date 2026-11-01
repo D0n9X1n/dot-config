@@ -2231,6 +2231,25 @@ copilot plugin update mux-agents@mux-agents" ]
       [ "$(cat "$plugin_log")" = "copilot plugin marketplace add D0n9X1n/feature-crew
 copilot plugin install feature-crew@feature-crew" ]
     )
+    # uu runs install.sh, which refreshes every Claude marketplace and updates each
+    # enabled user plugin; disabled and project or local plugins are left alone.
+    (
+      export PATH="$plugin_bin:/usr/bin:/bin"
+      DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+      : >"$plugin_log"
+      cp "$plugin_bin/copilot" "$plugin_bin/claude"
+      sed -i.bak 's/copilot %s/claude %s/' "$plugin_bin/claude"
+      rm -f "$plugin_bin/claude.bak"
+      hash -r
+      CHECK_PLUGINS='[{"id":"swift-lsp@claude-plugins-official","enabled":true,"scope":"user"},
+        {"id":"claude-code-wakatime@wakatime","enabled":true,"scope":"user"},
+        {"id":"off@claude-plugins-official","enabled":false,"scope":"user"},
+        {"id":"mine@team","enabled":true,"scope":"project"}]' \
+        update_claude_plugins >/dev/null
+      [ "$(cat "$plugin_log")" = "claude plugin marketplace update
+claude plugin update swift-lsp@claude-plugins-official
+claude plugin update claude-code-wakatime@wakatime" ]
+    )
   )
 }
 

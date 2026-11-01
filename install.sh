@@ -649,6 +649,22 @@ ensure_cli_plugin() {
   done
 }
 
+# uu runs install.sh, so refresh every Claude Code marketplace and update each
+# enabled user plugin too, such as the official LSP and WakaTime plugins. Project
+# and local plugins belong to their repos and are left alone.
+update_claude_plugins() {
+  local id
+  have_cmd claude && have_cmd jq || return 0
+  log_command claude plugin marketplace update \
+    || echo "Warning: claude plugin marketplace update failed"
+  claude plugin list --json 2>/dev/null \
+    | jq -r '.[] | select(.enabled == true and .scope == "user") | .id' \
+    | while IFS= read -r id; do
+        log_command claude plugin update "$id" </dev/null \
+          || echo "Warning: claude $id plugin update failed"
+      done
+}
+
 # An old script install of Feature-Crew put fc-* agents and skills in
 # ~/.claude, where they shadow the plugin. Remove those exact names once Claude
 # Code lists the plugin enabled; leave linked folders and other files alone.
@@ -1459,7 +1475,6 @@ if have_cmd jq && [ -f "$shared_mcp" ]; then
   fi
 fi
 
-# The official Copilot plugin supersedes the old vendored WakaTime MCP.
 # mermaid-tty is a Claude Code plugin that draws mermaid fences as box-drawing
 # diagrams. Install or update it in Claude Code; settings.json declares and enables it.
 ensure_mermaid_tty_plugin() {
@@ -1490,6 +1505,7 @@ ensure_mermaid_tty_plugin() {
   fi
 }
 
+# The official Copilot plugin supersedes the old vendored WakaTime MCP.
 cleanup_legacy_wakatime_mcp
 
 # The Copilot plugin manages its own WakaTime CLI on session start.
@@ -1504,6 +1520,9 @@ ensure_mermaid_tty_plugin
 
 # mux-agents: helper agents in tmux or RMUX panes, for Claude Code and Copilot CLI.
 ensure_cli_plugin mux-agents D0n9X1n/mux-agents
+
+# Every other enabled Claude Code plugin.
+update_claude_plugins
 
 # Import Copilot's merged MCP server map into Claude Code's local state file.
 import_copilot_mcp_into_claude

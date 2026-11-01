@@ -201,6 +201,8 @@ mermaid-tty marketplace 指向 GitHub 仓库 `D0n9X1n/mermaid-tty`。这个 plug
 
 mux-agents marketplace 指向 GitHub 仓库 `D0n9X1n/mux-agents`。这个 plugin 会在 tmux 或 RMUX pane 中启动 Claude Code 和 Copilot CLI 辅助 agent，在侧边栏显示每个 agent 正在做什么，并通过邮箱文件传递消息。要使用它，请在 tmux 3.2+ 或 RMUX 0.10+ 中启动 Claude。`install.sh` 会像 Feature-Crew 一样，在 PATH 上的每个 CLI 中安装或更新它。
 
+每次运行 `install.sh`（因此也包括每次 `uu`）都会刷新所有 Claude Code marketplace，并更新每个已启用的 user plugin，包括官方 LSP 和 WakaTime plugin。Project 和 local plugin 交给各自的仓库管理。Plugin 更新在 Claude Code 重启后生效。
+
 ## 常见问题
 
 ### RMUX 内的颜色不同

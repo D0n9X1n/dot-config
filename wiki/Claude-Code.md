@@ -201,6 +201,8 @@ The mermaid-tty marketplace points to the GitHub repository `D0n9X1n/mermaid-tty
 
 The mux-agents marketplace points to the GitHub repository `D0n9X1n/mux-agents`. The plugin starts Claude Code and Copilot CLI helper agents in tmux or RMUX panes, shows what each is doing in a side bar, and passes messages through mailbox files. Start Claude inside tmux 3.2+ or RMUX 0.10+ to use it. `install.sh` installs or updates it in each CLI on PATH, like Feature-Crew.
 
+Every `install.sh` run, and so every `uu`, also refreshes all Claude Code marketplaces and updates each enabled user plugin, including the official LSP and WakaTime plugins. Project and local plugins are left to their repos. A plugin update applies after Claude Code restarts.
+
 ## Common fixes
 
 ### Colors differ inside RMUX
