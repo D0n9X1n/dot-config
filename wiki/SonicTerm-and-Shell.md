@@ -25,7 +25,7 @@ The tracked config uses:
 |---|---|
 | Theme | `apollo`, from the pinned upstream release |
 | Keymap | `sonicterm-macos` |
-| Font | Rec Mono St.Helens, size 13.5 |
+| Font | Rec Mono St.Helens, size 13 |
 | Font weight scale | 1 |
 | Line height | 1.1 |
 | New window grid | 80 × 40 |
