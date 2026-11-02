@@ -90,6 +90,7 @@
     }
   },
   "autoCompactWindow": 770000,
+  "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
   "theme": "custom:apollo",
   "autoCompactEnabled": true,
