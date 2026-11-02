@@ -83,6 +83,7 @@ Claude Code 2.1.281 能识别原生 Opus 5.5 身份。修改模型和 effort 默
 | `feedbackDrafts` | `off` |
 | `enableWorkflows` | `true`；启用多 agent Workflow 脚本 |
 | `outputStyle` | `Concise`；简短回复，先给结果 |
+| `tui` | `fullscreen`；全屏终端界面 |
 | `crossSessionInbound` | `accept`；无需确认即可接收本机其他 Claude 会话的消息 |
 | `CLAUDE_CODE_AUTO_MODE_SERVER` | `"0"`；auto 模式使用 Claude Code 自己发出的 classifier 请求，而不是服务端审查。权限检查仍然开启 |
 

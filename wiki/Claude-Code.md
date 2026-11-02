@@ -83,6 +83,7 @@ Changing only `opusModel` does not select Opus at startup. `ANTHROPIC_MODEL`, th
 | `feedbackDrafts` | `off` |
 | `enableWorkflows` | `true`; enables multi-agent Workflow scripts |
 | `outputStyle` | `Concise`; short replies that lead with the result |
+| `tui` | `fullscreen`; the full-screen terminal UI |
 | `crossSessionInbound` | `accept`; take messages from other local Claude sessions without a prompt |
 | `CLAUDE_CODE_AUTO_MODE_SERVER` | `"0"`; auto mode uses classifier requests from Claude Code itself instead of server-side review. Permission checks stay on |
 

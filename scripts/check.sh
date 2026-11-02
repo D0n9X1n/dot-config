@@ -1150,7 +1150,7 @@ text = pathlib.Path('config/sonicterm/sonicterm.toml').read_text()
 window = re.search(r'^\[window\]\n(.*?)(?=^\[|\Z)', text, re.M | re.S).group(1)
 assert not re.search(r'^(opacity|blur)\s*=', window, re.M)
 assert re.search(r'^padding_top\s*=\s*0\s*$', window, re.M)
-assert re.search(r'^padding_bottom\s*=\s*2\s*$', window, re.M)
+assert re.search(r'^padding_bottom\s*=\s*4\s*$', window, re.M)
 assert not re.search(r'^\[render\]', text, re.M)
 assert 'keymap = "sonicterm-macos"' in text
 assert re.search(r'^tab_min_width\s*=\s*240\s*$', text, re.M)
