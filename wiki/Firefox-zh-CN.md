@@ -2,7 +2,7 @@
 
 [English](Firefox.md) | 简体中文
 
-`install.sh`（以及 `uu`）会配置本机每个 Firefox 安装的默认 profile。它管理两样东西：一个小的 `user.js` 和 oh-my-firefox 主题。
+`uu --all` 或 `./install.sh --all` 会配置本机每个 Firefox 安装的默认 profile。它管理两样东西：一个小的 `user.js` 和 oh-my-firefox 主题。普通的 `uu` 或 `./install.sh` 不会改动 Firefox，只输出一行提示说明已跳过。已配置的 profile 保留 `user.js` 链接，因此这里提交的 pref 修改仍会在 Firefox 下次启动时生效。
 
 ## Profiles
 
@@ -38,7 +38,7 @@ Git 从不提示输入，也从不 merge 或强制更新。设置 `DOT_CONFIGS_O
 
 ## 应用
 
-运行 `uu` 或 `./install.sh` 后重启 Firefox。Firefox 只在启动时读取 `user.js` 和 `chrome/`。
+运行 `uu --all` 或 `./install.sh --all` 后重启 Firefox。Firefox 只在启动时读取 `user.js` 和 `chrome/`。
 
 ## 检查
 

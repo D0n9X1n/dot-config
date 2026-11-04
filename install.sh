@@ -30,7 +30,30 @@ setup_logging() {
   fi
 }
 
+# --all also sets up Firefox. uu passes its own options through to here.
+install_all=0
+install_usage() {
+  cat <<'USAGE'
+Usage: ./install.sh [--all]
+
+  --all   also set up Firefox: link user.js into each default profile and
+          update the oh-my-firefox theme. Plain runs leave Firefox alone.
+USAGE
+}
+
+parse_install_args() {
+  local arg
+  for arg in "$@"; do
+    case "$arg" in
+      --all) install_all=1 ;;
+      -h|--help) install_usage; exit 0 ;;
+      *) echo "install.sh: unknown option: $arg" >&2; install_usage >&2; exit 2 ;;
+    esac
+  done
+}
+
 if [ "${DOT_CONFIGS_INSTALL_LIB_ONLY:-0}" != "1" ]; then
+  parse_install_args "$@"
   setup_logging
 fi
 
@@ -1137,6 +1160,16 @@ install_firefox_config() {
   done < <(firefox_profiles)
 }
 
+# Firefox changes only with --all, so a routine uu never touches it. Existing
+# user.js links still follow the repo.
+install_firefox_step() {
+  if [ "$install_all" = 1 ]; then
+    install_firefox_config
+  else
+    echo "Firefox: skipped; run uu --all or ./install.sh --all to set it up."
+  fi
+}
+
 manifest_source_for_destination() {
   local expected_type="$1"
   local expected_destination="$2"
@@ -1459,7 +1492,7 @@ validate_local_overlay
 install_apollo_themes
 link_manifest_files
 link_local_overlay
-install_firefox_config
+install_firefox_step
 # RMUX is Windows-only. Keep retention while an older macOS install remains.
 if is_macos && have_cmd python3 && have_cmd rmux; then
   log_command python3 -B "${scripts_root}/rmux/store.py" prepare || {

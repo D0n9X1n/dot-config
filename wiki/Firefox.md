@@ -2,7 +2,7 @@
 
 English | [简体中文](Firefox-zh-CN.md)
 
-`install.sh`, and so `uu`, configures every Firefox install's default profile on this Mac. It manages two things: a small `user.js` and the oh-my-firefox theme.
+`uu --all` or `./install.sh --all` configures every Firefox install's default profile on this Mac. It manages two things: a small `user.js` and the oh-my-firefox theme. A plain `uu` or `./install.sh` leaves Firefox alone and prints one line saying it was skipped. Profiles already set up keep their `user.js` link, so a pref change committed here still reaches Firefox at its next start.
 
 ## Profiles
 
@@ -38,7 +38,7 @@ Git never prompts and never merges or forces. Set `DOT_CONFIGS_OH_MY_FIREFOX_URL
 
 ## Apply
 
-Restart Firefox after `uu` or `./install.sh`. Firefox reads `user.js` and `chrome/` only at start.
+Restart Firefox after `uu --all` or `./install.sh --all`. Firefox reads `user.js` and `chrome/` only at start.
 
 ## Check
 
