@@ -25,11 +25,11 @@ The tracked config uses:
 |---|---|
 | Theme | `apollo`, from the pinned upstream release |
 | Keymap | `sonicterm-macos` |
-| Font | Rec Mono St.Helens, size 13 |
+| Font | Rec Mono St.Helens, size 13.5 |
 | Font weight scale | 1 |
 | Line height | 1.1 |
 | New window grid | 80 × 40 |
-| Top / bottom padding | 0 / 4 logical pixels |
+| Top / bottom padding | 0 / 0 logical pixels |
 | Tab width | 240 to 320 logical pixels; while the tab bar has room, each tab sizes to its title in that range |
 | Scrollback | 1000 lines |
 | Keypad mode | `numeric`: ordinary digits, operators, and Enter in legacy input; Kitty protocol unchanged |
@@ -41,7 +41,7 @@ The tracked config uses:
 
 Use **Reload Config** from the SonicTerm command palette (`Cmd+Shift+R`) after a config change. Some native window changes may need a restart.
 
-Top padding is 0 and bottom padding is 4 logical pixels. A partial-row gap may remain because the terminal uses whole text rows; its size depends on the window height. `panel_padding` affects popup panels, not this gap.
+Top and bottom padding are both 0. A partial-row gap may remain because the terminal uses whole text rows; its size depends on the window height. `panel_padding` affects popup panels, not this gap.
 
 `tab_min_width` needs a SonicTerm build that sizes tabs to their titles. Earlier builds ignore it and share the tab bar evenly, up to `tab_max_width` per tab.
 
