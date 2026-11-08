@@ -63,7 +63,7 @@ ts            # 确认、保存、重启并恢复当前服务器的工作区
 
 ## 终端输入与集成
 
-窗格保留原生 `TERM=tmux-256color` 和 `TERM_PROGRAM=tmux`。配置清除陈旧 terminfo 覆盖并设置真彩色变量，不冒充 SonicTerm 或 WezTerm；只有 Copilot 子进程保留文档中的 WezTerm 兼容覆盖。
+窗格保留原生 `TERM=tmux-256color` 和 `TERM_PROGRAM=tmux`。配置清除陈旧 terminfo 覆盖并设置真彩色变量，不冒充 SonicTerm；只有 Copilot 子进程保留文档中的 WezTerm 兼容覆盖。
 
 扩展按键协商让 Shift+Enter 与 Enter 保持区别。请求该协议的窗格应用收到扩展 Shift+Enter；未请求的应用收到原生配置发送的 Ctrl+J。普通 Enter 不变。修改外层键盘能力后，请重载并分离/重连客户端，以重新协商。
 

@@ -406,7 +406,7 @@ SH
 
     : >"$capture"
     PATH="$fake_bin:$PATH" CLAUDE_CAPTURE="$capture" \
-      zsh -c 'unset RMUX TMUX WEZTERM_PANE; source config/zsh/cc.zsh; cc model-smoke >/dev/null'
+      zsh -c 'unset RMUX TMUX; source config/zsh/cc.zsh; cc model-smoke >/dev/null'
     args="$(sed -n '1p' "$capture")"
     if [ "$args" != "--permission-mode bypassPermissions --model claude-opus-5-5[1m] --effort high" ]; then
       echo "cc launcher lost the native model, high effort, or permission default: $args" >&2
@@ -522,7 +522,7 @@ diff -u <(printf 'cleanup\n') "$COPILOT_CLEANUP_CAPTURE"
 command copilot --version
 diff -u <(printf '%s\n' 'rmux|outer-color|0' --version) "$COPILOT_CAPTURE"
 
-unset RMUX TMUX WEZTERM_PANE
+unset RMUX TMUX
 gg terminal-smoke >/dev/null
 diff -u <(printf '%s\n' 'WezTerm|truecolor|3' --yolo \
   --model gpt-6-astra --context long_context --effort high) "$COPILOT_CAPTURE"
@@ -706,6 +706,8 @@ run_wiki_smoke() {
     wiki/Apollo-Theme-zh-CN.md
     wiki/Firefox.md
     wiki/Firefox-zh-CN.md
+    wiki/Editors.md
+    wiki/Editors-zh-CN.md
     wiki/_Sidebar.md
     scripts/wiki-render.sh
     scripts/wiki-publish.sh
@@ -1163,7 +1165,6 @@ PY
   [ -f config/mcp/mcp-shared.json ]
   [ -f scripts/launchd/clean-npm-caches.sh ]
   [ ! -e archive/tmux/.tmux.conf ]
-  [ ! -e archive/wezterm/wezterm.lua ]
 
   [ ! -f .rmux.conf ]
   [ ! -f .sonicterm/sonicterm.toml ]
@@ -1383,17 +1384,17 @@ run_retired_config_migration_smoke() {
     other="$test_root/other"
     regular="$test_root/regular"
 
-    ln -s "$test_root/repo/wezterm/wezterm.lua" "$exact"
-    remove_repo_symlink "$exact" "$test_root/repo/wezterm/wezterm.lua" "test config" >/dev/null
+    ln -s "$test_root/repo/old/test.conf" "$exact"
+    remove_repo_symlink "$exact" "$test_root/repo/old/test.conf" "test config" >/dev/null
     [ ! -e "$exact" ] && [ ! -L "$exact" ]
-    remove_repo_symlink "$exact" "$test_root/repo/wezterm/wezterm.lua" "test config" >/dev/null
+    remove_repo_symlink "$exact" "$test_root/repo/old/test.conf" "test config" >/dev/null
 
     ln -s "$test_root/user.conf" "$other"
-    remove_repo_symlink "$other" "$test_root/repo/wezterm/wezterm.lua" "test config" >/dev/null
+    remove_repo_symlink "$other" "$test_root/repo/old/test.conf" "test config" >/dev/null
     [ -L "$other" ] && [ "$(readlink "$other")" = "$test_root/user.conf" ]
 
     printf 'keep\n' >"$regular"
-    remove_repo_symlink "$regular" "$test_root/repo/wezterm/wezterm.lua" "test config" >/dev/null
+    remove_repo_symlink "$regular" "$test_root/repo/old/test.conf" "test config" >/dev/null
     grep -Fq 'keep' "$regular"
 
     for retired_source in config/copilot/AGENTS.md copilot/AGENTS.md; do
@@ -1416,20 +1417,9 @@ run_retired_config_migration_smoke() {
   fi
   grep -Eq '^[[:space:]]+tmux$' install.sh
   grep -Fq $'link\tconfig/tmux/tmux.conf\t.tmux.conf' config/manifest.tsv
-  if grep -Eq '^[[:space:]]+wezterm$|brew install --cask wezterm' install.sh; then
-    echo "installer still installs WezTerm" >&2
-    return 1
-  fi
-  if grep -Eq 'command[[:space:]]+wezterm|wezterm cli' \
-      config/zsh/cc.zsh config/zsh/gg.zsh; then
-    echo "active launchers still call retired WezTerm commands" >&2
-    return 1
-  fi
   [ ! -e archive/tmux/.tmux.conf ]
-  [ ! -e archive/wezterm/wezterm.lua ]
   [ ! -f .tmux.conf ]
-  [ ! -f wezterm/wezterm.lua ]
-  echo "native multiplexer install and retired WezTerm link boundaries ok"
+  echo "native multiplexer install and retired link boundaries ok"
 }
 
 run_rmux_smoke() {
@@ -1646,7 +1636,6 @@ run_apollo_smoke() {
   [ -f scripts/apollo-releases.tsv ]
   [ -f scripts/apollo-theme.sh ]
   [ ! -d themes/apollo ]
-  [ ! -f config/sonicterm/themes/wezterm.toml ]
   grep -Fq 'theme = "apollo"' config/sonicterm/sonicterm.toml
   grep -Fq 'apollo-rmux.conf' config/rmux/rmux.conf
   grep -Fq 'apollo.tmux' config/tmux/tmux.conf
@@ -2693,6 +2682,80 @@ INI
   )
 }
 
+run_editors_smoke() {
+  python3 - <<'PY'
+import json, pathlib, re, tomllib
+text = pathlib.Path('config/zed/settings.json').read_text()
+text = re.sub(r'^\s*//.*$', '', text, flags=re.M)
+text = re.sub(r',(\s*[}\]])', r'\1', text)
+zed = json.loads(text)
+assert zed['vim_mode'] is True
+assert zed['buffer_font_family'] == 'Rec Mono St.Helens'
+neovide = tomllib.loads(pathlib.Path('config/neovide/config.toml').read_text())
+assert neovide == {'fork': True}, neovide
+PY
+  command -v zsh >/dev/null 2>&1 || return 0
+  (
+    local test_root
+    test_root="$(mktemp -d)"
+    trap 'rm -rf "$test_root"' EXIT
+    mkdir "$test_root/bin"
+    : >"$test_root/a.cc"
+    : >"$test_root/c:5"
+    # nv calls `command nvim`, so the fake must be a file on PATH. Like the
+    # real one, it fails to reach a socket that does not exist.
+    cat >"$test_root/bin/nvim" <<'FAKE'
+#!/bin/sh
+printf '%s\n' "$@" >>"$NV_TEST_ROOT/nvim"
+[ "$5" = '<Ignore>' ] && [ ! -S "$4" ] && exit 1
+exit 0
+FAKE
+    chmod +x "$test_root/bin/nvim"
+    PATH="$test_root/bin:$PATH" NV_TEST_ROOT="$test_root" \
+      zsh -f -s -- "$test_root" "$PWD" <<'ZSH'
+set -e
+t="${1:A}"
+open() {
+  print -rl -- "$@" >>"$t/open"
+  [ "$1" = -n ] && python3 -c 'import socket, sys; socket.socket(socket.AF_UNIX).bind(sys.argv[1])' "$t/s.sock"
+  return 0
+}
+source "$2/config/zsh/nv.zsh"
+cd "$t"
+export NV_SOCKET="$t/s.sock"
+expect() {
+  [[ "$(<"$t/$1")" == "$(print -rl -- "${@:2}")" ]] || { print -r -- "nv $1 got:"; cat "$t/$1"; exit 1; } >&2
+  : >"$t/$1"
+}
+probe=(--clean --headless --server "$t/s.sock" --remote-send '<Ignore>')
+send=(--clean --headless --server "$t/s.sock" --remote-send)
+drop() { print -rn -- "execute 'drop ' . fnameescape('$1')"; }
+
+# Cold start: Neovide starts empty and listening, then gets the file and line.
+# The column is dropped.
+nv x.cc:9:3
+expect open -n -a Neovide --args --chdir "$t" -- --listen "$t/s.sock" -a Neovide
+expect nvim $probe $send "<C-\\><C-N>:$(drop "$t/x.cc") | 9<CR>"
+
+# Warm: quotes and < are escaped for Vim.
+nv a.cc "it's <b>.cc:4"
+expect open -a Neovide
+expect nvim $probe $send "<C-\\><C-N>:$(drop "$t/a.cc") | $(drop "$t/it''s <lt>b>.cc") | 4<CR>"
+
+# An existing file whose name ends in :N is not split.
+nv c:5
+expect nvim $probe $send "<C-\\><C-N>:$(drop "$t/c:5")<CR>"
+expect open -a Neovide
+
+# No files: only bring the window forward.
+nv
+expect nvim $probe
+expect open -a Neovide
+ZSH
+  )
+  echo "Zed, Neovide, and nv ok"
+}
+
 run_smoke() {
   run_bash_syntax
   run_apollo_smoke
@@ -2726,6 +2789,7 @@ run_smoke() {
   run_mux_local_override_smoke
   run_relay_completion_smoke
   run_firefox_smoke
+  run_editors_smoke
   run_local_checks
 }
 
@@ -2742,10 +2806,11 @@ case "${1:-all}" in
   shell) run_shell_update_smoke; run_local_overlay_smoke; run_relay_completion_smoke ;;
   local) run_local_checks ;;
   firefox) run_firefox_smoke ;;
+  editors) run_editors_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;
   *)
-    echo "usage: $0 [smoke|apollo|apollo-online|instructions|models|mcp|wiki|rmux|tmux|shell|local|firefox|shellcheck|all]" >&2
+    echo "usage: $0 [smoke|apollo|apollo-online|instructions|models|mcp|wiki|rmux|tmux|shell|local|firefox|editors|shellcheck|all]" >&2
     exit 2
     ;;
 esac

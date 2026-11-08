@@ -63,7 +63,7 @@ This native profile does not fix [RMUX's separate prompt bug](https://github.com
 
 ## Terminal input and integration
 
-Panes retain native `TERM=tmux-256color` and `TERM_PROGRAM=tmux`. The profile removes stale terminfo overrides and sets truecolor variables. It does not impersonate SonicTerm or WezTerm; only Copilot child processes retain the documented WezTerm compatibility override.
+Panes retain native `TERM=tmux-256color` and `TERM_PROGRAM=tmux`. The profile removes stale terminfo overrides and sets truecolor variables. It does not impersonate SonicTerm; only Copilot child processes retain the documented WezTerm compatibility override.
 
 Extended-key negotiation keeps Shift+Enter distinct from Enter. Requesting pane apps receive extended Shift+Enter; the native profile sends Ctrl+J to nonrequesting apps. Ordinary Enter remains unchanged. After changing outer keyboard capabilities, reload and detach/reconnect the client to renegotiate.
 

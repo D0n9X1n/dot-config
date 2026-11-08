@@ -170,7 +170,7 @@ rmux claude --permission-mode bypassPermissions \
 
 `rmux claude` 会启用 Claude Code 的 tmux teammate mode，并在 Claude 进程的 `PATH` 前加入私有、进程级的 `tmux` shim，使 teammate 命令指向 RMUX。它不会替换系统全局的 `tmux`。本仓库不会运行 `rmux setup tmux-shim`。
 
-RMUX 窗格内同时提供原生变量和 tmux 兼容变量：`RMUX`、`RMUX_PANE`、`TMUX`、`TMUX_PANE`。`cc` 和 `gg` 先检查 `RMUX`，并执行 `rmux rename-window`。只有原生 tmux 窗格才走独立的 `tmux-store` 当前窗口路径。不使用全局 shim 或 WezTerm CLI。
+RMUX 窗格内同时提供原生变量和 tmux 兼容变量：`RMUX`、`RMUX_PANE`、`TMUX`、`TMUX_PANE`。`cc` 和 `gg` 先检查 `RMUX`，并执行 `rmux rename-window`。只有原生 tmux 窗格才走独立的 `tmux-store` 当前窗口路径。不使用全局 shim。
 
 Copilot CLI 尚不能识别所有 RMUX/SonicTerm 终端身份。因此仓库中的 `copilot` wrapper 和 `gg` 只为 Copilot 子进程设置 `TERM_PROGRAM=WezTerm`、`COLORTERM=truecolor` 和 `FORCE_COLOR=3`，使其选择已支持的 WezTerm/真彩色路径。外层 RMUX 窗格及其他程序仍然看到正确的 `TERM_PROGRAM=rmux`。
 
@@ -191,7 +191,7 @@ Copilot CLI 尚不能识别所有 RMUX/SonicTerm 终端身份。因此仓库中�
 
 共享的 `exit`/`logout`/空提示符 Ctrl+D 分派器先检查 `RMUX`，再检查 `TMUX`，避免把 RMUX 的兼容环境送到原生 tmux 服务器。两个引擎都不会自动连接。安装不会重载或停止任一运行中的服务器，也绝不会自动运行 `rs` 或 `ts`。
 
-`~/.tmux.conf` 重新由 `config/tmux/tmux.conf` 管理。旧根目录受管链接会迁移；用户文件和外部链接先备份，名称不会冲突，所有已有 tmux 备份都会保留。不添加 TPM 或 plugin bootstrap。已有 `~/.tmux/plugins/` 和 resurrect 快照保持不动。旧 tmux 配置和停用的 WezTerm 配置仍在 v2.4.0 Git 历史中，见[仓库操作](Repository-Operations-zh-CN.md)。
+`~/.tmux.conf` 重新由 `config/tmux/tmux.conf` 管理。旧根目录受管链接会迁移；用户文件和外部链接先备份，名称不会冲突，所有已有 tmux 备份都会保留。不添加 TPM 或 plugin bootstrap。已有 `~/.tmux/plugins/` 和 resurrect 快照保持不动。旧 tmux 配置仍在 v2.4.0 Git 历史中，见[仓库操作](Repository-Operations-zh-CN.md)。
 
 原生替代方案不修复 RMUX 尚未解决的[提示框问题 #60](https://github.com/D0n9X1n/dot-config/issues/60)。SonicTerm 仍是受管的外层终端。
 

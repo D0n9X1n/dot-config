@@ -84,8 +84,8 @@ Bundle hash 包含 release lock 和 adapter code。安装器会先验证每个�
 
 ## 安全清理
 
-旧 `themes/apollo/` 副本已经删除。只有当原 SonicTerm `wezterm.toml` 是本仓库过去创建的精确 symlink 时，安装器才会删除它。
+旧 `themes/apollo/` 副本已经删除。
 
-手动创建的 Vim、Neovim、VS Code、Windows Terminal 或 WezTerm 主题文件都属于用户，安装器永远不会删除。
+手动创建的 Vim、Neovim、VS Code 或 Windows Terminal 主题文件都属于用户，安装器永远不会删除。
 
 请看 [SonicTerm 与 Shell](SonicTerm-and-Shell-zh-CN.md)、[Tmux](Tmux-zh-CN.md)、[RMUX](RMUX-zh-CN.md)和[开发与发布](Development-and-Releases-zh-CN.md)。

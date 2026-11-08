@@ -1,0 +1,5 @@
+# Neovide settings: https://neovide.dev/config-file.html
+# Neovim settings, including guifont, stay in the separate nvim-config repo.
+
+# Return to the shell right away when Neovide starts from a terminal.
+fork = true

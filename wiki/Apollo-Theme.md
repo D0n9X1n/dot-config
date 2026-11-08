@@ -84,8 +84,8 @@ Do not copy colors from upstream into config, scripts, or Wiki pages.
 
 ## Safe cleanup
 
-The old `themes/apollo/` copies are gone. The installer removes the former SonicTerm `wezterm.toml` only when it is the exact symlink previously managed by this repository.
+The old `themes/apollo/` copies are gone.
 
-Manual Vim, Neovim, VS Code, Windows Terminal, or WezTerm theme files are user-owned and are never removed.
+Manual Vim, Neovim, VS Code, or Windows Terminal theme files are user-owned and are never removed.
 
 See [SonicTerm and shell](SonicTerm-and-Shell.md), [Tmux](Tmux.md), [RMUX](RMUX.md), and [Development and releases](Development-and-Releases.md).

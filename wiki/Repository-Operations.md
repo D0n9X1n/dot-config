@@ -60,6 +60,8 @@ The manifest check excludes SonicTerm `*.save.lock` runtime files and the `confi
 | `config/claude/**` | `~/.claude/` |
 | `config/copilot/**` | `~/.copilot/` |
 | `config/copilot-relay/config.yaml` | `~/.copilot-relay/config.yaml` |
+| `config/zed/settings.json` | `~/.config/zed/settings.json` |
+| `config/neovide/config.toml` | `~/.config/neovide/config.toml` |
 | `config/mcp/mcp-shared.json` | merge into local Copilot MCP data |
 | `config/launchd/*.plist` | render into `~/Library/LaunchAgents/` |
 | `scripts/copilot/cleanup-legacy.sh` | `~/.copilot/cleanup-legacy.sh` |
@@ -168,20 +170,17 @@ Local state is not the same as a user global. `~/.claude/CLAUDE.md` and `~/.copi
 
 ## Retired links
 
-WezTerm stays retired. The installer removes `~/.wezterm.lua` and the retired SonicTerm `wezterm.toml` only when they still point to this repo's exact old managed paths. User-owned files and links stay. Manually installed editor themes are never removed.
-
 Native tmux is active again through `config/tmux/tmux.conf` and `~/.tmux.conf`. It does not restore the old TPM setup. Existing plugins, resurrect files, and tmux backups stay untouched. See [Tmux](Tmux.md).
 
 The duplicate `~/.copilot/AGENTS.md` link is also removed only when it points to this repo's current or former managed source. User files and foreign links stay.
 
-The old tmux profile and retired WezTerm config remain in Git history. Inspect the v2.4.0 copies with:
+The old tmux profile remains in Git history. Inspect the v2.4.0 copy with:
 
 ```sh
 git show v2.4.0:archive/tmux/.tmux.conf
-git show v2.4.0:archive/wezterm/wezterm.lua
 ```
 
-These are reference copies, not active config. Any future managed file must follow the current manifest rules.
+It is a reference copy, not active config. Any future managed file must follow the current manifest rules.
 
 ## Apply and check
 
