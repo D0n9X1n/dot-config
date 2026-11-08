@@ -1,4 +1,4 @@
-# WezTerm-compatible default keymap for SonicTerm Terminal.
+# Default keymap for SonicTerm Terminal.
 # On macOS, `cmd` is used; on Windows, `ctrl` is the equivalent — `super`
 # matches both. Keys not listed fall through to the terminal.
 
@@ -11,7 +11,7 @@ version = "1.0"
 keys = "super+t"
 action = "new_tab"
 
-# WezTerm's Windows/Linux SpawnTab chord — also bound on macOS so the
+# The Windows/Linux new-tab chord — also bound on macOS so the
 # same muscle memory works whichever OS the keyboard came from.
 [[binding]]
 keys = "super+shift+t"
@@ -29,8 +29,8 @@ action = "next_tab"
 keys = "super+shift+["
 action = "prev_tab"
 
-# Cmd+Left / Cmd+Right — common user override (matches the user's
-# personal wezterm.lua and macOS document-tab convention).
+# Cmd+Left / Cmd+Right — common user override (matches the macOS
+# document-tab convention).
 [[binding]]
 keys = "super+left"
 action = "prev_tab"
@@ -179,7 +179,7 @@ action = "new_window"
 keys = "super+shift+f"
 action = "toggle_fullscreen"
 
-# WezTerm's macOS default for full-screen toggle (mirrors the system
+# Full-screen toggle (mirrors the system
 # View → Enter Full Screen shortcut).
 [[binding]]
 keys = "super+enter"
@@ -229,8 +229,7 @@ action = { scroll = "to_bottom" }
 keys = "super+shift+r"
 action = "reload_config"
 
-# Bare super+r is the spec'd WezTerm chord — added as an alias so users
-# coming from WezTerm don't need to remember the Shift modifier.
+# Bare super+r is an alias so reload does not need the Shift modifier.
 [[binding]]
 keys = "super+r"
 action = "reload_config"

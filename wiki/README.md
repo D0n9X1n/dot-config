@@ -21,6 +21,7 @@ The source is the flat `wiki/` folder. GitHub Actions publishes it to the GitHub
 - [Tmux](Tmux.md) — native tmux beside RMUX, with the same Apollo style and separate sessions.
 - [Tmux keymap](Tmux-Keymap.md) — native tmux bindings and prompt behavior.
 - [SonicTerm and shell](SonicTerm-and-Shell.md) — terminal files, zsh helpers, and launch wrappers.
+- [Editors](Editors.md) — Zed and Neovide settings, and `nv` to open files in Neovide.
 
 ## Work
 

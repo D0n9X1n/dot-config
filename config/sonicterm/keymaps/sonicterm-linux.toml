@@ -1,4 +1,4 @@
-# WezTerm-compatible default keymap for SonicTerm Terminal.
+# Default keymap for SonicTerm Terminal.
 # On macOS, `cmd` is used; on Linux, `ctrl` is the equivalent — `ctrl+shift`
 # matches both. Keys not listed fall through to the terminal.
 
@@ -184,7 +184,7 @@ action = "new_window"
 keys = "f11"
 action = "toggle_fullscreen"
 
-# WezTerm's macOS default for full-screen toggle (mirrors the system
+# Full-screen toggle (mirrors the system
 # View -> Enter Full Screen shortcut).
 [[binding]]
 keys = "ctrl+shift+enter"

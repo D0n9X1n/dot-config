@@ -1501,9 +1501,6 @@ if is_macos && have_cmd python3 && have_cmd rmux; then
   }
 fi
 remove_repo_symlink "${HOME}/.gitignore" "${repo_root}/.gitignore" "old global Git ignore"
-remove_repo_symlink "${HOME}/.wezterm.lua" "${repo_root}/wezterm/wezterm.lua" "WezTerm config"
-remove_repo_symlink "${HOME}/.sonicterm/themes/wezterm.toml" \
-  "${repo_root}/config/sonicterm/themes/wezterm.toml" "SonicTerm WezTerm theme"
 remove_legacy_claude_subagent_hook
 remove_repo_symlink "${HOME}/.copilot/AGENTS.md" \
   "${repo_root}/config/copilot/AGENTS.md" "duplicate Copilot instructions"

@@ -1,0 +1,52 @@
+// Zed settings
+//
+// For information on how to configure Zed, see the Zed
+// documentation: https://zed.dev/docs/configuring-zed
+//
+// To see all of Zed's default settings without changing your
+// custom settings, run `zed: open default settings` from the
+// command palette (cmd-shift-p / ctrl-shift-p)
+{
+  "disable_ai": true,
+  "buffer_font_weight": 400.0,
+  "tab_size": 4,
+  "vim": {
+    "use_smartcase_find": true,
+    "toggle_relative_line_numbers": false
+  },
+  "markdown_preview": {
+    "font_size": 14.0
+  },
+  "agent_buffer_font_size": 14.0,
+  "project_panel": {
+    "button": false
+  },
+  "collaboration_panel": {
+    "button": false
+  },
+  "icon_theme": "Zed (Default)",
+  "agent_servers": {
+    "codex-acp": {
+      "type": "registry"
+    },
+    "claude-acp": {
+      "type": "registry"
+    },
+    "github-copilot-cli": {
+      "type": "registry"
+    }
+  },
+  "ui_font_family": "Rec Sans Mt.Baker",
+  "buffer_font_family": "Rec Mono St.Helens",
+  "session": {
+    "trust_all_worktrees": true
+  },
+  "vim_mode": true,
+  "ui_font_size": 14.0,
+  "buffer_font_size": 12.0,
+  "theme": {
+    "mode": "dark",
+    "light": "Ayu Light",
+    "dark": "Ayu Dark",
+  },
+}

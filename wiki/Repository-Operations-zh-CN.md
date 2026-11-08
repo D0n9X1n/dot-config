@@ -60,6 +60,8 @@ type<TAB>source<TAB>home destination
 | `config/claude/**` | `~/.claude/` |
 | `config/copilot/**` | `~/.copilot/` |
 | `config/copilot-relay/config.yaml` | `~/.copilot-relay/config.yaml` |
+| `config/zed/settings.json` | `~/.config/zed/settings.json` |
+| `config/neovide/config.toml` | `~/.config/neovide/config.toml` |
 | `config/mcp/mcp-shared.json` | 合并到本机 Copilot MCP 数据 |
 | `config/launchd/*.plist` | 渲染到 `~/Library/LaunchAgents/` |
 | `scripts/copilot/cleanup-legacy.sh` | `~/.copilot/cleanup-legacy.sh` |
@@ -168,20 +170,17 @@ Claude 的 local scope 条目位于 `~/.claude.json` 的 `projects[].mcpServers`
 
 ## 已停用链接
 
-WezTerm 仍然停用。只有当 `~/.wezterm.lua` 和停用的 SonicTerm `wezterm.toml` 仍指向本仓库过去的精确受管路径时，安装器才会删除它们。用户自己的文件和链接会保留。手动安装的编辑器主题永远不会删除。
-
 原生 tmux 通过 `config/tmux/tmux.conf` 和 `~/.tmux.conf` 重新启用，但不恢复旧 TPM 设置。已有 plugins、resurrect 文件和 tmux 备份保持不动。请看 [Tmux](Tmux-zh-CN.md)。
 
 重复的 `~/.copilot/AGENTS.md` 链接也只在指向本仓库当前或过去的受管源文件时删除。用户文件和其他链接会保留。
 
-旧 tmux 配置和已停用的 WezTerm 配置保留在 Git 历史中。查看 v2.4.0 的副本：
+旧 tmux 配置保留在 Git 历史中。查看 v2.4.0 的副本：
 
 ```sh
 git show v2.4.0:archive/tmux/.tmux.conf
-git show v2.4.0:archive/wezterm/wezterm.lua
 ```
 
-这些副本仅供参考，不是生效配置。以后添加受管文件时，仍须遵循当前清单规则。
+这份副本仅供参考，不是生效配置。以后添加受管文件时，仍须遵循当前清单规则。
 
 ## 应用与检查
 

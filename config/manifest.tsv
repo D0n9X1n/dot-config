@@ -20,6 +20,7 @@ link	config/zsh/claude.zsh	.oh-my-zsh/custom/claude.zsh
 link	config/zsh/copilot.zsh	.oh-my-zsh/custom/copilot.zsh
 link	config/zsh/custom.zsh	.oh-my-zsh/custom/custom.zsh
 link	config/zsh/gg.zsh	.oh-my-zsh/custom/gg.zsh
+link	config/zsh/nv.zsh	.oh-my-zsh/custom/nv.zsh
 link	config/zsh/terminal-keys.zsh	.oh-my-zsh/custom/terminal-keys.zsh
 link	config/zsh/uu.zsh	.oh-my-zsh/custom/uu.zsh
 link	config/zsh/zz-rmux.zsh	.oh-my-zsh/custom/zz-rmux.zsh
@@ -39,4 +40,6 @@ render	config/launchd/com.d0n9x1n.copilot-relay-healthcheck.plist	Library/Launch
 link	scripts/launchd/Weekly npm Cache Cleanup	.local/libexec/Weekly npm Cache Cleanup
 render	config/launchd/com.d0n9x1n.npm-cache-clean.plist	Library/LaunchAgents/com.d0n9x1n.npm-cache-clean.plist
 link	scripts/launchd/vendor_names.py	.local/bin/startup-item-names
+link	config/zed/settings.json	.config/zed/settings.json
+link	config/neovide/config.toml	.config/neovide/config.toml
 firefox	config/firefox/user.js	user.js

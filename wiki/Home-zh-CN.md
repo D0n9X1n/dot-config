@@ -21,6 +21,7 @@
 - [Tmux](Tmux-zh-CN.md) — 与 RMUX 并存的原生 tmux；Apollo 样式相同，会话独立。
 - [Tmux 按键表](Tmux-Keymap-zh-CN.md) — 原生 tmux 按键和提示框行为。
 - [SonicTerm 与 Shell](SonicTerm-and-Shell-zh-CN.md) — 终端文件、zsh 助手和启动器。
+- [编辑器](Editors-zh-CN.md) — Zed 和 Neovide 设置，以及在 Neovide 中打开文件的 `nv`。
 
 ## 维护
 

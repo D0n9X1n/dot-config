@@ -80,6 +80,7 @@ RMUX 配置会明确保留条件式鼠标 bindings。Copilot 等支持鼠标的�
 | `cc.zsh` | 带标题的 Claude 启动器 |
 | `copilot.zsh` | allow-all Copilot alias、真彩色 wrapper 和清理 |
 | `gg.zsh` | 带标题、allow-all 的 Copilot 启动器 |
+| `nv.zsh` | `nv`：在同一个 Neovide 窗口中打开文件；见[编辑器](Editors-zh-CN.md) |
 | `uu.zsh` | `uu`：fast-forward 本检出，push 到 fork 镜像，然后运行 `install.sh`；它也会更新各个 CLI 及其 plugin；`uu --all` 还会配置 Firefox |
 | `zz-rmux.zsh` | RMUX 助手和共享安全分离分派器；较晚加载 |
 | `zz-tmux.zsh` | 原生 tmux 会话助手和交互式 `tr` 分派 |

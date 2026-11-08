@@ -1,6 +1,6 @@
 ---
 name: update-settings
-description: Change or apply a setting in this dot-configs repo. Use the config manifest, update the matching English and Chinese Wiki pages, run checks, then run install.sh. TRIGGER for changes to Claude Code, Copilot CLI, native tmux, RMUX, SonicTerm, zsh, copilot-relay, MCP, status lines, or launchd. SKIP for read-only questions and retired WezTerm or historical tmux settings in Git history.
+description: Change or apply a setting in this dot-configs repo. Use the config manifest, update the matching English and Chinese Wiki pages, run checks, then run install.sh. TRIGGER for changes to Claude Code, Copilot CLI, native tmux, RMUX, SonicTerm, zsh, Zed, Neovide, copilot-relay, MCP, status lines, or launchd. SKIP for read-only questions and historical tmux settings in Git history.
 ---
 
 # Update settings
@@ -26,6 +26,8 @@ Never edit a managed file under `$HOME`.
 | Shared workspace code | `scripts/mux/workspace.py` | `~/.local/lib/mux/workspace.py` |
 | SonicTerm | `config/sonicterm/` | `~/.sonicterm/` |
 | Zsh | `config/zsh/` | `~/.oh-my-zsh/custom/` |
+| Zed | `config/zed/settings.json` | `~/.config/zed/settings.json` |
+| Neovide | `config/neovide/config.toml` | `~/.config/neovide/config.toml` |
 | Relay | `config/copilot-relay/config.yaml` | `~/.copilot-relay/config.yaml` |
 | Safe MCP data | `config/mcp/mcp-shared.json` | merged locally |
 | launchd templates | `config/launchd/` | `~/Library/LaunchAgents/` |
