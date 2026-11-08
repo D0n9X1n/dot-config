@@ -102,7 +102,7 @@ git pull --ff-only
 ./install.sh
 ```
 
-安装器是幂等的。正确链接不会改变。不同的文件或链接会先备份，再被替换。原生 tmux 迁移会保留全部已有 tmux 备份。
+安装器是幂等的。正确链接不会改变。不同的文件或链接会被直接替换，不保留备份；旧的安装器备份也会被删除。请在本仓库中修改受管配置，而不是在安装后的路径上修改。
 
 安装器不会重载或停止运行中的 tmux 或 RMUX 服务器。新服务器使用已安装配置；只有自行决定时才重载已有服务器，请看 [Tmux](Tmux-zh-CN.md)。修改受管配置后，运行 `scripts/check.sh all`；release pins 有变化时还需运行 `scripts/check.sh apollo-online`，然后运行两次 `./install.sh`。
 

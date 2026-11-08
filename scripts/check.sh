@@ -438,13 +438,14 @@ run_mcp_default_smoke() {
     mkdir -p "$HOME/.config/github-copilot"
     printf '{"mcpServers":{"a":{"command":"x"},"b":{"command":"y"}}}\n' >"$HOME/.config/github-copilot/mcp.json"
     printf '{"theme":"t","mcpServers":{"old":{}}}\n' >"$HOME/.claude.json"
-    # A different map is backed up once and replaced; other keys stay.
-    timestamp=1 import_copilot_mcp_into_claude >/dev/null
+    # A different map is replaced without a backup; other keys stay.
+    import_copilot_mcp_into_claude >/dev/null
     jq -e '.theme == "t" and (.mcpServers | keys) == ["a","b"]' "$HOME/.claude.json" >/dev/null
-    [ -f "$HOME/.claude.json.bak.1" ]
-    # The same map (any key order) is left alone: no rewrite, no new backup.
+    [ -z "$(find "$HOME" -maxdepth 1 -name '.claude.json.bak.*' -print)" ]
+    # The same map (any key order) is left alone, and an old backup is removed.
     printf '{"theme":"t","mcpServers":{"b":{"command":"y"},"a":{"command":"x"}}}\n' >"$HOME/.claude.json"
-    timestamp=2 import_copilot_mcp_into_claude >/dev/null
+    : >"$HOME/.claude.json.bak.2"
+    import_copilot_mcp_into_claude >/dev/null
     [ ! -e "$HOME/.claude.json.bak.2" ]
     grep -Fq '"b":{"command":"y"},"a"' "$HOME/.claude.json"
   )
@@ -656,15 +657,13 @@ run_global_instructions_smoke() {
       >"$test_repo/config/copilot/copilot-instructions.md"
 
     HOME="$test_home"
-    timestamp="20000101000000"
-    link_file "$test_repo/config/claude/CLAUDE.md" "$test_home/.claude/CLAUDE.md"
+    link_file "$test_repo/config/claude/CLAUDE.md" "$test_home/.claude/CLAUDE.md" >/dev/null
     link_file "$test_repo/config/copilot/copilot-instructions.md" \
       "$test_home/.copilot/copilot-instructions.md"
 
     [ -L "$test_home/.claude/CLAUDE.md" ]
     [ "$(readlink "$test_home/.claude/CLAUDE.md")" = "$test_repo/config/claude/CLAUDE.md" ]
-    [ -f "$test_home/.claude/CLAUDE.md.bak.20000101000000" ]
-    grep -Fq 'original global instructions' "$test_home/.claude/CLAUDE.md.bak.20000101000000"
+    [ -z "$(find "$test_home/.claude" -name 'CLAUDE.md.bak.*' -print)" ]
     [ -L "$test_home/.copilot/copilot-instructions.md" ]
     [ "$(readlink "$test_home/.copilot/copilot-instructions.md")" \
       = "$test_repo/config/copilot/copilot-instructions.md" ]
@@ -912,7 +911,6 @@ TSV
     config_root="$test_repo/config"
     manifest="$test_repo/config/manifest.tsv"
     HOME="$test_home"
-    timestamp="20000101000000"
     validate_manifest
     [ "$(old_source_for_destination .copilot/cleanup-legacy.sh)" = "$test_repo/copilot/cleanup-legacy.sh" ]
 
@@ -925,31 +923,29 @@ TSV
     printf 'foreign\n' >"$foreign"
     ln -s "$foreign" "$test_home/.copilot/settings.json"
 
-    link_manifest_files
+    printf 'unmanaged\n' >"$test_home/.tmux.conf.bak.x"
+    link_manifest_files >/dev/null
     [ "$(readlink "$test_home/.rmux.conf")" = "$test_repo/config/rmux/rmux.conf" ]
     [ "$(readlink "$test_home/.tmux.conf")" = "$test_repo/config/tmux/tmux.conf" ]
-    grep -Fxq 'older backup' "$test_home/.tmux.conf.bak.19990101000000"
-    grep -Fxq 'same timestamp backup' "$test_home/.tmux.conf.bak.20000101000000"
-    grep -Fxq 'user tmux' "$test_home/.tmux.conf.bak.20000101000000.1"
     [ "$(readlink "$test_home/.claude/settings.json")" = "$test_repo/config/claude/settings.json" ]
-    grep -Fq 'user settings' "$test_home/.claude/settings.json.bak.20000101000000"
-    [ "$(readlink "$test_home/.copilot/settings.json.bak.20000101000000")" = "$foreign" ]
     [ "$(readlink "$test_home/.copilot/settings.json")" = "$test_repo/config/copilot/settings.json" ]
-
-    before="$(find "$test_home" -name '*.bak.*' -type f -o -name '*.bak.*' -type l | sort)"
-    link_manifest_files
-    after="$(find "$test_home" -name '*.bak.*' -type f -o -name '*.bak.*' -type l | sort)"
-    [ "$before" = "$after" ]
+    # User files and foreign links are replaced without a backup, and old
+    # installer backups are removed. Other names stay.
+    [ "$(find "$test_home" -name '*.bak.[0-9]*' | wc -l | tr -d ' ')" = 0 ]
+    grep -Fxq 'unmanaged' "$test_home/.tmux.conf.bak.x"
+    [ "$(cat "$foreign")" = foreign ]
+    link_manifest_files >/dev/null
+    [ "$(find "$test_home" -name '*.bak.[0-9]*' | wc -l | tr -d ' ')" = 0 ]
 
     rm "$test_home/.tmux.conf"
     ln -s "$test_repo/.tmux.conf" "$test_home/.tmux.conf"
-    link_manifest_files
+    link_manifest_files >/dev/null
     [ "$(readlink "$test_home/.tmux.conf")" = "$test_repo/config/tmux/tmux.conf" ]
     rm "$test_home/.tmux.conf"
     ln -s "$foreign" "$test_home/.tmux.conf"
-    link_manifest_files
-    [ "$(readlink "$test_home/.tmux.conf.bak.20000101000000.2")" = "$foreign" ]
-    grep -Fxq 'user tmux' "$test_home/.tmux.conf.bak.20000101000000.1"
+    link_manifest_files >/dev/null
+    [ "$(readlink "$test_home/.tmux.conf")" = "$test_repo/config/tmux/tmux.conf" ]
+    [ "$(find "$test_home" -name '*.bak.[0-9]*' | wc -l | tr -d ' ')" = 0 ]
 
     printf 'config/claude/settings.json\n' >"$test_repo/config/extra.json"
     cat >"$test_repo/config/manifest.tsv" <<'TSV'
@@ -1772,17 +1768,9 @@ SH
     export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
     export APOLLO_SKIP_FSH=1
     DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
-    timestamp="20000101000000"
     apollo_validate_lock "$APOLLO_RELEASES_FILE"
-    install_apollo_themes
-    printf '{"keep":true,"theme":"custom:apollo","second":true}\n' >"$test_home/.claude.json.next"
-    backup_path_once "$test_home/.claude.json"
-    mv "$test_home/.claude.json.next" "$test_home/.claude.json"
+    install_apollo_themes >/dev/null
   )
-
-  jq -e '.keep == true and (has("theme") | not)' \
-    "$test_home/.claude.json.bak.20000101000000" >/dev/null
-  jq -e '.theme == "custom:apollo" and .second == true' "$test_home/.claude.json" >/dev/null
   [ -L "$test_home/.local/share/dot-configs/apollo/current" ]
   first_current="$(readlink "$test_home/.local/share/dot-configs/apollo/current")"
   mkdir -p "$test_root/blocked-home"
@@ -1819,7 +1807,7 @@ SH
   )
   [ "$(readlink "$test_home/.local/share/dot-configs/apollo/current")" = "$first_current" ]
   [ -L "$test_home/.sonicterm/themes/apollo.toml" ]
-  grep -Fq 'user theme' "$test_home/.sonicterm/themes/apollo.toml.bak."*
+  [ -z "$(find "$test_home" -name '*.bak.*' -print)" ]
   [ -L "$test_home/.config/rmux-apollo-theme/apollo-rmux.conf" ]
   [ -L "$test_home/.config/tmux-apollo-theme/apollo.tmux" ]
   cmp -s "$fixtures/apollo.tmux" "$test_home/.config/tmux-apollo-theme/apollo.tmux"
@@ -1857,7 +1845,7 @@ SH
   curl_count_after="$(wc -l <"$test_root/curl.log" | tr -d ' ')"
   [ "$curl_count_before" = "$curl_count_after" ]
   [ "$first_current" = "$(readlink "$test_home/.local/share/dot-configs/apollo/current")" ]
-  [ "$(find "$test_home/.sonicterm/themes" -name 'apollo.toml.bak.*' | wc -l | tr -d ' ')" = "1" ]
+  [ -z "$(find "$test_home" -name '*.bak.*' -print)" ]
 
   awk -F '\t' 'BEGIN { OFS="\t" } $1 == "palette" { $6 = "0000000000000000000000000000000000000000000000000000000000000000" } { print }' \
     "$lock" >"$bad_lock"
@@ -2631,13 +2619,13 @@ INI
     install_firefox_config >/dev/null
     install_firefox_config >/dev/null
 
-    # user.js is linked into every install default, with one backup of the old file.
+    # user.js is linked into every install default; the old file is not kept.
     for p in new clean dirty ahead plain; do
       [ "$(readlink "$base/Profiles/$p/user.js")" = "$repo_root/config/firefox/user.js" ]
     done
     [ ! -e "$base/Profiles/unused/user.js" ]
     [ ! -e "$HOME/Library/outside/user.js" ]
-    [ "$(find "$base/Profiles/clean" -maxdepth 1 -name 'user.js.bak.*' | wc -l | tr -d ' ')" = 1 ]
+    [ -z "$(find "$base/Profiles/clean" -maxdepth 1 -name 'user.js.bak.*' -print)" ]
 
     # Missing chrome/ is cloned and a clean clone fast-forwards.
     [ "$(git -C "$base/Profiles/new/chrome" rev-parse HEAD)" = "$head" ]
@@ -2680,6 +2668,123 @@ INI
     [ ! -e "$HOME/Library/Logs/dot-configs-install.log" ]
     bash install.sh -h | grep -Fq 'Usage: ./install.sh [--all]'
   )
+}
+
+run_install_backup_smoke() {
+  # The installer never makes backups and removes leftover installer
+  # backups (<dest>.bak.<digit>...) at every destination it writes.
+  if grep -En '\.bak\.\$\{?timestamp|backup_path|link_file_preserving_backups|prune_old_backups' \
+      install.sh scripts/apollo-theme.sh; then
+    echo "installer still creates or prunes backups" >&2
+    return 1
+  fi
+  (
+    local test_root h out
+    test_root="$(mktemp -d)"
+    trap 'rm -rf "$test_root"' EXIT
+    export HOME="$test_root/home"
+    mkdir -p "$HOME"
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    h="$HOME"
+
+    # Exact scope: glob characters and newlines are literal, other names stay.
+    : >"$h/tool[1]"; : >"$h/tool[1].bak.1"; : >"$h/tool1.bak.1"
+    : >"$h/my file"; : >"$h/my file.bak.1"; : >"$h/file.bak.1"
+    : >"$h/a"; : >"$h/a.bak.2"; : >"$h/a.bak.x"; : >"$h/ab.bak.3"; : >"$h/a.bak.4
+config"
+    mkdir -p "$h/a.bak.5" "$h/nested"; : >"$h/a.bak.5/inner"; : >"$h/nested/a.bak.6"
+    ln -s "$h/missing" "$h/a.bak.7"
+    mkdir -p "$h/.claude/backups"; : >"$h/.claude/backups/.claude.json.backup.1"; : >"$h/.claude.json.backup"
+    remove_backups_of "$h/tool[1]"
+    remove_backups_of "$h/a"
+    remove_backups_of "$h/my file"
+    [ ! -e "$h/my file.bak.1" ]
+    [ -e "$h/file.bak.1" ]
+    [ ! -e "$h/tool[1].bak.1" ]
+    [ -e "$h/tool1.bak.1" ]
+    [ ! -e "$h/a.bak.2" ]
+    [ ! -e "$h/a.bak.4
+config" ]
+    [ ! -e "$h/a.bak.5" ]
+    [ ! -L "$h/a.bak.7" ]
+    [ -e "$h/a.bak.x" ]
+    [ -e "$h/ab.bak.3" ]
+    [ -e "$h/nested/a.bak.6" ]
+    [ -e "$h/.claude/backups/.claude.json.backup.1" ]
+    [ -e "$h/.claude.json.backup" ]
+
+    # A HOME whose own name looks like a backup is never matched.
+    mkdir -p "$test_root/.tmux.conf.bak.1"
+    remove_backups_of "$test_root/.tmux.conf.bak.1/.tmux.conf"
+    [ -d "$test_root/.tmux.conf.bak.1" ]
+
+    # A symlinked parent is followed to find the backups.
+    : >"$h/b.bak.1"; ln -s "$h" "$test_root/link"
+    remove_backups_of "$test_root/link/b"
+    [ ! -e "$h/b.bak.1" ]
+
+    # A missing parent is fine; an unreadable one fails.
+    remove_backups_of "$test_root/none/x"
+    mkdir -p "$test_root/locked"; : >"$test_root/locked/c.bak.1"; chmod 000 "$test_root/locked"
+    if remove_backups_of "$test_root/locked/c" 2>/dev/null; then
+      chmod 700 "$test_root/locked"; echo "unreadable parent was treated as clean" >&2; exit 1
+    fi
+    chmod 700 "$test_root/locked"
+
+    # One failed delete fails the call, even when a later delete succeeds.
+    : >"$h/d.bak.1"; : >"$h/d.bak.2"
+    if (
+      n=0
+      rm() { n=$((n + 1)); [ "$n" -gt 1 ] && command rm "$@"; [ "$n" -gt 1 ]; }
+      remove_backups_of "$h/d"
+    ) 2>/dev/null; then
+      echo "a failed backup delete was ignored" >&2; exit 1
+    fi
+
+    # link_file replaces without a backup and clears old backups, even when the
+    # link is already correct. Only real content is reported as replaced.
+    mkdir -p "$test_root/src"; : >"$test_root/src/f"
+    printf 'user\n' >"$h/f1"; : >"$h/f1.bak.1"
+    out="$(link_file "$test_root/src/f" "$h/f1")"
+    [ "$out" = "Replaced $h/f1" ]
+    [ "$(readlink "$h/f1")" = "$test_root/src/f" ]
+    ln -s "$test_root/elsewhere" "$h/f2"
+    [ -z "$(link_file "$test_root/src/f" "$h/f2")" ]
+    : >"$h/f1.bak.2"
+    link_file "$test_root/src/f" "$h/f1" >/dev/null
+    mkdir -p "$h/f3"; : >"$h/f3/keep"
+    [ "$(link_file "$test_root/src/f" "$h/f3")" = "Replaced $h/f3" ]
+    [ -L "$h/f3" ]
+    [ -z "$(find "$h" -maxdepth 1 -name 'f[0-9]*.bak.*' -print)" ]
+
+    # Rendered plists and MCP files clear old backups and make none.
+    mkdir -p "$h/Library/LaunchAgents" "$h/.config/github-copilot"
+    printf '__HOME__\n' >"$test_root/t.plist"
+    : >"$h/Library/LaunchAgents/x.plist.bak.1"
+    render_launchd_template "$test_root/t.plist" "$h/Library/LaunchAgents/x.plist" >/dev/null
+    [ ! -e "$h/Library/LaunchAgents/x.plist.bak.1" ]
+    printf '{"mcpServers":{"a":{"command":"x"}}}\n' >"$test_root/shared.json"
+    : >"$h/.config/github-copilot/mcp.json.bak.1"
+    merge_shared_mcp "$test_root/shared.json" >/dev/null
+    merge_shared_mcp "$test_root/shared.json" >/dev/null
+    jq -e '.mcpServers.a.command == "x"' "$h/.config/github-copilot/mcp.json" >/dev/null
+    [ -z "$(find "$h/.config/github-copilot" -name '*.bak.*' -print)" ]
+
+    # Callers stop when backup removal fails, also on their no-op paths.
+    remove_backups_of() { return 1; }
+    if link_file "$test_root/src/f" "$h/f1" >/dev/null 2>&1; then
+      echo "link_file ignored a failed backup removal" >&2; exit 1
+    fi
+    printf '{"theme":"custom:apollo"}\n' >"$h/.claude.json"
+    if apollo_set_claude_theme 2>/dev/null; then
+      echo "apollo_set_claude_theme ignored a failed backup removal" >&2; exit 1
+    fi
+    mkdir -p "$test_root/apollo/current"
+    if apollo_link_consumers "$test_root/apollo" >/dev/null 2>&1; then
+      echo "apollo_link_consumers ignored a failed backup removal" >&2; exit 1
+    fi
+  )
+  echo "installer makes no backups and clears old ones exactly"
 }
 
 run_editors_smoke() {
@@ -2766,6 +2871,7 @@ run_smoke() {
   python3 -B scripts/test-terminal-keys.py
   run_structure_smoke
   run_manifest_smoke
+  run_install_backup_smoke
   run_launchd_template_smoke
   python3 -B scripts/launchd/test_healthcheck.py
   python3 -B scripts/launchd/test_launcher_names.py
@@ -2807,10 +2913,11 @@ case "${1:-all}" in
   local) run_local_checks ;;
   firefox) run_firefox_smoke ;;
   editors) run_editors_smoke ;;
+  backups) run_install_backup_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;
   *)
-    echo "usage: $0 [smoke|apollo|apollo-online|instructions|models|mcp|wiki|rmux|tmux|shell|local|firefox|editors|shellcheck|all]" >&2
+    echo "usage: $0 [smoke|apollo|apollo-online|instructions|models|mcp|wiki|rmux|tmux|shell|local|firefox|editors|backups|shellcheck|all]" >&2
     exit 2
     ;;
 esac

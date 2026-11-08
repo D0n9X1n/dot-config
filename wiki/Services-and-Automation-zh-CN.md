@@ -238,7 +238,7 @@ startup-item-names --rollback
 
 `config/mcp/mcp-shared.json` 只包含安全共享项目。
 
-安装器把它们合并到本机 Copilot MCP 数据，然后把 server map 导入 `~/.claude.json`。server map 已一致时，它不修改 `~/.claude.json`，也不创建备份。
+安装器把它们合并到本机 Copilot MCP 数据，然后把 server map 导入 `~/.claude.json`。server map 已一致时，它不修改 `~/.claude.json`。它从不创建备份，并会删除旧的 `~/.claude.json.bak.<数字>` 副本。
 
 可选 MCP server 的 key 和 token 保留在本机 `~/.config/github-copilot/mcp.json`。永远不要放进共享文件。
 

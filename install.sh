@@ -9,7 +9,6 @@ manifest="${config_root}/manifest.tsv"
 # local/, so these files never conflict with an upstream merge.
 local_root="${DOT_CONFIGS_LOCAL:-${repo_root}/local}"
 local_manifest="${local_root}/manifest.tsv"
-timestamp="$(date +"%Y%m%d%H%M%S")"
 install_log="${DOT_CONFIGS_INSTALL_LOG:-${HOME}/Library/Logs/dot-configs-install.log}"
 source "${scripts_root}/apollo-theme.sh"
 RED="$(printf '\033[31m')"
@@ -855,73 +854,37 @@ install_macos_deps() {
   install_rec_mountain_fonts || true
 }
 
-backup_path() {
-  local path="$1"
-  if [ -e "$path" ] || [ -L "$path" ]; then
-    mv "$path" "${path}.bak.${timestamp}"
-    prune_old_backups "$path" 1
-  fi
-}
-
-backup_path_once() {
-  local path="$1"
-  local backup="${path}.bak.${timestamp}"
-  if [ -e "$backup" ] || [ -L "$backup" ]; then
-    return 0
-  fi
-  if [ -e "$path" ] || [ -L "$path" ]; then
-    cp -pP "$path" "$backup" || return 1
-    prune_old_backups "$path" 1
-  fi
-}
-
-prune_old_backups() {
-  local path="$1"
-  local keep="${2:-1}"
-  local dir
-  local base
-  local backup
-  local count=0
-
+# Remove installer backups (<path>.bak.<digit>...) of one path. The quoted
+# prefix keeps glob characters and newlines literal, so only this path's own
+# backups match, never its parent folder or another file.
+remove_backups_of() {
+  local path="$1" dir backup status=0
   dir="$(dirname "$path")"
-  base="$(basename "$path")"
-  [ -d "$dir" ] || return 0
-
-  while IFS= read -r backup; do
-    count=$((count + 1))
-    if [ "$count" -gt "$keep" ]; then
-      rm -rf -- "$backup"
-    fi
-  done < <(find "$dir" -maxdepth 1 -name "${base}.bak.[0-9]*" -print | sort -r)
+  [ -e "$dir" ] || return 0
+  if [ ! -r "$dir" ] || [ ! -x "$dir" ]; then
+    echo "Error: cannot read $dir to remove old backups of $path" >&2
+    return 1
+  fi
+  for backup in "$path".bak.[0-9]*; do
+    [ -e "$backup" ] || [ -L "$backup" ] || continue
+    rm -rf -- "$backup" || status=1
+  done
+  return "$status"
 }
 
 link_file() {
   local src="$1"
   local dest="$2"
 
-  prune_old_backups "$dest" 1
-
+  remove_backups_of "$dest" || return 1
   if [ -L "$dest" ] && [ "$(readlink "$dest")" = "$src" ]; then
     return 0
   fi
-
-  backup_path "$dest"
-  mkdir -p "$(dirname "$dest")"
-  ln -s "$src" "$dest"
-}
-
-link_file_preserving_backups() {
-  local src="$1" dest="$2" backup suffix=0
-  if [ -L "$dest" ] && [ "$(readlink "$dest")" = "$src" ]; then
-    return 0
-  fi
-  if [ -e "$dest" ] || [ -L "$dest" ]; then
-    backup="${dest}.bak.${timestamp}"
-    while [ -e "$backup" ] || [ -L "$backup" ]; do
-      suffix=$((suffix + 1))
-      backup="${dest}.bak.${timestamp}.${suffix}"
-    done
-    mv "$dest" "$backup" || return 1
+  if [ -L "$dest" ]; then
+    rm -f "$dest" || return 1
+  elif [ -e "$dest" ]; then
+    rm -rf "$dest" || return 1
+    echo "Replaced $dest"
   fi
   mkdir -p "$(dirname "$dest")" || return 1
   ln -s "$src" "$dest"
@@ -1191,11 +1154,7 @@ link_manifest_files() {
   while IFS=$'\t' read -r type source destination; do
     [ "$type" = "link" ] || continue
     migrate_managed_link "$destination"
-    case "$destination" in
-      .tmux.conf|.oh-my-zsh/custom/zz-tmux.zsh|.local/bin/tmux-store|.local/lib/tmux-store/*|.local/lib/mux/*)
-        link_file_preserving_backups "${repo_root}/${source}" "${HOME}/${destination}" ;;
-      *) link_file "${repo_root}/${source}" "${HOME}/${destination}" ;;
-    esac
+    link_file "${repo_root}/${source}" "${HOME}/${destination}"
     case "$source" in
       *.sh) chmod +x "${repo_root}/${source}" ;;
     esac
@@ -1245,6 +1204,7 @@ render_launchd_template() {
   local escaped_home=""
   local escaped_repo=""
 
+  remove_backups_of "$dest" || return 1
   escaped_home="$(xml_escape "$HOME" | sed_replacement_escape)"
   escaped_repo="$(xml_escape "$repo_root" | sed_replacement_escape)"
   mkdir -p "$(dirname "$dest")"
@@ -1421,13 +1381,40 @@ install_npm_cache_clean() {
   fi
 }
 
+# Merge the shared MCP servers into local Copilot MCP data; shared wins.
+merge_shared_mcp() {
+  local shared_mcp="$1"
+  local copilot_mcp_pre="${HOME}/.config/github-copilot/mcp.json"
+  local tmp_mcp
+  remove_backups_of "$copilot_mcp_pre" || return 1
+  have_cmd jq && [ -f "$shared_mcp" ] || return 0
+  mkdir -p "$(dirname "$copilot_mcp_pre")"
+  if [ ! -f "$copilot_mcp_pre" ]; then
+    jq '{mcpServers: (.mcpServers // {})}' "$shared_mcp" >"$copilot_mcp_pre" \
+      && echo "Created $copilot_mcp_pre with $(jq '.mcpServers | length' "$copilot_mcp_pre") shared MCP servers"
+  else
+    tmp_mcp="$(mktemp)"
+    if jq -s '
+          .[0].mcpServers as $local
+          | .[1].mcpServers as $shared
+          | .[0] + {mcpServers: ($local + $shared)}
+        ' "$copilot_mcp_pre" "$shared_mcp" >"$tmp_mcp"; then
+      mv "$tmp_mcp" "$copilot_mcp_pre"
+      echo "Merged shared MCP servers into $copilot_mcp_pre (shared wins on collision)"
+    else
+      rm -f "$tmp_mcp"
+      echo "Warning: jq merge of shared MCP into $copilot_mcp_pre failed; skipped"
+    fi
+  fi
+}
+
 # Import Copilot's merged MCP server map into Claude Code's local state file.
-# Skips the backup and rewrite when .mcpServers already matches, so repeated
-# installs leave no new ~/.claude.json.bak.* behind.
+# Skips the rewrite when .mcpServers already matches. Never backs up the file.
 import_copilot_mcp_into_claude() {
   local copilot_mcp="${HOME}/.config/github-copilot/mcp.json"
   local claude_user_json="${HOME}/.claude.json"
   local src_mcp_json tmp_user
+  remove_backups_of "$claude_user_json" || return 1
   have_cmd jq && [ -f "$copilot_mcp" ] || return 0
   src_mcp_json="$(jq -c '.mcpServers // {}' "$copilot_mcp" || echo '{}')"
   if [ "$src_mcp_json" = '{}' ] || [ "$src_mcp_json" = "null" ]; then
@@ -1442,14 +1429,9 @@ import_copilot_mcp_into_claude() {
   if [ -f "$claude_user_json" ]; then
     if jq --argjson src "$src_mcp_json" '.mcpServers = $src' \
         "$claude_user_json" >"$tmp_user"; then
-      if ! backup_path_once "$claude_user_json"; then
-        rm -f "$tmp_user"
-        echo "Warning: failed to back up $claude_user_json; MCP import skipped"
-      else
-        mv "$tmp_user" "$claude_user_json"
-        chmod 600 "$claude_user_json"
-        echo "Imported $(echo "$src_mcp_json" | jq 'length') MCP servers into $claude_user_json (from $copilot_mcp)"
-      fi
+      mv "$tmp_user" "$claude_user_json"
+      chmod 600 "$claude_user_json"
+      echo "Imported $(echo "$src_mcp_json" | jq 'length') MCP servers into $claude_user_json (from $copilot_mcp)"
     else
       rm -f "$tmp_user"
       echo "Warning: jq merge into $claude_user_json failed; MCP import skipped"
@@ -1519,28 +1501,7 @@ if [ -x "$cleanup_script" ]; then
 fi
 
 # Merge tracked, secret-free MCP servers into the user's Copilot MCP config.
-shared_mcp="$(manifest_source_for_destination merge .config/github-copilot/mcp.json)"
-copilot_mcp_pre="${HOME}/.config/github-copilot/mcp.json"
-if have_cmd jq && [ -f "$shared_mcp" ]; then
-  mkdir -p "$(dirname "$copilot_mcp_pre")"
-  if [ ! -f "$copilot_mcp_pre" ]; then
-    jq '{mcpServers: (.mcpServers // {})}' "$shared_mcp" >"$copilot_mcp_pre" \
-      && echo "Created $copilot_mcp_pre with $(jq '.mcpServers | length' "$copilot_mcp_pre") shared MCP servers"
-  else
-    tmp_mcp="$(mktemp)"
-    if jq -s '
-          .[0].mcpServers as $local
-          | .[1].mcpServers as $shared
-          | .[0] + {mcpServers: ($local + $shared)}
-        ' "$copilot_mcp_pre" "$shared_mcp" >"$tmp_mcp"; then
-      mv "$tmp_mcp" "$copilot_mcp_pre"
-      echo "Merged shared MCP servers into $copilot_mcp_pre (shared wins on collision)"
-    else
-      rm -f "$tmp_mcp"
-      echo "Warning: jq merge of shared MCP into $copilot_mcp_pre failed; skipped"
-    fi
-  fi
-fi
+merge_shared_mcp "$(manifest_source_for_destination merge .config/github-copilot/mcp.json)"
 
 # The official Copilot plugin supersedes the old vendored WakaTime MCP.
 cleanup_legacy_wakatime_mcp

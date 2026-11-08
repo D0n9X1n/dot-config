@@ -102,7 +102,7 @@ git pull --ff-only
 ./install.sh
 ```
 
-The installer is idempotent. It keeps correct links. It backs up a different file or link before replacing it. Native tmux migration preserves all earlier tmux backups.
+The installer is idempotent. It keeps correct links. It replaces a different file or link without keeping a backup, and removes old installer backups. Edit managed config in this repo, not at the installed path.
 
 The installer does not reload or stop live tmux or RMUX servers. New servers use the installed config. Reload an existing server only when you choose; see [Tmux](Tmux.md). After changing tracked config, run `scripts/check.sh all`, run `scripts/check.sh apollo-online` if release pins changed, then run `./install.sh` twice.
 

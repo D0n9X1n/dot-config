@@ -81,17 +81,19 @@ Generated status-line, shell-prompt, and Claude theme files are local runtime st
 
 ## Safe links
 
-For most `link` rows, `install.sh` does this:
+For every `link` row, `install.sh` does this:
 
-1. Leave the link alone when it already points to the right source.
-2. Remove an old link only when it points to the exact old repo path.
-3. Move any other file or link to `<name>.bak.YYYYMMDDHHMMSS`.
-4. Make the new link.
-5. Keep the newest backup for that destination.
+1. Remove old installer backups: `<name>.bak.<digits>…` next to the destination.
+2. Leave the link alone when it already points to the right source.
+3. Remove an old link only when it points to the exact old repo path.
+4. Replace any other file, folder, or link. No backup is kept.
+5. Make the new link.
 
-Native tmux links use a non-pruning path. This covers `~/.tmux.conf`, `zz-tmux.zsh`, `tmux-store`, and the tmux-store/shared mux libraries. A user file or foreign link gets a collision-safe backup name with a numeric suffix when needed. All existing backups are kept, even when the managed link is already correct.
+**A file you edited at a managed path is lost when the installer replaces it.** The installer prints `Replaced <path>` for a real file or folder. Change managed config in this repo instead.
 
-A user file is not silently deleted. A foreign symlink is not silently deleted. Both become backups before the managed link is made.
+Rendered launchd plists, the merged Copilot MCP file, and `~/.claude.json` work the same way: they are rewritten in place, and old `.bak.<digits>` copies next to them are removed. Other names, such as `.bak.x`, `~/.claude/backups/`, and `~/.claude.json.backup`, belong to other tools and stay.
+
+Copilot's own cleanup script also removes every `~/.copilot/*.bak.*` file; see [Copilot CLI](Copilot-CLI.md).
 
 The move from old root paths to `config/` is handled in the same install run. The exact old root-managed `~/.tmux.conf` link migrates to `config/tmux/tmux.conf`; it is active again, not retired.
 
@@ -170,7 +172,7 @@ Local state is not the same as a user global. `~/.claude/CLAUDE.md` and `~/.copi
 
 ## Retired links
 
-Native tmux is active again through `config/tmux/tmux.conf` and `~/.tmux.conf`. It does not restore the old TPM setup. Existing plugins, resurrect files, and tmux backups stay untouched. See [Tmux](Tmux.md).
+Native tmux is active again through `config/tmux/tmux.conf` and `~/.tmux.conf`. It does not restore the old TPM setup. Existing plugins and resurrect files stay untouched. See [Tmux](Tmux.md).
 
 The duplicate `~/.copilot/AGENTS.md` link is also removed only when it points to this repo's current or former managed source. User files and foreign links stay.
 

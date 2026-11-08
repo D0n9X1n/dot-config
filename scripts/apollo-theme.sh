@@ -465,6 +465,7 @@ apollo_validate_claude_state() {
 
 apollo_set_claude_theme() {
   local state="${HOME}/.claude.json" tmp
+  remove_backups_of "$state" || return 1
   if [ -f "$state" ] && jq -e '.theme == "custom:apollo"' "$state" >/dev/null 2>&1; then
     return 0
   fi
@@ -475,14 +476,10 @@ apollo_set_claude_theme() {
       rm -f "$tmp"
       return 1
     }
-    backup_path_once "$state" || {
-      rm -f "$tmp"
-      return 1
-    }
   else
     jq -n '{theme: "custom:apollo"}' >"$tmp"
   fi
-  mv "$tmp" "$state"
+  mv "$tmp" "$state" || return 1
   chmod 600 "$state"
 }
 
@@ -510,7 +507,7 @@ apollo_link_consumers() {
   local root="$1"
   link_file "${root}/current/sonicterm/apollo.toml" "${HOME}/.sonicterm/themes/apollo.toml" || return 1
   link_file "${root}/current/rmux/apollo-rmux.conf" "${HOME}/.config/rmux-apollo-theme/apollo-rmux.conf" || return 1
-  link_file_preserving_backups "${root}/current/tmux/apollo.tmux" "${HOME}/.config/tmux-apollo-theme/apollo.tmux" || return 1
+  link_file "${root}/current/tmux/apollo.tmux" "${HOME}/.config/tmux-apollo-theme/apollo.tmux" || return 1
   link_file "${root}/current/eza/theme.yml" "${HOME}/.config/eza-apollo-theme/theme.yml" || return 1
   link_file "${root}/current/generated/claude/apollo.json" "${HOME}/.claude/themes/apollo.json" || return 1
 }
