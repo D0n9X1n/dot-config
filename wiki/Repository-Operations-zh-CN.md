@@ -81,17 +81,19 @@ Apollo 主题文件不保存在 Git 中，也不作为 manifest source。`script
 
 ## 安全链接
 
-对于大多数 `link` 行，`install.sh` 会这样做：
+对于每个 `link` 行，`install.sh` 会这样做：
 
-1. 如果链接已经指向正确源文件，就不改它。
-2. 只有链接指向精确的旧仓库路径时，才删除旧链接。
-3. 其他文件或链接会移动为 `<名称>.bak.YYYYMMDDHHMMSS`。
-4. 创建新链接。
-5. 为每个目标保留最新备份。
+1. 删除旧的安装器备份：目标旁边的 `<名称>.bak.<数字>…`。
+2. 如果链接已经指向正确源文件，就不改它。
+3. 只有链接指向精确的旧仓库路径时，才删除旧链接。
+4. 替换其他文件、文件夹或链接，不保留备份。
+5. 创建新链接。
 
-原生 tmux 链接使用不裁剪备份的路径。范围包括 `~/.tmux.conf`、`zz-tmux.zsh`、`tmux-store` 和 tmux-store/共享 mux 库。用户文件或外部链接会获得不会冲突的备份名，必要时加数字后缀。所有已有备份都会保留，即使受管链接已经正确也不清理。
+**你在受管路径上修改的文件，会在安装器替换它时丢失。** 替换真实文件或文件夹时，安装器会输出 `Replaced <路径>`。请改为在本仓库中修改受管配置。
 
-用户文件不会被静默删除。指向其他位置的链接也不会被静默删除。它们会先变成备份，再创建受管链接。
+渲染的 launchd plist、合并后的 Copilot MCP 文件和 `~/.claude.json` 也一样：它们会被原地重写，旁边旧的 `.bak.<数字>` 副本会被删除。其他名称，例如 `.bak.x`、`~/.claude/backups/` 和 `~/.claude.json.backup`，属于其他工具，会保留。
+
+Copilot 自己的清理脚本也会删除所有 `~/.copilot/*.bak.*` 文件；见 [Copilot CLI](Copilot-CLI-zh-CN.md)。
 
 从旧根目录路径迁移到 `config/` 会在同一次安装中完成。精确指向旧根目录受管源的 `~/.tmux.conf` 会迁移到 `config/tmux/tmux.conf`；它重新启用，不再属于停用项。
 
@@ -170,7 +172,7 @@ Claude 的 local scope 条目位于 `~/.claude.json` 的 `projects[].mcpServers`
 
 ## 已停用链接
 
-原生 tmux 通过 `config/tmux/tmux.conf` 和 `~/.tmux.conf` 重新启用，但不恢复旧 TPM 设置。已有 plugins、resurrect 文件和 tmux 备份保持不动。请看 [Tmux](Tmux-zh-CN.md)。
+原生 tmux 通过 `config/tmux/tmux.conf` 和 `~/.tmux.conf` 重新启用，但不恢复旧 TPM 设置。已有 plugins 和 resurrect 文件保持不动。请看 [Tmux](Tmux-zh-CN.md)。
 
 重复的 `~/.copilot/AGENTS.md` 链接也只在指向本仓库当前或过去的受管源文件时删除。用户文件和其他链接会保留。
 

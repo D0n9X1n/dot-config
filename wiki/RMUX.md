@@ -191,7 +191,7 @@ On macOS and Linux, native tmux replaces RMUX. `rr`, `rl`, `rd`, `rh`, and `rs` 
 
 The shared `exit`/`logout`/empty-prompt Ctrl+D dispatcher checks `RMUX` before `TMUX`. This avoids sending RMUX's compatible environment to a native tmux server. Neither engine auto-attaches. Installation does not reload or stop either live server, and never runs `rs` or `ts` automatically.
 
-`~/.tmux.conf` is managed again from `config/tmux/tmux.conf`. The old root-managed link migrates; user files and foreign links get collision-safe backups, and all earlier tmux backups stay. No TPM or plugin bootstrap is added. Existing `~/.tmux/plugins/` and resurrect snapshots stay untouched. The old tmux profile remains in v2.4.0 Git history; see [Repository operations](Repository-Operations.md).
+`~/.tmux.conf` is managed again from `config/tmux/tmux.conf`. The old root-managed link migrates; user files and foreign links are replaced without a backup. No TPM or plugin bootstrap is added. Existing `~/.tmux/plugins/` and resurrect snapshots stay untouched. The old tmux profile remains in v2.4.0 Git history; see [Repository operations](Repository-Operations.md).
 
 The native alternative does not fix RMUX's open [prompt issue #60](https://github.com/D0n9X1n/dot-config/issues/60). SonicTerm remains the managed outer terminal.
 

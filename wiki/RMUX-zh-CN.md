@@ -191,7 +191,7 @@ Copilot CLI 尚不能识别所有 RMUX/SonicTerm 终端身份。因此仓库中�
 
 共享的 `exit`/`logout`/空提示符 Ctrl+D 分派器先检查 `RMUX`，再检查 `TMUX`，避免把 RMUX 的兼容环境送到原生 tmux 服务器。两个引擎都不会自动连接。安装不会重载或停止任一运行中的服务器，也绝不会自动运行 `rs` 或 `ts`。
 
-`~/.tmux.conf` 重新由 `config/tmux/tmux.conf` 管理。旧根目录受管链接会迁移；用户文件和外部链接先备份，名称不会冲突，所有已有 tmux 备份都会保留。不添加 TPM 或 plugin bootstrap。已有 `~/.tmux/plugins/` 和 resurrect 快照保持不动。旧 tmux 配置仍在 v2.4.0 Git 历史中，见[仓库操作](Repository-Operations-zh-CN.md)。
+`~/.tmux.conf` 重新由 `config/tmux/tmux.conf` 管理。旧根目录受管链接会迁移；用户文件和外部链接会被直接替换，不保留备份。不添加 TPM 或 plugin bootstrap。已有 `~/.tmux/plugins/` 和 resurrect 快照保持不动。旧 tmux 配置仍在 v2.4.0 Git 历史中，见[仓库操作](Repository-Operations-zh-CN.md)。
 
 原生替代方案不修复 RMUX 尚未解决的[提示框问题 #60](https://github.com/D0n9X1n/dot-config/issues/60)。SonicTerm 仍是受管的外层终端。
 

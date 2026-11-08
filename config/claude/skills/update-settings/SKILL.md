@@ -71,7 +71,7 @@ Keep Opus native. Never point Opus at GPT.
 - Read `wiki/Tmux.md` for native tmux and `wiki/RMUX.md` for RMUX. Their configs, sockets, and state stay separate; Apollo theme and status style stay aligned.
 - RMUX config uses tmux command syntax but remains native RMUX config. Keep `~/.rmux.conf` separate from the active `~/.tmux.conf`.
 - Test each engine with a unique `-L` socket. Never test against a live user server.
-- Do not add TPM, plugin bootstrap, or a global tmux shim. Leave old plugins and resurrect data alone; preserve every tmux migration backup.
+- Do not add TPM, plugin bootstrap, or a global tmux shim. Leave old plugins and resurrect data alone. The installer keeps no backups; see `wiki/Repository-Operations.md`.
 - SonicTerm uses `TERM_PROGRAM=SonicTerm`; RMUX panes use `TERM_PROGRAM=rmux`; native tmux panes keep `TERM_PROGRAM=tmux`.
 - Only Copilot children get the WezTerm compatibility name.
 - `cc`/`gg` check RMUX first. Native tmux renames go through `tmux-store` on the current socket, without changing `PATH`. Keep RMUX's private teammate shim unchanged.
