@@ -859,8 +859,19 @@ install_macos_deps() {
 # backups match, never its parent folder or another file.
 remove_backups_of() {
   local path="$1" dir backup status=0
-  dir="$(dirname "$path")"
-  [ -e "$dir" ] || return 0
+  # Not $(dirname): command substitution drops trailing newlines in a name.
+  case "$path" in
+    */*) dir="${path%/*}"; dir="${dir:-/}" ;;
+    *) dir=. ;;
+  esac
+  # A folder behind an unsearchable one looks missing; check the nearest
+  # folder that exists before treating the parent as absent.
+  while [ ! -e "$dir" ] && [ ! -L "$dir" ]; do
+    case "$dir" in
+      */*) dir="${dir%/*}"; dir="${dir:-/}" ;;
+      *) dir=. ;;
+    esac
+  done
   if [ ! -r "$dir" ] || [ ! -x "$dir" ]; then
     echo "Error: cannot read $dir to remove old backups of $path" >&2
     return 1
@@ -876,6 +887,10 @@ link_file() {
   local src="$1"
   local dest="$2"
 
+  # A trailing slash would make rm follow a symlinked folder.
+  case "$dest" in
+    ''|*/|*/.|*/..|*/../*) echo "Error: unsafe link destination: $dest" >&2; return 1 ;;
+  esac
   remove_backups_of "$dest" || return 1
   if [ -L "$dest" ] && [ "$(readlink "$dest")" = "$src" ]; then
     return 0
@@ -947,7 +962,7 @@ validate_manifest() {
       *) echo "Error: manifest source must be under config/ or scripts/: $source" >&2; return 1 ;;
     esac
     case "$destination" in
-      /*|*'..'*) echo "Error: unsafe manifest destination: $destination" >&2; return 1 ;;
+      /*|*'..'*|*/|*/.) echo "Error: unsafe manifest destination: $destination" >&2; return 1 ;;
     esac
     [ -f "${repo_root}/${source}" ] || {
       echo "Error: missing manifest source: $source" >&2
@@ -998,7 +1013,7 @@ validate_local_overlay() {
       /*|*'..'*) echo "Error: unsafe local manifest source: $source" >&2; return 1 ;;
     esac
     case "$destination" in
-      /*|*'..'*) echo "Error: unsafe local manifest destination: $destination" >&2; return 1 ;;
+      /*|*'..'*|*/|*/.) echo "Error: unsafe local manifest destination: $destination" >&2; return 1 ;;
       .oh-my-zsh/custom/zzz-local-*)
         echo "Error: $destination is reserved for local/zsh/*.zsh" >&2
         return 1

@@ -2730,6 +2730,24 @@ config" ]
       chmod 700 "$test_root/locked"; echo "unreadable parent was treated as clean" >&2; exit 1
     fi
     chmod 700 "$test_root/locked"
+    # A parent hidden behind an unsearchable folder is not treated as missing.
+    mkdir -p "$test_root/locked/nested"; : >"$test_root/locked/nested/e.bak.1"; chmod 600 "$test_root/locked"
+    if remove_backups_of "$test_root/locked/nested/e" 2>/dev/null; then
+      chmod 700 "$test_root/locked"; echo "unsearchable ancestor was treated as missing" >&2; exit 1
+    fi
+    chmod 700 "$test_root/locked"
+    [ -e "$test_root/locked/nested/e.bak.1" ]
+    # A parent whose name ends in a newline keeps it: the folder without the
+    # newline is unreadable, so checking it by mistake fails.
+    mkdir -p "$test_root/nl
+" "$test_root/nl"; chmod 000 "$test_root/nl"; : >"$test_root/nl
+/g"; : >"$test_root/nl
+/g.bak.1"
+    remove_backups_of "$test_root/nl
+/g"
+    [ ! -e "$test_root/nl
+/g.bak.1" ]
+    chmod 700 "$test_root/nl"
 
     # One failed delete fails the call, even when a later delete succeeds.
     : >"$h/d.bak.1"; : >"$h/d.bak.2"
@@ -2756,6 +2774,13 @@ config" ]
     [ "$(link_file "$test_root/src/f" "$h/f3")" = "Replaced $h/f3" ]
     [ -L "$h/f3" ]
     [ -z "$(find "$h" -maxdepth 1 -name 'f[0-9]*.bak.*' -print)" ]
+    # A trailing slash on a symlinked folder never deletes the folder it points to.
+    mkdir -p "$test_root/precious"; printf 'keep\n' >"$test_root/precious/data"
+    ln -s "$test_root/precious" "$h/target"
+    if link_file "$test_root/src/f" "$h/target/" >/dev/null 2>&1; then
+      echo "link_file accepted a trailing-slash destination" >&2; exit 1
+    fi
+    grep -Fxq keep "$test_root/precious/data"
 
     # Rendered plists and MCP files clear old backups and make none.
     mkdir -p "$h/Library/LaunchAgents" "$h/.config/github-copilot"
@@ -2782,6 +2807,17 @@ config" ]
     mkdir -p "$test_root/apollo/current"
     if apollo_link_consumers "$test_root/apollo" >/dev/null 2>&1; then
       echo "apollo_link_consumers ignored a failed backup removal" >&2; exit 1
+    fi
+    if render_launchd_template "$test_root/t.plist" "$h/Library/LaunchAgents/x.plist" >/dev/null 2>&1; then
+      echo "render_launchd_template ignored a failed backup removal" >&2; exit 1
+    fi
+    # Early-return paths: no shared file, and no Copilot MCP file.
+    if merge_shared_mcp "$test_root/absent.json" >/dev/null 2>&1; then
+      echo "merge_shared_mcp ignored a failed backup removal" >&2; exit 1
+    fi
+    rm -f "$h/.config/github-copilot/mcp.json"
+    if import_copilot_mcp_into_claude >/dev/null 2>&1; then
+      echo "import_copilot_mcp_into_claude ignored a failed backup removal" >&2; exit 1
     fi
   )
   echo "installer makes no backups and clears old ones exactly"
