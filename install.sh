@@ -801,6 +801,7 @@ install_macos_deps() {
   local formulae=(
     autojump
     eza
+    gh
     git
     jq
     neovim
@@ -1510,6 +1511,52 @@ merge_harbor_client_settings() {
   fi
 }
 
+# Set this Mac up as a Harbor device through the private harbor-server repo:
+# its sync.sh device step pushes an SSH key, installs Harbor.app, and pairs
+# the device certificate. All private values (hosts, users, keys) live there,
+# never here. Clones the repo with gh when missing; an existing checkout is
+# never pulled or changed. Every outcome prints one line at most and returns
+# 0, so uu always continues. HARBOR_DEVICE_SETUP=0 turns it off;
+# HARBOR_SERVER_DIR picks the checkout.
+setup_harbor_device() {
+  local dir="${HARBOR_SERVER_DIR:-${HOME}/Workspace/harbor/harbor-server}"
+  local sync rc=0
+  is_macos || return 0
+  [ "${HARBOR_DEVICE_SETUP:-1}" != "0" ] || return 0
+  sync="${dir}/.claude/skills/sync-japan/sync.sh"
+
+  if [ ! -d "$dir" ]; then
+    if ! have_cmd gh || ! gh auth status >/dev/null 2>&1; then
+      echo "Harbor device: no $dir; run \`gh auth login\`, then uu again (HARBOR_DEVICE_SETUP=0 skips this)"
+      return 0
+    fi
+    if ! mkdir -p "$(dirname "$dir")" ||
+      ! GIT_TERMINAL_PROMPT=0 gh repo clone ForYouzi/harbor-server "$dir" </dev/null >/dev/null 2>&1; then
+      echo "Warning: Harbor device: could not clone ForYouzi/harbor-server into $dir (no access or offline); skipped"
+      return 0
+    fi
+    echo "Harbor device: cloned ForYouzi/harbor-server into $dir"
+  fi
+
+  if [ ! -f "$sync" ] || ! grep -Eq '^[[:space:]]*([a-z|]+\|)?device(\|[a-z|]+)?\)' "$sync"; then
+    echo "Harbor device: $dir has no sync.sh device step yet; pull it to set up this Mac (skipped)"
+    return 0
+  fi
+
+  # With a terminal, sync.sh talks to it directly: the SSH password prompt and
+  # its own lines show at once instead of waiting on the install log's
+  # line-buffered pipe. Without one it cannot prompt and only logs.
+  if [ -t 0 ] && { : >/dev/tty; } 2>/dev/null; then
+    bash "$sync" device </dev/tty >/dev/tty 2>&1 || rc=$?
+  else
+    bash "$sync" device || rc=$?
+  fi
+  if [ "$rc" -ne 0 ]; then
+    echo "Warning: Harbor device setup exited $rc; continuing (run bash $sync device to retry)"
+  fi
+  return 0
+}
+
 if [ "${DOT_CONFIGS_INSTALL_LIB_ONLY:-0}" = "1" ]; then
   return 0 2>/dev/null || exit 0
 fi
@@ -1590,6 +1637,11 @@ update_claude_plugins
 
 # Import Copilot's merged MCP server map into Claude Code's local state file.
 import_copilot_mcp_into_claude
+
+# Harbor device: SSH key, Harbor.app, and device certificate, through the
+# private harbor-server checkout. Before the merge below, so a fresh app gets
+# its model settings in the same run.
+setup_harbor_device
 
 # harbor-client: model address and names follow the local copilot-relay.
 if is_macos; then

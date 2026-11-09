@@ -2979,6 +2979,96 @@ run_harbor_client_smoke() {
   echo "harbor-client settings follow the relay"
 }
 
+# The Harbor device step, with a fake gh and a fake harbor-server checkout
+# whose sync.sh records its arguments. No network, no real repo, no prompt.
+run_harbor_device_smoke() {
+  grep -Eq '^setup_harbor_device$' install.sh
+  (
+    local test_root fake_bin calls dir out
+    test_root="$(mktemp -d)"
+    trap 'rm -rf "$test_root"' EXIT
+    export HOME="$test_root/home"
+    mkdir -p "$HOME"
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    fake_bin="$test_root/bin"
+    calls="$test_root/calls"
+    dir="$test_root/work/harbor/harbor-server"
+    mkdir -p "$fake_bin"
+    # gh: auth status follows FAKE_GH_AUTH; repo clone follows FAKE_GH_CLONE
+    # and makes a checkout whose sync.sh records "sync <args>".
+    cat >"$fake_bin/gh" <<'SH'
+#!/usr/bin/env bash
+printf 'gh %s\n' "$*" >>"$CALLS"
+case "$1 $2" in
+  "auth status") [ "${FAKE_GH_AUTH:-ok}" = ok ] ;;
+  "repo clone")
+    [ "${FAKE_GH_CLONE:-ok}" = ok ] || exit 1
+    mkdir -p "$4/.claude/skills/sync-japan"
+    printf '#!/usr/bin/env bash\ncase "$1" in\n  device) printf "sync %%s\\n" "$*" >>"$CALLS"; exit "${FAKE_SYNC_RC:-0}" ;;\nesac\n' \
+      >"$4/.claude/skills/sync-japan/sync.sh"
+    ;;
+  *) exit 2 ;;
+esac
+SH
+    # git: any call (a pull, a fetch) is recorded and must never happen.
+    printf '#!/usr/bin/env bash\nprintf "git %%s\\n" "$*" >>"$CALLS"\n' >"$fake_bin/git"
+    chmod +x "$fake_bin/gh" "$fake_bin/git"
+    export PATH="$fake_bin:$PATH" CALLS="$calls" HARBOR_SERVER_DIR="$dir"
+
+    # Not macOS: nothing runs.
+    is_macos() { return 1; }
+    [ -z "$(setup_harbor_device </dev/null)" ]
+    [ ! -e "$calls" ]
+    is_macos() { return 0; }
+
+    # Opt-out: nothing runs.
+    [ -z "$(HARBOR_DEVICE_SETUP=0 setup_harbor_device </dev/null)" ]
+    [ ! -e "$calls" ]
+
+    # No checkout and gh not logged in: one hint, no clone.
+    out="$(FAKE_GH_AUTH=no setup_harbor_device </dev/null)"
+    [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = 1 ]
+    printf '%s\n' "$out" | grep -Fq 'run `gh auth login`, then uu again'
+    if grep -q 'repo clone' "$calls"; then return 1; fi
+    [ ! -e "$dir" ]
+    rm -f "$calls"
+
+    # No checkout and the clone fails: one warning, nothing else.
+    out="$(FAKE_GH_CLONE=no setup_harbor_device </dev/null)"
+    printf '%s\n' "$out" | grep -Fq 'could not clone ForYouzi/harbor-server'
+    if grep -q '^sync' "$calls"; then return 1; fi
+    rm -f "$calls"
+
+    # No checkout and gh logged in: clone, then sync.sh device once.
+    out="$(setup_harbor_device </dev/null)"
+    printf '%s\n' "$out" | grep -Fq "cloned ForYouzi/harbor-server into $dir"
+    grep -Fxq "gh repo clone ForYouzi/harbor-server $dir" "$calls"
+    [ "$(grep -c '^sync' "$calls")" = 1 ]
+    grep -Fxq 'sync device' "$calls"
+    rm -f "$calls"
+
+    # Checkout exists: sync.sh device once; gh and git are never called.
+    out="$(setup_harbor_device </dev/null)"
+    [ -z "$out" ]
+    [ "$(cat "$calls")" = 'sync device' ]
+    rm -f "$calls"
+
+    # sync.sh fails: one warning, a zero return, and the install continues.
+    out="$(set -e; FAKE_SYNC_RC=7 setup_harbor_device </dev/null; echo continued)"
+    printf '%s\n' "$out" | grep -Fq 'Harbor device setup exited 7; continuing'
+    printf '%s\n' "$out" | grep -Fxq continued
+    rm -f "$calls"
+
+    # A checkout older than the device step: one hint, sync.sh not run.
+    printf '#!/usr/bin/env bash\ncase "$1" in\n  pair) printf "sync %%s\\n" "$*" >>"$CALLS" ;;\nesac\n' \
+      >"$dir/.claude/skills/sync-japan/sync.sh"
+    out="$(setup_harbor_device </dev/null)"
+    printf '%s\n' "$out" | grep -Fq 'has no sync.sh device step yet'
+    [ ! -e "$calls" ]
+  )
+  echo "Harbor device step ok"
+}
+
 run_smoke() {
   run_bash_syntax
   run_apollo_smoke
@@ -3015,6 +3105,7 @@ run_smoke() {
   run_firefox_smoke
   run_editors_smoke
   run_harbor_client_smoke
+  run_harbor_device_smoke
   run_local_checks
 }
 
@@ -3032,7 +3123,7 @@ case "${1:-all}" in
   local) run_local_checks ;;
   firefox) run_firefox_smoke ;;
   editors) run_editors_smoke ;;
-  harbor) run_harbor_client_smoke ;;
+  harbor) run_harbor_client_smoke; run_harbor_device_smoke ;;
   backups) run_install_backup_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;
