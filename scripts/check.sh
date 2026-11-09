@@ -3056,6 +3056,106 @@ run_herdr_copy_smoke() {
   )
 }
 
+# Fixture for install.sh's Herdr steps: a bare herdr-config remote with pins p1, p2 (themes only)
+# and p3 (user/settings.json), a bare superproject pinned at p1, and a temp HOME. Prints the dir.
+herdr_fixture() {
+  local t="$1" h s
+  h="$t/herdr-src"; s="$t/super-src"
+  git init -q -b main "$h"
+  mkdir -p "$h/layouts" "$h/themes" "$h/user" "$h/mods/m"
+  printf 'l1\n' >"$h/layouts/x.json"; printf 't1\n' >"$h/themes/x.json"
+  printf '{"zoom":1}\n' >"$h/user/settings.json"; printf '{}\n' >"$h/user/keys.json"; printf 'm\n' >"$h/mods/m/a.js"
+  git -C "$h" add -A && git -C "$h" commit -qm p1 && git -C "$h" tag p1
+  printf 't2\n' >"$h/themes/x.json"; git -C "$h" commit -qam p2 && git -C "$h" tag p2
+  printf '{"zoom":2}\n' >"$h/user/settings.json"; git -C "$h" commit -qam p3 && git -C "$h" tag p3
+  git clone -q --bare "$h" "$t/herdr.git"
+  git init -q -b main "$s"
+  mkdir -p "$s/config"; printf 'readme\n' >"$s/README.md"; printf 'cfg\n' >"$s/config/plain.txt"
+  printf 'link\t%s\t%s\n' config/plain.txt .plain \
+    config/herdr/layouts/x.json .config/herdr-app/layouts/x.json \
+    config/herdr/themes/x.json .config/herdr-app/themes/x.json \
+    config/herdr/user/settings.json .config/herdr-app/settings.json >"$s/config/manifest.tsv"
+  printf 'copy\tconfig/herdr/mods/m/a.js\t.config/herdr-app/mods/m/a.js\n' >>"$s/config/manifest.tsv"
+  git -C "$s" submodule add -q "file://$t/herdr.git" config/herdr
+  git -C "$s/config/herdr" checkout -q p1
+  git -C "$s" add -A && git -C "$s" commit -qm super
+  git clone -q --bare "$s" "$t/super.git"
+}
+
+# install.sh's Herdr steps on fixtures: offline skip, repeat, dirty edit carried, conflict, uu.
+run_herdr_install_smoke() {
+  (
+    set -euo pipefail
+    local t r out p1 p2 p3 before after
+    t="$(mktemp -d)"
+    [ -n "$t" ] && [ -d "$t" ] || exit 1
+    trap 'rm -rf "$t"' EXIT
+    export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t.invalid \
+      GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t.invalid
+    export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=protocol.file.allow GIT_CONFIG_VALUE_0=always
+    local wt; wt="$(pwd -P)"
+    herdr_fixture "$t"
+    p1="$(git -C "$t/herdr.git" rev-parse p1)"; p2="$(git -C "$t/herdr.git" rev-parse p2)"; p3="$(git -C "$t/herdr.git" rev-parse p3)"
+    fail() { echo "herdr install: $*" >&2; exit 1; }
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    run() { # run <repo> <home>: the Herdr part of an install
+      repo_root="$1"; manifest="$1/config/manifest.tsv"; export HOME="$2"; mkdir -p "$HOME"
+      herdr_install_prepare; validate_manifest; link_manifest_files; copy_manifest_files; herdr_install_report
+    }
+    listing() { find "$1" -print | LC_ALL=C sort | while IFS= read -r p; do
+      if [ -d "$p" ] && [ ! -L "$p" ]; then echo "D $p"; else ls -lid -- "$p"; fi; done; }
+
+    # (a) Offline: only Herdr rows are skipped, with exactly one warning.
+    git clone -q "$t/super.git" "$t/r1"
+    git -C "$t/r1" config submodule.config/herdr.url file:///nonexistent
+    out="$(run "$t/r1" "$t/h1" 2>&1)"
+    [ "$(grep -c '^Herdr config:' <<<"$out")" = 1 ] || fail "offline: want one Herdr warning, got: $out"
+    [ "$(readlink "$t/h1/.plain")" = "$t/r1/config/plain.txt" ] || fail "offline: the plain row was not linked"
+    [ ! -e "$t/h1/.config/herdr-app" ] && [ ! -L "$t/h1/.config/herdr-app/settings.json" ] || fail "offline: a Herdr row was installed"
+
+    # (b) Repeat: a second online install changes nothing.
+    git clone -q "$t/super.git" "$t/r2"
+    run "$t/r2" "$t/h2" >/dev/null 2>&1
+    [ "$(git -C "$t/r2/config/herdr" rev-parse HEAD)" = "$p1" ] || fail "repeat: not at p1"
+    [ "$(cat "$t/h2/.config/herdr-app/settings.json")" = '{"zoom":1}' ] || fail "repeat: settings not linked"
+    [ -f "$t/h2/.config/herdr-app/mods/m/a.js" ] && [ ! -L "$t/h2/.config/herdr-app/mods/m/a.js" ] || fail "repeat: mod not copied"
+    before="$(listing "$t/h2")"
+    out="$(run "$t/r2" "$t/h2" 2>&1)"
+    after="$(listing "$t/h2")"
+    [ "$before" = "$after" ] || { diff <(printf '%s\n' "$before") <(printf '%s\n' "$after") >&2 || true; fail "repeat: the second install changed HOME"; }
+    ! grep -q '^Herdr config:' <<<"$out" || fail "repeat: unexpected warning: $out"
+
+    # (c) A dirty, non-conflicting edit survives a pin advance to p2.
+    git clone -q "$t/super.git" "$t/r3"
+    run "$t/r3" "$t/h3" >/dev/null 2>&1
+    printf '{"zoom":1.2}\n' >"$t/r3/config/herdr/user/settings.json"
+    git -C "$t/r3" update-index --cacheinfo "160000,$p2,config/herdr" && git -C "$t/r3" commit -qm p2
+    out="$(run "$t/r3" "$t/h3" 2>&1)"
+    [ "$(git -C "$t/r3/config/herdr" rev-parse HEAD)" = "$p2" ] || fail "dirty: HEAD is not p2: $out"
+    [ "$(cat "$t/h3/.config/herdr-app/settings.json")" = '{"zoom":1.2}' ] || fail "dirty: the edit was lost"
+    [ "$(cat "$t/h3/.config/herdr-app/themes/x.json")" = t2 ] || fail "dirty: p2's theme is not linked"
+
+    # (d) A conflicting edit: the message, the old pin kept, the links still resolve.
+    git -C "$t/r3" update-index --cacheinfo "160000,$p3,config/herdr" && git -C "$t/r3" commit -qm p3
+    out="$(run "$t/r3" "$t/h3" 2>&1)"
+    grep -qxF 'Herdr config: commit or discard local edits in config/herdr, then rerun ./install.sh' <<<"$out" \
+      || fail "conflict: no message: $out"
+    [ "$(git -C "$t/r3/config/herdr" rev-parse HEAD)" = "$p2" ] || fail "conflict: HEAD moved"
+    for l in settings.json themes/x.json layouts/x.json; do
+      [ -e "$t/h3/.config/herdr-app/$l" ] || fail "conflict: $l does not resolve"
+    done
+    [ "$(cat "$t/h3/.config/herdr-app/settings.json")" = '{"zoom":1.2}' ] || fail "conflict: the edit was lost"
+
+    # (e) uu's ready check ignores the submodule, and still refuses another tracked edit.
+    zsh -c 'source "$1/config/zsh/uu.zsh"; _dot_configs_uu_ready "$2"' _ "$wt" "$t/r3" 2>/dev/null \
+      || fail "uu: refused a repo whose only change is the submodule"
+    printf 'x\n' >>"$t/r3/README.md"
+    ! zsh -c 'source "$1/config/zsh/uu.zsh"; _dot_configs_uu_ready "$2"' _ "$wt" "$t/r3" 2>/dev/null \
+      || fail "uu: accepted a repo with a tracked edit"
+    echo "herdr install: ok"
+  )
+}
+
 # Herdr: the herdr-config submodule (config/herdr) and how install.sh uses it.
 HERDR_PIN=v0.0.2
 herdr_expected_rows() {
@@ -3162,7 +3262,7 @@ case "${1:-all}" in
   firefox) run_firefox_smoke ;;
   editors) run_editors_smoke ;;
   harbor) run_harbor_client_smoke ;;
-  herdr) run_herdr_smoke; run_herdr_copy_smoke ;;
+  herdr) run_herdr_smoke; run_herdr_copy_smoke; run_herdr_install_smoke ;;
   backups) run_install_backup_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;

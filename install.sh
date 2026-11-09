@@ -933,6 +933,43 @@ migrate_managed_link() {
   fi
 }
 
+# Herdr: config/herdr is the herdr-config submodule. Its update never stops
+# the install; a conflict with local edits keeps the current checkout. Rows
+# whose source is missing (offline, or not checked out) are skipped and
+# reported once by herdr_install_report.
+HERDR_CONFLICT=0
+HERDR_UPDATE_ERROR=""
+herdr_submodule_update() {
+  [ -f "$repo_root/.gitmodules" ] || return 0
+  git config -f "$repo_root/.gitmodules" --get submodule.config/herdr.path >/dev/null 2>&1 || return 0
+  local err
+  err="$(git -C "$repo_root" submodule update --init config/herdr 2>&1)" && return 0
+  case "$err" in
+    *'would be overwritten'*|*'Please commit your changes'*|*'local changes'*)
+      HERDR_CONFLICT=1
+      echo "Herdr config: commit or discard local edits in config/herdr, then rerun ./install.sh" ;;
+    *) HERDR_UPDATE_ERROR="$(printf '%s' "$err" | tail -n 1)" ;;
+  esac
+  return 0
+}
+
+herdr_install_prepare() { herdr_submodule_update; }
+
+# True for a config/herdr row whose source is not here; such rows are skipped.
+herdr_source_missing() {
+  case "$1" in config/herdr/*) [ ! -f "${repo_root}/$1" ] ;; *) return 1 ;; esac
+}
+
+herdr_install_report() {
+  local skipped
+  skipped="$(awk -F'\t' '$2 ~ /^config\/herdr\// {print $2}' "$manifest" | while IFS= read -r src; do
+    [ -f "${repo_root}/${src}" ] || echo x; done | grep -c x || true)"
+  [ "$HERDR_CONFLICT" = 1 ] && return 0
+  if [ "${skipped:-0}" -gt 0 ]; then
+    echo "Herdr config: config/herdr is not checked out${HERDR_UPDATE_ERROR:+ ($HERDR_UPDATE_ERROR)}; skipped ${skipped} Herdr rows. Rerun ./install.sh when online."
+  fi
+}
+
 validate_manifest() {
   local type source destination extra
   local seen_destinations=""
@@ -964,10 +1001,10 @@ validate_manifest() {
     case "$destination" in
       /*|*'..'*|*/|*/.) echo "Error: unsafe manifest destination: $destination" >&2; return 1 ;;
     esac
-    [ -f "${repo_root}/${source}" ] || {
+    if [ ! -f "${repo_root}/${source}" ] && ! herdr_source_missing "$source"; then
       echo "Error: missing manifest source: $source" >&2
       return 1
-    }
+    fi
     case $'\n'"${seen_destinations}"$'\n' in
       *$'\n'"${destination}"$'\n'*) echo "Error: duplicate manifest destination: $destination" >&2; return 1 ;;
     esac
@@ -1178,6 +1215,7 @@ link_manifest_files() {
   local type source destination
   while IFS=$'\t' read -r type source destination; do
     [ "$type" = "link" ] || continue
+    herdr_source_missing "$source" && continue
     migrate_managed_link "$destination"
     link_file "${repo_root}/${source}" "${HOME}/${destination}"
     case "$source" in
@@ -1272,7 +1310,11 @@ copy_manifest_files() {
       fi
     done <"$state"
   fi
-  mv -f "$tmp" "$state" || { rm -f "$tmp"; return 1; }
+  if [ -f "$state" ] && cmp -s "$tmp" "$state"; then
+    rm -f "$tmp"
+  else
+    mv -f "$tmp" "$state" || { rm -f "$tmp"; return 1; }
+  fi
   return "$status"
 }
 
@@ -1625,11 +1667,13 @@ else
   echo "Auto-install only supports macOS + Homebrew. Install apps/fonts/CLIs manually."
 fi
 
+herdr_install_prepare
 validate_manifest
 validate_local_overlay
 install_apollo_themes
 link_manifest_files
 copy_manifest_files || echo "Warning: some copy rows were not installed (see above)" >&2
+herdr_install_report
 link_local_overlay
 install_firefox_step
 # RMUX is Windows-only. Keep retention while an older macOS install remains.
