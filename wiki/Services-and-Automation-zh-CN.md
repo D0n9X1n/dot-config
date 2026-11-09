@@ -16,7 +16,7 @@ Copilot 使用内置 GitHub 集成；Claude 使用已认证的 `gh`。不需要�
 - npm 中的 Copilot CLI 和 copilot-relay
 - oh-my-zsh
 - `eza`、`jq`、`neovim` 和 autojump 等 shell 工具
-- GitHub CLI（`gh`），Harbor 设备步骤用它克隆私有仓库
+- GitHub CLI（`gh`），Harbor 设备步骤用它从私有仓库下载文件
 - Nerd Font 符号与 Noto Color Emoji
 - [Rec Mountain Fonts](https://github.com/D0n9X1n/rec-mountain-fonts) release 中的 Rec Mono St.Helens、Rec Sans Mt.Baker 与 Rec Serif Mt.Adams；安装器会移除已停用的 `font-recursive` cask 与 `RecMonoBaker-*` 字体
 - SonicTerm、RMUX、原生 tmux 和 eza 的固定 Apollo theme releases
@@ -256,21 +256,28 @@ startup-item-names --rollback
 
 macOS 上每次运行 `install.sh`（以及 `uu`）还会把这台 Mac 设为 Harbor 设备。具体工作在私有仓库 `ForYouzi/harbor-server` 中完成，所以这个公开仓库不含任何服务器地址、用户名或密钥。该步骤在上面的设置合并之前运行，所以新装的应用在同一次运行中就会拿到模型键。
 
+新 Mac 不需要 harbor-server 检出。服务器在别处运行；这台 Mac 只需要设备设置脚本和固定的主机密钥。`uu` 用 `gh` 从私有仓库的 `main` 下载它们，保存在 `${XDG_CACHE_HOME:-~/.cache}/harbor/device/` 中，路径与仓库中相同：
+
+- `.claude/skills/sync-japan/sync.sh`
+- `deploy/known_hosts`
+- `deploy/japan/guarded.sh`
+
 在全新的 Mac 上：
 
 1. 用能读取 `ForYouzi/harbor-server` 的账号运行一次 `gh auth login`。
-2. 在终端中运行 `uu`。它把仓库克隆到 `~/Workspace/harbor/harbor-server`，然后在其中运行 `bash .claude/skills/sync-japan/sync.sh device`。这一步会生成 SSH key、询问一次服务器密码以推送它、安装 Harbor，并配对设备证书。
-3. 之后的运行发现一切就绪，该步骤什么也不做，也不会询问。
+2. 在终端中运行 `uu`。它下载这三个文件，然后运行 `bash ~/.cache/harbor/device/.claude/skills/sync-japan/sync.sh device`。这一步会生成 SSH key、询问一次服务器密码以推送它、安装 Harbor，并配对设备证书。
+3. 之后的运行会重新下载这些文件，发现一切就绪，该步骤什么也不做，也不会询问。
 
 行为：
 
-- `HARBOR_DEVICE_SETUP=0` 关闭该步骤。`HARBOR_SERVER_DIR` 指定其他检出。
-- 检出不存在且 `gh` 未安装或未登录时，它打印一行提示先 `gh auth login`，然后跳过。克隆失败（无权限、离线）时打印一条警告并跳过。
-- 已有的检出从不被 pull 或修改。它的 `sync.sh` 还没有 `device` 步骤时，打印一行提示并跳过。
+- `HARBOR_DEVICE_SETUP=0` 关闭该步骤。
+- 每次运行先把三个文件全部下载到一个新文件夹，再整体替换缓存文件夹（权限 `0700`）。下载失败时旧缓存保持原样，绝不会只替换一半。
+- `gh` 未安装、未登录或下载失败（无权限、离线）时，有缓存就使用它，并打印一行说明这是较旧的副本；没有缓存时打印一行提示先 `gh auth login`，然后跳过。
+- 它从不克隆或 pull 任何仓库。
 - 有终端时，`sync.sh device` 直接读写该终端，所以密码提示会立即出现；它的输出不进安装日志。没有终端时它无法询问，输出写入日志。
 - 非零退出码只打印一条警告，安装会继续。
 
-`scripts/check.sh harbor` 用假的 `gh` 和假的检出测试该步骤，不访问网络。
+`scripts/check.sh harbor` 用一个提供这三个文件或按需失败的假 `gh` 测试该步骤，不访问网络。
 
 ## MCP 合并
 
