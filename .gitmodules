@@ -1,0 +1,4 @@
+[submodule "config/herdr"]
+	path = config/herdr
+	url = https://github.com/D0n9X1n/herdr-config.git
+	ignore = dirty

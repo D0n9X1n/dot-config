@@ -873,10 +873,11 @@ run_manifest_smoke() {
       echo "duplicate manifest source: $duplicate_source" >&2
       return 1
     }
-    config_files="$(find config -type f ! -path 'config/manifest.tsv' \
+    # config/herdr is a submodule: run_herdr_smoke checks its rows against its tracked files.
+    config_files="$(find config -type f ! -path 'config/manifest.tsv' ! -path 'config/herdr/*' \
       ! -path 'config/sonicterm/*.save.lock' ! -path 'config/copilot/*.json.lock' \
       ! -name '.DS_Store' -print | sort)"
-    manifest_config_files="$(grep -Ev '^(#|$)' config/manifest.tsv | cut -f2 | grep '^config/' | sort)"
+    manifest_config_files="$(grep -Ev '^(#|$)' config/manifest.tsv | cut -f2 | grep '^config/' | grep -v '^config/herdr/' | sort)"
     [ "$config_files" = "$manifest_config_files" ] || {
       echo "config/ files and manifest sources differ" >&2
       diff -u <(printf '%s\n' "$config_files") <(printf '%s\n' "$manifest_config_files") >&2 || true
@@ -2981,6 +2982,28 @@ run_harbor_client_smoke() {
   echo "harbor-client settings follow the relay"
 }
 
+# Herdr: the herdr-config submodule (config/herdr) and how install.sh uses it.
+HERDR_PIN=v0.0.2
+run_herdr_smoke() {
+  (
+    set -euo pipefail
+    local got
+    got="$(git config -f .gitmodules --get submodule.config/herdr.path)" || { echo "herdr: no config/herdr submodule in .gitmodules" >&2; exit 1; }
+    [ "$got" = config/herdr ] || { echo "herdr: submodule path is $got" >&2; exit 1; }
+    got="$(git config -f .gitmodules --get submodule.config/herdr.url)"
+    [ "$got" = https://github.com/D0n9X1n/herdr-config.git ] || { echo "herdr: submodule url is $got" >&2; exit 1; }
+    got="$(git config -f .gitmodules --get submodule.config/herdr.ignore || true)"
+    [ "$got" = dirty ] || { echo "herdr: submodule ignore is '$got', want dirty" >&2; exit 1; }
+    [ "$(git ls-files -s config/herdr | awk '{print $1}')" = 160000 ] || { echo "herdr: config/herdr is not a gitlink" >&2; exit 1; }
+    if [ -e config/herdr/.git ]; then
+      got="$(git -C config/herdr describe --exact-match --tags HEAD 2>/dev/null || true)"
+      [ "$got" = "$HERDR_PIN" ] || { echo "herdr: config/herdr is at '$got', want $HERDR_PIN" >&2; exit 1; }
+    fi
+    grep -q -- '--ignore-submodules=all' config/zsh/uu.zsh || { echo "herdr: uu's dirty check does not ignore submodules" >&2; exit 1; }
+    echo "herdr: ok"
+  )
+}
+
 run_smoke() {
   run_bash_syntax
   run_apollo_smoke
@@ -3035,11 +3058,12 @@ case "${1:-all}" in
   firefox) run_firefox_smoke ;;
   editors) run_editors_smoke ;;
   harbor) run_harbor_client_smoke ;;
+  herdr) run_herdr_smoke ;;
   backups) run_install_backup_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;
   *)
-    echo "usage: $0 [smoke|apollo|apollo-online|instructions|models|mcp|wiki|rmux|tmux|shell|local|firefox|editors|harbor|backups|shellcheck|all]" >&2
+    echo "usage: $0 [smoke|apollo|apollo-online|instructions|models|mcp|wiki|rmux|tmux|shell|local|firefox|editors|harbor|herdr|backups|shellcheck|all]" >&2
     exit 2
     ;;
 esac

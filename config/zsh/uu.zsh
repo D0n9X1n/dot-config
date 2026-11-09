@@ -27,7 +27,7 @@ unfunction _dot_configs_uu_ready _dot_configs_uu_pull _dot_configs_uu_sync_fork 
 function _dot_configs_uu_ready {
   emulate -L zsh
   local repo="$1" branch
-  if [[ -n "$(command git -C "$repo" status --porcelain --untracked-files=no)" ]]; then
+  if [[ -n "$(command git -C "$repo" status --porcelain --untracked-files=no --ignore-submodules=all)" ]]; then
     print -u2 "uu: $repo has uncommitted changes; commit or stash them first"
     return 1
   fi
