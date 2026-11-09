@@ -1065,6 +1065,16 @@ link_local_overlay() {
   echo "Linked local overlay from $local_root"
 }
 
+# Run local/install.sh last, with Bash from the overlay folder, when it
+# exists. DOT_CONFIGS_LOCAL holds the overlay path. Its failure only warns:
+# private steps never stop an upstream install.
+run_local_install_hook() {
+  [ -f "${local_root}/install.sh" ] || return 0
+  echo "Local install hook: ${local_root}/install.sh"
+  (cd "$local_root" && DOT_CONFIGS_LOCAL="$local_root" bash ./install.sh) ||
+    echo "Warning: local install hook failed (exit $?); continuing"
+}
+
 # Each Firefox install's default profile, one absolute path per line, from the
 # [Install*] sections of profiles.ini.
 firefox_profiles() {
@@ -1459,6 +1469,47 @@ import_copilot_mcp_into_claude() {
   fi
 }
 
+# Keep the harbor-client desktop app's model keys in step with this Mac's
+# relay. Only the keys in the tracked file change; every other key the app
+# writes stays, and secrets.bin is never read. Skips when the app has no data
+# folder yet, when settings.json is not a JSON object, or when it already
+# matches. The write is atomic (temp file + rename in the same folder).
+merge_harbor_client_settings() {
+  local shared="$1"
+  local app_dir="${HOME}/Library/Application Support/harbor-client"
+  local dest="${app_dir}/settings.json"
+  local tmp
+  remove_backups_of "$dest" || return 1
+  have_cmd jq && [ -f "$shared" ] || return 0
+  if [ ! -d "$app_dir" ]; then
+    echo "harbor-client: no app data folder; skipped"
+    return 0
+  fi
+  if [ -f "$dest" ]; then
+    if ! jq -e 'type == "object"' "$dest" >/dev/null 2>&1; then
+      echo "Warning: $dest is not a JSON object; harbor-client settings left alone"
+      return 0
+    fi
+    if jq -e --slurpfile s "$shared" '. as $cur | $s[0] | to_entries | all(.value == $cur[.key])' \
+        "$dest" >/dev/null 2>&1; then
+      echo "harbor-client settings already match $shared"
+      return 0
+    fi
+  fi
+  tmp="$(mktemp "${dest}.dot-configs.XXXXXX")" || return 1
+  if [ -f "$dest" ]; then
+    set -- jq -s '.[0] + .[1]' "$dest" "$shared"
+  else
+    set -- jq '.' "$shared"
+  fi
+  if "$@" >"$tmp" && chmod 600 "$tmp" && mv -f "$tmp" "$dest"; then
+    echo "Merged harbor-client model settings into $dest (restart harbor-client to use them)"
+  else
+    rm -f "$tmp"
+    echo "Warning: could not merge harbor-client settings into $dest; skipped"
+  fi
+}
+
 if [ "${DOT_CONFIGS_INSTALL_LIB_ONLY:-0}" = "1" ]; then
   return 0 2>/dev/null || exit 0
 fi
@@ -1540,6 +1591,12 @@ update_claude_plugins
 # Import Copilot's merged MCP server map into Claude Code's local state file.
 import_copilot_mcp_into_claude
 
+# harbor-client: model address and names follow the local copilot-relay.
+if is_macos; then
+  merge_harbor_client_settings \
+    "$(manifest_source_for_destination merge "Library/Application Support/harbor-client/settings.json")"
+fi
+
 # launchd agent: copilot-relay on login (macOS only). Renders the
 # template (substituting absolute $HOME paths — launchd doesn't expand
 # $HOME at runtime) into ~/Library/LaunchAgents and bootstraps it.
@@ -1574,3 +1631,6 @@ if is_macos; then
   uid="$(id -u)"
   install_npm_cache_clean "$uid"
 fi
+
+# Last: the overlay's own install hook, for private work upstream cannot know.
+run_local_install_hook

@@ -1,0 +1,6 @@
+{
+  "modelBase": "http://127.0.0.1:4142",
+  "model": "claude-opus-5-5",
+  "checkModel": "gpt-6-astra",
+  "investigateModel": "claude-opus-5-5[1m]"
+}

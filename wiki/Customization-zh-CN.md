@@ -19,6 +19,7 @@ local/
   manifest.tsv   你自己的链接行
   zsh/*.zsh      你自己的 shell 文件，在所有上游助手之后加载
   check.sh       你自己的检查
+  install.sh     你自己的安装步骤，由 install.sh 最后运行
   README.md      你自己的说明
 ```
 
@@ -75,6 +76,10 @@ set -g window-status-current-style 'bg=#89b4fa,fg=#1e1e2e,bold'
 `scripts/check.sh all`、`smoke` 和 `local` 会先验证 `local/manifest.tsv`，再在仓库根目录用 Bash 运行 `local/check.sh`。`DOT_CONFIGS_LOCAL` 保存 overlay 路径。非零退出码会让检查失败。
 
 上游 ShellCheck 会跳过 `local/`。请在 `local/check.sh` 中检查你自己的文件。zsh 文件可以用 `zsh -n FILE` 检查语法。
+
+### `install.sh`
+
+`./install.sh`（以及 `uu`）会最后在 overlay 文件夹中用 Bash 运行 `local/install.sh`。`DOT_CONFIGS_LOCAL` 保存 overlay 路径。它适合需要私有值（例如主机地址）的私有步骤。非零退出码只打印一条警告，安装会继续；所以请让它自己打印简短状态，并且永远不要读取或打印秘密。
 
 ### `README.md`
 
