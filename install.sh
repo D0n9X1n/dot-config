@@ -953,7 +953,62 @@ herdr_submodule_update() {
   return 0
 }
 
-herdr_install_prepare() { herdr_submodule_update; }
+# Live values win. Before the submodule step, live settings.json and keys.json
+# are read (through any link) into one temp folder; after it, they are written
+# into config/herdr/user/ when they differ, and the temp folder is removed in
+# the same step. No seed copy and no backup is kept. On first adoption (a
+# regular keys.json), keys equal to Herdr's defaults keep the tracked keymap;
+# other keys get the tracked overrides merged over them.
+HERDR_SKIP_LINKS=""
+herdr_seed_capture() {
+  local f live
+  for f in settings keys; do
+    live="$HOME/.config/herdr-app/$f.json"
+    [ -e "$live" ] || continue
+    if ! cp -L "$live" "$1/$f.json" 2>/dev/null; then
+      rm -f "$1/$f.json"
+      echo "Herdr config: could not read $live; left it as it is and did not link it."
+      HERDR_SKIP_LINKS="${HERDR_SKIP_LINKS}.config/herdr-app/$f.json"$'\n'
+      continue
+    fi
+    if [ -L "$live" ]; then echo link >"$1/$f.kind"; else echo file >"$1/$f.kind"; fi
+  done
+}
+
+herdr_seed_apply() {
+  local seed="$1" user="$repo_root/config/herdr/user" defaults="$repo_root/config/herdr/data/herdr-default-keys.json"
+  [ -d "$user" ] || return 0
+  if [ -f "$seed/settings.json" ] && ! cmp -s "$seed/settings.json" "$user/settings.json"; then
+    cat "$seed/settings.json" >"$user/settings.json" && echo "Herdr config: kept your live settings.json"
+  fi
+  [ -f "$seed/keys.json" ] || return 0
+  if [ "$(cat "$seed/keys.kind")" = file ] && [ -f "$defaults" ] && cmp -s "$seed/keys.json" "$defaults"; then
+    return 0
+  fi
+  if [ "$(cat "$seed/keys.kind")" = file ] && [ -f "$user/keys.overrides.json" ]; then
+    jq -S -s '.[0] * .[1] | walk(if type == "object" then with_entries(select(.value != null)) else . end)' \
+      "$seed/keys.json" "$user/keys.overrides.json" >"$seed/keys.merged" || return 0
+    mv -f "$seed/keys.merged" "$seed/keys.json"
+  fi
+  if ! cmp -s "$seed/keys.json" "$user/keys.json"; then
+    cat "$seed/keys.json" >"$user/keys.json" && echo "Herdr config: kept your live keys.json"
+  fi
+}
+
+herdr_skip_link() {
+  case $'\n'"$HERDR_SKIP_LINKS" in *$'\n'"$1"$'\n'*) return 0 ;; esac
+  return 1
+}
+
+herdr_install_prepare() {
+  local seed
+  HERDR_SKIP_LINKS=""
+  seed="$(mktemp -d "${TMPDIR:-/tmp}/herdr-live.XXXXXX")" || { herdr_submodule_update; return 0; }
+  herdr_seed_capture "$seed"
+  herdr_submodule_update
+  herdr_seed_apply "$seed" || echo "Herdr config: could not keep your live values; check config/herdr/user/" >&2
+  rm -rf -- "$seed"
+}
 
 # True for a config/herdr row whose source is not here; such rows are skipped.
 herdr_source_missing() {
@@ -1216,6 +1271,7 @@ link_manifest_files() {
   while IFS=$'\t' read -r type source destination; do
     [ "$type" = "link" ] || continue
     herdr_source_missing "$source" && continue
+    herdr_skip_link "$destination" && continue
     migrate_managed_link "$destination"
     link_file "${repo_root}/${source}" "${HOME}/${destination}"
     case "$source" in

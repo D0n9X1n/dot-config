@@ -3062,9 +3062,13 @@ herdr_fixture() {
   local t="$1" h s
   h="$t/herdr-src"; s="$t/super-src"
   git init -q -b main "$h"
-  mkdir -p "$h/layouts" "$h/themes" "$h/user" "$h/mods/m"
+  mkdir -p "$h/layouts" "$h/themes" "$h/user" "$h/mods/m" "$h/data"
   printf 'l1\n' >"$h/layouts/x.json"; printf 't1\n' >"$h/themes/x.json"
-  printf '{"zoom":1}\n' >"$h/user/settings.json"; printf '{}\n' >"$h/user/keys.json"; printf 'm\n' >"$h/mods/m/a.js"
+  printf '{"zoom":1}\n' >"$h/user/settings.json"; printf 'm\n' >"$h/mods/m/a.js"
+  printf '{"global":{"cmd-w":"tab.close","cmd-alt-l":"layout.switch","cmd-x":"app.quit"}}\n' >"$h/data/herdr-default-keys.json"
+  printf '{"global":{"cmd-w":"pane.close","cmd-x":null}}\n' >"$h/user/keys.overrides.json"
+  jq -S -s '.[0] * .[1] | walk(if type == "object" then with_entries(select(.value != null)) else . end)' \
+    "$h/data/herdr-default-keys.json" "$h/user/keys.overrides.json" >"$h/user/keys.json"
   git -C "$h" add -A && git -C "$h" commit -qm p1 && git -C "$h" tag p1
   printf 't2\n' >"$h/themes/x.json"; git -C "$h" commit -qam p2 && git -C "$h" tag p2
   printf '{"zoom":2}\n' >"$h/user/settings.json"; git -C "$h" commit -qam p3 && git -C "$h" tag p3
@@ -3074,7 +3078,8 @@ herdr_fixture() {
   printf 'link\t%s\t%s\n' config/plain.txt .plain \
     config/herdr/layouts/x.json .config/herdr-app/layouts/x.json \
     config/herdr/themes/x.json .config/herdr-app/themes/x.json \
-    config/herdr/user/settings.json .config/herdr-app/settings.json >"$s/config/manifest.tsv"
+    config/herdr/user/settings.json .config/herdr-app/settings.json \
+    config/herdr/user/keys.json .config/herdr-app/keys.json >"$s/config/manifest.tsv"
   printf 'copy\tconfig/herdr/mods/m/a.js\t.config/herdr-app/mods/m/a.js\n' >>"$s/config/manifest.tsv"
   git -C "$s" submodule add -q "file://$t/herdr.git" config/herdr
   git -C "$s/config/herdr" checkout -q p1
@@ -3153,6 +3158,73 @@ run_herdr_install_smoke() {
     ! zsh -c 'source "$1/config/zsh/uu.zsh"; _dot_configs_uu_ready "$2"' _ "$wt" "$t/r3" 2>/dev/null \
       || fail "uu: accepted a repo with a tracked edit"
     echo "herdr install: ok"
+  )
+}
+
+# install.sh keeps live Herdr values: settings.json and keys.json are read before the submodule
+# step and written into config/herdr/user/ when they differ. No seed folder, no backup.
+run_herdr_seed_smoke() {
+  (
+    set -euo pipefail
+    local t out
+    t="$(mktemp -d)"
+    [ -n "$t" ] && [ -d "$t" ] || exit 1
+    trap 'chmod -R u+rw "$t" 2>/dev/null; rm -rf "$t"' EXIT
+    export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t.invalid \
+      GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t.invalid
+    export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=protocol.file.allow GIT_CONFIG_VALUE_0=always
+    export TMPDIR="$t/tmp"; mkdir -p "$TMPDIR"
+    herdr_fixture "$t"
+    fail() { echo "herdr seed: $*" >&2; exit 1; }
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    run() {
+      repo_root="$1"; manifest="$1/config/manifest.tsv"; export HOME="$2"; mkdir -p "$HOME"
+      herdr_install_prepare; validate_manifest; link_manifest_files; copy_manifest_files; herdr_install_report
+    }
+    live() { printf '%s\n' "$1/.config/herdr-app/$2"; }
+    linked() { [ -L "$(live "$1" "$2")" ] && [ "$(readlink "$(live "$1" "$2")")" = "$3/config/herdr/user/$2" ]; }
+    new() { git clone -q "$t/super.git" "$t/r$1"; mkdir -p "$t/h$1/.config/herdr-app"; }
+
+    # A live regular settings.json at zoom 1.2 stays 1.2, now through the link.
+    new 1; printf '{"zoom":1.2}\n' >"$(live "$t/h1" settings.json)"
+    run "$t/r1" "$t/h1" >/dev/null 2>&1
+    linked "$t/h1" settings.json "$t/r1" || fail "regular settings: not linked"
+    [ "$(cat "$(live "$t/h1" settings.json)")" = '{"zoom":1.2}' ] || fail "regular settings: zoom 1.2 lost"
+    # A live settings.json linked to an older checkout keeps its value too.
+    new 2; mkdir -p "$t/old"; printf '{"zoom":1.2}\n' >"$t/old/settings.json"
+    ln -s "$t/old/settings.json" "$(live "$t/h2" settings.json)"
+    run "$t/r2" "$t/h2" >/dev/null 2>&1
+    linked "$t/h2" settings.json "$t/r2" || fail "linked settings: not relinked"
+    [ "$(cat "$(live "$t/h2" settings.json)")" = '{"zoom":1.2}' ] || fail "linked settings: zoom 1.2 lost"
+    [ "$(cat "$t/old/settings.json")" = '{"zoom":1.2}' ] || fail "linked settings: the old target changed"
+    # Live keys equal to Herdr's defaults: the tracked keymap wins.
+    new 3; cp "$t/r3/config/herdr/data/herdr-default-keys.json" "$(live "$t/h3" keys.json)" 2>/dev/null \
+      || cp "$t/herdr-src/data/herdr-default-keys.json" "$(live "$t/h3" keys.json)"
+    run "$t/r3" "$t/h3" >/dev/null 2>&1
+    linked "$t/h3" keys.json "$t/r3" || fail "default keys: not linked"
+    cmp -s "$(live "$t/h3" keys.json)" "$t/herdr-src/user/keys.json" || fail "default keys: the keymap was replaced"
+    # Live custom regular keys: the overrides merge over them (cmd-w becomes pane.close; nulls drop).
+    new 4; printf '{"global":{"cmd-w":"tab.close","cmd-k":"mine","cmd-x":"app.quit"}}\n' >"$(live "$t/h4" keys.json)"
+    run "$t/r4" "$t/h4" >/dev/null 2>&1
+    linked "$t/h4" keys.json "$t/r4" || fail "custom keys: not linked"
+    [ "$(jq -c -S . "$(live "$t/h4" keys.json)")" = '{"global":{"cmd-k":"mine","cmd-w":"pane.close"}}' ] \
+      || fail "custom keys: got $(jq -c . "$(live "$t/h4" keys.json)")"
+    # A linked keys.json with a rebinding keeps it across an install.
+    new 5; run "$t/r5" "$t/h5" >/dev/null 2>&1
+    jq '.global["cmd-alt-l"] = "app.help"' "$(live "$t/h5" keys.json)" >"$t/k" && cat "$t/k" >"$(live "$t/h5" keys.json)"
+    run "$t/r5" "$t/h5" >/dev/null 2>&1
+    [ "$(jq -r '.global["cmd-alt-l"]' "$(live "$t/h5" keys.json)")" = app.help ] || fail "linked keys: the rebinding was lost"
+    # A file that cannot be read: its link is skipped and the file is left as it was.
+    new 6; printf '{"zoom":3}\n' >"$(live "$t/h6" settings.json)"; chmod 000 "$(live "$t/h6" settings.json)"
+    out="$(run "$t/r6" "$t/h6" 2>&1)"
+    chmod 644 "$(live "$t/h6" settings.json)"
+    [ ! -L "$(live "$t/h6" settings.json)" ] && [ "$(cat "$(live "$t/h6" settings.json)")" = '{"zoom":3}' ] \
+      || fail "unreadable settings: it was replaced"
+    grep -q 'could not read' <<<"$out" || fail "unreadable settings: no message"
+    # No seed folder, no temp file, no backup.
+    [ -z "$(find "$TMPDIR" -mindepth 1 -print)" ] || fail "a temp file or seed folder was left: $(find "$TMPDIR" -mindepth 1 | head -3)"
+    [ -z "$(find "$t" -name '*.bak*' -print)" ] || fail "a .bak file was made"
+    echo "herdr seed: ok"
   )
 }
 
@@ -3262,7 +3334,7 @@ case "${1:-all}" in
   firefox) run_firefox_smoke ;;
   editors) run_editors_smoke ;;
   harbor) run_harbor_client_smoke ;;
-  herdr) run_herdr_smoke; run_herdr_copy_smoke; run_herdr_install_smoke ;;
+  herdr) run_herdr_smoke; run_herdr_copy_smoke; run_herdr_install_smoke; run_herdr_seed_smoke ;;
   backups) run_install_backup_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;
