@@ -6,7 +6,7 @@ This repo syncs the Zed and Neovide settings. Neovim itself lives in the separat
 
 ## Zed
 
-`config/zed/settings.json` links to `~/.config/zed/settings.json`. It holds the theme, fonts, Vim mode, and agent servers.
+`config/zed/settings.json` links to `~/.config/zed/settings.json`. It holds the theme, icon theme, fonts, Vim mode, and agent servers. A new window opens with an empty tab.
 
 Zed writes setting changes through the link, so a change made in Zed shows up in this repo as a Git change. Commit it, or drop it with `git checkout`.
 

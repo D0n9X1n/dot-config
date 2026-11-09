@@ -6,7 +6,7 @@
 
 ## Zed
 
-`config/zed/settings.json` 链接到 `~/.config/zed/settings.json`。它包含主题、字体、Vim 模式和 agent servers。
+`config/zed/settings.json` 链接到 `~/.config/zed/settings.json`。它包含主题、图标主题、字体、Vim 模式和 agent servers。新窗口会打开一个空标签页。
 
 Zed 会通过链接写入设置，因此在 Zed 中修改设置后，本仓库会出现 Git 改动。请提交它，或用 `git checkout` 丢弃。
 

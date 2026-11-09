@@ -2840,6 +2840,8 @@ text = re.sub(r',(\s*[}\]])', r'\1', text)
 zed = json.loads(text)
 assert zed['vim_mode'] is True
 assert zed['buffer_font_family'] == 'Rec Mono St.Helens'
+assert zed['on_new_window'] == 'empty_tab'
+assert zed['icon_theme'] == {'mode': 'dark', 'light': 'Zed (Default)', 'dark': 'Zed (Default)'}
 neovide = tomllib.loads(pathlib.Path('config/neovide/config.toml').read_text())
 assert neovide == {'fork': True}, neovide
 PY
