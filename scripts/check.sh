@@ -3157,7 +3157,7 @@ run_herdr_install_smoke() {
 }
 
 # Herdr: the herdr-config submodule (config/herdr) and how install.sh uses it.
-HERDR_PIN=v0.0.2
+HERDR_PIN=v0.0.3
 herdr_expected_rows() {
   git -C config/herdr ls-files -- layouts themes mods user/settings.json user/keys.json agent/herdr-context.sh |
     awk -v OFS='\t' '
