@@ -63,6 +63,7 @@ The manifest check excludes SonicTerm `*.save.lock` runtime files and the `confi
 | `config/zed/settings.json` | `~/.config/zed/settings.json` |
 | `config/neovide/config.toml` | `~/.config/neovide/config.toml` |
 | `config/mcp/mcp-shared.json` | merge into local Copilot MCP data |
+| `config/harbor-client/settings.json` | merge model keys into `~/Library/Application Support/harbor-client/settings.json` |
 | `config/launchd/*.plist` | render into `~/Library/LaunchAgents/` |
 | `scripts/copilot/cleanup-legacy.sh` | `~/.copilot/cleanup-legacy.sh` |
 | `scripts/rmux/rmux-store` | `~/.local/bin/rmux-store` |

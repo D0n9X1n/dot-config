@@ -63,6 +63,7 @@ type<TAB>source<TAB>home destination
 | `config/zed/settings.json` | `~/.config/zed/settings.json` |
 | `config/neovide/config.toml` | `~/.config/neovide/config.toml` |
 | `config/mcp/mcp-shared.json` | 合并到本机 Copilot MCP 数据 |
+| `config/harbor-client/settings.json` | 把模型键合并到 `~/Library/Application Support/harbor-client/settings.json` |
 | `config/launchd/*.plist` | 渲染到 `~/Library/LaunchAgents/` |
 | `scripts/copilot/cleanup-legacy.sh` | `~/.copilot/cleanup-legacy.sh` |
 | `scripts/rmux/rmux-store` | `~/.local/bin/rmux-store` |

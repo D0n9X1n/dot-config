@@ -234,6 +234,23 @@ Apply and rollback preserve blocked/allowed state. The tool does not reload serv
 
 Not every detail name should change: the iStat daemon and TeamViewer helpers already have meaningful grouped app associations. The Teams agent, CleanerOne `TCLoginItemHelper`, and Quick Look/Spotlight extensions use vendor-internal signed names. Map those names to their purpose rather than overwriting them.
 
+## harbor-client
+
+`config/harbor-client/settings.json` keeps the harbor-client desktop app's model keys in step with this Mac's relay. Every `install.sh` run, and so every `uu`, merges these four keys into `~/Library/Application Support/harbor-client/settings.json`:
+
+| Key | Value | Why |
+|---|---|---|
+| `modelBase` | `http://127.0.0.1:4142` | the relay's `host` and `port`, the same address as Claude's `ANTHROPIC_BASE_URL` |
+| `model` | `claude-opus-5-5` | names with "opus" route to `opusModel`; the app takes no `[1m]` here |
+| `checkModel` | `gpt-6-astra` | the relay's `gptModel`; the app needs a checker from another family |
+| `investigateModel` | `claude-opus-5-5[1m]` | the app runs Claude Code with it, so it matches Claude's `ANTHROPIC_MODEL` |
+
+`scripts/check.sh harbor` checks these values against the relay config and Claude settings.
+
+Every other key stays as the app wrote it: `apiBase` (the private harbor server, set in the app), `claudePath`, `theme`, `crewBudgetUsd`, and any key a newer app adds. Tokens and keys live in the app's encrypted `secrets.bin`; the installer never reads it. The merge skips a Mac without the app's data folder, leaves a `settings.json` that is not a JSON object alone, and does not rewrite a file that already matches. It writes a temp file in the same folder and renames it over the old one.
+
+Quit harbor-client before `uu`, or restart it afterwards. The running app keeps its old host allowlist until it restarts, and saving its settings page while it still shows the old values writes them back. A model token saved for another model address is not sent to the relay; enter the relay token once in the app's settings after the address changes.
+
 ## MCP merge
 
 `config/mcp/mcp-shared.json` contains only safe shared entries.

@@ -19,6 +19,7 @@ local/
   manifest.tsv   your own link rows
   zsh/*.zsh      your own shell files, loaded after every upstream helper
   check.sh       your own checks
+  install.sh     your own install steps, run last by install.sh
   README.md      your own notes
 ```
 
@@ -75,6 +76,10 @@ When you delete or rename a file in `local/zsh/`, the next install removes its o
 `scripts/check.sh all`, `smoke`, and `local` validate `local/manifest.tsv`, then run `local/check.sh` with Bash from the repository root. `DOT_CONFIGS_LOCAL` holds the overlay path. A non-zero exit fails the check.
 
 Upstream ShellCheck skips `local/`. Lint your own files in `local/check.sh`. For zsh files, `zsh -n FILE` checks syntax.
+
+### `install.sh`
+
+`./install.sh`, and so `uu`, runs `local/install.sh` last, with Bash from the overlay folder. `DOT_CONFIGS_LOCAL` holds the overlay path. Use it for private steps that need private values, such as host addresses. A non-zero exit prints one warning and the install continues, so make the hook print its own short status and never read or print secrets.
 
 ### `README.md`
 

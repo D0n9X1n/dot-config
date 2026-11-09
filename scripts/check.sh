@@ -2386,6 +2386,14 @@ run_local_overlay_smoke() {
       return 1
     fi
 
+    # The install hook runs in the overlay folder; its failure only warns.
+    printf 'pwd -P >"$DOT_CONFIGS_LOCAL/hook-ran"\nexit 4\n' >"$overlay/install.sh"
+    out="$(run_local_install_hook)"
+    [ "$(cat "$overlay/hook-ran")" = "$(cd "$overlay" && pwd -P)" ]
+    printf '%s\n' "$out" | grep -Fq 'local install hook failed (exit 4)'
+    rm -f "$overlay/install.sh" "$overlay/hook-ran"
+    [ -z "$(run_local_install_hook)" ]
+
     # uu also fast-forwards an overlay that is its own Git repo.
     export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
     export GIT_AUTHOR_NAME=check GIT_AUTHOR_EMAIL=check@example.com
@@ -2897,6 +2905,80 @@ ZSH
   echo "Zed, Neovide, and nv ok"
 }
 
+run_harbor_client_smoke() {
+  local shared=config/harbor-client/settings.json relay_base
+  grep -Fq $'merge\tconfig/harbor-client/settings.json\tLibrary/Application Support/harbor-client/settings.json' \
+    config/manifest.tsv
+
+  # The tracked file holds only the model keys. apiBase (a private host),
+  # claudePath, theme, crewBudgetUsd and every secret stay in the app.
+  jq -e 'keys == ["checkModel", "investigateModel", "model", "modelBase"] and all(.[]; type == "string")' \
+    "$shared" >/dev/null || {
+    echo "$shared must hold exactly modelBase, model, checkModel and investigateModel" >&2
+    return 1
+  }
+
+  # modelBase is the relay's own listen address, which Claude also uses.
+  relay_base="http://$(sed -n 's/^host:[[:space:]]*//p' config/copilot-relay/config.yaml):$(sed -n 's/^port:[[:space:]]*//p' config/copilot-relay/config.yaml)"
+  jq -e --arg b "$relay_base" '.modelBase == $b' "$shared" >/dev/null || {
+    echo "$shared modelBase must be the relay address $relay_base" >&2
+    return 1
+  }
+  jq -e --slurpfile c config/claude/settings.json '.modelBase == $c[0].env.ANTHROPIC_BASE_URL' "$shared" >/dev/null
+
+  # Models: Opus stays native and routes to opusModel; the checker is GPT-6
+  # Astra (another family, as harbor-client requires). The investigator runs
+  # Claude Code, so it matches Claude's default; the others take no [1m].
+  jq -e --slurpfile c config/claude/settings.json '
+    .model == "claude-opus-5-5" and
+    .checkModel == "gpt-6-astra" and
+    .investigateModel == $c[0].env.ANTHROPIC_MODEL
+  ' "$shared" >/dev/null
+  grep -Eq "^gptModel:[[:space:]]*$(jq -r .checkModel "$shared")\$" config/copilot-relay/config.yaml
+
+  (
+    local test_root app dest
+    test_root="$(mktemp -d)"
+    trap 'rm -rf "$test_root"' EXIT
+    export HOME="$test_root/home"
+    mkdir -p "$HOME"
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    app="$HOME/Library/Application Support/harbor-client"
+    dest="$app/settings.json"
+
+    # No app data folder: nothing is created.
+    merge_harbor_client_settings "$repo_root/$shared" >/dev/null
+    [ ! -e "$app" ]
+
+    # Merge: managed keys change, every other key stays, no temp file is left.
+    mkdir -p "$app"
+    printf '{"apiBase":"https://api.example.test","modelBase":"https://api.anthropic.com","model":"x","theme":"dark","crewBudgetUsd":"20","claudePath":"/opt/claude"}' >"$dest"
+    : >"$dest.bak.1"
+    merge_harbor_client_settings "$repo_root/$shared" >/dev/null
+    jq -e --slurpfile s "$repo_root/$shared" '
+      . == ({"apiBase":"https://api.example.test","theme":"dark","crewBudgetUsd":"20","claudePath":"/opt/claude"} + $s[0])
+    ' "$dest" >/dev/null
+    [ "$(stat -f '%Lp' "$dest" 2>/dev/null || stat -c '%a' "$dest")" = 600 ]
+    [ "$(find "$app" -type f | wc -l | tr -d ' ')" = 1 ]
+
+    # A matching file is left untouched.
+    touch -t 200001010000 "$dest"
+    merge_harbor_client_settings "$repo_root/$shared" | grep -Fq 'already match'
+    [ -z "$(find "$dest" -newermt '2000-01-02' -print)" ]
+
+    # A broken file is never replaced.
+    printf 'not json' >"$dest"
+    merge_harbor_client_settings "$repo_root/$shared" >/dev/null
+    [ "$(cat "$dest")" = 'not json' ]
+
+    # A data folder without settings.json gets just the managed keys.
+    rm -f "$dest"
+    merge_harbor_client_settings "$repo_root/$shared" >/dev/null
+    jq -e --slurpfile s "$repo_root/$shared" '. == $s[0]' "$dest" >/dev/null
+  )
+  echo "harbor-client settings follow the relay"
+}
+
 run_smoke() {
   run_bash_syntax
   run_apollo_smoke
@@ -2932,6 +3014,7 @@ run_smoke() {
   run_relay_completion_smoke
   run_firefox_smoke
   run_editors_smoke
+  run_harbor_client_smoke
   run_local_checks
 }
 
@@ -2949,11 +3032,12 @@ case "${1:-all}" in
   local) run_local_checks ;;
   firefox) run_firefox_smoke ;;
   editors) run_editors_smoke ;;
+  harbor) run_harbor_client_smoke ;;
   backups) run_install_backup_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;
   *)
-    echo "usage: $0 [smoke|apollo|apollo-online|instructions|models|mcp|wiki|rmux|tmux|shell|local|firefox|editors|backups|shellcheck|all]" >&2
+    echo "usage: $0 [smoke|apollo|apollo-online|instructions|models|mcp|wiki|rmux|tmux|shell|local|firefox|editors|harbor|backups|shellcheck|all]" >&2
     exit 2
     ;;
 esac
