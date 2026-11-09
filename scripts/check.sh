@@ -87,7 +87,8 @@ run_shellcheck() {
     return 1
   }
 
-  files="$(find . \( -path './.git' -o -path './local' \) -prune -o -type f \( \
+  # config/herdr is the herdr-config submodule; it has its own CI and shellcheck.
+  files="$(find . \( -path './.git' -o -path './local' -o -path './config/herdr' \) -prune -o -type f \( \
     -name '*.bash' \
     -o -name '.bashrc' \
     -o -name 'bashrc' \
@@ -1205,6 +1206,18 @@ PY
     return 1
   fi
   echo "active config tree and archive boundary ok"
+  # Herdr: every checkout brings the submodule, and smoke runs the Herdr groups.
+  local checkouts subs
+  checkouts="$(cat .github/workflows/*.yml | grep -c 'uses: actions/checkout@' || true)"
+  subs="$(cat .github/workflows/*.yml | grep -c 'submodules: true' || true)"
+  [ "$checkouts" -gt 0 ] && [ "$checkouts" = "$subs" ] || {
+    echo "workflows: $checkouts checkouts but $subs with submodules: true" >&2
+    return 1
+  }
+  for f in run_herdr_smoke run_herdr_copy_smoke run_herdr_install_smoke run_herdr_seed_smoke run_herdr_app_smoke; do
+    declare -f run_smoke | grep -qw "$f" || { echo "run_smoke does not call $f" >&2; return 1; }
+  done
+  declare -f run_shellcheck | grep -q "config/herdr" || { echo "run_shellcheck does not prune config/herdr" >&2; return 1; }
 }
 
 run_rmux_store_tests() {
@@ -3378,6 +3391,11 @@ run_smoke() {
   run_firefox_smoke
   run_editors_smoke
   run_harbor_client_smoke
+  run_herdr_smoke
+  run_herdr_copy_smoke
+  run_herdr_install_smoke
+  run_herdr_seed_smoke
+  run_herdr_app_smoke
   run_local_checks
 }
 
