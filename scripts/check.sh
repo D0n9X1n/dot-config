@@ -708,6 +708,8 @@ run_wiki_smoke() {
     wiki/Firefox-zh-CN.md
     wiki/Editors.md
     wiki/Editors-zh-CN.md
+    wiki/Herdr.md
+    wiki/Herdr-zh-CN.md
     wiki/_Sidebar.md
     scripts/wiki-render.sh
     scripts/wiki-publish.sh
@@ -1206,6 +1208,13 @@ PY
     return 1
   fi
   echo "active config tree and archive boundary ok"
+  # Herdr docs: the index pages and the update-settings skill name Herdr.
+  for f in wiki/README.md wiki/Home-zh-CN.md wiki/_Sidebar.md wiki/Repository-Operations.md \
+      wiki/Repository-Operations-zh-CN.md config/claude/skills/update-settings/SKILL.md; do
+    grep -q 'Herdr' "$f" || { echo "$f does not mention Herdr" >&2; return 1; }
+  done
+  grep -q '(Herdr.md)' wiki/_Sidebar.md && grep -q '(Herdr-zh-CN.md)' wiki/_Sidebar.md \
+    || { echo "wiki/_Sidebar.md does not link both Herdr pages" >&2; return 1; }
   # Herdr: every checkout brings the submodule, and smoke runs the Herdr groups.
   local checkouts subs
   checkouts="$(cat .github/workflows/*.yml | grep -c 'uses: actions/checkout@' || true)"

@@ -1,6 +1,6 @@
 ---
 name: update-settings
-description: Change or apply a setting in this dot-configs repo. Use the config manifest, update the matching English and Chinese Wiki pages, run checks, then run install.sh. TRIGGER for changes to Claude Code, Copilot CLI, native tmux, RMUX, SonicTerm, zsh, Zed, Neovide, copilot-relay, MCP, status lines, or launchd. SKIP for read-only questions and historical tmux settings in Git history.
+description: Change or apply a setting in this dot-configs repo. Use the config manifest, update the matching English and Chinese Wiki pages, run checks, then run install.sh. TRIGGER for changes to Claude Code, Copilot CLI, native tmux, RMUX, SonicTerm, zsh, Zed, Neovide, copilot-relay, MCP, status lines, launchd, or Herdr. SKIP for read-only questions and historical tmux settings in Git history.
 ---
 
 # Update settings
@@ -32,6 +32,7 @@ Never edit a managed file under `$HOME`.
 | Safe MCP data | `config/mcp/mcp-shared.json` | merged locally |
 | launchd templates | `config/launchd/` | `~/Library/LaunchAgents/` |
 | Apollo runtime | `scripts/apollo-releases.tsv` + `scripts/apollo-theme.sh` | `~/.local/share/dot-configs/apollo/` and consumer links |
+| Herdr | `config/herdr/` submodule (pin in `scripts/check.sh` `HERDR_PIN`) | `~/.config/herdr-app/` (mods are copies) and `~/.local/bin/herdr-agent-context` |
 
 `config/manifest.tsv` is the tracked-file install list. Add a row when a new managed file is added.
 

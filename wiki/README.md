@@ -29,6 +29,7 @@ The source is the flat `wiki/` folder. GitHub Actions publishes it to the GitHub
 - [Development and releases](Development-and-Releases.md) — checks, Wiki publish, issues, tags, and releases.
 - [Apollo theme](Apollo-Theme.md) — pinned upstream releases and local runtime adapters.
 - [Firefox](Firefox.md) — managed `user.js` prefs and the oh-my-firefox theme, kept current by `uu`.
+- [Herdr](Herdr.md) — the Apollo Herdr layout from the herdr-config submodule, agent hooks, and the Dock icon.
 
 ## Main folders
 

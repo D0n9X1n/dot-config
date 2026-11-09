@@ -15,6 +15,7 @@
 - [Development and releases](Development-and-Releases.md)
 - [Apollo theme](Apollo-Theme.md)
 - [Firefox](Firefox.md)
+- [Herdr](Herdr.md)
 - [Editors](Editors.md)
 
 ## 简体中文
@@ -34,4 +35,5 @@
 - [开发与发布](Development-and-Releases-zh-CN.md)
 - [Apollo 主题](Apollo-Theme-zh-CN.md)
 - [Firefox](Firefox-zh-CN.md)
+- [Herdr](Herdr-zh-CN.md)
 - [编辑器](Editors-zh-CN.md)
