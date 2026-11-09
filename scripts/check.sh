@@ -3058,6 +3058,13 @@ run_herdr_copy_smoke() {
 
 # Herdr: the herdr-config submodule (config/herdr) and how install.sh uses it.
 HERDR_PIN=v0.0.2
+herdr_expected_rows() {
+  git -C config/herdr ls-files -- layouts themes mods user/settings.json user/keys.json agent/herdr-context.sh |
+    awk -v OFS='\t' '
+      $0 == "agent/herdr-context.sh" { print "link", "config/herdr/" $0, ".local/bin/herdr-agent-context"; next }
+      /^mods\// { print "copy", "config/herdr/" $0, ".config/herdr-app/" $0; next }
+      { d = $0; sub(/^user\//, "", d); print "link", "config/herdr/" $0, ".config/herdr-app/" d }'
+}
 run_herdr_smoke() {
   (
     set -euo pipefail
@@ -3074,6 +3081,29 @@ run_herdr_smoke() {
       [ "$got" = "$HERDR_PIN" ] || { echo "herdr: config/herdr is at '$got', want $HERDR_PIN" >&2; exit 1; }
     fi
     grep -q -- '--ignore-submodules=all' config/zsh/uu.zsh || { echo "herdr: uu's dirty check does not ignore submodules" >&2; exit 1; }
+    # Manifest rows: one per installable tracked file. Mods are copy rows (Herdr does not load
+    # their glyphs through links); layouts, themes, user settings/keys and the agent script are links.
+    local rows want
+    rows="$(awk -F'\t' '$2 ~ /^config\/herdr\// {print $1 "\t" $2 "\t" $3}' config/manifest.tsv | sort)"
+    if [ -e config/herdr/.git ]; then
+      want="$(herdr_expected_rows | sort)"
+      [ "$rows" = "$want" ] || {
+        echo "herdr: manifest rows differ from config/herdr's installable files" >&2
+        diff -u <(printf '%s\n' "$want") <(printf '%s\n' "$rows") >&2 || true
+        exit 1
+      }
+      while IFS=$'\t' read -r _ src _; do
+        git -C config/herdr ls-files --error-unmatch -- "${src#config/herdr/}" >/dev/null 2>&1 \
+          || { echo "herdr: $src is not a tracked file" >&2; exit 1; }
+      done <<<"$rows"
+    fi
+    [ -n "$rows" ] || { echo "herdr: no config/herdr manifest rows" >&2; exit 1; }
+    if grep -E '(^|/)(jsconfig\.json|gpui-kit\.d\.ts)$|\.md$|^config/herdr/(data|scripts|assets|test|wiki|docs|\.github)/' \
+        <<<"$(cut -f2 <<<"$rows")"; then
+      echo "herdr: a generated, doc or non-install file is a manifest source" >&2; exit 1
+    fi
+    awk -F'\t' '$2 ~ /^config\/herdr\/mods\// && $1 != "copy" {bad=1} END {exit bad}' config/manifest.tsv \
+      || { echo "herdr: a mods row is not a copy row" >&2; exit 1; }
     echo "herdr: ok"
   )
 }
