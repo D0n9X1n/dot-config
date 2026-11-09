@@ -801,7 +801,6 @@ install_macos_deps() {
   local formulae=(
     autojump
     eza
-    gh
     git
     jq
     neovim
@@ -1511,100 +1510,6 @@ merge_harbor_client_settings() {
   fi
 }
 
-# Set this Mac up as a Harbor device. The work lives in the private
-# ForYouzi/harbor-server repo: its sync.sh device step pushes an SSH key,
-# installs Harbor.app, and pairs the device certificate. All private values
-# (hosts, users, keys) live there, never here. A client-only Mac needs no
-# checkout: gh downloads just the files that step reads, from main, into the
-# cache dir, keeping their repo paths. This file list is a contract with that
-# repo. Every outcome returns 0, so uu always continues.
-# HARBOR_DEVICE_SETUP=0 turns it off.
-HARBOR_DEVICE_REPO="ForYouzi/harbor-server"
-HARBOR_DEVICE_FILES=(
-  .claude/skills/sync-japan/sync.sh
-  deploy/known_hosts
-  deploy/japan/guarded.sh
-)
-
-# Download every device file into a new dir next to $1, then swap it in as a
-# whole. Any failure leaves an existing $1 untouched and removes the partial
-# download.
-fetch_harbor_device_files() {
-  local cache="$1" parent tmp old path
-  parent="$(dirname "$cache")"
-  mkdir -p "$parent" || return 1
-  tmp="$(mktemp -d "${parent}/.device.new.XXXXXX")" || return 1
-  for path in "${HARBOR_DEVICE_FILES[@]}"; do
-    if ! mkdir -p "${tmp}/$(dirname "$path")" ||
-      ! GH_PROMPT_DISABLED=1 gh api -H 'Accept: application/vnd.github.raw' \
-        "repos/${HARBOR_DEVICE_REPO}/contents/${path}?ref=main" \
-        </dev/null >"${tmp}/${path}" 2>/dev/null ||
-      [ ! -s "${tmp}/${path}" ]; then
-      rm -rf "$tmp"
-      return 1
-    fi
-  done
-  chmod -R go-rwx "$tmp" || {
-    rm -rf "$tmp"
-    return 1
-  }
-  if [ -e "$cache" ]; then
-    old="$(mktemp -d "${parent}/.device.old.XXXXXX")" || {
-      rm -rf "$tmp"
-      return 1
-    }
-    if ! mv "$cache" "${old}/device"; then
-      rm -rf "$tmp" "$old"
-      return 1
-    fi
-    if ! mv "$tmp" "$cache"; then
-      mv "${old}/device" "$cache"
-      rm -rf "$tmp" "$old"
-      return 1
-    fi
-    rm -rf "$old"
-  elif ! mv "$tmp" "$cache"; then
-    rm -rf "$tmp"
-    return 1
-  fi
-}
-
-setup_harbor_device() {
-  local cache="${XDG_CACHE_HOME:-${HOME}/.cache}/harbor/device"
-  local sync reason="" rc=0
-  is_macos || return 0
-  [ "${HARBOR_DEVICE_SETUP:-1}" != "0" ] || return 0
-  sync="${cache}/.claude/skills/sync-japan/sync.sh"
-
-  if ! have_cmd gh; then
-    reason="gh is not installed"
-  elif ! GH_PROMPT_DISABLED=1 gh auth status </dev/null >/dev/null 2>&1; then
-    reason="gh is not logged in"
-  elif ! fetch_harbor_device_files "$cache"; then
-    reason="could not download it from ${HARBOR_DEVICE_REPO} (no access or offline)"
-  fi
-  if [ -n "$reason" ]; then
-    if [ ! -f "$sync" ]; then
-      echo "Harbor device: ${reason}; run \`gh auth login\`, then uu again (HARBOR_DEVICE_SETUP=0 skips this)"
-      return 0
-    fi
-    echo "Harbor device: ${reason}; using the older copy in $cache"
-  fi
-
-  # With a terminal, sync.sh talks to it directly: the SSH password prompt and
-  # its own lines show at once instead of waiting on the install log's
-  # line-buffered pipe. Without one it cannot prompt and only logs.
-  if [ -t 0 ] && { : >/dev/tty; } 2>/dev/null; then
-    bash "$sync" device </dev/tty >/dev/tty 2>&1 || rc=$?
-  else
-    bash "$sync" device || rc=$?
-  fi
-  if [ "$rc" -ne 0 ]; then
-    echo "Warning: Harbor device setup exited $rc; continuing (run bash $sync device to retry)"
-  fi
-  return 0
-}
-
 if [ "${DOT_CONFIGS_INSTALL_LIB_ONLY:-0}" = "1" ]; then
   return 0 2>/dev/null || exit 0
 fi
@@ -1685,11 +1590,6 @@ update_claude_plugins
 
 # Import Copilot's merged MCP server map into Claude Code's local state file.
 import_copilot_mcp_into_claude
-
-# Harbor device: SSH key, Harbor.app, and device certificate, through files
-# downloaded from the private harbor-server repo. Before the merge below, so a
-# fresh app gets its model settings in the same run.
-setup_harbor_device
 
 # harbor-client: model address and names follow the local copilot-relay.
 if is_macos; then

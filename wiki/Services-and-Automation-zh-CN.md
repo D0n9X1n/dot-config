@@ -16,7 +16,6 @@ Copilot 使用内置 GitHub 集成；Claude 使用已认证的 `gh`。不需要�
 - npm 中的 Copilot CLI 和 copilot-relay
 - oh-my-zsh
 - `eza`、`jq`、`neovim` 和 autojump 等 shell 工具
-- GitHub CLI（`gh`），Harbor 设备步骤用它从私有仓库下载文件
 - Nerd Font 符号与 Noto Color Emoji
 - [Rec Mountain Fonts](https://github.com/D0n9X1n/rec-mountain-fonts) release 中的 Rec Mono St.Helens、Rec Sans Mt.Baker 与 Rec Serif Mt.Adams；安装器会移除已停用的 `font-recursive` cask 与 `RecMonoBaker-*` 字体
 - SonicTerm、RMUX、原生 tmux 和 eza 的固定 Apollo theme releases
@@ -237,7 +236,7 @@ startup-item-names --rollback
 
 ## harbor-client
 
-`config/harbor-client/settings.json` 让 harbor-client 桌面应用的模型键与本机 relay 保持一致。每次运行 `install.sh`（以及 `uu`）都会把这四个键合并到 `~/Library/Application Support/harbor-client/settings.json`：
+`uu` 不负责把 Mac 设为 Harbor 设备；这在 Harbor 应用内完成（设置 › 一键配置本机）。`config/harbor-client/settings.json` 只让 harbor-client 桌面应用的模型键与本机 relay 保持一致。每次运行 `install.sh`（以及 `uu`）都会把这四个键合并到 `~/Library/Application Support/harbor-client/settings.json`：
 
 | 键 | 值 | 原因 |
 |---|---|---|
@@ -251,33 +250,6 @@ startup-item-names --rollback
 其他键保持应用写入的原样：`apiBase`（私有 harbor 服务器，在应用中设置）、`claudePath`、`theme`、`crewBudgetUsd`，以及新版应用增加的键。令牌和密钥保存在应用加密的 `secrets.bin` 中；安装器从不读取它。没有应用数据文件夹的 Mac 会跳过合并；不是 JSON 对象的 `settings.json` 保持不动；已一致的文件不会重写。写入时先在同一文件夹写临时文件，再 rename 覆盖旧文件。
 
 运行 `uu` 前先退出 harbor-client，或之后重启它。运行中的应用在重启前沿用旧的主机白名单；如果设置页仍显示旧值时点了保存，旧值会被写回。为其他模型地址保存的模型令牌不会发给 relay；地址改变后，请在应用设置中重新输入一次 relay 令牌。
-
-### Harbor 设备
-
-macOS 上每次运行 `install.sh`（以及 `uu`）还会把这台 Mac 设为 Harbor 设备。具体工作在私有仓库 `ForYouzi/harbor-server` 中完成，所以这个公开仓库不含任何服务器地址、用户名或密钥。该步骤在上面的设置合并之前运行，所以新装的应用在同一次运行中就会拿到模型键。
-
-新 Mac 不需要 harbor-server 检出。服务器在别处运行；这台 Mac 只需要设备设置脚本和固定的主机密钥。`uu` 用 `gh` 从私有仓库的 `main` 下载它们，保存在 `${XDG_CACHE_HOME:-~/.cache}/harbor/device/` 中，路径与仓库中相同：
-
-- `.claude/skills/sync-japan/sync.sh`
-- `deploy/known_hosts`
-- `deploy/japan/guarded.sh`
-
-在全新的 Mac 上：
-
-1. 用能读取 `ForYouzi/harbor-server` 的账号运行一次 `gh auth login`。
-2. 在终端中运行 `uu`。它下载这三个文件，然后运行 `bash ~/.cache/harbor/device/.claude/skills/sync-japan/sync.sh device`。这一步会生成 SSH key、询问一次服务器密码以推送它、安装 Harbor，并配对设备证书。
-3. 之后的运行会重新下载这些文件，发现一切就绪，该步骤什么也不做，也不会询问。
-
-行为：
-
-- `HARBOR_DEVICE_SETUP=0` 关闭该步骤。
-- 每次运行先把三个文件全部下载到一个新文件夹，再整体替换缓存文件夹（权限 `0700`）。下载失败时旧缓存保持原样，绝不会只替换一半。
-- `gh` 未安装、未登录或下载失败（无权限、离线）时，有缓存就使用它，并打印一行说明这是较旧的副本；没有缓存时打印一行提示先 `gh auth login`，然后跳过。
-- 它从不克隆或 pull 任何仓库。
-- 有终端时，`sync.sh device` 直接读写该终端，所以密码提示会立即出现；它的输出不进安装日志。没有终端时它无法询问，输出写入日志。
-- 非零退出码只打印一条警告，安装会继续。
-
-`scripts/check.sh harbor` 用一个提供这三个文件或按需失败的假 `gh` 测试该步骤，不访问网络。
 
 ## MCP 合并
 
