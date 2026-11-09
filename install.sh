@@ -1015,6 +1015,50 @@ herdr_source_missing() {
   case "$1" in config/herdr/*) [ ! -f "${repo_root}/$1" ] ;; *) return 1 ;; esac
 }
 
+# Herdr.app, searched in ~/Applications then /Applications (HERDR_APP_ROOTS,
+# colon-separated, overrides the list for tests).
+herdr_app_path() {
+  local IFS=: root
+  for root in ${HERDR_APP_ROOTS:-${HOME}/Applications:/Applications}; do
+    if [ -n "$root" ] && [ -d "$root/Herdr.app" ]; then
+      printf '%s\n' "$root/Herdr.app"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# macOS: install Herdr when there is no Herdr.app and no herdr-app on PATH.
+# An existing install is never touched. A failure warns and install goes on.
+ensure_herdr() {
+  is_macos || return 0
+  herdr_app_path >/dev/null && return 0
+  have_cmd herdr-app && return 0
+  if [ "${SKIP_BREW:-0}" = "1" ]; then
+    echo "Herdr: not installed; skipped (SKIP_BREW=1)."
+    return 0
+  fi
+  if ! have_cmd brew; then
+    echo "Warning: Herdr is not installed and Homebrew is missing; skipped." >&2
+    return 0
+  fi
+  echo "Herdr: not installed; running brew install --cask herdr-app"
+  brew install --cask herdr-app || echo "Warning: brew install --cask herdr-app failed; Herdr is not installed." >&2
+  return 0
+}
+
+# macOS: a Herdr update replaces the app and drops its custom icon, so put the
+# Apollo Dock icon back when it is missing. A failure warns and install goes on.
+herdr_dock_icon() {
+  is_macos || return 0
+  local app script="${repo_root}/config/herdr/scripts/set-app-icon.sh"
+  app="$(herdr_app_path)" || return 0
+  [ -x "$script" ] || return 0
+  "$script" --check --app "$app" >/dev/null 2>&1 && return 0
+  "$script" --app "$app" || echo "Warning: could not set the Apollo Dock icon on $app; skipped." >&2
+  return 0
+}
+
 herdr_install_report() {
   local skipped
   skipped="$(awk -F'\t' '$2 ~ /^config\/herdr\// {print $2}' "$manifest" | while IFS= read -r src; do
@@ -1723,6 +1767,7 @@ else
   echo "Auto-install only supports macOS + Homebrew. Install apps/fonts/CLIs manually."
 fi
 
+ensure_herdr
 herdr_install_prepare
 validate_manifest
 validate_local_overlay
@@ -1730,6 +1775,7 @@ install_apollo_themes
 link_manifest_files
 copy_manifest_files || echo "Warning: some copy rows were not installed (see above)" >&2
 herdr_install_report
+herdr_dock_icon
 link_local_overlay
 install_firefox_step
 # RMUX is Windows-only. Keep retention while an older macOS install remains.

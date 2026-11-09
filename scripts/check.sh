@@ -3228,6 +3228,52 @@ run_herdr_seed_smoke() {
   )
 }
 
+# install.sh installs Herdr when it is missing (macOS: brew install --cask herdr-app) and puts the
+# Apollo Dock icon back when a Herdr update removed it. Both only warn on failure.
+run_herdr_app_smoke() (
+  set -euo pipefail
+  local t out
+  t="$(mktemp -d)"
+  [ -n "$t" ] && [ -d "$t" ] || exit 1
+  trap 'rm -rf "$t"' EXIT
+  export HOME="$t/home"; mkdir -p "$HOME" "$t/bin" "$t/apps" "$t/repo/config/herdr/scripts"
+  DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+  fail() { echo "herdr app: $*" >&2; exit 1; }
+  is_macos() { return 0; }
+  export HERDR_APP_ROOTS="$t/apps"
+  printf '#!/bin/sh\necho "$@" >>"%s/brew.log"\n[ ! -f "%s/brew.fail" ]\n' "$t" "$t" >"$t/bin/brew"; chmod +x "$t/bin/brew"
+  calls() { cat "$t/brew.log" 2>/dev/null || true; }
+  reset() { rm -f "$t/brew.log" "$t/brew.fail" "$t/icon.log" "$t/check.ok" "$t/apply.fail" "$t/bin/herdr-app"; unset SKIP_BREW; }
+  OLDPATH="$PATH"; export PATH="$t/bin:/usr/bin:/bin"
+
+  reset; out="$(ensure_herdr 2>&1)"
+  [ "$(calls)" = "install --cask herdr-app" ] || fail "missing Herdr: brew was not run (got '$(calls)')"
+  reset; touch "$t/brew.fail"; out="$(ensure_herdr 2>&1)" || fail "a brew failure stopped the install"
+  [ "$(grep -c '^Warning:' <<<"$out")" = 1 ] || fail "a brew failure gave no single warning: $out"
+  reset; export SKIP_BREW=1; ensure_herdr >/dev/null 2>&1; [ -z "$(calls)" ] || fail "SKIP_BREW=1 still ran brew"
+  reset; printf '#!/bin/sh\n' >"$t/bin/herdr-app"; chmod +x "$t/bin/herdr-app"
+  ensure_herdr >/dev/null 2>&1; [ -z "$(calls)" ] || fail "herdr-app on PATH, yet brew ran"
+  reset; mkdir -p "$t/apps/Herdr.app"; ensure_herdr >/dev/null 2>&1; [ -z "$(calls)" ] || fail "an installed Herdr.app, yet brew ran"
+  reset; is_macos() { return 1; }; rm -rf "$t/apps/Herdr.app"; ensure_herdr >/dev/null 2>&1
+  [ -z "$(calls)" ] || fail "brew ran off macOS"; is_macos() { return 0; }
+
+  # Dock icon: a stub set-app-icon.sh that logs its arguments.
+  repo_root="$t/repo"
+  printf '#!/bin/sh\necho "$*" >>"%s/icon.log"\ncase "$*" in --check*) [ -f "%s/check.ok" ] ;; *) [ ! -f "%s/apply.fail" ] ;; esac\n' \
+    "$t" "$t" "$t" >"$t/repo/config/herdr/scripts/set-app-icon.sh"; chmod +x "$t/repo/config/herdr/scripts/set-app-icon.sh"
+  reset; herdr_dock_icon >/dev/null 2>&1; [ ! -s "$t/icon.log" ] || fail "no Herdr.app, yet the icon script ran"
+  mkdir -p "$t/apps/Herdr.app"
+  reset; out="$(herdr_dock_icon 2>&1)"
+  [ "$(cat "$t/icon.log")" = "--check --app $t/apps/Herdr.app"$'\n'"--app $t/apps/Herdr.app" ] || fail "no custom icon: not applied ($(cat "$t/icon.log"))"
+  reset; touch "$t/check.ok"; herdr_dock_icon >/dev/null 2>&1
+  [ "$(cat "$t/icon.log")" = "--check --app $t/apps/Herdr.app" ] || fail "the icon was applied although it is set"
+  reset; touch "$t/apply.fail"; out="$(herdr_dock_icon 2>&1)" || fail "an icon failure stopped the install"
+  grep -q '^Warning:' <<<"$out" || fail "an icon failure gave no warning"
+  reset; is_macos() { return 1; }; herdr_dock_icon >/dev/null 2>&1; [ ! -s "$t/icon.log" ] || fail "the icon script ran off macOS"
+  export PATH="$OLDPATH"
+  echo "herdr app: ok"
+)
+
 # Herdr: the herdr-config submodule (config/herdr) and how install.sh uses it.
 HERDR_PIN=v0.0.3
 herdr_expected_rows() {
@@ -3334,7 +3380,7 @@ case "${1:-all}" in
   firefox) run_firefox_smoke ;;
   editors) run_editors_smoke ;;
   harbor) run_harbor_client_smoke ;;
-  herdr) run_herdr_smoke; run_herdr_copy_smoke; run_herdr_install_smoke; run_herdr_seed_smoke ;;
+  herdr) run_herdr_smoke; run_herdr_copy_smoke; run_herdr_install_smoke; run_herdr_seed_smoke; run_herdr_app_smoke ;;
   backups) run_install_backup_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;
