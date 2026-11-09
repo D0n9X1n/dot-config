@@ -945,7 +945,7 @@ validate_manifest() {
   while IFS=$'\t' read -r type source destination extra; do
     case "$type" in
       ''|'#'*) continue ;;
-      link|merge|render|firefox) ;;
+      link|copy|merge|render|firefox) ;;
       *) echo "Error: unknown manifest type '$type'" >&2; return 1 ;;
     esac
     [ -z "$extra" ] || {
@@ -1184,6 +1184,96 @@ link_manifest_files() {
       *.sh) chmod +x "${repo_root}/${source}" ;;
     esac
   done <"$manifest"
+}
+
+# copy rows install real files: Herdr does not load a mod's svg()/image() assets
+# through links. No backup is made. A destination that is a link into this
+# repo's worktrees is replaced by the copy; any other link, or a folder, is left
+# alone with a warning. The state file records "<sha256>  <destination>" for
+# every installed copy, so when a row goes away its copy is removed only while
+# its bytes are still the ones installed; an edited copy is kept and dropped.
+copy_state_file() { printf '%s\n' "${HOME}/.local/state/dot-configs/copy-manifest"; }
+
+file_sha256() {
+  if have_cmd shasum; then shasum -a 256 "$1"; else sha256sum "$1"; fi | cut -c1-64
+}
+
+link_points_into_repo() {
+  local link="$1" target dir root
+  target="$(readlink "$link")" || return 1
+  case "$target" in /*) ;; *) target="$(dirname "$link")/$target" ;; esac
+  dir="$(cd "$(dirname "$target")" 2>/dev/null && pwd -P)" || return 1
+  while IFS= read -r root; do
+    root="$(cd "$root" 2>/dev/null && pwd -P)" || continue
+    case "$dir/" in "$root"/*) return 0 ;; esac
+  done < <(git -C "$repo_root" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p')
+  return 1
+}
+
+copy_file() {
+  local src="$1" dest="$2"
+  case "$dest" in
+    ''|*/|*/.|*/..|*/../*) echo "Error: unsafe copy destination: $dest" >&2; return 1 ;;
+  esac
+  if [ -L "$dest" ]; then
+    link_points_into_repo "$dest" || {
+      echo "Warning: $dest is a link outside this repo; left it alone" >&2
+      return 1
+    }
+    rm -f "$dest" || return 1
+  elif [ -d "$dest" ]; then
+    echo "Warning: $dest is a folder; left it alone" >&2
+    return 1
+  elif [ -f "$dest" ] && cmp -s "$src" "$dest"; then
+    return 0
+  elif [ -e "$dest" ]; then
+    echo "Replaced $dest"
+  fi
+  mkdir -p "$(dirname "$dest")" || return 1
+  install -m 0644 "$src" "$dest"
+}
+
+# The state line for one destination (sha and two spaces are 66 characters).
+copy_state_line() { awk -v d="$1" 'substr($0, 67) == d' "$2" 2>/dev/null || true; }
+
+copy_manifest_files() {
+  local type source destination dest state tmp line sum path dests status=0
+  state="$(copy_state_file)"
+  dests="$(awk -F'\t' -v h="$HOME" '$1 == "copy" { print h "/" $3 }' "$manifest")"
+  [ -n "$dests" ] || [ -f "$state" ] || return 0
+  mkdir -p "$(dirname "$state")" || return 1
+  tmp="$(mktemp "${state}.XXXXXX")" || return 1
+  while IFS=$'\t' read -r type source destination; do
+    [ "$type" = copy ] || continue
+    dest="${HOME}/${destination}"
+    # A missing source (an offline submodule) keeps the old copy and its state.
+    if [ ! -f "${repo_root}/${source}" ]; then
+      copy_state_line "$dest" "$state" >>"$tmp"
+      continue
+    fi
+    if copy_file "${repo_root}/${source}" "$dest"; then
+      printf '%s  %s\n' "$(file_sha256 "$dest")" "$dest" >>"$tmp"
+    else
+      status=1
+      copy_state_line "$dest" "$state" >>"$tmp"
+    fi
+  done <"$manifest"
+  if [ -f "$state" ]; then
+    while IFS= read -r line; do
+      sum="${line:0:64}"; path="${line:66}"
+      [ -n "$path" ] || continue
+      printf '%s\n' "$dests" | grep -qxF -- "$path" && continue
+      [ -f "$path" ] && [ ! -L "$path" ] || continue
+      if [ "$(file_sha256 "$path")" = "$sum" ]; then
+        rm -f "$path" && echo "Removed $path (its source is gone)"
+        rmdir "$(dirname "$path")" 2>/dev/null || true
+      else
+        echo "Kept $path (edited since install; no longer managed)"
+      fi
+    done <"$state"
+  fi
+  mv -f "$tmp" "$state" || { rm -f "$tmp"; return 1; }
+  return "$status"
 }
 
 remove_legacy_claude_subagent_hook() {
@@ -1539,6 +1629,7 @@ validate_manifest
 validate_local_overlay
 install_apollo_themes
 link_manifest_files
+copy_manifest_files || echo "Warning: some copy rows were not installed (see above)" >&2
 link_local_overlay
 install_firefox_step
 # RMUX is Windows-only. Keep retention while an older macOS install remains.

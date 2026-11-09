@@ -2982,6 +2982,80 @@ run_harbor_client_smoke() {
   echo "harbor-client settings follow the relay"
 }
 
+# copy rows: installed as files (Herdr does not load mod glyphs through links), never backed up,
+# removed with their row only while their bytes are still what was installed.
+run_herdr_copy_smoke() {
+  (
+    set -euo pipefail
+    local t d state src mode ino out
+    t="$(mktemp -d)"
+    [ -n "$t" ] && [ -d "$t" ] || exit 1
+    trap 'rm -rf "$t"' EXIT
+    export HOME="$t/home"
+    mkdir -p "$HOME"
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    repo_root="$t/repo"
+    manifest="$repo_root/config/manifest.tsv"
+    src="$repo_root/config/herdr/mods/m"
+    mkdir -p "$src"
+    git -C "$repo_root" init -q
+    printf 'a\n' >"$src/a.js"
+    printf 'b\n' >"$src/b.svg"
+    printf 'c\n' >"$src/c.png"
+    printf 'copy\tconfig/herdr/mods/m/%s\t.config/herdr-app/mods/m/%s\n' a.js a.js b.svg b.svg c.png c.png >"$manifest"
+    state="$HOME/.local/state/dot-configs/copy-manifest"
+    d="$HOME/.config/herdr-app/mods/m"
+    fail() { echo "herdr copy: $*" >&2; exit 1; }
+    sha() { if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1"; else sha256sum "$1"; fi | cut -c1-64; }
+
+    # Fresh copy: regular files, mode 0644, bytes equal, one state line each.
+    copy_manifest_files >/dev/null
+    for f in a.js b.svg c.png; do
+      [ -f "$d/$f" ] && [ ! -L "$d/$f" ] || fail "fresh: $f is not a regular file"
+      cmp -s "$src/$f" "$d/$f" || fail "fresh: $f bytes differ"
+      mode="$(stat -f %Lp "$d/$f" 2>/dev/null || stat -c %a "$d/$f")"
+      [ "$mode" = 644 ] || fail "fresh: $f mode $mode"
+      grep -qxF "$(sha "$src/$f")  $d/$f" "$state" || fail "fresh: no state line for $f"
+    done
+    # Equal bytes: skipped (same inode).
+    ino="$(ls -i "$d/a.js" | awk '{print $1}')"
+    copy_manifest_files >/dev/null
+    [ "$(ls -i "$d/a.js" | awk '{print $1}')" = "$ino" ] || fail "equal: a.js was rewritten"
+    # A link into this repo at a copy destination: replaced by the copy.
+    rm "$d/a.js"; ln -s "$src/a.js" "$d/a.js"
+    copy_manifest_files >/dev/null
+    [ -f "$d/a.js" ] && [ ! -L "$d/a.js" ] || fail "symlink into the repo was not replaced"
+    # A link outside this repo: left alone, with a warning.
+    printf 'other\n' >"$t/other.svg"; rm "$d/b.svg"; ln -s "$t/other.svg" "$d/b.svg"
+    out="$(copy_manifest_files 2>&1)" || true
+    [ -L "$d/b.svg" ] && [ "$(readlink "$d/b.svg")" = "$t/other.svg" ] || fail "a link outside the repo was replaced"
+    grep -q 'outside this repo' <<<"$out" || fail "no warning for a link outside the repo"
+    [ "$(cat "$t/other.svg")" = other ] || fail "the outside link's target changed"
+    rm "$d/b.svg"; copy_manifest_files >/dev/null
+    # Offline: a row whose source is missing keeps its copy and its state.
+    mv "$src/c.png" "$t/c.png.away"
+    copy_manifest_files >/dev/null 2>&1 || true
+    [ -f "$d/c.png" ] || fail "offline: c.png was removed"
+    grep -q "  $d/c.png\$" "$state" || fail "offline: c.png lost its state"
+    mv "$t/c.png.away" "$src/c.png"
+    # A removed row whose copy is unchanged: deleted, and its state line dropped.
+    grep -v 'mods/m/a.js' "$manifest" >"$t/m" && mv "$t/m" "$manifest"; rm "$src/a.js"
+    copy_manifest_files >/dev/null
+    [ ! -e "$d/a.js" ] || fail "removed source: an unchanged copy stayed"
+    ! grep -q "  $d/a.js\$" "$state" || fail "removed source: state line stayed"
+    # A removed row whose copy was edited: kept, and no longer tracked.
+    printf 'mine\n' >"$d/b.svg"
+    grep -v 'mods/m/b.svg' "$manifest" >"$t/m" && mv "$t/m" "$manifest"; rm "$src/b.svg"
+    out="$(copy_manifest_files 2>&1)"
+    [ "$(cat "$d/b.svg")" = mine ] || fail "removed source: an edited copy was changed"
+    ! grep -q "  $d/b.svg\$" "$state" || fail "removed source: an edited copy is still tracked"
+    grep -q "Kept $d/b.svg" <<<"$out" || fail "removed source: no note for the kept file"
+    # Never a backup.
+    [ -z "$(find "$HOME" -name '*.bak*' -print)" ] || fail "a .bak file was made"
+    echo "herdr copy: ok"
+  )
+}
+
 # Herdr: the herdr-config submodule (config/herdr) and how install.sh uses it.
 HERDR_PIN=v0.0.2
 run_herdr_smoke() {
@@ -3058,7 +3132,7 @@ case "${1:-all}" in
   firefox) run_firefox_smoke ;;
   editors) run_editors_smoke ;;
   harbor) run_harbor_client_smoke ;;
-  herdr) run_herdr_smoke ;;
+  herdr) run_herdr_smoke; run_herdr_copy_smoke ;;
   backups) run_install_backup_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;
