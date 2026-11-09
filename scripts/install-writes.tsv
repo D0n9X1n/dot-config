@@ -1,0 +1,67 @@
+# function<TAB>class<TAB>trimmed text, one row per write or delete site in install.sh (scripts/install-sites.awk).
+# journaled: a path in the preflight footprint (restored after a failure before deleting).
+# temp-only: a temp file the same function makes and removes. package: an installer-managed asset (fonts, log, clone).
+cleanup_legacy_feature_crew	journaled	rm -f "$path" && echo "Removed old Feature-Crew file: $path"
+cleanup_legacy_feature_crew	journaled	rm -rf "$path" && echo "Removed old Feature-Crew file: $path"
+cleanup_legacy_feature_crew	journaled	rm -rf "$path" && echo "Removed old Feature-Crew skill: $path"
+cleanup_legacy_wakatime_mcp	journaled	&& mv "$tmp_json" "$claude_user_json" \
+cleanup_legacy_wakatime_mcp	journaled	&& mv "$tmp_json" "$copilot_mcp_pre" \
+cleanup_legacy_wakatime_mcp	journaled	rm -rf "$wm_dest"
+cleanup_legacy_wakatime_mcp	temp-only	jq 'del(.mcpServers.wakatime)' "$claude_user_json" >"$tmp_json" \
+cleanup_legacy_wakatime_mcp	temp-only	jq 'del(.mcpServers.wakatime)' "$copilot_mcp_pre" >"$tmp_json" \
+cleanup_legacy_wakatime_mcp	temp-only	|| { rm -f "$tmp_json"; echo "Warning: failed to remove WakaTime MCP from $claude_user_json"; }
+cleanup_legacy_wakatime_mcp	temp-only	|| { rm -f "$tmp_json"; echo "Warning: failed to remove WakaTime MCP from $copilot_mcp_pre"; }
+copy_file	journaled	install -m 0644 "$src" "$dest"
+copy_file	journaled	rm -f "$dest" || return 1
+copy_manifest_files	journaled	mv -f "$tmp" "$state" || { rm -f "$tmp"; return 1; }
+copy_manifest_files	journaled	rm -f "$path" && echo "Removed $path (its source is gone)"
+copy_manifest_files	journaled	rmdir "$(dirname "$path")" 2>/dev/null || true
+copy_manifest_files	temp-only	copy_state_line "$dest" "$state" >>"$tmp"
+copy_manifest_files	temp-only	printf '%s  %s\n' "$(file_sha256 "$dest")" "$dest" >>"$tmp"
+copy_manifest_files	temp-only	rm -f "$tmp"
+ensure_homebrew	temp-only	rm -f "$installer"
+ensure_oh_my_firefox	package	&& mv "${tmp}/repo" "$chrome"; then
+ensure_oh_my_firefox	temp-only	"${chrome}".clone.??????) rm -rf -- "$tmp" ;;
+ensure_oh_my_zsh	temp-only	rm -f "$installer"
+ensure_wakatime_cfg_api_key	journaled	mv "$tmp_cfg" "$cfg"
+ensure_wakatime_cfg_api_key	temp-only	' "$cfg" >"$tmp_cfg"
+ensure_wakatime_cfg_api_key	temp-only	cp "$cfg" "$tmp_cfg"
+ensure_wakatime_cfg_api_key	temp-only	printf '\n[settings]\n' >>"$tmp_cfg"
+ensure_wakatime_cfg_api_key	temp-only	printf 'api_key = %s\n' "$key" >>"$tmp_cfg"
+ensure_wakatime_cfg_api_key	temp-only	sed -E "s|^[[:space:]]*api_key[[:space:]]*=.*|api_key = ${key}|" "$cfg" >"$tmp_cfg"
+ensure_wakatime_cfg_api_key	temp-only	} >"$tmp_cfg"
+herdr_install_prepare	temp-only	rm -rf -- "$seed"
+herdr_seed_apply	journaled	cat "$seed/keys.json" >"$user/keys.json" && echo "Herdr config: kept your live keys.json"
+herdr_seed_apply	journaled	cat "$seed/settings.json" >"$user/settings.json" && echo "Herdr config: kept your live settings.json"
+herdr_seed_apply	temp-only	"$seed/keys.json" "$user/keys.overrides.json" >"$seed/keys.merged" || return 0
+herdr_seed_apply	temp-only	mv -f "$seed/keys.merged" "$seed/keys.json"
+herdr_seed_capture	temp-only	if ! cp -L "$live" "$1/$f.json" 2>/dev/null; then
+herdr_seed_capture	temp-only	if [ -L "$live" ]; then echo link >"$1/$f.kind"; else echo file >"$1/$f.kind"; fi
+herdr_seed_capture	temp-only	rm -f "$1/$f.json"
+import_copilot_mcp_into_claude	journaled	mv "$tmp_user" "$claude_user_json"
+import_copilot_mcp_into_claude	temp-only	"$claude_user_json" >"$tmp_user"; then
+import_copilot_mcp_into_claude	temp-only	printf '{"mcpServers":%s}\n' "$src_mcp_json" >"$tmp_user"
+import_copilot_mcp_into_claude	temp-only	rm -f "$tmp_user"
+install_rec_mountain_fonts	package	mv "$tmp_font" "$target"
+install_rec_mountain_fonts	package	printf '%s\n' "$tag" >"$marker"
+install_rec_mountain_fonts	package	rm -f "${fonts_dir}/${font}"
+install_rec_mountain_fonts	package	rm -f "${fonts_dir}/.recursive-code-config.version" "${fonts_dir}/.m-fonts.version"
+install_rec_mountain_fonts	temp-only	rm -f "$release_json"
+install_rec_mountain_fonts	temp-only	rm -f "$tmp_font"
+link_file	journaled	ln -s "$src" "$dest"
+link_file	journaled	rm -f "$dest" || return 1
+link_file	journaled	rm -rf "$dest" || return 1
+link_local_overlay	journaled	rm -f "$dest" && echo "Removed old local link: $dest"
+main	journaled	[ -f "$legacy_plist" ] && rm -f "$legacy_plist" && echo "Migration: removed $legacy_plist"
+merge_harbor_client_settings	journaled	if "$@" >"$tmp" && chmod 600 "$tmp" && mv -f "$tmp" "$dest"; then
+merge_harbor_client_settings	temp-only	rm -f "$tmp"
+merge_shared_mcp	journaled	jq '{mcpServers: (.mcpServers // {})}' "$shared_mcp" >"$copilot_mcp_pre" \
+merge_shared_mcp	journaled	mv "$tmp_mcp" "$copilot_mcp_pre"
+merge_shared_mcp	temp-only	' "$copilot_mcp_pre" "$shared_mcp" >"$tmp_mcp"; then
+merge_shared_mcp	temp-only	rm -f "$tmp_mcp"
+migrate_managed_link	journaled	rm -f "$dest"
+remove_backups_of	journaled	rm -rf -- "$backup" || status=1
+remove_legacy_claude_subagent_hook	journaled	rmdir "$hooks_dir" 2>/dev/null || true
+remove_repo_symlink	journaled	rm -f "$path"
+render_launchd_template	journaled	"$template" >"$dest"
+setup_logging	package	done | tee -a "$install_log") 2>&1

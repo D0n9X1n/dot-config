@@ -1223,7 +1223,7 @@ PY
     echo "workflows: $checkouts checkouts but $subs with submodules: true" >&2
     return 1
   }
-  for f in run_herdr_smoke run_herdr_copy_smoke run_herdr_install_smoke run_herdr_seed_smoke run_herdr_app_smoke; do
+  for f in run_herdr_smoke run_herdr_copy_smoke run_herdr_install_smoke run_herdr_seed_smoke run_herdr_app_smoke run_herdr_preflight_smoke; do
     declare -f run_smoke | grep -qw "$f" || { echo "run_smoke does not call $f" >&2; return 1; }
   done
   declare -f run_shellcheck | grep -q "config/herdr" || { echo "run_shellcheck does not prune config/herdr" >&2; return 1; }
@@ -3296,6 +3296,90 @@ run_herdr_app_smoke() (
   echo "herdr app: ok"
 )
 
+# Write-site guard and owner-home preflight. Every rm/rmdir/mv/cp/ln/install -m/redirect/tee -a in
+# install.sh must be classified in scripts/install-writes.tsv; scripts/herdr-preflight.sh must refuse
+# every unsafe home state and change nothing.
+herdr_sites() { awk -f scripts/install-sites.awk "${1:-install.sh}" | cut -f2,3 | LC_ALL=C sort -u; }
+herdr_classified() { grep -v '^#' "${1:-scripts/install-writes.tsv}" | awk -F'\t' '{print $1 "\t" $3}' | LC_ALL=C sort -u; }
+herdr_guard() { # herdr_guard [install.sh] [tsv]: 0 when every site is classified with a known class
+  local d
+  d="$(diff <(herdr_sites "${1:-install.sh}") <(herdr_classified "${2:-scripts/install-writes.tsv}"))" || {
+    echo "install.sh write sites and scripts/install-writes.tsv differ:" >&2; printf '%s\n' "$d" >&2; return 1; }
+  ! grep -v '^#' "${2:-scripts/install-writes.tsv}" | awk -F'\t' '$2 !~ /^(journaled|temp-only|package)$/' | grep -q . \
+    || { echo "scripts/install-writes.tsv has an unknown class" >&2; return 1; }
+}
+
+run_herdr_preflight_smoke() (
+  set -euo pipefail
+  local t root out rc
+  root="$(pwd -P)"
+  t="$(mktemp -d)"
+  [ -n "$t" ] && [ -d "$t" ] || exit 1
+  trap 'rm -rf "$t"' EXIT
+  fail() { echo "herdr preflight: $*" >&2; exit 1; }
+  # Guard: passes on the tree; a new site or an unknown class fails it.
+  herdr_guard || fail "the write-site guard fails on the tree"
+  cp install.sh "$t/install.sh"; printf 'new_step() { rm -rf "$HOME/.x"; }\n' >>"$t/install.sh"
+  ! herdr_guard "$t/install.sh" 2>/dev/null || fail "the guard missed a new write site"
+  awk -F'\t' -v OFS='\t' '!done && $2 == "journaled" { $2 = "other"; done = 1 } { print }' scripts/install-writes.tsv >"$t/w.tsv"
+  grep -q $'\tother\t' "$t/w.tsv" || fail "the class mutation did not apply"
+  ! herdr_guard install.sh "$t/w.tsv" 2>/dev/null || fail "the guard accepted class other"
+
+  tree() { (cd "$1" && find . -print | LC_ALL=C sort | while IFS= read -r p; do
+    if [ -L "$p" ]; then echo "L $p $(readlink "$p")"; elif [ -f "$p" ]; then echo "F $p $(shasum -a 256 < "$p" | cut -c1-16)"; else echo "D $p"; fi
+  done) | shasum -a 256; }
+  pre() { # pre <case>: run the preflight on a fresh HOME the case set up; HOME must not change
+    local before
+    before="$(tree "$HOME")"
+    rc=0; out="$(env -u DOT_CONFIGS_LOCAL bash scripts/herdr-preflight.sh "$t/journal" 2>&1)" || rc=$?
+    [ "$(tree "$HOME")" = "$before" ] || fail "$1: the preflight changed HOME"
+  }
+  fresh() { rm -rf "$t/home"; mkdir -p "$t/home"; export HOME="$t/home"; }
+
+  fresh; pre clean
+  [ "$rc" = 0 ] || fail "clean HOME refused: $out"
+  for p in .claude/agents/fc-pm.md .claude/agents/fc-tech-lead.md .claude/skills/fc-debug .claude/feature-crew.sha256 \
+      .local/share/wakatime-mcp .config/github-copilot/mcp.json .claude.json .tmux.conf .config/herdr-app/settings.json \
+      .config/herdr-app/mods/apollo-tabs/main.js .config/herdr-app/mods/apollo-tabs .local/state/dot-configs/copy-manifest; do
+    grep -qxF "$HOME/$p" "$t/journal" || fail "the journal lacks $p"
+  done
+  grep -qxF "$root/config/herdr/user/settings.json" "$t/journal" || fail "the journal lacks config/herdr/user/settings.json"
+  fresh; cp config/tmux/tmux.conf "$HOME/.tmux.conf"; pre equal
+  [ "$rc" = 0 ] || fail "an equal .tmux.conf was refused: $out"
+  fresh; printf 'mine\n' >"$HOME/.tmux.conf"; pre differs
+  [ "$rc" = 1 ] && grep -q "REFUSE differs: $HOME/.tmux.conf" <<<"$out" || fail "a differing .tmux.conf was allowed"
+  fresh; mkdir "$HOME/.tmux.conf"; pre folder
+  [ "$rc" = 1 ] && grep -q "REFUSE differs: $HOME/.tmux.conf" <<<"$out" || fail "a folder at a link row was allowed"
+  fresh; mkdir -p "$HOME/.config/herdr-app"; printf '{"zoom":9}\n' >"$HOME/.config/herdr-app/settings.json"
+  printf '{}\n' >"$HOME/.config/herdr-app/keys.json"; pre live-values
+  [ "$rc" = 0 ] || fail "differing live Herdr settings/keys were refused: $out"
+  fresh; printf 'x\n' >"$t/elsewhere"; ln -s "$t/elsewhere" "$HOME/.tmux.conf"; pre outside
+  [ "$rc" = 1 ] && grep -q "REFUSE link resolves outside this repo: $HOME/.tmux.conf" <<<"$out" || fail "a link outside the repo was allowed"
+  fresh; rm -f "$t/via"; ln -s "$root" "$t/via"; ln -s "$t/via/config/tmux/tmux.conf" "$HOME/.tmux.conf"; pre via
+  [ "$rc" = 0 ] || fail "a link into the repo through another link was refused: $out"
+  fresh; mkdir -p "$HOME/Library/LaunchAgents"; printf 'owner\n' >"$t/owner.plist"
+  ln -s "$t/owner.plist" "$HOME/Library/LaunchAgents/com.d0n9x1n.npm-cache-clean.plist"; pre render-link
+  [ "$rc" = 1 ] && grep -q "REFUSE symlink at a written destination: $HOME/Library/LaunchAgents/com.d0n9x1n.npm-cache-clean.plist" <<<"$out" \
+    || fail "a symlinked render destination was allowed"
+  [ "$(cat "$t/owner.plist")" = owner ] || fail "the owner file changed"
+  fresh; ln -s "$t/owner.plist" "$HOME/.wakatime.cfg"; pre wakatime-link
+  [ "$rc" = 1 ] && grep -q "REFUSE symlink at a written destination: $HOME/.wakatime.cfg" <<<"$out" || fail "a symlinked .wakatime.cfg was allowed"
+  fresh; printf '{}\n' >"$HOME/.claude.json.bak.1"; pre bak-merge
+  [ "$rc" = 1 ] && grep -q "REFUSE backup: $HOME/.claude.json.bak.1" <<<"$out" || fail "a .claude.json backup was allowed"
+  fresh; printf 'x\n' >"$HOME/.tmux.conf.bak.1"; pre bak-link
+  [ "$rc" = 1 ] && grep -q "REFUSE backup: $HOME/.tmux.conf.bak.1" <<<"$out" || fail "a .tmux.conf backup was allowed"
+  fresh; rc=0; out="$(DOT_CONFIGS_LOCAL="$t/x" bash scripts/herdr-preflight.sh "$t/journal" 2>&1)" || rc=$?
+  [ "$rc" = 1 ] && grep -q "REFUSE overlay" <<<"$out" || fail "an overlay was allowed"
+  local m="$HOME/.config/herdr-app/mods/apollo-tabs/main.js"
+  fresh; mkdir -p "$(dirname "$m")"; printf 'old\n' >"$m"; pre copy-file
+  [ "$rc" = 0 ] || fail "a regular file at a copy destination was refused: $out"
+  fresh; mkdir -p "$(dirname "$m")"; ln -s "$t/elsewhere" "$m"; pre copy-outside
+  [ "$rc" = 1 ] && grep -q "REFUSE link resolves outside this repo: $m" <<<"$out" || fail "a link outside the repo at a copy destination was allowed"
+  fresh; mkdir -p "$m"; pre copy-folder
+  [ "$rc" = 1 ] && grep -q "REFUSE folder at a copy destination: $m" <<<"$out" || fail "a folder at a copy destination was allowed"
+  echo "herdr preflight: ok"
+)
+
 # Herdr: the herdr-config submodule (config/herdr) and how install.sh uses it.
 HERDR_PIN=v0.0.3
 herdr_expected_rows() {
@@ -3405,6 +3489,7 @@ run_smoke() {
   run_herdr_install_smoke
   run_herdr_seed_smoke
   run_herdr_app_smoke
+  run_herdr_preflight_smoke
   run_local_checks
 }
 
@@ -3423,7 +3508,7 @@ case "${1:-all}" in
   firefox) run_firefox_smoke ;;
   editors) run_editors_smoke ;;
   harbor) run_harbor_client_smoke ;;
-  herdr) run_herdr_smoke; run_herdr_copy_smoke; run_herdr_install_smoke; run_herdr_seed_smoke; run_herdr_app_smoke ;;
+  herdr) run_herdr_smoke; run_herdr_copy_smoke; run_herdr_install_smoke; run_herdr_seed_smoke; run_herdr_app_smoke; run_herdr_preflight_smoke ;;
   backups) run_install_backup_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;
