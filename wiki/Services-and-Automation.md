@@ -16,7 +16,6 @@ On macOS, the installer can add:
 - Copilot CLI and copilot-relay from npm
 - oh-my-zsh
 - shell tools such as `eza`, `jq`, `neovim`, and autojump
-- GitHub CLI (`gh`), which the Harbor device step uses to download files from a private repo
 - Nerd Font symbols and Noto Color Emoji
 - Rec Mono St.Helens, Rec Sans Mt.Baker, and Rec Serif Mt.Adams from the [Rec Mountain Fonts](https://github.com/D0n9X1n/rec-mountain-fonts) release; the installer removes the retired `font-recursive` casks and `RecMonoBaker-*` fonts
 - pinned Apollo theme releases for SonicTerm, RMUX, native tmux, and eza
@@ -237,7 +236,7 @@ Not every detail name should change: the iStat daemon and TeamViewer helpers alr
 
 ## harbor-client
 
-`config/harbor-client/settings.json` keeps the harbor-client desktop app's model keys in step with this Mac's relay. Every `install.sh` run, and so every `uu`, merges these four keys into `~/Library/Application Support/harbor-client/settings.json`:
+`uu` does not set a Mac up as a Harbor device; that is done inside the Harbor app (设置 › 一键配置本机). `config/harbor-client/settings.json` only keeps the harbor-client desktop app's model keys in step with this Mac's relay. Every `install.sh` run, and so every `uu`, merges these four keys into `~/Library/Application Support/harbor-client/settings.json`:
 
 | Key | Value | Why |
 |---|---|---|
@@ -251,33 +250,6 @@ Not every detail name should change: the iStat daemon and TeamViewer helpers alr
 Every other key stays as the app wrote it: `apiBase` (the private harbor server, set in the app), `claudePath`, `theme`, `crewBudgetUsd`, and any key a newer app adds. Tokens and keys live in the app's encrypted `secrets.bin`; the installer never reads it. The merge skips a Mac without the app's data folder, leaves a `settings.json` that is not a JSON object alone, and does not rewrite a file that already matches. It writes a temp file in the same folder and renames it over the old one.
 
 Quit harbor-client before `uu`, or restart it afterwards. The running app keeps its old host allowlist until it restarts, and saving its settings page while it still shows the old values writes them back. A model token saved for another model address is not sent to the relay; enter the relay token once in the app's settings after the address changes.
-
-### Harbor device
-
-Every `install.sh` run on macOS, and so every `uu`, also sets this Mac up as a Harbor device. The work lives in the private `ForYouzi/harbor-server` repo, so this public repo holds no server address, user, or key. The step runs before the settings merge above, so a newly installed app gets its model keys in the same run.
-
-A new Mac needs no harbor-server checkout. The server runs elsewhere; this Mac only needs the device setup script and the pinned host keys. `uu` downloads them from the private repo's `main` with `gh` and keeps them in `${XDG_CACHE_HOME:-~/.cache}/harbor/device/`, under the same paths as in the repo:
-
-- `.claude/skills/sync-japan/sync.sh`
-- `deploy/known_hosts`
-- `deploy/japan/guarded.sh`
-
-On a brand-new Mac:
-
-1. Run `gh auth login` once with an account that can read `ForYouzi/harbor-server`.
-2. Run `uu` in a terminal. It downloads the three files, then runs `bash ~/.cache/harbor/device/.claude/skills/sync-japan/sync.sh device`. That step generates an SSH key, asks for the server password once to push it, installs Harbor, and pairs the device certificate.
-3. Later runs download the files again and find everything in place, so the step does nothing and asks nothing.
-
-Behavior:
-
-- `HARBOR_DEVICE_SETUP=0` turns the step off.
-- Every run downloads all three files to a new folder first, then replaces the cache folder as a whole (mode `0700`). A failed download leaves the old cache as it was, never half replaced.
-- When `gh` is not installed, not logged in, or the download fails (no access, offline), it uses the cache if there is one and prints one line saying it is an older copy. With no cache it prints one line asking for `gh auth login` and skips.
-- It never clones or pulls a repo.
-- With a terminal, `sync.sh device` reads from and writes to that terminal directly, so the password prompt shows at once; its lines do not reach the install log. Without a terminal it cannot prompt; its output goes to the log.
-- A non-zero exit prints one warning, and the install continues.
-
-`scripts/check.sh harbor` tests the step with a fake `gh` that serves the three files or fails on demand, without network.
 
 ## MCP merge
 
