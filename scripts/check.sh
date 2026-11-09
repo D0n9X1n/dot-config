@@ -3322,6 +3322,22 @@ run_herdr_smoke() {
     fi
     awk -F'\t' '$2 ~ /^config\/herdr\/mods\// && $1 != "copy" {bad=1} END {exit bad}' config/manifest.tsv \
       || { echo "herdr: a mods row is not a copy row" >&2; exit 1; }
+    # Hooks: Herdr session context for Claude Code and Copilot CLI, a silent no-op without the script.
+    local claude_cmd copilot_cmd
+    claude_cmd='[ -x ~/.local/bin/herdr-agent-context ] && ~/.local/bin/herdr-agent-context claude || true'
+    copilot_cmd='[ -x ~/.local/bin/herdr-agent-context ] && ~/.local/bin/herdr-agent-context copilot || true'
+    jq -e --arg c "$claude_cmd" '.hooks.SessionStart[] | select(.matcher == "startup|resume|clear|compact")
+      | .hooks[] | select(.type == "command" and .command == $c and .timeout == 5)' config/claude/settings.json >/dev/null \
+      || { echo "herdr: config/claude/settings.json has no Herdr SessionStart hook" >&2; exit 1; }
+    jq -e --arg c "$copilot_cmd" '.hooks.sessionStart[1] == {type: "command", bash: $c, timeoutSec: 5}' \
+      config/copilot/settings.json >/dev/null || { echo "herdr: config/copilot/settings.json has no Herdr sessionStart hook" >&2; exit 1; }
+    jq -e '.hooks.sessionStart[0].bash == "~/.copilot/subagent-state.sh reset"' config/copilot/settings.json >/dev/null \
+      || { echo "herdr: the Copilot subagent reset hook is not first" >&2; exit 1; }
+    local nh out
+    nh="$(mktemp -d)"
+    out="$(HOME="$nh" bash -c "$claude_cmd" 2>&1)" || { rm -rf "$nh"; echo "herdr: the hook fails without the script" >&2; exit 1; }
+    rm -rf "$nh"
+    [ -z "$out" ] || { echo "herdr: the hook prints without the script: $out" >&2; exit 1; }
     echo "herdr: ok"
   )
 }
