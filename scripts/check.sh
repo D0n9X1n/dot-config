@@ -2979,41 +2979,60 @@ run_harbor_client_smoke() {
   echo "harbor-client settings follow the relay"
 }
 
-# The Harbor device step, with a fake gh and a fake harbor-server checkout
-# whose sync.sh records its arguments. No network, no real repo, no prompt.
+# The Harbor device step, with a fake gh that serves the three device files
+# (or fails on demand) and a fake sync.sh that records its arguments. No
+# network, no real repo, no prompt, and never a clone.
 run_harbor_device_smoke() {
   grep -Eq '^setup_harbor_device$' install.sh
+  # The device functions download files; they never clone or name a checkout.
+  if sed -n '/^HARBOR_DEVICE_REPO=/,/^if \[ "\${DOT_CONFIGS_INSTALL_LIB_ONLY/p' install.sh |
+    grep -Eq 'HARBOR_SERVER_DIR|clone'; then
+    echo "install.sh still clones harbor-server for the device step" >&2
+    return 1
+  fi
   (
-    local test_root fake_bin calls dir out
+    local test_root fake_bin calls cache sync out f
     test_root="$(mktemp -d)"
     trap 'rm -rf "$test_root"' EXIT
     export HOME="$test_root/home"
     mkdir -p "$HOME"
+    unset XDG_CACHE_HOME HARBOR_DEVICE_SETUP
     DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
     fake_bin="$test_root/bin"
     calls="$test_root/calls"
-    dir="$test_root/work/harbor/harbor-server"
+    cache="$HOME/.cache/harbor/device"
+    sync="$cache/.claude/skills/sync-japan/sync.sh"
     mkdir -p "$fake_bin"
-    # gh: auth status follows FAKE_GH_AUTH; repo clone follows FAKE_GH_CLONE
-    # and makes a checkout whose sync.sh records "sync <args>".
+    # gh: auth status follows FAKE_GH_AUTH. api serves the three files as raw
+    # bodies; FAKE_GH_FAIL names a path that fails. The served sync.sh records
+    # "sync <args> <marker>" and exits FAKE_SYNC_RC; FAKE_GH_MARK tags a copy.
     cat >"$fake_bin/gh" <<'SH'
 #!/usr/bin/env bash
 printf 'gh %s\n' "$*" >>"$CALLS"
 case "$1 $2" in
   "auth status") [ "${FAKE_GH_AUTH:-ok}" = ok ] ;;
-  "repo clone")
-    [ "${FAKE_GH_CLONE:-ok}" = ok ] || exit 1
-    mkdir -p "$4/.claude/skills/sync-japan"
-    printf '#!/usr/bin/env bash\ncase "$1" in\n  device) printf "sync %%s\\n" "$*" >>"$CALLS"; exit "${FAKE_SYNC_RC:-0}" ;;\nesac\n' \
-      >"$4/.claude/skills/sync-japan/sync.sh"
+  "api -H")
+    [ "$3" = 'Accept: application/vnd.github.raw' ] || exit 2
+    path="${4#repos/ForYouzi/harbor-server/contents/}"
+    [ "$path" != "$4" ] || exit 2
+    case "$path" in *'?ref=main') path="${path%\?ref=main}" ;; *) exit 2 ;; esac
+    [ "$path" != "${FAKE_GH_FAIL:-}" ] || { echo 'HTTP 404' >&2; exit 1; }
+    case "$path" in
+      .claude/skills/sync-japan/sync.sh)
+        printf '#!/usr/bin/env bash\nprintf "sync %%s %s\\n" "$*" >>"$CALLS"\nexit "${FAKE_SYNC_RC:-0}"\n' \
+          "${FAKE_GH_MARK:-new}" ;;
+      deploy/known_hosts) echo '# pinned host keys (fake)' ;;
+      deploy/japan/guarded.sh) echo '# guarded (fake)' ;;
+      *) echo 'HTTP 404' >&2; exit 1 ;;
+    esac
     ;;
   *) exit 2 ;;
 esac
 SH
-    # git: any call (a pull, a fetch) is recorded and must never happen.
+    # git: any call (a clone, a pull) is recorded and must never happen.
     printf '#!/usr/bin/env bash\nprintf "git %%s\\n" "$*" >>"$CALLS"\n' >"$fake_bin/git"
     chmod +x "$fake_bin/gh" "$fake_bin/git"
-    export PATH="$fake_bin:$PATH" CALLS="$calls" HARBOR_SERVER_DIR="$dir"
+    export PATH="$fake_bin:$PATH" CALLS="$calls"
 
     # Not macOS: nothing runs.
     is_macos() { return 1; }
@@ -3025,46 +3044,81 @@ SH
     [ -z "$(HARBOR_DEVICE_SETUP=0 setup_harbor_device </dev/null)" ]
     [ ! -e "$calls" ]
 
-    # No checkout and gh not logged in: one hint, no clone.
+    # gh missing and no cache: one hint, nothing run.
+    out="$(have_cmd() { [ "$1" != gh ] && command -v "$1" >/dev/null 2>&1; }; setup_harbor_device </dev/null)"
+    [ "$out" = 'Harbor device: gh is not installed; run `gh auth login`, then uu again (HARBOR_DEVICE_SETUP=0 skips this)' ]
+    [ ! -e "$calls" ]
+    [ ! -e "$HOME/.cache" ]
+
+    # gh not logged in and no cache: one hint, nothing fetched or run.
     out="$(FAKE_GH_AUTH=no setup_harbor_device </dev/null)"
     [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = 1 ]
+    printf '%s\n' "$out" | grep -Fq 'gh is not logged in; run `gh auth login`, then uu again'
+    [ "$(cat "$calls")" = 'gh auth status' ]
+    [ ! -e "$cache" ]
+    rm -f "$calls"
+
+    # A fetch failure and no cache: one hint, no partial cache, nothing run.
+    out="$(FAKE_GH_FAIL=deploy/known_hosts setup_harbor_device </dev/null)"
+    [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = 1 ]
+    printf '%s\n' "$out" | grep -Fq 'could not download it from ForYouzi/harbor-server'
     printf '%s\n' "$out" | grep -Fq 'run `gh auth login`, then uu again'
-    if grep -q 'repo clone' "$calls"; then return 1; fi
-    [ ! -e "$dir" ]
-    rm -f "$calls"
-
-    # No checkout and the clone fails: one warning, nothing else.
-    out="$(FAKE_GH_CLONE=no setup_harbor_device </dev/null)"
-    printf '%s\n' "$out" | grep -Fq 'could not clone ForYouzi/harbor-server'
     if grep -q '^sync' "$calls"; then return 1; fi
+    [ ! -e "$cache" ]
+    [ -z "$(find "$HOME/.cache/harbor" -mindepth 1 -maxdepth 1)" ]
     rm -f "$calls"
 
-    # No checkout and gh logged in: clone, then sync.sh device once.
-    out="$(setup_harbor_device </dev/null)"
-    printf '%s\n' "$out" | grep -Fq "cloned ForYouzi/harbor-server into $dir"
-    grep -Fxq "gh repo clone ForYouzi/harbor-server $dir" "$calls"
-    [ "$(grep -c '^sync' "$calls")" = 1 ]
-    grep -Fxq 'sync device' "$calls"
-    rm -f "$calls"
-
-    # Checkout exists: sync.sh device once; gh and git are never called.
-    out="$(setup_harbor_device </dev/null)"
+    # gh ok: the three files from main in their repo layout, a 0700 cache, and
+    # sync.sh device run once from it.
+    out="$(FAKE_GH_MARK=first setup_harbor_device </dev/null)"
     [ -z "$out" ]
-    [ "$(cat "$calls")" = 'sync device' ]
+    for f in .claude/skills/sync-japan/sync.sh deploy/known_hosts deploy/japan/guarded.sh; do
+      grep -Fxq "gh api -H Accept: application/vnd.github.raw repos/ForYouzi/harbor-server/contents/${f}?ref=main" "$calls"
+      [ -s "$cache/$f" ]
+    done
+    [ "$(cd "$cache" && find . -type f | sort | tr '\n' ' ')" = './.claude/skills/sync-japan/sync.sh ./deploy/japan/guarded.sh ./deploy/known_hosts ' ]
+    [ "$(stat -f %Lp "$cache" 2>/dev/null || stat -c %a "$cache")" = 700 ]
+    grep -Fxq '# pinned host keys (fake)' "$cache/deploy/known_hosts"
+    [ "$(grep -c '^sync' "$calls")" = 1 ]
+    grep -Fxq 'sync device first' "$calls"
+    [ "$(find "$HOME/.cache/harbor" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')" = 1 ]
+    rm -f "$calls"
+
+    # A fetch failure partway with a cache: the old cache stays whole (not half
+    # replaced), one line says so, and the old sync.sh device runs once.
+    out="$(FAKE_GH_MARK=second FAKE_GH_FAIL=deploy/japan/guarded.sh setup_harbor_device </dev/null)"
+    [ "$out" = "Harbor device: could not download it from ForYouzi/harbor-server (no access or offline); using the older copy in $cache" ]
+    grep -q 'contents/deploy/known_hosts' "$calls"
+    grep -Fq 'first' "$sync"
+    if grep -Fq 'second' "$sync"; then return 1; fi
+    [ "$(cat "$calls" | grep '^sync')" = 'sync device first' ]
+    [ "$(find "$HOME/.cache/harbor" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')" = 1 ]
+    rm -f "$calls"
+
+    # gh logged out with a cache: the older copy runs, with a line saying so.
+    out="$(FAKE_GH_AUTH=no setup_harbor_device </dev/null)"
+    [ "$out" = "Harbor device: gh is not logged in; using the older copy in $cache" ]
+    [ "$(grep -c '^sync device first$' "$calls")" = 1 ]
+    rm -f "$calls"
+
+    # A good fetch replaces the cache as a whole.
+    out="$(FAKE_GH_MARK=third setup_harbor_device </dev/null)"
+    [ -z "$out" ]
+    grep -Fxq 'sync device third' "$calls"
     rm -f "$calls"
 
     # sync.sh fails: one warning, a zero return, and the install continues.
     out="$(set -e; FAKE_SYNC_RC=7 setup_harbor_device </dev/null; echo continued)"
     printf '%s\n' "$out" | grep -Fq 'Harbor device setup exited 7; continuing'
     printf '%s\n' "$out" | grep -Fxq continued
-    rm -f "$calls"
 
-    # A checkout older than the device step: one hint, sync.sh not run.
-    printf '#!/usr/bin/env bash\ncase "$1" in\n  pair) printf "sync %%s\\n" "$*" >>"$CALLS" ;;\nesac\n' \
-      >"$dir/.claude/skills/sync-japan/sync.sh"
-    out="$(setup_harbor_device </dev/null)"
-    printf '%s\n' "$out" | grep -Fq 'has no sync.sh device step yet'
-    [ ! -e "$calls" ]
+    # XDG_CACHE_HOME moves the cache.
+    out="$(XDG_CACHE_HOME="$test_root/xdg" setup_harbor_device </dev/null)"
+    [ -z "$out" ]
+    [ -f "$test_root/xdg/harbor/device/.claude/skills/sync-japan/sync.sh" ]
+
+    # Never a clone or any other git call.
+    if grep -Eq '^git |repo clone' "$calls"; then return 1; fi
   )
   echo "Harbor device step ok"
 }

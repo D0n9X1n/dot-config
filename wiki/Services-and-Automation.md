@@ -16,7 +16,7 @@ On macOS, the installer can add:
 - Copilot CLI and copilot-relay from npm
 - oh-my-zsh
 - shell tools such as `eza`, `jq`, `neovim`, and autojump
-- GitHub CLI (`gh`), which the Harbor device step uses to clone a private repo
+- GitHub CLI (`gh`), which the Harbor device step uses to download files from a private repo
 - Nerd Font symbols and Noto Color Emoji
 - Rec Mono St.Helens, Rec Sans Mt.Baker, and Rec Serif Mt.Adams from the [Rec Mountain Fonts](https://github.com/D0n9X1n/rec-mountain-fonts) release; the installer removes the retired `font-recursive` casks and `RecMonoBaker-*` fonts
 - pinned Apollo theme releases for SonicTerm, RMUX, native tmux, and eza
@@ -256,21 +256,28 @@ Quit harbor-client before `uu`, or restart it afterwards. The running app keeps 
 
 Every `install.sh` run on macOS, and so every `uu`, also sets this Mac up as a Harbor device. The work lives in the private `ForYouzi/harbor-server` repo, so this public repo holds no server address, user, or key. The step runs before the settings merge above, so a newly installed app gets its model keys in the same run.
 
+A new Mac needs no harbor-server checkout. The server runs elsewhere; this Mac only needs the device setup script and the pinned host keys. `uu` downloads them from the private repo's `main` with `gh` and keeps them in `${XDG_CACHE_HOME:-~/.cache}/harbor/device/`, under the same paths as in the repo:
+
+- `.claude/skills/sync-japan/sync.sh`
+- `deploy/known_hosts`
+- `deploy/japan/guarded.sh`
+
 On a brand-new Mac:
 
 1. Run `gh auth login` once with an account that can read `ForYouzi/harbor-server`.
-2. Run `uu` in a terminal. It clones the repo into `~/Workspace/harbor/harbor-server`, then runs `bash .claude/skills/sync-japan/sync.sh device` there. That step generates an SSH key, asks for the server password once to push it, installs Harbor, and pairs the device certificate.
-3. Later runs find everything in place, so the step does nothing and asks nothing.
+2. Run `uu` in a terminal. It downloads the three files, then runs `bash ~/.cache/harbor/device/.claude/skills/sync-japan/sync.sh device`. That step generates an SSH key, asks for the server password once to push it, installs Harbor, and pairs the device certificate.
+3. Later runs download the files again and find everything in place, so the step does nothing and asks nothing.
 
 Behavior:
 
-- `HARBOR_DEVICE_SETUP=0` turns the step off. `HARBOR_SERVER_DIR` picks another checkout.
-- When the checkout is missing and `gh` is not installed or not logged in, it prints one line asking for `gh auth login` and skips. A failed clone (no access, offline) prints one warning and skips.
-- An existing checkout is never pulled or changed. When its `sync.sh` has no `device` step yet, it prints one hint and skips.
+- `HARBOR_DEVICE_SETUP=0` turns the step off.
+- Every run downloads all three files to a new folder first, then replaces the cache folder as a whole (mode `0700`). A failed download leaves the old cache as it was, never half replaced.
+- When `gh` is not installed, not logged in, or the download fails (no access, offline), it uses the cache if there is one and prints one line saying it is an older copy. With no cache it prints one line asking for `gh auth login` and skips.
+- It never clones or pulls a repo.
 - With a terminal, `sync.sh device` reads from and writes to that terminal directly, so the password prompt shows at once; its lines do not reach the install log. Without a terminal it cannot prompt; its output goes to the log.
 - A non-zero exit prints one warning, and the install continues.
 
-`scripts/check.sh harbor` tests the step with a fake `gh` and a fake checkout, without network.
+`scripts/check.sh harbor` tests the step with a fake `gh` that serves the three files or fails on demand, without network.
 
 ## MCP merge
 
