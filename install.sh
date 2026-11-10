@@ -967,18 +967,28 @@ herdr_skip() {
   echo "Warning: Herdr config: could not keep your live $1.json ($2); left it as it is and did not link it." >&2
 }
 
+# Returns 1 when any live value could not be saved; the submodule then stays at its pin this run.
 herdr_seed_capture() {
-  local f live
+  local f live ok=0
   for f in settings keys; do
     live="$HOME/.config/herdr-app/$f.json"
-    [ -e "$live" ] || continue
+    [ -e "$live" ] || [ -L "$live" ] || continue
     if ! cp -L "$live" "$1/$f.json" 2>/dev/null; then
       rm -f "$1/$f.json"
       herdr_skip "$f" "could not read it"
+      ok=1
       continue
     fi
     if [ -L "$live" ]; then echo link >"$1/$f.kind"; else echo file >"$1/$f.kind"; fi
+    [ -s "$1/$f.kind" ] || ok=1
   done
+  return "$ok"
+}
+
+# Live values could not be saved first, so updating the submodule could change a live file behind
+# its link with nothing to restore it from. Keep the current checkout this run.
+herdr_hold_pin() {
+  echo "Warning: Herdr config: could not save your live settings first; left config/herdr at its current pin. Rerun ./install.sh to update it." >&2
 }
 
 # herdr_seed_write <settings|keys> <file>: the value into config/herdr/user/, checked; else skip.
@@ -1034,13 +1044,17 @@ herdr_skip_link() {
 herdr_install_prepare() {
   local seed
   HERDR_SKIP_LINKS=""
+  # Capture first: the submodule is updated only after every live value is safely saved.
   if ! seed="$(mktemp -d "${TMPDIR:-/tmp}/herdr-live.XXXXXX" 2>/dev/null)" || [ ! -d "$seed" ]; then
-    herdr_submodule_update
+    herdr_hold_pin
     herdr_seed_unavailable
     return 0
   fi
-  herdr_seed_capture "$seed"
-  herdr_submodule_update
+  if herdr_seed_capture "$seed"; then
+    herdr_submodule_update
+  else
+    herdr_hold_pin
+  fi
   herdr_seed_apply "$seed"
   rm -rf -- "$seed"
 }

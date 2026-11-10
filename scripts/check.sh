@@ -3408,6 +3408,29 @@ run_herdr_adopt_smoke() (
   [ "$(warns "$out" keys.json)" = 1 ] || fail "bad linked keys: want one warning, got: $out"
   cmp -s "$t/r4/config/herdr/user/keys.json" "$t/herdr-src/user/keys.json" || fail "bad linked keys: bad JSON was adopted"
   rest "$t/r4" "$t/h4" || fail "bad linked keys: the rest of the install did not run"
+
+  # 5. Capture fails while live settings.json links into the submodule and the pin advances:
+  #    the submodule must stay put, so the live bytes do not change behind the link.
+  new 5; ln -s "$t/r5/config/herdr/user/settings.json" "$(live "$t/h5" settings.json)"
+  git -C "$t/r5" update-index --cacheinfo "160000,$(git -C "$t/herdr.git" rev-parse p3),config/herdr" && git -C "$t/r5" commit -qm p3
+  out="$(TMPDIR="$t/no/such/dir" run "$t/r5" "$t/h5" 2>&1)" || fail "capture failed: the install stopped: $out"
+  [ "$(cat "$(live "$t/h5" settings.json)")" = '{"zoom":1}' ] || fail "capture failed: the live settings changed to $(cat "$(live "$t/h5" settings.json)")"
+  [ "$(git -C "$t/r5/config/herdr" rev-parse HEAD)" = "$(git -C "$t/herdr.git" rev-parse p1)" ] || fail "capture failed: the submodule advanced"
+  [ "$(grep -c 'left config/herdr at its current pin' <<<"$out" || true)" = 1 ] || fail "capture failed: want one pin warning, got: $out"
+  rest "$t/r5" "$t/h5" || fail "capture failed: the rest of the install did not run"
+
+  # 6. One live file cannot be read (keys.json) while settings.json links into the submodule and the
+  #    pin advances: the submodule stays put, and the unreadable file is left alone.
+  new 6; ln -s "$t/r6/config/herdr/user/settings.json" "$(live "$t/h6" settings.json)"
+  printf '{"global":{}}\n' >"$(live "$t/h6" keys.json)"; chmod 000 "$(live "$t/h6" keys.json)"
+  git -C "$t/r6" update-index --cacheinfo "160000,$(git -C "$t/herdr.git" rev-parse p3),config/herdr" && git -C "$t/r6" commit -qm p3
+  out="$(run "$t/r6" "$t/h6" 2>&1)" || fail "unreadable keys: the install stopped: $out"
+  chmod 644 "$(live "$t/h6" keys.json)"
+  [ "$(cat "$(live "$t/h6" settings.json)")" = '{"zoom":1}' ] || fail "unreadable keys: the live settings changed to $(cat "$(live "$t/h6" settings.json)")"
+  [ "$(git -C "$t/r6/config/herdr" rev-parse HEAD)" = "$(git -C "$t/herdr.git" rev-parse p1)" ] || fail "unreadable keys: the submodule advanced"
+  kept "$t/h6" keys.json '{"global":{}}' || fail "unreadable keys: the live keys.json was replaced"
+  [ "$(grep -c 'left config/herdr at its current pin' <<<"$out" || true)" = 1 ] || fail "unreadable keys: want one pin warning, got: $out"
+  rest "$t/r6" "$t/h6" || fail "unreadable keys: the rest of the install did not run"
   echo "herdr adopt: ok"
 )
 
