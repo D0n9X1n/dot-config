@@ -1094,6 +1094,12 @@ herdr_dock_icon() {
   return 0
 }
 
+# herdr_step <function>: runs one Herdr step; a failure prints one warning and the install goes on.
+herdr_step() {
+  "$@" || echo "Warning: Herdr: $1 failed (exit $?); the rest of the install goes on." >&2
+  return 0
+}
+
 herdr_install_report() {
   local skipped
   skipped="$(awk -F'\t' '$2 ~ /^config\/herdr\// {print $2}' "$manifest" | while IFS= read -r src; do
@@ -1346,17 +1352,31 @@ manifest_source_for_destination() {
 }
 
 link_manifest_files() {
-  local type source destination
+  local type source destination herdr_failed=""
   while IFS=$'\t' read -r type source destination; do
     [ "$type" = "link" ] || continue
     herdr_source_missing "$source" && continue
     herdr_skip_link "$destination" && continue
-    migrate_managed_link "$destination"
-    link_file "${repo_root}/${source}" "${HOME}/${destination}"
     case "$source" in
+      # A Herdr row that cannot be linked is left as it is; one warning at the end, and the
+      # install goes on. Other rows keep their behavior.
+      config/herdr/*)
+        if ! { migrate_managed_link "$destination" && link_file "${repo_root}/${source}" "${HOME}/${destination}"; } 2>/dev/null; then
+          herdr_failed="${herdr_failed}${herdr_failed:+, }${destination}"
+          continue
+        fi ;;
+      *)
+        migrate_managed_link "$destination"
+        link_file "${repo_root}/${source}" "${HOME}/${destination}" ;;
+    esac
+    case "$source" in
+      config/herdr/*.sh) chmod +x "${repo_root}/${source}" 2>/dev/null || true ;;
       *.sh) chmod +x "${repo_root}/${source}" ;;
     esac
   done <"$manifest"
+  if [ -n "$herdr_failed" ]; then
+    echo "Warning: Herdr config: could not link ${herdr_failed}; left them as they are." >&2
+  fi
 }
 
 # copy rows install real files: Herdr does not load a mod's svg()/image() assets
@@ -1825,15 +1845,15 @@ else
   echo "Auto-install only supports macOS + Homebrew. Install apps/fonts/CLIs manually."
 fi
 
-ensure_herdr
-herdr_install_prepare
+herdr_step ensure_herdr
+herdr_step herdr_install_prepare
 validate_manifest
 validate_local_overlay
 install_apollo_themes
 link_manifest_files
-copy_manifest_files || echo "Warning: some copy rows were not installed (see above)" >&2
-herdr_install_report
-herdr_dock_icon
+herdr_step copy_manifest_files
+herdr_step herdr_install_report
+herdr_step herdr_dock_icon
 link_local_overlay
 install_firefox_step
 # RMUX is Windows-only. Keep retention while an older macOS install remains.

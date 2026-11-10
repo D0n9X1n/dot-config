@@ -1223,10 +1223,14 @@ PY
     echo "workflows: $checkouts checkouts but $subs with submodules: true" >&2
     return 1
   }
-  for f in run_herdr_smoke run_herdr_copy_smoke run_herdr_install_smoke run_herdr_seed_smoke run_herdr_adopt_smoke run_herdr_copy_boundary_smoke run_herdr_app_smoke run_herdr_preflight_smoke; do
+  for f in run_herdr_smoke run_herdr_copy_smoke run_herdr_install_smoke run_herdr_seed_smoke run_herdr_adopt_smoke run_herdr_copy_boundary_smoke run_herdr_link_fail_smoke run_herdr_app_smoke run_herdr_preflight_smoke; do
     declare -f run_smoke | grep -qw "$f" || { echo "run_smoke does not call $f" >&2; return 1; }
   done
   declare -f run_shellcheck | grep -q "config/herdr" || { echo "run_shellcheck does not prune config/herdr" >&2; return 1; }
+  # Every Herdr step in install.sh's main runs through herdr_step, so a failure only warns.
+  for f in ensure_herdr herdr_install_prepare copy_manifest_files herdr_install_report herdr_dock_icon; do
+    grep -qx "herdr_step $f" install.sh || { echo "install.sh does not run $f through herdr_step" >&2; return 1; }
+  done
 }
 
 run_rmux_store_tests() {
@@ -3250,6 +3254,56 @@ run_herdr_seed_smoke() {
   )
 }
 
+# A Herdr failure never stops the install: a Herdr row that cannot be linked (here a regular file
+# blocks ~/.config/herdr-app/layouts) gives one warning, and later rows and steps still run under
+# set -e. herdr_step runs a Herdr step so its failure warns and the install goes on.
+run_herdr_link_fail_smoke() (
+  set -euo pipefail
+  local t r h rc
+  t="$(mktemp -d)"
+  [ -n "$t" ] && [ -d "$t" ] || exit 1
+  trap 'rm -rf "$t"' EXIT
+  export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t.invalid \
+    GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t.invalid
+  export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=protocol.file.allow GIT_CONFIG_VALUE_0=always
+  export TMPDIR="$t/tmp"; mkdir -p "$TMPDIR"
+  herdr_fixture "$t"
+  fail() { echo "herdr link fail: $*" >&2; exit 1; }
+  DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+  r="$t/r1"; h="$t/h1"
+  git clone -q "$t/super.git" "$r"; git -C "$r" submodule update -q --init
+  printf 'later\n' >"$r/config/later.txt"; printf 'link\tconfig/later.txt\t.later\n' >>"$r/config/manifest.tsv"
+  mkdir -p "$h/.config/herdr-app"; printf 'blocker\n' >"$h/.config/herdr-app/layouts"
+  # Errexit is off inside $(...), so run the steps in a plain subshell with set -e, as main runs them.
+  set +e
+  (
+    set -e
+    repo_root="$r"; manifest="$r/config/manifest.tsv"; export HOME="$h"
+    herdr_step herdr_install_prepare
+    validate_manifest
+    link_manifest_files
+    herdr_step copy_manifest_files
+    herdr_step herdr_install_report
+    echo "LATER STEP RAN"
+  ) >"$t/log" 2>&1
+  rc=$?
+  set -e
+  [ "$rc" = 0 ] || fail "the install stopped (exit $rc): $(tail -3 "$t/log")"
+  [ "$(grep -c '^Warning: Herdr config: could not link' "$t/log" || true)" = 1 ] || fail "want one warning, got: $(cat "$t/log")"
+  [ "$(readlink "$h/.later")" = "$r/config/later.txt" ] || fail "a later non-Herdr row was not linked"
+  grep -qx 'LATER STEP RAN' "$t/log" || fail "a later step did not run"
+  [ -f "$h/.config/herdr-app/layouts" ] && [ "$(cat "$h/.config/herdr-app/layouts")" = blocker ] || fail "the blocking file changed"
+  [ -L "$h/.config/herdr-app/themes/x.json" ] && [ -L "$h/.config/herdr-app/settings.json" ] || fail "other Herdr rows were not linked"
+  # herdr_step: a failing Herdr step warns once and the install goes on, under set -e.
+  set +e
+  ( set -e; broken_step() { return 3; }; herdr_step broken_step; echo "AFTER" ) >"$t/log2" 2>&1
+  rc=$?
+  set -e
+  [ "$rc" = 0 ] && grep -qx AFTER "$t/log2" || fail "herdr_step: a failed step stopped the install"
+  [ "$(grep -c '^Warning: Herdr:' "$t/log2" || true)" = 1 ] || fail "herdr_step: want one warning, got: $(cat "$t/log2")"
+  echo "herdr link fail: ok"
+)
+
 # copy rows write and delete only inside ~/.config/herdr-app/mods/, physically: a linked mod folder or
 # mods folder is refused and nothing outside is touched; a copy-manifest entry outside that folder is
 # ignored and never deleted, even when its sha matches.
@@ -3599,6 +3653,7 @@ run_smoke() {
   run_herdr_seed_smoke
   run_herdr_adopt_smoke
   run_herdr_copy_boundary_smoke
+  run_herdr_link_fail_smoke
   run_herdr_app_smoke
   run_herdr_preflight_smoke
   run_local_checks
@@ -3619,7 +3674,7 @@ case "${1:-all}" in
   firefox) run_firefox_smoke ;;
   editors) run_editors_smoke ;;
   harbor) run_harbor_client_smoke ;;
-  herdr) run_herdr_smoke; run_herdr_copy_smoke; run_herdr_install_smoke; run_herdr_seed_smoke; run_herdr_adopt_smoke; run_herdr_copy_boundary_smoke; run_herdr_app_smoke; run_herdr_preflight_smoke ;;
+  herdr) run_herdr_smoke; run_herdr_copy_smoke; run_herdr_install_smoke; run_herdr_seed_smoke; run_herdr_adopt_smoke; run_herdr_copy_boundary_smoke; run_herdr_link_fail_smoke; run_herdr_app_smoke; run_herdr_preflight_smoke ;;
   backups) run_install_backup_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;
