@@ -32,7 +32,7 @@ Never edit a managed file under `$HOME`.
 | Safe MCP data | `config/mcp/mcp-shared.json` | merged locally |
 | launchd templates | `config/launchd/` | `~/Library/LaunchAgents/` |
 | Apollo runtime | `scripts/apollo-releases.tsv` + `scripts/apollo-theme.sh` | `~/.local/share/dot-configs/apollo/` and consumer links |
-| Herdr | `config/herdr/` submodule (pin in `scripts/check.sh` `HERDR_PIN`) | `~/.config/herdr-app/` (mods are copies) and `~/.local/bin/herdr-agent-context` |
+| Herdr config for Apollo.app | `config/herdr/` submodule (pin in `scripts/check.sh` `HERDR_PIN`) | `~/.config/herdr-app/` (mods are copies) and `~/.local/bin/herdr-agent-context`. Apollo.app replaced Herdr.app; install never installs either app |
 
 `config/manifest.tsv` is the tracked-file install list. Add a row when a new managed file is added.
 

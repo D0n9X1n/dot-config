@@ -2,17 +2,16 @@
 
 [English](Herdr.md) | 简体中文
 
-[Herdr](https://herdr.dev) 是本仓库用 Apollo 布局配置的终端工作区。布局放在独立的公开仓库 [herdr-config](https://github.com/D0n9X1n/herdr-config) 中。本仓库把它作为 Git 子模块固定在 `config/herdr`。
+本页介绍终端工作区应用的 Apollo 布局。应用是 **Apollo.app**：它是 [Herdr](https://herdr.dev) 的改名副本，已取代 Herdr.app。它读取 Herdr 的设置目录 `~/.config/herdr-app`，所以下面的内容仍然安装到那里。布局放在独立的公开仓库 [herdr-config](https://github.com/D0n9X1n/herdr-config) 中。本仓库把它作为 Git 子模块固定在 `config/herdr`。
 
 ## 安装做什么
 
-`./install.sh`（以及运行它的 `uu`）在 macOS 上执行这些 Herdr 步骤：
+`./install.sh`（以及运行它的 `uu`）在 macOS 上执行这些步骤。它从不安装 Herdr 或 Apollo.app；请手动安装 Apollo.app。
 
-1. **缺少时安装 Herdr。** 如果 `~/Applications` 和 `/Applications` 中都没有 `Herdr.app`，`PATH` 上也没有 `herdr-app`，就运行 `brew install --cask herdr-app`。已有的安装从不改动。失败时只输出一条警告，其余安装继续。`SKIP_BREW=1` 会跳过这一步。
-2. **更新子模块。** 运行 `git submodule update --init config/herdr`。离线时会跳过 Herdr 行，并输出一行 `Herdr config:`，其他内容照常安装。
-3. **保留你的当前值。** 读取当前的 `settings.json` 和 `keys.json`，有差异时写入 `config/herdr/user/`。如果你的 `keys.json` 仍是 Herdr 默认值，则使用 Apollo 按键表。
-4. **安装文件。** 布局、主题、`settings.json`、`keys.json` 和 agent 脚本是链接。mod 是副本；见下文。
-5. **恢复程序坞图标。** Herdr 更新会替换应用并去掉它的自定义图标。如果 `config/herdr/scripts/set-app-icon.sh --check` 没有发现自定义图标，安装器会重新设置 Apollo 图标。失败时输出警告并继续。
+1. **更新子模块。** 运行 `git submodule update --init config/herdr`。离线时会跳过 Herdr 行，并输出一行 `Herdr config:`，其他内容照常安装。
+2. **保留你的当前值。** 读取当前的 `settings.json` 和 `keys.json`，有差异时写入 `config/herdr/user/`。如果你的 `keys.json` 仍是 Herdr 默认值，则使用 Apollo 按键表。
+3. **安装文件。** 布局、主题、`settings.json`、`keys.json` 和 agent 脚本是链接。mod 是副本；见下文。
+4. **恢复程序坞图标。** 重新签名或复制 `Apollo.app` 会去掉它的自定义图标。如果 `config/herdr/scripts/set-app-icon.sh --check --app <Apollo.app>` 没有发现自定义图标，安装器会重新设置 Apollo 图标。它先查找 `~/Applications`，再查找 `/Applications`。失败时输出警告并继续。
 
 不保留任何备份：没有种子文件夹、没有归档、没有 `.bak` 文件。
 

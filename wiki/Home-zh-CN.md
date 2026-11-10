@@ -29,7 +29,7 @@
 - [开发与发布](Development-and-Releases-zh-CN.md) — 检查、Wiki 发布、issues、tags 和 releases。
 - [Apollo 主题](Apollo-Theme-zh-CN.md) — 固定的上游 release 和本机运行 adapters。
 - [Firefox](Firefox-zh-CN.md) — 受管的 `user.js` 设置和 oh-my-firefox 主题，由 `uu` 保持最新。
-- [Herdr](Herdr-zh-CN.md) — 来自 herdr-config 子模块的 Apollo Herdr 布局、agent hook 和程序坞图标。
+- [Herdr](Herdr-zh-CN.md) — 来自 herdr-config 子模块、供 Apollo.app（已取代 Herdr.app）使用的 Apollo 布局、agent hook 和程序坞图标。
 
 ## 主要文件夹
 
