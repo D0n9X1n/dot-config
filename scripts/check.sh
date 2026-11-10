@@ -3568,6 +3568,8 @@ run_herdr_preflight_smoke() (
 
 # Herdr: the herdr-config submodule (config/herdr) and how install.sh uses it.
 HERDR_PIN=v0.0.4
+# The commit HERDR_PIN points to. CI clones the submodule without tags, so the gitlink is checked by SHA.
+HERDR_PIN_SHA=9b1a76c16a00544d770a2c30f692a116ae8501e9
 herdr_expected_rows() {
   git -C config/herdr ls-files -- layouts themes mods user/settings.json user/keys.json agent/herdr-context.sh |
     awk -v OFS='\t' '
@@ -3586,9 +3588,14 @@ run_herdr_smoke() {
     got="$(git config -f .gitmodules --get submodule.config/herdr.ignore || true)"
     [ "$got" = dirty ] || { echo "herdr: submodule ignore is '$got', want dirty" >&2; exit 1; }
     [ "$(git ls-files -s config/herdr | awk '{print $1}')" = 160000 ] || { echo "herdr: config/herdr is not a gitlink" >&2; exit 1; }
+    got="$(git ls-files -s config/herdr | awk '{print $2}')"
+    [ "$got" = "$HERDR_PIN_SHA" ] || { echo "herdr: config/herdr gitlink is '$got', want $HERDR_PIN_SHA ($HERDR_PIN)" >&2; exit 1; }
     if [ -e config/herdr/.git ]; then
-      got="$(git -C config/herdr describe --exact-match --tags HEAD 2>/dev/null || true)"
-      [ "$got" = "$HERDR_PIN" ] || { echo "herdr: config/herdr is at '$got', want $HERDR_PIN" >&2; exit 1; }
+      got="$(git -C config/herdr rev-parse HEAD 2>/dev/null || true)"
+      [ "$got" = "$HERDR_PIN_SHA" ] || { echo "herdr: config/herdr is checked out at '$got', want $HERDR_PIN_SHA ($HERDR_PIN)" >&2; exit 1; }
+      if got="$(git -C config/herdr rev-parse -q --verify "refs/tags/$HERDR_PIN^{commit}" 2>/dev/null)"; then
+        [ "$got" = "$HERDR_PIN_SHA" ] || { echo "herdr: tag $HERDR_PIN is $got, not $HERDR_PIN_SHA" >&2; exit 1; }
+      fi
     fi
     grep -q -- '--ignore-submodules=all' config/zsh/uu.zsh || { echo "herdr: uu's dirty check does not ignore submodules" >&2; exit 1; }
     # Manifest rows: one per installable tracked file. Mods are copy rows (Herdr does not load

@@ -53,4 +53,4 @@ git -C config/herdr checkout vX.Y.Z
 git add config/herdr
 ```
 
-Change `HERDR_PIN` in `scripts/check.sh` to match, run `scripts/check.sh all`, then commit.
+Change `HERDR_PIN` and `HERDR_PIN_SHA` (the tag's commit, from `git -C config/herdr rev-parse vX.Y.Z^{commit}`) in `scripts/check.sh` to match, run `scripts/check.sh all`, then commit. CI checks out the submodule without tags, so the check compares the commit.

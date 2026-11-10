@@ -53,4 +53,4 @@ git -C config/herdr checkout vX.Y.Z
 git add config/herdr
 ```
 
-把 `scripts/check.sh` 中的 `HERDR_PIN` 改成相同版本，运行 `scripts/check.sh all`，然后提交。
+把 `scripts/check.sh` 中的 `HERDR_PIN` 和 `HERDR_PIN_SHA`（该标签的提交，用 `git -C config/herdr rev-parse vX.Y.Z^{commit}` 获取）改成相同版本，运行 `scripts/check.sh all`，然后提交。CI 拉取子模块时不带标签，所以检查比较的是提交。
