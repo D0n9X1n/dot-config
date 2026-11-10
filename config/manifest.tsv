@@ -71,6 +71,7 @@ copy	config/herdr/mods/apollo-pane/main.js	.config/herdr-app/mods/apollo-pane/ma
 copy	config/herdr/mods/apollo-pane/mod.json	.config/herdr-app/mods/apollo-pane/mod.json
 copy	config/herdr/mods/apollo-pane/split-down.svg	.config/herdr-app/mods/apollo-pane/split-down.svg
 copy	config/herdr/mods/apollo-pane/split-right.svg	.config/herdr-app/mods/apollo-pane/split-right.svg
+copy	config/herdr/mods/apollo-pane/star.svg	.config/herdr-app/mods/apollo-pane/star.svg
 copy	config/herdr/mods/apollo-pane/zoom.svg	.config/herdr-app/mods/apollo-pane/zoom.svg
 copy	config/herdr/mods/apollo-spaces/arc.svg	.config/herdr-app/mods/apollo-spaces/arc.svg
 copy	config/herdr/mods/apollo-spaces/branch.svg	.config/herdr-app/mods/apollo-spaces/branch.svg
@@ -78,11 +79,16 @@ copy	config/herdr/mods/apollo-spaces/check.svg	.config/herdr-app/mods/apollo-spa
 copy	config/herdr/mods/apollo-spaces/chevron-down.svg	.config/herdr-app/mods/apollo-spaces/chevron-down.svg
 copy	config/herdr/mods/apollo-spaces/chevron.svg	.config/herdr-app/mods/apollo-spaces/chevron.svg
 copy	config/herdr/mods/apollo-spaces/diamond.svg	.config/herdr-app/mods/apollo-spaces/diamond.svg
+copy	config/herdr/mods/apollo-spaces/folder.svg	.config/herdr-app/mods/apollo-spaces/folder.svg
+copy	config/herdr/mods/apollo-spaces/home.svg	.config/herdr-app/mods/apollo-spaces/home.svg
 copy	config/herdr/mods/apollo-spaces/lib.js	.config/herdr-app/mods/apollo-spaces/lib.js
 copy	config/herdr/mods/apollo-spaces/main.js	.config/herdr-app/mods/apollo-spaces/main.js
 copy	config/herdr/mods/apollo-spaces/mod.json	.config/herdr-app/mods/apollo-spaces/mod.json
 copy	config/herdr/mods/apollo-spaces/pin.svg	.config/herdr-app/mods/apollo-spaces/pin.svg
 copy	config/herdr/mods/apollo-spaces/plus.svg	.config/herdr-app/mods/apollo-spaces/plus.svg
+copy	config/herdr/mods/apollo-spaces/repo.svg	.config/herdr-app/mods/apollo-spaces/repo.svg
+copy	config/herdr/mods/apollo-spaces/server.svg	.config/herdr-app/mods/apollo-spaces/server.svg
+copy	config/herdr/mods/apollo-spaces/star.svg	.config/herdr-app/mods/apollo-spaces/star.svg
 copy	config/herdr/mods/apollo-specs/lib.js	.config/herdr-app/mods/apollo-specs/lib.js
 copy	config/herdr/mods/apollo-specs/main.js	.config/herdr-app/mods/apollo-specs/main.js
 copy	config/herdr/mods/apollo-specs/mod.json	.config/herdr-app/mods/apollo-specs/mod.json
@@ -103,6 +109,7 @@ copy	config/herdr/mods/apollo-tabs/main.js	.config/herdr-app/mods/apollo-tabs/ma
 copy	config/herdr/mods/apollo-tabs/mod.json	.config/herdr-app/mods/apollo-tabs/mod.json
 copy	config/herdr/mods/apollo-tabs/more.svg	.config/herdr-app/mods/apollo-tabs/more.svg
 copy	config/herdr/mods/apollo-tabs/specs.svg	.config/herdr-app/mods/apollo-tabs/specs.svg
+copy	config/herdr/mods/apollo-tabs/star.svg	.config/herdr-app/mods/apollo-tabs/star.svg
 copy	config/herdr/mods/apollo-tabs/win-close.svg	.config/herdr-app/mods/apollo-tabs/win-close.svg
 copy	config/herdr/mods/apollo-tabs/win-max.svg	.config/herdr-app/mods/apollo-tabs/win-max.svg
 copy	config/herdr/mods/apollo-tabs/win-min.svg	.config/herdr-app/mods/apollo-tabs/win-min.svg
