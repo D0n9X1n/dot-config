@@ -39,6 +39,7 @@ type<TAB>source<TAB>home destination
 | 类型 | 工作 |
 |---|---|
 | `link` | 在 `$HOME` 中创建符号链接 |
+| `copy` | 把真实文件复制到 `$HOME`；用于 Herdr mod（见下文） |
 | `merge` | 把安全共享数据合并到本机文件 |
 | `render` | 填充模板并写入本机文件 |
 | `firefox` | 在每个 Firefox 默认 profile 中创建符号链接；请看 [Firefox](Firefox-zh-CN.md) |
@@ -65,6 +66,9 @@ type<TAB>source<TAB>home destination
 | `config/mcp/mcp-shared.json` | 合并到本机 Copilot MCP 数据 |
 | `config/harbor-client/settings.json` | 把模型键合并到 `~/Library/Application Support/harbor-client/settings.json` |
 | `config/launchd/*.plist` | 渲染到 `~/Library/LaunchAgents/` |
+| `config/herdr/{layouts,themes}/*`、`config/herdr/user/{settings,keys}.json` | 链接到 `~/.config/herdr-app/` 下；见 [Herdr](Herdr-zh-CN.md) |
+| `config/herdr/mods/**` | 复制到 `~/.config/herdr-app/mods/` 下 |
+| `config/herdr/agent/herdr-context.sh` | `~/.local/bin/herdr-agent-context` |
 | `scripts/copilot/cleanup-legacy.sh` | `~/.copilot/cleanup-legacy.sh` |
 | `scripts/rmux/rmux-store` | `~/.local/bin/rmux-store` |
 | `scripts/rmux/store.py` | `~/.local/lib/rmux-store/store.py` |
@@ -97,6 +101,17 @@ Apollo 主题文件不保存在 Git 中，也不作为 manifest source。`script
 Copilot 自己的清理脚本也会删除所有 `~/.copilot/*.bak.*` 文件；见 [Copilot CLI](Copilot-CLI-zh-CN.md)。
 
 从旧根目录路径迁移到 `config/` 会在同一次安装中完成。精确指向旧根目录受管源的 `~/.tmux.conf` 会迁移到 `config/tmux/tmux.conf`；它重新启用，不再属于停用项。
+
+## 安全复制
+
+`copy` 行安装真实文件，而不是链接。Herdr 不会通过链接加载 mod 的图标文件，所以 `config/herdr/mods/**` 使用 `copy`。
+
+1. 字节已经相同时跳过该文件。
+2. 只有指向本仓库 worktree 的链接才会被替换。其他链接或文件夹会保留，并给出警告。
+3. 以 `0644` 权限写入文件，不保留备份。
+4. 在 `~/.local/state/dot-configs/copy-manifest` 中记录它的 SHA-256。
+
+某个 `copy` 行被删除后，下一次安装只在文件字节仍与记录的 SHA-256 相同时才删除它。被修改过的文件会保留，输出 `Kept`，之后不再受管。源文件缺失时（例如子模块离线），旧副本保持不变。`uu` 会运行安装器，所以更新也会这样到达。
 
 ## 添加或修改配置
 

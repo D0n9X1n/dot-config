@@ -933,6 +933,197 @@ migrate_managed_link() {
   fi
 }
 
+# Herdr: config/herdr is the herdr-config submodule. Its update never stops
+# the install; a conflict with local edits keeps the current checkout. Rows
+# whose source is missing (offline, or not checked out) are skipped and
+# reported once by herdr_install_report.
+HERDR_CONFLICT=0
+HERDR_UPDATE_ERROR=""
+herdr_submodule_update() {
+  [ -f "$repo_root/.gitmodules" ] || return 0
+  git config -f "$repo_root/.gitmodules" --get submodule.config/herdr.path >/dev/null 2>&1 || return 0
+  local err
+  err="$(git -C "$repo_root" submodule update --init config/herdr 2>&1)" && return 0
+  case "$err" in
+    *'would be overwritten'*|*'Please commit your changes'*|*'local changes'*)
+      HERDR_CONFLICT=1
+      echo "Herdr config: commit or discard local edits in config/herdr, then rerun ./install.sh" ;;
+    *) HERDR_UPDATE_ERROR="$(printf '%s' "$err" | tail -n 1)" ;;
+  esac
+  return 0
+}
+
+# Live values win. Before the submodule step, live settings.json and keys.json
+# are read (through any link) into one temp folder; after it, they are written
+# into config/herdr/user/ when they differ, and the temp folder is removed in
+# the same step. No seed copy and no backup is kept. On first adoption (a
+# regular keys.json), keys equal to Herdr's defaults keep the tracked keymap;
+# other keys get the tracked overrides merged over them.
+HERDR_SKIP_LINKS=""
+# herdr_skip <settings|keys> <reason>: that live file could not be kept in config/herdr/user/, so it is
+# not linked and stays exactly as it is. One warning; the rest of the install goes on.
+herdr_skip() {
+  HERDR_SKIP_LINKS="${HERDR_SKIP_LINKS}.config/herdr-app/$1.json"$'\n'
+  echo "Warning: Herdr config: could not keep your live $1.json ($2); left it as it is and did not link it." >&2
+}
+
+# Returns 1 when any live value could not be saved; the submodule then stays at its pin this run.
+herdr_seed_capture() {
+  local f live ok=0
+  for f in settings keys; do
+    live="$HOME/.config/herdr-app/$f.json"
+    [ -e "$live" ] || [ -L "$live" ] || continue
+    if ! cp -L "$live" "$1/$f.json" 2>/dev/null; then
+      rm -f "$1/$f.json"
+      herdr_skip "$f" "could not read it"
+      ok=1
+      continue
+    fi
+    if [ -L "$live" ]; then echo link >"$1/$f.kind"; else echo file >"$1/$f.kind"; fi
+    [ -s "$1/$f.kind" ] || ok=1
+  done
+  return "$ok"
+}
+
+# Live values could not be saved first, so updating the submodule could change a live file behind
+# its link with nothing to restore it from. Keep the current checkout this run.
+herdr_hold_pin() {
+  echo "Warning: Herdr config: could not save your live settings first; left config/herdr at its current pin. Rerun ./install.sh to update it." >&2
+}
+
+# herdr_seed_write <settings|keys> <file>: the value into config/herdr/user/, checked; else skip.
+herdr_seed_write() {
+  local dest="$repo_root/config/herdr/user/$1.json"
+  cmp -s "$2" "$dest" && return 0
+  if cat "$2" 2>/dev/null >"$dest" && cmp -s "$2" "$dest"; then
+    echo "Herdr config: kept your live $1.json"
+  else
+    herdr_skip "$1" "could not write config/herdr/user/$1.json"
+  fi
+}
+
+herdr_seed_apply() {
+  local seed="$1" user="$repo_root/config/herdr/user" defaults="$repo_root/config/herdr/data/herdr-default-keys.json"
+  [ -d "$user" ] || return 0
+  [ -f "$seed/settings.json" ] && herdr_seed_write settings "$seed/settings.json"
+  [ -f "$seed/keys.json" ] || return 0
+  if [ "$(cat "$seed/keys.kind" 2>/dev/null)" = file ] && [ -f "$defaults" ] && cmp -s "$seed/keys.json" "$defaults"; then
+    return 0
+  fi
+  if ! jq -e . "$seed/keys.json" >/dev/null 2>&1; then
+    herdr_skip keys "it is not valid JSON"
+    return 0
+  fi
+  if [ "$(cat "$seed/keys.kind" 2>/dev/null)" = file ] && [ -f "$user/keys.overrides.json" ]; then
+    if ! jq -S -s '.[0] * .[1] | walk(if type == "object" then with_entries(select(.value != null)) else . end)' \
+        "$seed/keys.json" "$user/keys.overrides.json" >"$seed/keys.merged" 2>/dev/null \
+      || ! mv -f "$seed/keys.merged" "$seed/keys.json"; then
+      herdr_skip keys "could not merge the Apollo key overrides"
+      return 0
+    fi
+  fi
+  herdr_seed_write keys "$seed/keys.json"
+}
+
+# With no temp folder the live values cannot be read safely: a live file that differs from
+# config/herdr/user/ is skipped, not replaced.
+herdr_seed_unavailable() {
+  local f live
+  for f in settings keys; do
+    live="$HOME/.config/herdr-app/$f.json"
+    [ -e "$live" ] || [ -L "$live" ] || continue
+    cmp -s "$live" "$repo_root/config/herdr/user/$f.json" 2>/dev/null || herdr_skip "$f" "no temp folder"
+  done
+}
+
+herdr_skip_link() {
+  case $'\n'"$HERDR_SKIP_LINKS" in *$'\n'"$1"$'\n'*) return 0 ;; esac
+  return 1
+}
+
+herdr_install_prepare() {
+  local seed
+  HERDR_SKIP_LINKS=""
+  # Capture first: the submodule is updated only after every live value is safely saved.
+  if ! seed="$(mktemp -d "${TMPDIR:-/tmp}/herdr-live.XXXXXX" 2>/dev/null)" || [ ! -d "$seed" ]; then
+    herdr_hold_pin
+    herdr_seed_unavailable
+    return 0
+  fi
+  if herdr_seed_capture "$seed"; then
+    herdr_submodule_update
+  else
+    herdr_hold_pin
+  fi
+  herdr_seed_apply "$seed"
+  rm -rf -- "$seed"
+}
+
+# True for a config/herdr row whose source is not here; such rows are skipped.
+herdr_source_missing() {
+  case "$1" in config/herdr/*) [ ! -f "${repo_root}/$1" ] ;; *) return 1 ;; esac
+}
+
+# Herdr.app, searched in ~/Applications then /Applications (HERDR_APP_ROOTS,
+# colon-separated, overrides the list for tests).
+herdr_app_path() {
+  local IFS=: root
+  for root in ${HERDR_APP_ROOTS:-${HOME}/Applications:/Applications}; do
+    if [ -n "$root" ] && [ -d "$root/Herdr.app" ]; then
+      printf '%s\n' "$root/Herdr.app"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# macOS: install Herdr when there is no Herdr.app and no herdr-app on PATH.
+# An existing install is never touched. A failure warns and install goes on.
+ensure_herdr() {
+  is_macos || return 0
+  herdr_app_path >/dev/null && return 0
+  have_cmd herdr-app && return 0
+  if [ "${SKIP_BREW:-0}" = "1" ]; then
+    echo "Herdr: not installed; skipped (SKIP_BREW=1)."
+    return 0
+  fi
+  if ! have_cmd brew; then
+    echo "Warning: Herdr is not installed and Homebrew is missing; skipped." >&2
+    return 0
+  fi
+  echo "Herdr: not installed; running brew install --cask herdr-app"
+  brew install --cask herdr-app || echo "Warning: brew install --cask herdr-app failed; Herdr is not installed." >&2
+  return 0
+}
+
+# macOS: a Herdr update replaces the app and drops its custom icon, so put the
+# Apollo Dock icon back when it is missing. A failure warns and install goes on.
+herdr_dock_icon() {
+  is_macos || return 0
+  local app script="${repo_root}/config/herdr/scripts/set-app-icon.sh"
+  app="$(herdr_app_path)" || return 0
+  [ -x "$script" ] || return 0
+  "$script" --check --app "$app" >/dev/null 2>&1 && return 0
+  "$script" --app "$app" || echo "Warning: could not set the Apollo Dock icon on $app; skipped." >&2
+  return 0
+}
+
+# herdr_step <function>: runs one Herdr step; a failure prints one warning and the install goes on.
+herdr_step() {
+  "$@" || echo "Warning: Herdr: $1 failed (exit $?); the rest of the install goes on." >&2
+  return 0
+}
+
+herdr_install_report() {
+  local skipped
+  skipped="$(awk -F'\t' '$2 ~ /^config\/herdr\// {print $2}' "$manifest" | while IFS= read -r src; do
+    [ -f "${repo_root}/${src}" ] || echo x; done | grep -c x || true)"
+  [ "$HERDR_CONFLICT" = 1 ] && return 0
+  if [ "${skipped:-0}" -gt 0 ]; then
+    echo "Herdr config: config/herdr is not checked out${HERDR_UPDATE_ERROR:+ ($HERDR_UPDATE_ERROR)}; skipped ${skipped} Herdr rows. Rerun ./install.sh when online."
+  fi
+}
+
 validate_manifest() {
   local type source destination extra
   local seen_destinations=""
@@ -945,7 +1136,7 @@ validate_manifest() {
   while IFS=$'\t' read -r type source destination extra; do
     case "$type" in
       ''|'#'*) continue ;;
-      link|merge|render|firefox) ;;
+      link|copy|merge|render|firefox) ;;
       *) echo "Error: unknown manifest type '$type'" >&2; return 1 ;;
     esac
     [ -z "$extra" ] || {
@@ -964,10 +1155,10 @@ validate_manifest() {
     case "$destination" in
       /*|*'..'*|*/|*/.) echo "Error: unsafe manifest destination: $destination" >&2; return 1 ;;
     esac
-    [ -f "${repo_root}/${source}" ] || {
+    if [ ! -f "${repo_root}/${source}" ] && ! herdr_source_missing "$source"; then
       echo "Error: missing manifest source: $source" >&2
       return 1
-    }
+    fi
     case $'\n'"${seen_destinations}"$'\n' in
       *$'\n'"${destination}"$'\n'*) echo "Error: duplicate manifest destination: $destination" >&2; return 1 ;;
     esac
@@ -1175,15 +1366,148 @@ manifest_source_for_destination() {
 }
 
 link_manifest_files() {
-  local type source destination
+  local type source destination herdr_failed=""
   while IFS=$'\t' read -r type source destination; do
     [ "$type" = "link" ] || continue
-    migrate_managed_link "$destination"
-    link_file "${repo_root}/${source}" "${HOME}/${destination}"
+    herdr_source_missing "$source" && continue
+    herdr_skip_link "$destination" && continue
     case "$source" in
+      # A Herdr row that cannot be linked is left as it is; one warning at the end, and the
+      # install goes on. Other rows keep their behavior.
+      config/herdr/*)
+        if ! { migrate_managed_link "$destination" && link_file "${repo_root}/${source}" "${HOME}/${destination}"; } 2>/dev/null; then
+          herdr_failed="${herdr_failed}${herdr_failed:+, }${destination}"
+          continue
+        fi ;;
+      *)
+        migrate_managed_link "$destination"
+        link_file "${repo_root}/${source}" "${HOME}/${destination}" ;;
+    esac
+    case "$source" in
+      config/herdr/*.sh) chmod +x "${repo_root}/${source}" 2>/dev/null || true ;;
       *.sh) chmod +x "${repo_root}/${source}" ;;
     esac
   done <"$manifest"
+  if [ -n "$herdr_failed" ]; then
+    echo "Warning: Herdr config: could not link ${herdr_failed}; left them as they are." >&2
+  fi
+}
+
+# copy rows install real files: Herdr does not load a mod's svg()/image() assets
+# through links. No backup is made. A destination that is a link into this
+# repo's worktrees is replaced by the copy; any other link, or a folder, is left
+# alone with a warning. The state file records "<sha256>  <destination>" for
+# every installed copy, so when a row goes away its copy is removed only while
+# its bytes are still the ones installed; an edited copy is kept and dropped.
+copy_state_file() { printf '%s\n' "${HOME}/.local/state/dot-configs/copy-manifest"; }
+
+file_sha256() {
+  if have_cmd shasum; then shasum -a 256 "$1"; else sha256sum "$1"; fi | cut -c1-64
+}
+
+link_points_into_repo() {
+  local link="$1" target dir root
+  target="$(readlink "$link")" || return 1
+  case "$target" in /*) ;; *) target="$(dirname "$link")/$target" ;; esac
+  dir="$(cd "$(dirname "$target")" 2>/dev/null && pwd -P)" || return 1
+  while IFS= read -r root; do
+    root="$(cd "$root" 2>/dev/null && pwd -P)" || continue
+    case "$dir/" in "$root"/*) return 0 ;; esac
+  done < <(git -C "$repo_root" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p')
+  return 1
+}
+
+# copy rows may write or delete only inside ~/.config/herdr-app/mods/, physically: every folder that
+# already exists between $HOME and the destination's folder must be a real folder (no link), so a
+# linked mod folder, mods folder or ~/.config can never send a write or a delete elsewhere.
+copy_dest_ok() {
+  local dest="$1" root="${HOME}/.config/herdr-app/mods" hp a ap
+  case "$dest" in "$root"/?*) ;; *) return 1 ;; esac
+  case "$dest" in */../*|*/./*|*/..|*/.) return 1 ;; esac
+  hp="$(cd "$HOME" 2>/dev/null && pwd -P)" || return 1
+  a="$(dirname "$dest")"
+  while [ ! -e "$a" ] && [ ! -L "$a" ]; do a="$(dirname "$a")"; done
+  [ -d "$a" ] || return 1
+  ap="$(cd "$a" 2>/dev/null && pwd -P)" || return 1
+  [ "$ap" = "$hp${a#"$HOME"}" ]
+}
+
+copy_file() {
+  local src="$1" dest="$2"
+  case "$dest" in
+    ''|*/|*/.|*/..|*/../*) echo "Error: unsafe copy destination: $dest" >&2; return 1 ;;
+  esac
+  copy_dest_ok "$dest" || {
+    echo "Warning: $dest is not inside ~/.config/herdr-app/mods (a linked folder is on the way); left it alone" >&2
+    return 1
+  }
+  if [ -L "$dest" ]; then
+    link_points_into_repo "$dest" || {
+      echo "Warning: $dest is a link outside this repo; left it alone" >&2
+      return 1
+    }
+    rm -f "$dest" || return 1
+  elif [ -d "$dest" ]; then
+    echo "Warning: $dest is a folder; left it alone" >&2
+    return 1
+  elif [ -f "$dest" ] && cmp -s "$src" "$dest"; then
+    return 0
+  elif [ -e "$dest" ]; then
+    echo "Replaced $dest"
+  fi
+  mkdir -p "$(dirname "$dest")" || return 1
+  install -m 0644 "$src" "$dest"
+}
+
+# The state line for one destination (sha and two spaces are 66 characters).
+copy_state_line() { awk -v d="$1" 'substr($0, 67) == d' "$2" 2>/dev/null || true; }
+
+copy_manifest_files() {
+  local type source destination dest state tmp line sum path dests status=0
+  state="$(copy_state_file)"
+  dests="$(awk -F'\t' -v h="$HOME" '$1 == "copy" { print h "/" $3 }' "$manifest")"
+  [ -n "$dests" ] || [ -f "$state" ] || return 0
+  mkdir -p "$(dirname "$state")" || return 1
+  tmp="$(mktemp "${state}.XXXXXX")" || return 1
+  while IFS=$'\t' read -r type source destination; do
+    [ "$type" = copy ] || continue
+    dest="${HOME}/${destination}"
+    # A missing source (an offline submodule) keeps the old copy and its state.
+    if [ ! -f "${repo_root}/${source}" ]; then
+      copy_state_line "$dest" "$state" >>"$tmp"
+      continue
+    fi
+    if copy_file "${repo_root}/${source}" "$dest"; then
+      printf '%s  %s\n' "$(file_sha256 "$dest")" "$dest" >>"$tmp"
+    else
+      status=1
+      copy_dest_ok "$dest" && copy_state_line "$dest" "$state" >>"$tmp"
+    fi
+  done <"$manifest"
+  if [ -f "$state" ]; then
+    while IFS= read -r line; do
+      sum="${line:0:64}"; path="${line:66}"
+      [ -n "$path" ] || continue
+      printf '%s\n' "$dests" | grep -qxF -- "$path" && continue
+      if ! copy_dest_ok "$path"; then
+        echo "Warning: Ignored a copy-manifest entry outside ~/.config/herdr-app/mods: $path" >&2
+        continue
+      fi
+      [ -f "$path" ] && [ ! -L "$path" ] || continue
+      if [ "$(file_sha256 "$path")" = "$sum" ]; then
+        rm -f "$path" && echo "Removed $path (its source is gone)"
+        rmdir "$(dirname "$path")" 2>/dev/null || true
+      else
+        echo "Kept $path (edited since install; no longer managed)"
+      fi
+    done <"$state"
+  fi
+  if [ -f "$state" ] && cmp -s "$tmp" "$state"; then
+    rm -f "$tmp"
+  else
+    mv -f "$tmp" "$state" || { rm -f "$tmp"; return 1; }
+  fi
+  return "$status"
 }
 
 remove_legacy_claude_subagent_hook() {
@@ -1535,10 +1859,15 @@ else
   echo "Auto-install only supports macOS + Homebrew. Install apps/fonts/CLIs manually."
 fi
 
+herdr_step ensure_herdr
+herdr_step herdr_install_prepare
 validate_manifest
 validate_local_overlay
 install_apollo_themes
 link_manifest_files
+herdr_step copy_manifest_files
+herdr_step herdr_install_report
+herdr_step herdr_dock_icon
 link_local_overlay
 install_firefox_step
 # RMUX is Windows-only. Keep retention while an older macOS install remains.

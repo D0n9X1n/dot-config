@@ -95,5 +95,19 @@
   "theme": "custom:apollo",
   "autoCompactEnabled": true,
   "crossSessionInbound": "accept",
-  "skipAutoPermissionPrompt": true
+  "skipAutoPermissionPrompt": true,
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x ~/.local/bin/herdr-agent-context ] && ~/.local/bin/herdr-agent-context claude || true",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
 }

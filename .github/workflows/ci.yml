@@ -12,6 +12,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Install terminal multiplexers
         run: brew install rmux tmux
@@ -35,6 +37,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Install Homebrew shell add-ons
         run: brew install autojump zsh-fast-syntax-highlighting
@@ -56,6 +60,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Run shellcheck

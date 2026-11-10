@@ -39,6 +39,7 @@ Types:
 | Type | Work |
 |---|---|
 | `link` | Make a symlink in `$HOME` |
+| `copy` | Copy a real file into `$HOME`; used for Herdr mods (see below) |
 | `merge` | Merge safe shared data into a local file |
 | `render` | Fill a template and write a local file |
 | `firefox` | Make a symlink in each Firefox default profile; see [Firefox](Firefox.md) |
@@ -65,6 +66,9 @@ The manifest check excludes SonicTerm `*.save.lock` runtime files and the `confi
 | `config/mcp/mcp-shared.json` | merge into local Copilot MCP data |
 | `config/harbor-client/settings.json` | merge model keys into `~/Library/Application Support/harbor-client/settings.json` |
 | `config/launchd/*.plist` | render into `~/Library/LaunchAgents/` |
+| `config/herdr/{layouts,themes}/*`, `config/herdr/user/{settings,keys}.json` | links under `~/.config/herdr-app/`; see [Herdr](Herdr.md) |
+| `config/herdr/mods/**` | copies under `~/.config/herdr-app/mods/` |
+| `config/herdr/agent/herdr-context.sh` | `~/.local/bin/herdr-agent-context` |
 | `scripts/copilot/cleanup-legacy.sh` | `~/.copilot/cleanup-legacy.sh` |
 | `scripts/rmux/rmux-store` | `~/.local/bin/rmux-store` |
 | `scripts/rmux/store.py` | `~/.local/lib/rmux-store/store.py` |
@@ -97,6 +101,17 @@ Rendered launchd plists, the merged Copilot MCP file, and `~/.claude.json` work 
 Copilot's own cleanup script also removes every `~/.copilot/*.bak.*` file; see [Copilot CLI](Copilot-CLI.md).
 
 The move from old root paths to `config/` is handled in the same install run. The exact old root-managed `~/.tmux.conf` link migrates to `config/tmux/tmux.conf`; it is active again, not retired.
+
+## Safe copies
+
+`copy` rows install a real file, not a link. Herdr does not load a mod's glyph files through a link, so `config/herdr/mods/**` uses `copy`.
+
+1. Skip the file when its bytes already match.
+2. Replace a link only when it points into this repo's worktrees. Any other link, or a folder, is left alone with a warning.
+3. Write the file with mode `0644`. No backup is kept.
+4. Record its SHA-256 in `~/.local/state/dot-configs/copy-manifest`.
+
+When a `copy` row goes away, the next install removes its file only if the bytes still match the recorded SHA-256. An edited file is kept, reported as `Kept`, and no longer managed. If a source is missing (for example, an offline submodule), the old copy stays. `uu` runs the installer, so updates arrive the same way.
 
 ## Add or change config
 

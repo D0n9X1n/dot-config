@@ -37,6 +37,11 @@
         "type": "command",
         "bash": "~/.copilot/subagent-state.sh reset",
         "timeoutSec": 2
+      },
+      {
+        "type": "command",
+        "bash": "[ -x ~/.local/bin/herdr-agent-context ] && ~/.local/bin/herdr-agent-context copilot || true",
+        "timeoutSec": 5
       }
     ],
     "sessionEnd": [
