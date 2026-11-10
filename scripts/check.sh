@@ -3567,9 +3567,9 @@ run_herdr_preflight_smoke() (
 )
 
 # Herdr: the herdr-config submodule (config/herdr) and how install.sh uses it.
-HERDR_PIN=v0.0.4
+HERDR_PIN=v0.0.6
 # The commit HERDR_PIN points to. CI clones the submodule without tags, so the gitlink is checked by SHA.
-HERDR_PIN_SHA=9b1a76c16a00544d770a2c30f692a116ae8501e9
+HERDR_PIN_SHA=2be7bf9254d3924a6fa1052f323dc1197fc78da2
 herdr_expected_rows() {
   git -C config/herdr ls-files -- layouts themes mods user/settings.json user/keys.json agent/herdr-context.sh |
     awk -v OFS='\t' '
