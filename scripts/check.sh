@@ -1223,7 +1223,7 @@ PY
     echo "workflows: $checkouts checkouts but $subs with submodules: true" >&2
     return 1
   }
-  for f in run_herdr_smoke run_herdr_copy_smoke run_herdr_install_smoke run_herdr_seed_smoke run_herdr_adopt_smoke run_herdr_app_smoke run_herdr_preflight_smoke; do
+  for f in run_herdr_smoke run_herdr_copy_smoke run_herdr_install_smoke run_herdr_seed_smoke run_herdr_adopt_smoke run_herdr_copy_boundary_smoke run_herdr_app_smoke run_herdr_preflight_smoke; do
     declare -f run_smoke | grep -qw "$f" || { echo "run_smoke does not call $f" >&2; return 1; }
   done
   declare -f run_shellcheck | grep -q "config/herdr" || { echo "run_shellcheck does not prune config/herdr" >&2; return 1; }
@@ -3250,6 +3250,50 @@ run_herdr_seed_smoke() {
   )
 }
 
+# copy rows write and delete only inside ~/.config/herdr-app/mods/, physically: a linked mod folder or
+# mods folder is refused and nothing outside is touched; a copy-manifest entry outside that folder is
+# ignored and never deleted, even when its sha matches.
+run_herdr_copy_boundary_smoke() (
+  set -euo pipefail
+  local t d state src out
+  t="$(mktemp -d)"
+  [ -n "$t" ] && [ -d "$t" ] || exit 1
+  trap 'rm -rf "$t"' EXIT
+  export HOME="$t/home"; mkdir -p "$HOME"
+  DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+  repo_root="$t/repo"; manifest="$repo_root/config/manifest.tsv"
+  src="$repo_root/config/herdr/mods/m"; mkdir -p "$src"; git -C "$repo_root" init -q
+  printf 'new\n' >"$src/a.js"
+  printf 'copy\tconfig/herdr/mods/m/a.js\t.config/herdr-app/mods/m/a.js\n' >"$manifest"
+  state="$HOME/.local/state/dot-configs/copy-manifest"
+  d="$HOME/.config/herdr-app/mods"
+  fail() { echo "herdr copy boundary: $*" >&2; exit 1; }
+  sha() { if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1"; else sha256sum "$1"; fi | cut -c1-64; }
+
+  # 1. A mod folder that links to a folder outside: refused, and the outside file is untouched.
+  mkdir -p "$t/outside" "$d"; printf 'theirs\n' >"$t/outside/a.js"; ln -s "$t/outside" "$d/m"
+  out="$(copy_manifest_files 2>&1)" || true
+  [ "$(cat "$t/outside/a.js")" = theirs ] || fail "linked mod folder: the outside file was overwritten"
+  grep -q 'not inside ~/.config/herdr-app/mods' <<<"$out" || fail "linked mod folder: no warning: $out"
+  ! grep -q "  $d/m/a.js\$" "$state" 2>/dev/null || fail "linked mod folder: the copy was recorded"
+  # 2. The mods folder itself links outside: nothing is written there.
+  rm "$d/m"; rmdir "$d"; mkdir -p "$t/outmods"; ln -s "$t/outmods" "$d"
+  copy_manifest_files >/dev/null 2>&1 || true
+  [ -z "$(find "$t/outmods" -mindepth 1 -print)" ] || fail "linked mods folder: a copy was written through it"
+  rm "$d"; mkdir -p "$d"
+  # 3. Forged state entries with matching shas: one outside, one inside mods through a linked folder.
+  printf 'victim\n' >"$t/victim.txt"; mkdir -p "$t/outside2"; printf 'v2\n' >"$t/outside2/f.js"; ln -s "$t/outside2" "$d/x"
+  mkdir -p "$(dirname "$state")"
+  printf '%s  %s\n' "$(sha "$t/victim.txt")" "$t/victim.txt" "$(sha "$t/outside2/f.js")" "$d/x/f.js" >"$state"
+  out="$(copy_manifest_files 2>&1)" || true
+  [ -f "$t/victim.txt" ] || fail "forged entry outside: the file was deleted"
+  [ -f "$t/outside2/f.js" ] || fail "forged entry through a linked folder: the file was deleted"
+  [ "$(grep -c 'Ignored a copy-manifest entry' <<<"$out" || true)" = 2 ] || fail "forged entries: want two warnings, got: $out"
+  ! grep -qE 'victim\.txt|/x/f\.js' "$state" || fail "forged entries stayed in the state file"
+  [ -f "$d/m/a.js" ] && [ ! -L "$d/m/a.js" ] && [ "$(cat "$d/m/a.js")" = new ] || fail "the normal copy did not run"
+  echo "herdr copy boundary: ok"
+)
+
 # A failed adoption never costs a live value: when the live settings.json or keys.json cannot be kept
 # in config/herdr/user/ (a write error, no temp folder, keys that are not JSON), that destination is
 # not linked and the live file stays byte-identical; the rest of the install goes on.
@@ -3438,6 +3482,8 @@ run_herdr_preflight_smoke() (
   [ "$rc" = 0 ] || fail "a regular file at a copy destination was refused: $out"
   fresh; mkdir -p "$(dirname "$m")"; ln -s "$t/elsewhere" "$m"; pre copy-outside
   [ "$rc" = 1 ] && grep -q "REFUSE link resolves outside this repo: $m" <<<"$out" || fail "a link outside the repo at a copy destination was allowed"
+  fresh; mkdir -p "$HOME/.config/herdr-app/mods" "$t/outdir"; ln -s "$t/outdir" "$HOME/.config/herdr-app/mods/apollo-tabs"; pre copy-linked-dir
+  [ "$rc" = 1 ] && grep -q "REFUSE linked folder on the way to a copy destination: $m" <<<"$out" || fail "a linked mod folder was allowed"
   fresh; mkdir -p "$m"; pre copy-folder
   [ "$rc" = 1 ] && grep -q "REFUSE folder at a copy destination: $m" <<<"$out" || fail "a folder at a copy destination was allowed"
   echo "herdr preflight: ok"
@@ -3552,6 +3598,7 @@ run_smoke() {
   run_herdr_install_smoke
   run_herdr_seed_smoke
   run_herdr_adopt_smoke
+  run_herdr_copy_boundary_smoke
   run_herdr_app_smoke
   run_herdr_preflight_smoke
   run_local_checks
@@ -3572,7 +3619,7 @@ case "${1:-all}" in
   firefox) run_firefox_smoke ;;
   editors) run_editors_smoke ;;
   harbor) run_harbor_client_smoke ;;
-  herdr) run_herdr_smoke; run_herdr_copy_smoke; run_herdr_install_smoke; run_herdr_seed_smoke; run_herdr_adopt_smoke; run_herdr_app_smoke; run_herdr_preflight_smoke ;;
+  herdr) run_herdr_smoke; run_herdr_copy_smoke; run_herdr_install_smoke; run_herdr_seed_smoke; run_herdr_adopt_smoke; run_herdr_copy_boundary_smoke; run_herdr_app_smoke; run_herdr_preflight_smoke ;;
   backups) run_install_backup_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;

@@ -1383,11 +1383,30 @@ link_points_into_repo() {
   return 1
 }
 
+# copy rows may write or delete only inside ~/.config/herdr-app/mods/, physically: every folder that
+# already exists between $HOME and the destination's folder must be a real folder (no link), so a
+# linked mod folder, mods folder or ~/.config can never send a write or a delete elsewhere.
+copy_dest_ok() {
+  local dest="$1" root="${HOME}/.config/herdr-app/mods" hp a ap
+  case "$dest" in "$root"/?*) ;; *) return 1 ;; esac
+  case "$dest" in */../*|*/./*|*/..|*/.) return 1 ;; esac
+  hp="$(cd "$HOME" 2>/dev/null && pwd -P)" || return 1
+  a="$(dirname "$dest")"
+  while [ ! -e "$a" ] && [ ! -L "$a" ]; do a="$(dirname "$a")"; done
+  [ -d "$a" ] || return 1
+  ap="$(cd "$a" 2>/dev/null && pwd -P)" || return 1
+  [ "$ap" = "$hp${a#"$HOME"}" ]
+}
+
 copy_file() {
   local src="$1" dest="$2"
   case "$dest" in
     ''|*/|*/.|*/..|*/../*) echo "Error: unsafe copy destination: $dest" >&2; return 1 ;;
   esac
+  copy_dest_ok "$dest" || {
+    echo "Warning: $dest is not inside ~/.config/herdr-app/mods (a linked folder is on the way); left it alone" >&2
+    return 1
+  }
   if [ -L "$dest" ]; then
     link_points_into_repo "$dest" || {
       echo "Warning: $dest is a link outside this repo; left it alone" >&2
@@ -1428,7 +1447,7 @@ copy_manifest_files() {
       printf '%s  %s\n' "$(file_sha256 "$dest")" "$dest" >>"$tmp"
     else
       status=1
-      copy_state_line "$dest" "$state" >>"$tmp"
+      copy_dest_ok "$dest" && copy_state_line "$dest" "$state" >>"$tmp"
     fi
   done <"$manifest"
   if [ -f "$state" ]; then
@@ -1436,6 +1455,10 @@ copy_manifest_files() {
       sum="${line:0:64}"; path="${line:66}"
       [ -n "$path" ] || continue
       printf '%s\n' "$dests" | grep -qxF -- "$path" && continue
+      if ! copy_dest_ok "$path"; then
+        echo "Warning: Ignored a copy-manifest entry outside ~/.config/herdr-app/mods: $path" >&2
+        continue
+      fi
       [ -f "$path" ] && [ ! -L "$path" ] || continue
       if [ "$(file_sha256 "$path")" = "$sum" ]; then
         rm -f "$path" && echo "Removed $path (its source is gone)"

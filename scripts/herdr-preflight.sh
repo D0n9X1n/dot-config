@@ -52,6 +52,10 @@ while IFS=$'\t' read -r type src t; do
   case "$t" in *'*'*) continue ;; esac
   printf '%s\n' "$t" >>"$journal"
   [ "$type" = legacy ] && continue
+  if [ "$type" = copy ] && ! copy_dest_ok "$t"; then
+    no "linked folder on the way to a copy destination: $t"
+    continue
+  fi
   for b in "$t".bak.[0-9]*; do
     if [ -e "$b" ] || [ -L "$b" ]; then no "backup: $b"; fi
   done

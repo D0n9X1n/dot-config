@@ -16,6 +16,7 @@ copy_file	journaled	rm -f "$dest" || return 1
 copy_manifest_files	journaled	mv -f "$tmp" "$state" || { rm -f "$tmp"; return 1; }
 copy_manifest_files	journaled	rm -f "$path" && echo "Removed $path (its source is gone)"
 copy_manifest_files	journaled	rmdir "$(dirname "$path")" 2>/dev/null || true
+copy_manifest_files	temp-only	copy_dest_ok "$dest" && copy_state_line "$dest" "$state" >>"$tmp"
 copy_manifest_files	temp-only	copy_state_line "$dest" "$state" >>"$tmp"
 copy_manifest_files	temp-only	printf '%s  %s\n' "$(file_sha256 "$dest")" "$dest" >>"$tmp"
 copy_manifest_files	temp-only	rm -f "$tmp"
