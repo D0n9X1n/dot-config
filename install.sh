@@ -960,6 +960,13 @@ herdr_submodule_update() {
 # regular keys.json), keys equal to Herdr's defaults keep the tracked keymap;
 # other keys get the tracked overrides merged over them.
 HERDR_SKIP_LINKS=""
+# herdr_skip <settings|keys> <reason>: that live file could not be kept in config/herdr/user/, so it is
+# not linked and stays exactly as it is. One warning; the rest of the install goes on.
+herdr_skip() {
+  HERDR_SKIP_LINKS="${HERDR_SKIP_LINKS}.config/herdr-app/$1.json"$'\n'
+  echo "Warning: Herdr config: could not keep your live $1.json ($2); left it as it is and did not link it." >&2
+}
+
 herdr_seed_capture() {
   local f live
   for f in settings keys; do
@@ -967,32 +974,56 @@ herdr_seed_capture() {
     [ -e "$live" ] || continue
     if ! cp -L "$live" "$1/$f.json" 2>/dev/null; then
       rm -f "$1/$f.json"
-      echo "Herdr config: could not read $live; left it as it is and did not link it."
-      HERDR_SKIP_LINKS="${HERDR_SKIP_LINKS}.config/herdr-app/$f.json"$'\n'
+      herdr_skip "$f" "could not read it"
       continue
     fi
     if [ -L "$live" ]; then echo link >"$1/$f.kind"; else echo file >"$1/$f.kind"; fi
   done
 }
 
+# herdr_seed_write <settings|keys> <file>: the value into config/herdr/user/, checked; else skip.
+herdr_seed_write() {
+  local dest="$repo_root/config/herdr/user/$1.json"
+  cmp -s "$2" "$dest" && return 0
+  if cat "$2" 2>/dev/null >"$dest" && cmp -s "$2" "$dest"; then
+    echo "Herdr config: kept your live $1.json"
+  else
+    herdr_skip "$1" "could not write config/herdr/user/$1.json"
+  fi
+}
+
 herdr_seed_apply() {
   local seed="$1" user="$repo_root/config/herdr/user" defaults="$repo_root/config/herdr/data/herdr-default-keys.json"
   [ -d "$user" ] || return 0
-  if [ -f "$seed/settings.json" ] && ! cmp -s "$seed/settings.json" "$user/settings.json"; then
-    cat "$seed/settings.json" >"$user/settings.json" && echo "Herdr config: kept your live settings.json"
-  fi
+  [ -f "$seed/settings.json" ] && herdr_seed_write settings "$seed/settings.json"
   [ -f "$seed/keys.json" ] || return 0
-  if [ "$(cat "$seed/keys.kind")" = file ] && [ -f "$defaults" ] && cmp -s "$seed/keys.json" "$defaults"; then
+  if [ "$(cat "$seed/keys.kind" 2>/dev/null)" = file ] && [ -f "$defaults" ] && cmp -s "$seed/keys.json" "$defaults"; then
     return 0
   fi
-  if [ "$(cat "$seed/keys.kind")" = file ] && [ -f "$user/keys.overrides.json" ]; then
-    jq -S -s '.[0] * .[1] | walk(if type == "object" then with_entries(select(.value != null)) else . end)' \
-      "$seed/keys.json" "$user/keys.overrides.json" >"$seed/keys.merged" || return 0
-    mv -f "$seed/keys.merged" "$seed/keys.json"
+  if ! jq -e . "$seed/keys.json" >/dev/null 2>&1; then
+    herdr_skip keys "it is not valid JSON"
+    return 0
   fi
-  if ! cmp -s "$seed/keys.json" "$user/keys.json"; then
-    cat "$seed/keys.json" >"$user/keys.json" && echo "Herdr config: kept your live keys.json"
+  if [ "$(cat "$seed/keys.kind" 2>/dev/null)" = file ] && [ -f "$user/keys.overrides.json" ]; then
+    if ! jq -S -s '.[0] * .[1] | walk(if type == "object" then with_entries(select(.value != null)) else . end)' \
+        "$seed/keys.json" "$user/keys.overrides.json" >"$seed/keys.merged" 2>/dev/null \
+      || ! mv -f "$seed/keys.merged" "$seed/keys.json"; then
+      herdr_skip keys "could not merge the Apollo key overrides"
+      return 0
+    fi
   fi
+  herdr_seed_write keys "$seed/keys.json"
+}
+
+# With no temp folder the live values cannot be read safely: a live file that differs from
+# config/herdr/user/ is skipped, not replaced.
+herdr_seed_unavailable() {
+  local f live
+  for f in settings keys; do
+    live="$HOME/.config/herdr-app/$f.json"
+    [ -e "$live" ] || [ -L "$live" ] || continue
+    cmp -s "$live" "$repo_root/config/herdr/user/$f.json" 2>/dev/null || herdr_skip "$f" "no temp folder"
+  done
 }
 
 herdr_skip_link() {
@@ -1003,10 +1034,14 @@ herdr_skip_link() {
 herdr_install_prepare() {
   local seed
   HERDR_SKIP_LINKS=""
-  seed="$(mktemp -d "${TMPDIR:-/tmp}/herdr-live.XXXXXX")" || { herdr_submodule_update; return 0; }
+  if ! seed="$(mktemp -d "${TMPDIR:-/tmp}/herdr-live.XXXXXX" 2>/dev/null)" || [ ! -d "$seed" ]; then
+    herdr_submodule_update
+    herdr_seed_unavailable
+    return 0
+  fi
   herdr_seed_capture "$seed"
   herdr_submodule_update
-  herdr_seed_apply "$seed" || echo "Herdr config: could not keep your live values; check config/herdr/user/" >&2
+  herdr_seed_apply "$seed"
   rm -rf -- "$seed"
 }
 

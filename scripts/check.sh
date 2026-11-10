@@ -1223,7 +1223,7 @@ PY
     echo "workflows: $checkouts checkouts but $subs with submodules: true" >&2
     return 1
   }
-  for f in run_herdr_smoke run_herdr_copy_smoke run_herdr_install_smoke run_herdr_seed_smoke run_herdr_app_smoke run_herdr_preflight_smoke; do
+  for f in run_herdr_smoke run_herdr_copy_smoke run_herdr_install_smoke run_herdr_seed_smoke run_herdr_adopt_smoke run_herdr_app_smoke run_herdr_preflight_smoke; do
     declare -f run_smoke | grep -qw "$f" || { echo "run_smoke does not call $f" >&2; return 1; }
   done
   declare -f run_shellcheck | grep -q "config/herdr" || { echo "run_shellcheck does not prune config/herdr" >&2; return 1; }
@@ -3250,6 +3250,69 @@ run_herdr_seed_smoke() {
   )
 }
 
+# A failed adoption never costs a live value: when the live settings.json or keys.json cannot be kept
+# in config/herdr/user/ (a write error, no temp folder, keys that are not JSON), that destination is
+# not linked and the live file stays byte-identical; the rest of the install goes on.
+run_herdr_adopt_smoke() (
+  set -euo pipefail
+  local t out
+  t="$(mktemp -d)"
+  [ -n "$t" ] && [ -d "$t" ] || exit 1
+  trap 'chmod -R u+rwx "$t" 2>/dev/null; rm -rf "$t"' EXIT
+  export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t.invalid \
+    GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t.invalid
+  export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=protocol.file.allow GIT_CONFIG_VALUE_0=always
+  export TMPDIR="$t/tmp"; mkdir -p "$TMPDIR"
+  herdr_fixture "$t"
+  fail() { echo "herdr adopt: $*" >&2; exit 1; }
+  DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+  run() {
+    repo_root="$1"; manifest="$1/config/manifest.tsv"; export HOME="$2"; mkdir -p "$HOME"
+    herdr_install_prepare; validate_manifest; link_manifest_files; copy_manifest_files; herdr_install_report
+  }
+  live() { printf '%s\n' "$1/.config/herdr-app/$2"; }
+  kept() { local p; p="$(live "$1" "$2")"; [ -f "$p" ] && [ ! -L "$p" ] && [ "$(cat "$p")" = "$3" ]; }
+  rest() { # the rest of the install still ran: a non-Herdr link and another Herdr link exist
+    [ "$(readlink "$2/.plain")" = "$1/config/plain.txt" ] && [ -L "$(live "$2" themes/x.json)" ]; }
+  warns() { grep -c "could not keep your live $2" <<<"$1" || true; }
+  new() { git clone -q "$t/super.git" "$t/r$1"; git -C "$t/r$1" submodule update -q --init; mkdir -p "$t/h$1/.config/herdr-app"; }
+
+  # 1. The write into config/herdr/user/ is denied.
+  new 1; printf '{"zoom":9}\n' >"$(live "$t/h1" settings.json)"
+  chmod 444 "$t/r1/config/herdr/user/settings.json"; chmod 555 "$t/r1/config/herdr/user"
+  out="$(run "$t/r1" "$t/h1" 2>&1)" || fail "write denied: the install stopped: $out"
+  chmod 755 "$t/r1/config/herdr/user"
+  kept "$t/h1" settings.json '{"zoom":9}' || fail "write denied: the live settings.json was replaced"
+  [ "$(warns "$out" settings.json)" = 1 ] || fail "write denied: want one warning, got: $out"
+  rest "$t/r1" "$t/h1" || fail "write denied: the rest of the install did not run"
+
+  # 2. No temp folder can be made.
+  new 2; printf '{"zoom":9}\n' >"$(live "$t/h2" settings.json)"; printf '{"global":{"cmd-k":"mine"}}\n' >"$(live "$t/h2" keys.json)"
+  out="$(TMPDIR="$t/no/such/dir" run "$t/r2" "$t/h2" 2>&1)" || fail "no temp folder: the install stopped: $out"
+  kept "$t/h2" settings.json '{"zoom":9}' || fail "no temp folder: the live settings.json was replaced"
+  kept "$t/h2" keys.json '{"global":{"cmd-k":"mine"}}' || fail "no temp folder: the live keys.json was replaced"
+  [ "$(warns "$out" settings.json)" = 1 ] && [ "$(warns "$out" keys.json)" = 1 ] || fail "no temp folder: want one warning each, got: $out"
+  rest "$t/r2" "$t/h2" || fail "no temp folder: the rest of the install did not run"
+
+  # 3. Live keys.json is not JSON.
+  new 3; printf '{not json\n' >"$(live "$t/h3" keys.json)"
+  out="$(run "$t/r3" "$t/h3" 2>&1)" || fail "bad keys: the install stopped: $out"
+  kept "$t/h3" keys.json '{not json' || fail "bad keys: the live keys.json was replaced"
+  [ "$(warns "$out" keys.json)" = 1 ] || fail "bad keys: want one warning, got: $out"
+  [ -L "$(live "$t/h3" settings.json)" ] || fail "bad keys: settings.json was not linked"
+  rest "$t/r3" "$t/h3" || fail "bad keys: the rest of the install did not run"
+
+  # 4. Live keys.json is a link to a file that is not JSON (no merge step runs for a link).
+  new 4; mkdir -p "$t/old4"; printf '{not json\n' >"$t/old4/keys.json"; ln -s "$t/old4/keys.json" "$(live "$t/h4" keys.json)"
+  out="$(run "$t/r4" "$t/h4" 2>&1)" || fail "bad linked keys: the install stopped: $out"
+  [ "$(readlink "$(live "$t/h4" keys.json)")" = "$t/old4/keys.json" ] || fail "bad linked keys: the live link was replaced"
+  [ "$(cat "$t/old4/keys.json")" = '{not json' ] || fail "bad linked keys: its target changed"
+  [ "$(warns "$out" keys.json)" = 1 ] || fail "bad linked keys: want one warning, got: $out"
+  cmp -s "$t/r4/config/herdr/user/keys.json" "$t/herdr-src/user/keys.json" || fail "bad linked keys: bad JSON was adopted"
+  rest "$t/r4" "$t/h4" || fail "bad linked keys: the rest of the install did not run"
+  echo "herdr adopt: ok"
+)
+
 # install.sh installs Herdr when it is missing (macOS: brew install --cask herdr-app) and puts the
 # Apollo Dock icon back when a Herdr update removed it. Both only warn on failure.
 run_herdr_app_smoke() (
@@ -3488,6 +3551,7 @@ run_smoke() {
   run_herdr_copy_smoke
   run_herdr_install_smoke
   run_herdr_seed_smoke
+  run_herdr_adopt_smoke
   run_herdr_app_smoke
   run_herdr_preflight_smoke
   run_local_checks
@@ -3508,7 +3572,7 @@ case "${1:-all}" in
   firefox) run_firefox_smoke ;;
   editors) run_editors_smoke ;;
   harbor) run_harbor_client_smoke ;;
-  herdr) run_herdr_smoke; run_herdr_copy_smoke; run_herdr_install_smoke; run_herdr_seed_smoke; run_herdr_app_smoke; run_herdr_preflight_smoke ;;
+  herdr) run_herdr_smoke; run_herdr_copy_smoke; run_herdr_install_smoke; run_herdr_seed_smoke; run_herdr_adopt_smoke; run_herdr_app_smoke; run_herdr_preflight_smoke ;;
   backups) run_install_backup_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;

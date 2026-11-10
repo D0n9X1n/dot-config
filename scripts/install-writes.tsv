@@ -31,13 +31,12 @@ ensure_wakatime_cfg_api_key	temp-only	printf 'api_key = %s\n' "$key" >>"$tmp_cfg
 ensure_wakatime_cfg_api_key	temp-only	sed -E "s|^[[:space:]]*api_key[[:space:]]*=.*|api_key = ${key}|" "$cfg" >"$tmp_cfg"
 ensure_wakatime_cfg_api_key	temp-only	} >"$tmp_cfg"
 herdr_install_prepare	temp-only	rm -rf -- "$seed"
-herdr_seed_apply	journaled	cat "$seed/keys.json" >"$user/keys.json" && echo "Herdr config: kept your live keys.json"
-herdr_seed_apply	journaled	cat "$seed/settings.json" >"$user/settings.json" && echo "Herdr config: kept your live settings.json"
-herdr_seed_apply	temp-only	"$seed/keys.json" "$user/keys.overrides.json" >"$seed/keys.merged" || return 0
-herdr_seed_apply	temp-only	mv -f "$seed/keys.merged" "$seed/keys.json"
+herdr_seed_apply	temp-only	"$seed/keys.json" "$user/keys.overrides.json" >"$seed/keys.merged" 2>/dev/null \
+herdr_seed_apply	temp-only	|| ! mv -f "$seed/keys.merged" "$seed/keys.json"; then
 herdr_seed_capture	temp-only	if ! cp -L "$live" "$1/$f.json" 2>/dev/null; then
 herdr_seed_capture	temp-only	if [ -L "$live" ]; then echo link >"$1/$f.kind"; else echo file >"$1/$f.kind"; fi
 herdr_seed_capture	temp-only	rm -f "$1/$f.json"
+herdr_seed_write	journaled	if cat "$2" 2>/dev/null >"$dest" && cmp -s "$2" "$dest"; then
 import_copilot_mcp_into_claude	journaled	mv "$tmp_user" "$claude_user_json"
 import_copilot_mcp_into_claude	temp-only	"$claude_user_json" >"$tmp_user"; then
 import_copilot_mcp_into_claude	temp-only	printf '{"mcpServers":%s}\n' "$src_mcp_json" >"$tmp_user"
