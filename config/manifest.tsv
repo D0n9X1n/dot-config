@@ -60,7 +60,6 @@ copy	config/herdr/mods/apollo-chrome/main.js	.config/herdr-app/mods/apollo-chrom
 copy	config/herdr/mods/apollo-chrome/mod.json	.config/herdr-app/mods/apollo-chrome/mod.json
 copy	config/herdr/mods/apollo-chrome/panel-close.svg	.config/herdr-app/mods/apollo-chrome/panel-close.svg
 copy	config/herdr/mods/apollo-chrome/panel-open.svg	.config/herdr-app/mods/apollo-chrome/panel-open.svg
-copy	config/herdr/mods/apollo-chrome/plug.svg	.config/herdr-app/mods/apollo-chrome/plug.svg
 copy	config/herdr/mods/apollo-chrome/search.svg	.config/herdr-app/mods/apollo-chrome/search.svg
 copy	config/herdr/mods/apollo-pane/arc.svg	.config/herdr-app/mods/apollo-pane/arc.svg
 copy	config/herdr/mods/apollo-pane/branch.svg	.config/herdr-app/mods/apollo-pane/branch.svg
@@ -92,6 +91,7 @@ copy	config/herdr/mods/apollo-status/branch.svg	.config/herdr-app/mods/apollo-st
 copy	config/herdr/mods/apollo-status/lib.js	.config/herdr-app/mods/apollo-status/lib.js
 copy	config/herdr/mods/apollo-status/main.js	.config/herdr-app/mods/apollo-status/main.js
 copy	config/herdr/mods/apollo-status/mod.json	.config/herdr-app/mods/apollo-status/mod.json
+copy	config/herdr/mods/apollo-tabs/admin.svg	.config/herdr-app/mods/apollo-tabs/admin.svg
 copy	config/herdr/mods/apollo-tabs/arc.svg	.config/herdr-app/mods/apollo-tabs/arc.svg
 copy	config/herdr/mods/apollo-tabs/changes.svg	.config/herdr-app/mods/apollo-tabs/changes.svg
 copy	config/herdr/mods/apollo-tabs/check.svg	.config/herdr-app/mods/apollo-tabs/check.svg
@@ -103,6 +103,10 @@ copy	config/herdr/mods/apollo-tabs/main.js	.config/herdr-app/mods/apollo-tabs/ma
 copy	config/herdr/mods/apollo-tabs/mod.json	.config/herdr-app/mods/apollo-tabs/mod.json
 copy	config/herdr/mods/apollo-tabs/more.svg	.config/herdr-app/mods/apollo-tabs/more.svg
 copy	config/herdr/mods/apollo-tabs/specs.svg	.config/herdr-app/mods/apollo-tabs/specs.svg
+copy	config/herdr/mods/apollo-tabs/win-close.svg	.config/herdr-app/mods/apollo-tabs/win-close.svg
+copy	config/herdr/mods/apollo-tabs/win-max.svg	.config/herdr-app/mods/apollo-tabs/win-max.svg
+copy	config/herdr/mods/apollo-tabs/win-min.svg	.config/herdr-app/mods/apollo-tabs/win-min.svg
+copy	config/herdr/mods/apollo-tabs/win-restore.svg	.config/herdr-app/mods/apollo-tabs/win-restore.svg
 link	config/herdr/themes/apollo.json	.config/herdr-app/themes/apollo.json
 link	config/herdr/user/keys.json	.config/herdr-app/keys.json
 link	config/herdr/user/settings.json	.config/herdr-app/settings.json
