@@ -83,7 +83,7 @@ while IFS=$'\t' read -r type src t; do
   fi
 done < <(targets)
 
-# Not journaled: the Dock icon (a Finder custom icon on Herdr.app's bundle root), which install sets
+# Not journaled: the Dock icon (a Finder custom icon on Apollo.app's bundle root), which install sets
 # only when missing; scripts/set-app-icon.sh --remove takes it off.
-if app="$(herdr_app_path 2>/dev/null)"; then echo "dock icon: may set the Apollo icon on $app (not journaled)"; fi
+if app="$(apollo_app_path 2>/dev/null)"; then echo "dock icon: may set the Apollo icon on $app (not journaled)"; fi
 exit "$bad"
