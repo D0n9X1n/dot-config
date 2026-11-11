@@ -614,13 +614,24 @@ ZSH
 # from the old lock format, tag directories the lock no longer names, and
 # temp files left by an interrupted download. Never follows a symlink or
 # leaves the Apollo root.
-# True when every file a set recorded at build time still has its SHA-256.
+# True when nothing in a set changed since it was built. Every recorded file
+# must still match. A file the record does not list (sets built before every
+# file was recorded list only the downloads) must be a generated file that
+# regenerating from the set's palette reproduces exactly; anything else, or
+# any doubt, means the set is treated as edited and kept.
 apollo_set_unmodified() {
-  local set="$1" sum file
+  local set="$1" sum file unlisted
   while read -r sum file; do
     [ -n "$file" ] || continue
     [ -f "${set}/${file}" ] && [ "$(apollo_sha256 "${set}/${file}")" = "$sum" ] || return 1
   done <"${set}/SHA256SUMS"
+  unlisted="$(cd "$set" && find . -type f ! -name SHA256SUMS ! -name .complete | sed 's#^\./##' | \
+    while IFS= read -r file; do
+      awk -v f="$file" '$2 == f { found = 1 } END { exit !found }' SHA256SUMS || printf '%s\n' "$file"
+    done)"
+  [ -z "$unlisted" ] && return 0
+  printf '%s\n' "$unlisted" | grep -qv '^generated/' && return 1
+  apollo_validate_generated "$set" >/dev/null 2>&1
 }
 
 apollo_prune() {
@@ -680,8 +691,18 @@ apollo_prune() {
 # so it is held until this shell closes fd 8 or exits, even on SIGKILL. No
 # stale-lock cleanup is needed, so there is no takeover race.
 apollo_lock_acquire() {
-  local root="$1"
+  local root="$1" owner
   mkdir -p "$root" || return 1
+  # The previous lock was a directory holding the owner's PID. Remove one
+  # whose owner is gone; honor one whose owner still runs.
+  if [ -d "${root}/.install.lock" ] && [ ! -L "${root}/.install.lock" ]; then
+    owner="$(cat "${root}/.install.lock/pid" 2>/dev/null || true)"
+    if [ -n "$owner" ] && kill -0 "$owner" 2>/dev/null; then
+      printf 'Error: another Apollo install is running (%s); try again later.\n' "${root}/.install.lock" >&2
+      return 1
+    fi
+    rm -rf -- "${root}/.install.lock"
+  fi
   exec 8>>"${root}/.install.lock" || return 1
   if ! perl -MFcntl=:flock -e '
       open(my $f, ">&=", 8) or exit 2;

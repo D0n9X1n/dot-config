@@ -2172,6 +2172,70 @@ SH
   [ "$(readlink "$apollo_root_dir/current")" = "$apollo_before" ] || { echo "Apollo switched to a set it failed to publish" >&2; return 1; }
   [ -d "$apollo_root_dir/$apollo_before" ]
 
+  # Sets built before every file was recorded list only the five downloads.
+  # An unedited one is still pruned; one with an edited generated file is kept.
+  apollo_cur="$(readlink "$apollo_root_dir/current")"
+  for apollo_old in 1111111111111111111111111111111111111111111111111111111111111111 2222222222222222222222222222222222222222222222222222222222222222; do
+    cp -R "$apollo_root_dir/$apollo_cur" "$apollo_root_dir/sets/$apollo_old"
+    grep -E '  (palette|sonicterm|rmux|tmux|eza)/' "$apollo_root_dir/$apollo_cur/SHA256SUMS" \
+      >"$apollo_root_dir/sets/$apollo_old/SHA256SUMS"
+  done
+  printf ' ' >>"$apollo_root_dir/sets/2222222222222222222222222222222222222222222222222222222222222222/generated/claude/apollo.json"
+  (
+    export HOME="$test_home"
+    export PATH="$fake_bin:$PATH"
+    export APOLLO_ROOT="$apollo_root_dir"
+    export APOLLO_TEST_FIXTURES="$fixtures"
+    export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+    export APOLLO_SKIP_FSH=1
+    export APOLLO_LOCK_WAIT=1
+    export APOLLO_RELEASES_FILE="$lock"
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    apollo_prune "$apollo_root_dir" "$lock"
+  ) >/dev/null
+  [ ! -e "$apollo_root_dir/sets/1111111111111111111111111111111111111111111111111111111111111111" ] || { echo "Apollo kept an unedited old-format set" >&2; return 1; }
+  [ -d "$apollo_root_dir/sets/2222222222222222222222222222222222222222222222222222222222222222" ] || { echo "Apollo pruned an old-format set with an edited generated file" >&2; return 1; }
+  rm -rf -- "$apollo_root_dir/sets/2222222222222222222222222222222222222222222222222222222222222222"
+
+  # A directory lock left by the previous lock format: removed when its owner
+  # is gone, honored while its owner lives.
+  mkdir "$apollo_root_dir/.install.lock.dirtest" && rmdir "$apollo_root_dir/.install.lock.dirtest"
+  rm -f -- "$apollo_root_dir/.install.lock"
+  mkdir "$apollo_root_dir/.install.lock"
+  sleep 300 &
+  apollo_holder=$!
+  printf '%s\n' "$apollo_holder" >"$apollo_root_dir/.install.lock/pid"
+  if (
+    export HOME="$test_home"
+    export PATH="$fake_bin:$PATH"
+    export APOLLO_ROOT="$apollo_root_dir"
+    export APOLLO_TEST_FIXTURES="$fixtures"
+    export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+    export APOLLO_SKIP_FSH=1
+    export APOLLO_LOCK_WAIT=1
+    export APOLLO_RELEASES_FILE="$lock"
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    install_apollo_themes
+  ) >/dev/null 2>&1; then
+    kill "$apollo_holder" 2>/dev/null
+    echo "Apollo install ignored a live old-format directory lock" >&2
+    return 1
+  fi
+  kill -9 "$apollo_holder" 2>/dev/null; wait "$apollo_holder" 2>/dev/null || true
+  (
+    export HOME="$test_home"
+    export PATH="$fake_bin:$PATH"
+    export APOLLO_ROOT="$apollo_root_dir"
+    export APOLLO_TEST_FIXTURES="$fixtures"
+    export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+    export APOLLO_SKIP_FSH=1
+    export APOLLO_LOCK_WAIT=1
+    export APOLLO_RELEASES_FILE="$lock"
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    install_apollo_themes
+  ) >/dev/null 2>&1 || { echo "Apollo install stayed blocked by a dead old-format directory lock" >&2; return 1; }
+  [ -f "$apollo_root_dir/.install.lock" ] || { echo "Apollo did not replace the old-format directory lock" >&2; return 1; }
+
   # App tags are bound to their own row: <id>-vX.Y.Z. The palette keeps vX.Y.Z.
   local tag_case tag_lock
   for tag_case in 'tmux v1.0.0' 'tmux rmux-v1.0.0' 'tmux tmux-v1' 'palette palette-v1.0.0'; do
