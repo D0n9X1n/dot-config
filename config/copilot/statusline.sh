@@ -31,25 +31,31 @@
 #   .vim.mode, .agent.name, .workspace.git_worktree, .output_style.name,
 #   .cost.total_cost_usd
 #
-# Default layout matches ~/.claude/statusline.sh:
-#   L1: status       — time, run timer, premium requests, waka today
-#   L2: model        — model, effort, context
-#   L3: integrations — mcp, skills, agents, style
-#   L4: cwd path     — full directory path
-#   L5: repo + git   — repo, branch, diff, stash, worktree
+# Default layout: a padding row, then two lines (same design as
+# ~/.claude/statusline.sh). Every item is an accent-colored icon, a muted
+# label and its value; items are separated by a thin rule.
+#   L1: Model (aqua), Effort (purple), Req (yellow), WakaTime (green),
+#       Tasks (orange; hidden at 0), Venv (green), and Context last (blue):
+#       a ten-cell bar, the percentage in green/yellow/red, and the capacity.
+#   L2: Branch (orange) with its indicators (✓ clean or ● dirty, aqua
+#       ahead/behind, a purple stash icon with the count when there are
+#       stashes), Diff (blue): this session's +added in green and -removed
+#       in red, nonzero parts only, hidden when both are 0; then Path (aqua)
+#       at the right end: right-aligned with COLUMNS and shortened from the
+#       left (…/) to fit, otherwise after the rule.
 #   Bottom: separator + active subagents — root + one line per live task subagent
 #           each row shows: agent name, purpose, and running time
 #
-# Additional Copilot-only segments remain available via
-# COPILOT_STATUSLINE_SEGMENTS: wall, api, cache_pct, last_call,
-# gh_account, ext_count, venv.
+# More segments stay available via COPILOT_STATUSLINE_SEGMENTS: time, timer,
+# wall, api, cache_pct, last_call, mcp, skills, agent, repo, stash,
+# worktree, gh_account, ext_count.
 #
 # Env overrides (mirror the Claude one for muscle memory):
 #   COPILOT_STATUSLINE_NO_ICONS=1   drop icons, keep text labels
 #   COPILOT_STATUSLINE_NO_COLOR=1   drop color (still pads + separators);
 #                                   legacy COPILOT_STATUSLINE_NO_DIM=1
 #                                   is honored as an alias.
-#   COPILOT_STATUSLINE_PAD_TOP=N    blank lines before the line (default 0)
+#   COPILOT_STATUSLINE_PAD_TOP=N    blank rows before the lines (default 1)
 #   COPILOT_STATUSLINE_PAD_LEFT=N   spaces before the line     (default 0)
 #   COPILOT_STATUSLINE_PAD_RIGHT=N  spaces after the line      (default 0)
 #   COPILOT_STATUSLINE_SEGMENTS="…" override the segment list (and order)
@@ -66,18 +72,9 @@
 set -u
 
 # --- Configuration ---------------------------------------------------------
-# Five-line layout. A literal `\n` token in SEGMENTS introduces a line
-# break in the render loop. Empty/no-op segments collapse cleanly so
-# auto-hiding ones (worktree, stash, diff, skills, agents) take no space
-# when off.
-# Default accent lattice avoids repeating icon colors for adjacent segments
-# and for segments in the same visual column:
-#   L1: yellow, orange, green, aqua
-#   L2: aqua, purple, yellow
-#   L3: blue, green, aqua, purple, orange
-#   L4: orange
-#   L5: green, yellow, red, orange, purple
-SEGMENTS="${COPILOT_STATUSLINE_SEGMENTS:-time timer premium waka \n model effort ctx \n mcp skills agent subagents style \n path \n git branch diff stash worktree}"
+# A literal `\n` token in SEGMENTS starts the next line. `path` is placed
+# at the right end of its line. Segments without data take no space.
+SEGMENTS="${COPILOT_STATUSLINE_SEGMENTS:-model effort premium waka subagents venv ctx \n branch diff path}"
 SEP=' │ '
 SUBAGENT_SEPARATOR='----------------------------------------'
 
@@ -98,7 +95,7 @@ ICONS_ON=1
 #   U+F155 dollar           = EF 85 95   Req (premium request count)
 #   U+F021 refresh          = EF 80 A1   Cache
 #   U+F1D8 paper-plane      = EF 87 98   Last
-#   U+F121 code            = EF 84 A1   Diff
+#   U+F440 diff            = EF 91 80   Diff
 #   U+F07C folder-open     = EF 81 BC   Path
 #   U+F1C0 database         = EF 87 80   Context
 #   U+F121 code             = EF 84 A1   Vim
@@ -122,7 +119,7 @@ ICON_API=$'\xef\x88\xb3'
 ICON_REQ=$'\xef\x85\x95'
 ICON_CACHE=$'\xef\x80\xa1'
 ICON_LAST=$'\xef\x87\x98'
-ICON_DIFF=$'\xef\x84\xa1'
+ICON_DIFF=$'\xef\x91\x80'
 ICON_CTX=$'\xef\x87\x80'
 ICON_VIM=$'\xef\x84\xa1'
 ICON_AGENT=$'\xef\x84\xb5'
@@ -154,12 +151,18 @@ if [ -z "${COPILOT_STATUSLINE_NO_COLOR:-}" ] && [ -z "${COPILOT_STATUSLINE_NO_DI
 fi
 # Existing bundles may not yet export the bright foreground role.
 [ -n "$C_FG_BRIGHT" ] || C_FG_BRIGHT="$C_FG"
+# The icon carries the accent; labels are muted so the values read first.
+# The generated include has no darker rule role, so the separators and the
+# empty context cells use the same inactive foreground as the labels.
+C_MUTED="$C_FG_DIM"
+C_RULE="$C_FG_DIM"
+C_PATH_VALUE="$C_FG_BRIGHT"
 
 # Per-side padding emitted from inside the script. Copilot CLI's
 # statusLine.padding* fields are silently ignored — only the single
 # `padding` key is honored — so we apply our own spacing here for
 # finer control.
-PAD_TOP="${COPILOT_STATUSLINE_PAD_TOP:-0}"
+PAD_TOP="${COPILOT_STATUSLINE_PAD_TOP:-1}"
 PAD_LEFT="${COPILOT_STATUSLINE_PAD_LEFT:-0}"
 PAD_RIGHT="${COPILOT_STATUSLINE_PAD_RIGHT:-0}"
 
@@ -201,7 +204,7 @@ f233|${ICON_API}|API
 f155|${ICON_REQ}|Req
 f021|${ICON_CACHE}|Cache
 f1d8|${ICON_LAST}|Last
-f121|${ICON_DIFF}|Diff
+f440|${ICON_DIFF}|Diff
 f1c0|${ICON_CTX}|Context
 f121|${ICON_VIM}|Vim
 f135|${ICON_AGENT}|Agent
@@ -322,11 +325,12 @@ fi
 
 # --- 3. Helpers ------------------------------------------------------------
 label() {
+  # "<accent icon> <muted label> "
   local color="$1" icon="$2" text="$3"
   if [ "$ICONS_ON" = "1" ]; then
-    printf '%s%s %s%s ' "$color" "$icon" "$text" "$C_RESET"
+    printf '%s%s %s%s%s ' "$color" "$icon" "$C_MUTED" "$text" "$C_RESET"
   else
-    printf '%s%s%s ' "$color" "$text" "$C_RESET"
+    printf '%s%s%s ' "$C_MUTED" "$text" "$C_RESET"
   fi
 }
 
@@ -406,7 +410,7 @@ seg_model() {
         s/  +/ /g
         s/ +$//
       ')"
-  printf '%s%s%s%s' "$(label "$C_YELLOW" "$ICON_MODEL" 'Model')" "$C_FG_BRIGHT" "$short" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_AQUA" "$ICON_MODEL" 'Model')" "$C_FG_BRIGHT" "$short" "$C_RESET"
 }
 
 seg_effort() {
@@ -442,7 +446,7 @@ seg_api() {
 
 seg_premium() {
   is_pos_int "$premium" || return 0
-  printf '%s%s%d%s' "$(label "$C_GREEN" "$ICON_REQ" 'Req')" "$C_FG" "$premium" "$C_RESET"
+  printf '%s%s%d%s' "$(label "$C_YELLOW" "$ICON_REQ" 'Req')" "$C_FG" "$premium" "$C_RESET"
 }
 
 seg_cache_pct() {
@@ -470,46 +474,106 @@ seg_last_call() {
 # tradeoff isn't worth it. Kept here so re-enabling is just a matter of
 # adding `diff` to SEGMENTS.
 seg_diff() {
-  local a="${lines_added:-0}" r="${lines_removed:-0}"
-  is_pos_int "$a" || is_pos_int "$r" || return 0
-  printf '%s%s+%d%s%s/-%d%s' \
-    "$(label "$C_RED" "$ICON_DIFF" 'Diff')" \
-    "$C_GREEN" "$a" "$C_RESET" \
-    "$C_RED" "$r" "$C_RESET"
+  # This session's code changes: +added in green and -removed in red, only
+  # the nonzero parts; hidden when both are 0.
+  local a="${lines_added:-0}" r="${lines_removed:-0}" body=""
+  is_pos_int "$a" && body="${C_GREEN}+${a}${C_RESET}"
+  if is_pos_int "$r"; then
+    [ -n "$body" ] && body="${body} "
+    body="${body}${C_RED}-${r}${C_RESET}"
+  fi
+  [ -n "$body" ] || return 0
+  printf '%s%s' "$(label "$C_BLUE" "$ICON_DIFF" 'Diff')" "$body"
 }
 
 # Ctx — context window usage. Copilot's `.context_window.used_percentage`
 # is integer %. Show absolute size parenthetically when known. Color-grade
 # green→yellow→red so a glance tells you how much room is left.
+# Context — a ten-cell bar, the used percentage graded green → yellow → red,
+# and the muted capacity. Hidden while the percentage is 0 or missing.
 seg_ctx() {
   [ -n "$ctx_pct" ] || return 0
-  local pct_int
+  local pct_int filled body
   pct_int="$(awk -v p="$ctx_pct" 'BEGIN{ printf("%d", p+0) }')"
+  is_pos_int "$pct_int" || return 0
   local color="$C_GREEN"
   if [ "$pct_int" -ge 80 ]; then
     color="$C_RED"
   elif [ "$pct_int" -ge 50 ]; then
     color="$C_YELLOW"
   fi
-  local body
-  if [ -n "$ctx_size" ] && [ "$ctx_size" != "null" ]; then
-    body="${color}${pct_int}%${C_RESET}${C_FG_DIM}/$(fmt_tokens "$ctx_size")${C_RESET}"
-  else
-    body="${color}${pct_int}%${C_RESET}"
+  filled=$(( (pct_int + 5) / 10 ))
+  [ "$filled" -le 10 ] || filled=10
+  body="${color}$(repeat '▰' "$filled")${C_RESET}${C_RULE}$(repeat '▱' $((10 - filled)))${C_RESET} ${color}${pct_int}%${C_RESET}"
+  if is_pos_int "$ctx_size"; then
+    body="${body}${C_MUTED} of $(fmt_tokens "$ctx_size")${C_RESET}"
   fi
-  printf '%s%s' "$(label "$C_YELLOW" "$ICON_CTX" 'Context')" "$body"
+  printf '%s%s' "$(label "$C_BLUE" "$ICON_CTX" 'Context')" "$body"
 }
 
-# Path — full cwd as its own line, matching the Claude statusline. Replace
-# $HOME with ~ for brevity.
-seg_path() {
-  [ -n "$cwd" ] || return 0
-  local p="$cwd"
+# Visible width of a rendered string: ANSI color codes take no columns and
+# each UTF-8 character counts once (continuation bytes are dropped), so the
+# result does not depend on the locale.
+vis_width() {
+  printf '%s' "$1" | LC_ALL=C sed $'s/\033\\[[0-9;]*m//g' | LC_ALL=C tr -d '\200-\277' | wc -c | tr -d ' '
+}
+
+# The folder path for the Path item: the workspace (or $PWD), with $HOME as ~.
+path_text() {
+  local p="${cwd:-$PWD}"
+  [ -n "$p" ] || return 0
   case "$p" in
     "$HOME") p="~" ;;
-    "$HOME"/*) p="~${p#$HOME}" ;;
+    "$HOME"/*) p="~${p#"$HOME"}" ;;
   esac
-  printf '%s%s%s%s' "$(label "$C_AQUA" "$ICON_PATH" 'Path')" "$C_FG_BRIGHT" "$p" "$C_RESET"
+  __PATH_TEXT="$p"
+}
+
+# Shorten a path from the left to at most $2 columns, keeping whole folder
+# names: ~/a/b/c/d -> …/c/d. The last folder stays even when it is wider.
+# Result in $__SHORT.
+shorten_path() {
+  local rest="$1" max="$2"
+  __SHORT="$1"
+  [ "$(vis_width "$__SHORT")" -le "$max" ] && return 0
+  while :; do
+    case "$rest" in
+      */*) rest="${rest#*/}" ;;
+      *) return 0 ;;
+    esac
+    __SHORT="…/$rest"
+    [ "$(vis_width "$__SHORT")" -le "$max" ] && return 0
+  done
+}
+
+# Join a line's segments with the path at its right end. With COLUMNS the
+# path is right-aligned (keeping a six-column margin) and shortened to fit;
+# otherwise it follows the segments after the rule. Result in $__LINE.
+finish_path_line() {
+  local left="$1" prefix cols usable lw pw room gap
+  __LINE="$left"
+  [ -n "$__PATH_TEXT" ] || return 0
+  prefix="$(label "$C_AQUA" "$ICON_PATH" 'Path')"
+  cols="${COLUMNS:-0}"
+  case "$cols" in '' | *[!0-9]*) cols=0 ;; esac
+  if [ "$cols" -gt 0 ] && [ -n "$left" ]; then
+    usable=$((cols - 6 - PAD_LEFT - PAD_RIGHT))
+    lw="$(vis_width "$left")"
+    pw="$(vis_width "$prefix")"
+    room=$((usable - lw - 3 - pw))
+    if [ "$room" -ge 8 ]; then
+      shorten_path "$__PATH_TEXT" "$room"
+      gap=$((usable - lw - pw - $(vis_width "$__SHORT")))
+      [ "$gap" -ge 3 ] || gap=3
+      __LINE="${left}$(repeat ' ' "$gap")${prefix}${C_PATH_VALUE}${__SHORT}${C_RESET}"
+      return 0
+    fi
+  fi
+  if [ -n "$left" ]; then
+    __LINE="${left}${C_RULE}${SEP}${C_RESET}${prefix}${C_PATH_VALUE}${__PATH_TEXT}${C_RESET}"
+  else
+    __LINE="${prefix}${C_PATH_VALUE}${__PATH_TEXT}${C_RESET}"
+  fi
 }
 
 # Vim / Style — Copilot CLI doesn't currently surface equivalent runtime
@@ -517,18 +581,15 @@ seg_path() {
 seg_vim()    { return 0; }
 seg_style()  { return 0; }
 
-# Subagents — inline count of currently running subagents. Shows "0" when
-# idle, colored by activity: green=0, yellow=1-2, orange=3+. The detailed
-# per-agent rows render at the bottom of the statusline separately.
+# Tasks — inline count of currently running subagents, hidden when idle and
+# colored by activity: yellow=1-2, orange=3+. The detailed per-agent rows
+# render at the bottom of the statusline separately.
 seg_subagents() {
   local n="${__SUBAGENT_COUNT:-0}"
-  local color="$C_GREEN"
-  if [ "$n" -ge 3 ]; then
-    color="$C_ORANGE"
-  elif [ "$n" -ge 1 ]; then
-    color="$C_YELLOW"
-  fi
-  printf '%s%s%d%s' "$(label "$C_PURPLE" "$ICON_SUBAGENT" 'Tasks')" "$color" "$n" "$C_RESET"
+  is_pos_int "$n" || return 0
+  local color="$C_YELLOW"
+  [ "$n" -ge 3 ] && color="$C_ORANGE"
+  printf '%s%s%d%s' "$(label "$C_ORANGE" "$ICON_SUBAGENT" 'Tasks')" "$color" "$n" "$C_RESET"
 }
 
 # Plugin skills + agents — enabled plugins also load
@@ -736,15 +797,30 @@ seg_repo() {
 
 seg_git() { seg_repo; }
 
+# Branch with its indicators: ✓ clean or ● dirty, ahead/behind, and the
+# stash icon with the count only when there are stashes.
 seg_branch() {
   load_git_state
   [ "$GIT_INSIDE" = "1" ] || return 0
-  local br="$GIT_BRANCH"
-  [ -n "$br" ] || return 0
+  local br="${GIT_BRANCH:-detached}" state out
   if [ ${#br} -gt 24 ]; then
     br="${br:0:23}…"
   fi
-  printf '%s%s%s%s' "$(label "$C_YELLOW" "$ICON_BRANCH" 'Branch')" "$C_FG_BRIGHT" "$br" "$C_RESET"
+  if [ "$GIT_STATE" = "dirty" ]; then
+    if [ "$ICONS_ON" = "1" ]; then state="${C_YELLOW}●${C_RESET}"; else state="${C_YELLOW}dirty${C_RESET}"; fi
+  else
+    if [ "$ICONS_ON" = "1" ]; then state="${C_GREEN}✓${C_RESET}"; else state="${C_GREEN}clean${C_RESET}"; fi
+  fi
+  out="$(label "$C_ORANGE" "$ICON_BRANCH" 'Branch')${C_FG_BRIGHT}${br}${C_RESET} ${state}"
+  [ -n "$GIT_SYNC" ] && out="${out} ${C_AQUA}${GIT_SYNC}${C_RESET}"
+  if is_pos_int "$GIT_STASH"; then
+    if [ "$ICONS_ON" = "1" ]; then
+      out="${out} ${C_PURPLE}${ICON_STASH} ${GIT_STASH}${C_RESET}"
+    else
+      out="${out} ${C_PURPLE}stash ${GIT_STASH}${C_RESET}"
+    fi
+  fi
+  printf '%s' "$out"
 }
 
 seg_stash() {
@@ -757,7 +833,7 @@ seg_stash() {
 
 seg_venv() {
   [ -n "${VIRTUAL_ENV:-}" ] || return 0
-  printf '%s%s%s%s' "$(label "$C_BLUE" "$ICON_VENV" 'Venv')" "$C_FG" "$(basename "$VIRTUAL_ENV")" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_GREEN" "$ICON_VENV" 'Venv')" "$C_FG" "$(basename "$VIRTUAL_ENV")" "$C_RESET"
 }
 
 seg_gh_account() {
@@ -825,7 +901,7 @@ seg_waka() {
   case "$secs" in '' | *[!0-9]*) secs=0 ;; esac
   total=$((hrs * 3600 + mins * 60 + secs))
   [ "$total" -ge 60 ] || return 0
-  printf '%s%s%s%s' "$(label "$C_AQUA" "$ICON_WAKA" 'WakaTime')" "$C_FG" "$(fmt_dhm "$total")" "$C_RESET"
+  printf '%s%s%s%s' "$(label "$C_GREEN" "$ICON_WAKA" 'WakaTime')" "$C_FG" "$(fmt_dhm "$total")" "$C_RESET"
 }
 
 # Ext — count Copilot CLI extensions in user-scope + project-scope dirs.
@@ -1213,25 +1289,38 @@ EOF
   [ "$__SUBAGENT_COUNT" -ge 0 ] 2>/dev/null || __SUBAGENT_COUNT=0
 fi
 
-# A literal `\n` token in $SEGMENTS introduces a line break: segments before
-# it form line 1, segments after it form line 2.
+# A literal `\n` token in $SEGMENTS starts the next line; `path` is held
+# back and placed at the right end of its line by finish_path_line. A line
+# with no data takes no row.
 out=""
-line_started=0
+line=""
+__PATH_TEXT=""
+add_line() {
+  [ -n "$__LINE" ] || return 0
+  if [ -n "$out" ]; then out="${out}"$'\n'"${__LINE}"; else out="$__LINE"; fi
+}
 for s in $SEGMENTS; do
   if [ "$s" = '\n' ]; then
-    out="${out}"$'\n'
-    line_started=0
+    finish_path_line "$line"
+    add_line
+    line=""
+    __PATH_TEXT=""
+    continue
+  fi
+  if [ "$s" = "path" ]; then
+    path_text
     continue
   fi
   part="$("seg_$s" 2>/dev/null || true)"
   [ -n "$part" ] || continue
-  if [ "$line_started" = 1 ]; then
-    out="${out}${C_FG_DIM}${SEP}${C_RESET}${part}"
+  if [ -n "$line" ]; then
+    line="${line}${C_RULE}${SEP}${C_RESET}${part}"
   else
-    out="${out}${part}"
-    line_started=1
+    line="$part"
   fi
 done
+finish_path_line "$line"
+add_line
 
 [ -n "$__SUBAGENT_BLOCK" ] && out="${out}"$'\n'"${C_DIM}${SUBAGENT_SEPARATOR}${C_RESET}"$'\n'"${__SUBAGENT_BLOCK}"
 

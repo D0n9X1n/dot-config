@@ -171,17 +171,14 @@ Do not restore the old lifecycle counter hook.
 
 ## Status line
 
-Claude and Copilot status lines share the same five-line shape, locally generated Apollo colors, and five-second per-directory Git cache:
+Claude and Copilot status lines share the same two-line design, locally generated Apollo colors, and five-second per-directory Git cache. A padding row comes first, then:
 
-1. time, run time, cost, WakaTime
-2. model, effort, context
-3. MCP, skills, agents, style
-4. current path
-5. repo, branch, diff, stash, worktree
+1. model, effort, WakaTime, venv, and context last (a ten-cell bar, the percentage, and the capacity, such as `45% of 1.0M`)
+2. branch first, with its indicators (✓ clean or ● dirty, ahead/behind, and a stash icon with the count when there are stashes), then Diff (this session's `+added` in green and `-removed` in red, only the nonzero parts, hidden when both are 0), and the folder path at the right end
+
+Every item is an accent-colored Nerd Font icon, a muted label, and its value; a thin rule separates items, and an item without data is hidden. With `COLUMNS` known, the path is right-aligned and shortened from the left (`…/`) to fit; otherwise it follows the other items. `CLAUDE_STATUSLINE_PAD_TOP` sets the padding rows (default 1).
 
 Both scripts source the same generated Apollo color include. If it is missing or color is disabled, they remain readable without colors. Claude's custom status line has no live-subagent count or tree because Claude Code has native subagent UI. Copilot keeps the custom rows.
-
-Skills and Agents count user and project files plus the skills and agents of each enabled plugin. The script reads `installPath` from `~/.claude/plugins/installed_plugins.json` and `enabledPlugins` from user, project, and local settings; a later scope wins. It counts `skills/*/SKILL.md` and `agents/*.md` there. The plugin counts are cached per working directory and recomputed only when one of those files changes.
 
 ## Plugins
 

@@ -80,19 +80,18 @@ Remove any later `alias copilot=...` from `~/.zshrc`; it would override the mana
 
 ## Status line
 
-The Copilot status line shares the five-line layout and locally generated Apollo colors with Claude:
+The Copilot status line shares the two-line design and locally generated Apollo colors with Claude. A padding row comes first, then:
 
-1. time, run time, requests, WakaTime
-2. model, effort, context
-3. MCP, skills, agents, tasks, style
-4. current path
-5. repo, branch, diff, stash, worktree
+1. model, effort, requests, WakaTime, tasks (hidden when no subagent runs), venv, and context last (a ten-cell bar, the percentage, and the capacity)
+2. branch first, with its indicators (✓ clean or ● dirty, ahead/behind, and a stash icon with the count when there are stashes), then Diff (this session's `+added` in green and `-removed` in red, only the nonzero parts, hidden when both are 0), and the folder path at the right end
+
+Every item is an accent-colored Nerd Font icon, a muted label, and its value; a thin rule separates items, and an item without data is hidden. With `COLUMNS` known, the path is right-aligned and shortened from the left (`…/`) to fit; otherwise it follows the other items. Live-subagent rows stay below the two lines.
 
 It reads session JSON with one `jq` call. Both provider status scripts source the same generated Apollo color include and fall back to readable uncolored output when it is absent. Git data is cached for five seconds per working directory. GitHub auth data is cached for five minutes.
 
-Skills and Agents count user and project files plus the skills and agents of each enabled plugin. The script reads `installedPlugins[]` (`cache_path`, `enabled`) from `~/.copilot/config.json`, skipping its `//` comment lines, and counts `skills/*/SKILL.md` and `agents/*.md` there. The plugin counts are cached until that file changes.
+The `skills` and `agent` segments are no longer in the default list; add them with `COPILOT_STATUSLINE_SEGMENTS`. They count user and project files plus the skills and agents of each enabled plugin. The script reads `installedPlugins[]` (`cache_path`, `enabled`) from `~/.copilot/config.json`, skipping its `//` comment lines, and counts `skills/*/SKILL.md` and `agents/*.md` there. The plugin counts are cached until that file changes.
 
-Copilot uses one extra color role from that shared include. Model, Effort, Path, and Branch print their values in the bright foreground role, so the identity of the session stands out from ordinary values. Their labels keep accent roles: Model is yellow, Path is aqua, Run is purple. Ordinary segment separators and the context capacity suffix use the dim foreground role rather than the plain dim attribute. The live-subagent rows and their separator are unchanged. Claude's status line does not use the bright role, so the shared generator does not change it.
+Copilot uses one extra color role from that shared include. Model, Effort, Path, and Branch print their values in the bright foreground role, so the identity of the session stands out from ordinary values. Labels use the inactive foreground role; the icon before each label carries its accent: Model and Path are aqua, Branch is orange, Context is blue. Segment separators, the empty context cells, and the context capacity suffix also use the inactive foreground role rather than the plain dim attribute. The live-subagent rows and their separator are unchanged. Claude's status line does not use the bright role, so the shared generator does not change it.
 
 Useful environment switches:
 
@@ -100,7 +99,7 @@ Useful environment switches:
 |---|---|
 | `COPILOT_STATUSLINE_NO_ICONS=1` | Hide icons |
 | `COPILOT_STATUSLINE_NO_COLOR=1` | Hide colors |
-| `COPILOT_STATUSLINE_PAD_TOP=N` | Add top space |
+| `COPILOT_STATUSLINE_PAD_TOP=N` | Set padding rows (default 1) |
 | `COPILOT_STATUSLINE_PAD_LEFT=N` | Add left space |
 | `COPILOT_STATUSLINE_PAD_RIGHT=N` | Add right space |
 | `COPILOT_STATUSLINE_SEGMENTS="..."` | Set segment order |

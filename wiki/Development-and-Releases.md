@@ -38,7 +38,7 @@ config/claude/statusline.sh
 config/copilot/statusline.sh
 ```
 
-Keep the same five-line shape, palette, and per-directory Git cache. Keep the provider fields different: Claude shows cost; Copilot shows premium requests and custom live-subagent rows.
+Keep the same two-line shape (a padding row, then two lines), palette, and per-directory Git cache. Keep the provider fields different: Copilot shows premium requests and custom live-subagent rows; Claude shows neither.
 
 Keep these model routes:
 

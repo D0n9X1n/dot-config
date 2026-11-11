@@ -80,17 +80,16 @@ source ~/.oh-my-zsh/custom/gg.zsh
 
 ## 状态栏
 
-Copilot 状态栏与 Claude 共享五行布局和本机生成的 Apollo 颜色：
+Copilot 状态栏与 Claude 共享两行设计和本机生成的 Apollo 颜色。最上面是一行留白，然后是：
 
-1. 时间、运行时间、请求、WakaTime
-2. 模型、effort、context
-3. MCP、skills、agents、tasks、style
-4. 当前路径
-5. repo、branch、diff、stash、worktree
+1. 模型、effort、请求、WakaTime、tasks（没有 subagent 运行时隐藏）、venv，最后是 context（十格进度条、百分比和容量）
+2. 先是 branch 及其标记（✓ 干净或 ● 有修改、领先/落后，有 stash 时显示 stash 图标和数量），然后是 Diff（本会话绿色的 `+新增` 和红色的 `-删除`，只显示非零部分，两者都为 0 时隐藏），文件夹路径在行的最右端
+
+每一项都是带强调色的 Nerd Font 图标、弱化的标签和值；项之间用细竖线分隔，没有数据的项会隐藏。已知 `COLUMNS` 时，路径右对齐，并从左侧缩短（`…/`）以适应宽度；否则路径跟在其他项后面。live-subagent rows 仍显示在两行下面。
 
 它用一次 `jq` 读取 session JSON。两个 provider 状态脚本读取同一个本机生成 Apollo 颜色 include；文件缺失时会回退为可读的无色输出。Git 数据按工作目录缓存五秒。GitHub auth 数据缓存五分钟。
 
-Skills 和 Agents 统计 user 和 project 文件，也统计每个已启用 plugin 的 skills 和 agents。脚本从 `~/.copilot/config.json` 读取 `installedPlugins[]`（`cache_path`、`enabled`），跳过其中的 `//` 注释行，并统计其中的 `skills/*/SKILL.md` 和 `agents/*.md`。plugin 数量会缓存到该文件变化为止。
+`skills` 和 `agent` 段不再在默认列表中；可用 `COPILOT_STATUSLINE_SEGMENTS` 加回。它们统计 user 和 project 文件，也统计每个已启用 plugin 的 skills 和 agents。脚本从 `~/.copilot/config.json` 读取 `installedPlugins[]`（`cache_path`、`enabled`），跳过其中的 `//` 注释行，并统计其中的 `skills/*/SKILL.md` 和 `agents/*.md`。plugin 数量会缓存到该文件变化为止。
 
 Copilot 从该共享 include 中多用一个颜色角色。Model、Effort、Path 和 Branch 的值使用亮前景角色，让会话身份从普通值中突出。它们的标签保留强调色：Model 为黄色，Path 为青色，Run 为紫色。普通分隔符和 context 容量后缀改用暗前景角色，而不是纯 dim 属性。实时 subagent 行及其分隔线保持不变。Claude 状态栏不使用亮前景角色，所以共享生成器不会改变它。
 
@@ -100,7 +99,7 @@ Copilot 从该共享 include 中多用一个颜色角色。Model、Effort、Path
 |---|---|
 | `COPILOT_STATUSLINE_NO_ICONS=1` | 隐藏图标 |
 | `COPILOT_STATUSLINE_NO_COLOR=1` | 隐藏颜色 |
-| `COPILOT_STATUSLINE_PAD_TOP=N` | 添加顶部空白 |
+| `COPILOT_STATUSLINE_PAD_TOP=N` | 设置留白行数（默认 1） |
 | `COPILOT_STATUSLINE_PAD_LEFT=N` | 添加左侧空白 |
 | `COPILOT_STATUSLINE_PAD_RIGHT=N` | 添加右侧空白 |
 | `COPILOT_STATUSLINE_SEGMENTS="..."` | 设置 segment 顺序 |

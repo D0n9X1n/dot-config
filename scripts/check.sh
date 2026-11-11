@@ -32,6 +32,18 @@ run_statusline_smoke() {
 
   out="$(echo '{"model":{"display_name":"Claude (xhigh)"}}' | bash config/copilot/statusline.sh)"
   [ -n "$out" ] && echo "copilot statusline ok: ${#out} bytes"
+
+  # Diff shows only the nonzero parts and hides when both are 0.
+  for script in config/claude/statusline.sh config/copilot/statusline.sh; do
+    out="$(printf '{"cost":{"total_lines_added":12,"total_lines_removed":0}}' |
+      CLAUDE_STATUSLINE_NO_COLOR=1 COPILOT_STATUSLINE_NO_COLOR=1 bash "$script")"
+    case "$out" in *"Diff +12"*) ;; *) echo "$script: Diff should show +12: $out" >&2; return 1 ;; esac
+    case "$out" in *"-0"*) echo "$script: Diff should hide a zero part: $out" >&2; return 1 ;; esac
+    out="$(printf '{"cost":{"total_lines_added":0,"total_lines_removed":0}}' |
+      CLAUDE_STATUSLINE_NO_COLOR=1 COPILOT_STATUSLINE_NO_COLOR=1 bash "$script")"
+    case "$out" in *Diff*) echo "$script: Diff should hide when both are 0: $out" >&2; return 1 ;; esac
+  done
+  echo "statusline diff ok"
 }
 
 run_statusline_plugin_smoke() {
@@ -40,7 +52,7 @@ run_statusline_plugin_smoke() {
   trap 'rm -rf "${test_root:-}"' RETURN
   home="$test_root/home"
   proj="$test_root/proj"
-  mkdir -p "$home/.claude/plugins" "$home/.copilot" "$proj" "$test_root/tmp"
+  mkdir -p "$home/.copilot" "$proj" "$test_root/tmp"
 
   # One enabled plugin with 2 skills + 1 agent, one disabled with 1 skill.
   for plugin in on off; do
@@ -50,34 +62,18 @@ run_statusline_plugin_smoke() {
   mkdir -p "$test_root/on/skills/s2"
   touch "$test_root/on/skills/s2/SKILL.md" "$test_root/on/agents/a.md"
 
-  printf '{"version":2,"plugins":{"on@m":[{"scope":"user","installPath":"%s"}],"off@m":[{"scope":"user","installPath":"%s"}]}}\n' \
-    "$test_root/on" "$test_root/off" >"$home/.claude/plugins/installed_plugins.json"
-  printf '{"enabledPlugins":{"on@m":true,"off@m":false}}\n' >"$home/.claude/settings.json"
-  out="$(cd "$proj" && printf '{}' | HOME="$home" TMPDIR="$test_root/tmp" \
-    CLAUDE_STATUSLINE_NO_COLOR=1 CLAUDE_STATUSLINE_NO_ICONS=1 bash "$OLDPWD/config/claude/statusline.sh")"
-  case "$out" in *"Skills 2"*"Agents 1"*) ;; *)
-    echo "claude statusline should count enabled plugin skills and agents: $out" >&2; return 1 ;;
-  esac
-
-  mkdir -p "$proj/.claude"
-  printf '{"enabledPlugins":{"on@m":false}}\n' >"$proj/.claude/settings.local.json"
-  out="$(cd "$proj" && printf '{}' | HOME="$home" TMPDIR="$test_root/tmp" \
-    CLAUDE_STATUSLINE_NO_COLOR=1 CLAUDE_STATUSLINE_NO_ICONS=1 bash "$OLDPWD/config/claude/statusline.sh")"
-  case "$out" in *Skills*|*Agents*)
-    echo "claude statusline should drop a plugin disabled in project settings: $out" >&2; return 1 ;;
-  esac
-
   printf '// managed\n{"installedPlugins":[{"name":"on","cache_path":"%s","enabled":true},{"name":"off","cache_path":"%s","enabled":false}]}\n' \
     "$test_root/on" "$test_root/off" >"$home/.copilot/config.json"
   out="$(cd "$proj" && printf '{}' | HOME="$home" TMPDIR="$test_root/tmp" \
-    COPILOT_STATUSLINE_NO_COLOR=1 COPILOT_STATUSLINE_NO_ICONS=1 bash "$OLDPWD/config/copilot/statusline.sh")"
+    COPILOT_STATUSLINE_NO_COLOR=1 COPILOT_STATUSLINE_NO_ICONS=1 COPILOT_STATUSLINE_SEGMENTS='skills agent' \
+    bash "$OLDPWD/config/copilot/statusline.sh")"
   case "$out" in *"Skills 2"*"Agents 1"*) ;; *)
     echo "copilot statusline should count enabled plugin skills and agents: $out" >&2; return 1 ;;
   esac
   rm -rf "$test_root"
   test_root=""
   trap - RETURN
-  echo "statusline plugin skill and agent counts ok"
+  echo "copilot statusline plugin skill and agent counts ok"
 }
 
 run_shellcheck() {
@@ -1903,7 +1899,7 @@ SH
     return 1
   fi
 
-  local colors_file payload old_home pct code rows
+  local colors_file payload old_home pct code rows out_icons
   colors_file="$test_home/.local/share/dot-configs/apollo/current/generated/statusline-colors.sh"
   grep -Fq "C_FG_BRIGHT=" "$colors_file" || {
     echo "generated statusline colors are missing C_FG_BRIGHT" >&2
@@ -1920,26 +1916,33 @@ SH
     [ "$C_FG_DIM" = "$(printf '\033[38;2;0;0;7m')" ]
   )
 
-  # Selected segments use the bright role for values; labels keep their roles.
+  # Labels use the muted inactive foreground; Copilot values keep the bright role.
   payload='{"model":{"display_name":"Claude Sonnet 4.5 (max)"},"workspace":{"current_dir":"'"$test_home"'"},"context_window":{"used_percentage":50,"context_window_size":100000}}'
   out="$(printf '%s' "$payload" | HOME="$test_home" \
     COPILOT_STATUSLINE_NO_ICONS=1 \
     COPILOT_STATUSLINE_SEGMENTS='model effort ctx \n path' \
     bash config/copilot/statusline.sh)"
-  printf '%s' "$out" | grep -Fq $'\033[38;2;0;0;9mModel\033[0m \033[38;2;0;0;8mSonnet 4.5\033[0m' || {
-    echo "Model segment lost the yellow label / bright value styling" >&2
+  printf '%s' "$out" | grep -Fq $'\033[38;2;0;0;7mModel\033[0m \033[38;2;0;0;8mSonnet 4.5\033[0m' || {
+    echo "Model segment lost the muted label / bright value styling" >&2
     return 1
   }
-  printf '%s' "$out" | grep -Fq $'\033[38;2;0;0;13mEffort\033[0m \033[38;2;0;0;8mmax\033[0m' || {
+  printf '%s' "$out" | grep -Fq $'\033[38;2;0;0;7mEffort\033[0m \033[38;2;0;0;8mmax\033[0m' || {
     echo "Effort segment lost the bright value styling" >&2
     return 1
   }
-  printf '%s' "$out" | grep -Fq $'\033[38;2;0;0;14mPath\033[0m \033[38;2;0;0;8m~\033[0m' || {
-    echo "Path segment lost the aqua label / bright value styling" >&2
+  printf '%s' "$out" | grep -Fq $'\033[38;2;0;0;7mPath\033[0m \033[38;2;0;0;8m~\033[0m' || {
+    echo "Path segment lost the muted label / bright value styling" >&2
+    return 1
+  }
+  # With icons, the icon carries the accent and the label stays muted.
+  out_icons="$(printf '%s' "$payload" | HOME="$test_home" \
+    COPILOT_STATUSLINE_SEGMENTS='model' bash config/copilot/statusline.sh)"
+  printf '%s' "$out_icons" | grep -Fq $'\033[38;2;0;0;14m\xef\x8b\x9b \033[38;2;0;0;7mModel\033[0m' || {
+    echo "Model icon lost its aqua accent / muted label" >&2
     return 1
   }
   # Capacity suffix and ordinary separators use the dim foreground, not C_DIM.
-  printf '%s' "$out" | grep -Fq $'\033[38;2;0;0;7m/100k\033[0m' || {
+  printf '%s' "$out" | grep -Fq $'\033[38;2;0;0;7m of 100k\033[0m' || {
     echo "context capacity is not using the dim foreground role" >&2
     return 1
   }
@@ -1968,12 +1971,12 @@ SH
 80 10
 BOUNDS
 
-  # A file preserves the trailing newline of an empty last row.
+  # Default: a padding row, line 1, and line 2 (the path; no repo here).
   printf '%s' "$payload" | HOME="$test_home" bash config/copilot/statusline.sh \
     >"$test_root/default-line.txt"
   rows="$(tr -dc '\n' <"$test_root/default-line.txt" | wc -c | tr -d ' ')"
-  [ "$rows" = "4" ] || {
-    echo "default Copilot status line is no longer five rows (separators: $rows)" >&2
+  [ "$rows" = "2" ] || {
+    echo "default Copilot status line is no longer a padding row plus two lines (separators: $rows)" >&2
     return 1
   }
 
@@ -2001,7 +2004,7 @@ BOUNDS
   out="$(printf '%s' "$payload" | HOME="$old_home" \
     COPILOT_STATUSLINE_NO_ICONS=1 COPILOT_STATUSLINE_SEGMENTS='model' \
     bash config/copilot/statusline.sh)"
-  printf '%s' "$out" | grep -Fq $'\033[38;2;0;0;9mModel\033[0m \033[38;2;0;0;5mSonnet 4.5\033[0m' || {
+  printf '%s' "$out" | grep -Fq $'\033[38;2;0;0;7mModel\033[0m \033[38;2;0;0;5mSonnet 4.5\033[0m' || {
     echo "an older color include did not fall back to C_FG" >&2
     return 1
   }
