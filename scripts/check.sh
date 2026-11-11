@@ -2082,22 +2082,23 @@ SH
   ) >/dev/null
   first_current="$(readlink "$apollo_root_dir/current")"
 
-  # Installs are serialized: while another live install holds the lock, a
-  # second one changes nothing; a lock left by a dead process is taken over.
+  # Installs are serialized by a kernel lock: while a live process holds it, a
+  # second install changes nothing; the lock dies with its holder.
   apollo_before="$(readlink "$apollo_root_dir/current")"
-  mkdir "$apollo_root_dir/.install.lock"
-  sleep 300 &
+  : >"$apollo_root_dir/.install.lock"
+  perl -MFcntl=:flock -e 'open(my $f, ">>", $ARGV[0]) or die; flock($f, LOCK_EX) or die; sleep 300' \
+    "$apollo_root_dir/.install.lock" &
   apollo_holder=$!
-  printf '%s\n' "$apollo_holder" >"$apollo_root_dir/.install.lock/pid"
+  sleep 1
   if (
     export HOME="$test_home"
     export PATH="$fake_bin:$PATH"
-    export APOLLO_RELEASES_FILE="$test_root/bumped.tsv"
     export APOLLO_ROOT="$apollo_root_dir"
     export APOLLO_TEST_FIXTURES="$fixtures"
     export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
     export APOLLO_SKIP_FSH=1
     export APOLLO_LOCK_WAIT=1
+    export APOLLO_RELEASES_FILE="$test_root/bumped.tsv"
     DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
     install_apollo_themes
   ) >/dev/null 2>&1; then
@@ -2106,20 +2107,70 @@ SH
     return 1
   fi
   [ "$(readlink "$apollo_root_dir/current")" = "$apollo_before" ]
-  kill "$apollo_holder" 2>/dev/null; wait "$apollo_holder" 2>/dev/null || true
+  kill -9 "$apollo_holder" 2>/dev/null; wait "$apollo_holder" 2>/dev/null || true
   (
     export HOME="$test_home"
     export PATH="$fake_bin:$PATH"
-    export APOLLO_RELEASES_FILE="$lock"
     export APOLLO_ROOT="$apollo_root_dir"
     export APOLLO_TEST_FIXTURES="$fixtures"
     export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
     export APOLLO_SKIP_FSH=1
     export APOLLO_LOCK_WAIT=1
+    export APOLLO_RELEASES_FILE="$lock"
     DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
     install_apollo_themes
-  ) >/dev/null || { echo "Apollo install did not take over a stale lock" >&2; return 1; }
-  [ ! -e "$apollo_root_dir/.install.lock" ] || { echo "Apollo install left its lock behind" >&2; return 1; }
+  ) >/dev/null || { echo "Apollo install stayed blocked after the lock holder died" >&2; return 1; }
+
+  # A generated file edited through its consumer link marks its set as edited.
+  apollo_gen_set="$(readlink "$apollo_root_dir/current")"
+  cp "$apollo_root_dir/$apollo_gen_set/generated/claude/apollo.json" "$test_root/gen.bak"
+  printf ' ' >>"$test_home/.claude/themes/apollo.json"
+  if (
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    apollo_set_unmodified "$apollo_root_dir/$apollo_gen_set"
+  ); then
+    echo "Apollo edit guard missed an edited generated file" >&2
+    return 1
+  fi
+  cp "$test_root/gen.bak" "$apollo_root_dir/$apollo_gen_set/generated/claude/apollo.json"
+
+  # Prune never follows a symlinked sets/ or blobs/ out of the root.
+  apollo_link_root="$test_root/link-root"
+  mkdir -p "$apollo_link_root" "$test_root/outside/active" "$test_root/outside/user-project"
+  : >"$test_root/outside/active/.complete"
+  printf 'notes\n' >"$test_root/outside/user-project/notes"
+  ln -s "$test_root/outside" "$apollo_link_root/sets"
+  ln -s sets/active "$apollo_link_root/current"
+  (
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    apollo_prune "$apollo_link_root" "$lock"
+  ) >/dev/null 2>&1 || true
+  [ -f "$test_root/outside/user-project/notes" ] || { echo "Apollo prune followed a symlinked sets/ out of its root" >&2; return 1; }
+
+  # A failed publish of a new set leaves the working activation untouched.
+  apollo_before="$(readlink "$apollo_root_dir/current")"
+  mkdir -p "$fake_bin/failmv"
+  printf '#!/bin/bash\ncase "$*" in *sets/.*) exit 1 ;; esac\nexec /bin/mv "$@"\n' >"$fake_bin/failmv/mv"
+  chmod +x "$fake_bin/failmv/mv"
+  awk -F '\t' 'BEGIN { OFS="\t" } $1 == "eza" { $4 = "eza-v1.0.3" } { print }' "$lock" >"$test_root/bumped4.tsv"
+  if (
+    export HOME="$test_home"
+    export PATH="$fake_bin:$PATH"
+    export APOLLO_ROOT="$apollo_root_dir"
+    export APOLLO_TEST_FIXTURES="$fixtures"
+    export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+    export APOLLO_SKIP_FSH=1
+    export APOLLO_LOCK_WAIT=1
+    export PATH="$fake_bin/failmv:$PATH"
+    export APOLLO_RELEASES_FILE="$test_root/bumped4.tsv"
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    install_apollo_themes
+  ) >/dev/null 2>&1; then
+    echo "Apollo install reported success after failing to publish its set" >&2
+    return 1
+  fi
+  [ "$(readlink "$apollo_root_dir/current")" = "$apollo_before" ] || { echo "Apollo switched to a set it failed to publish" >&2; return 1; }
+  [ -d "$apollo_root_dir/$apollo_before" ]
 
   # App tags are bound to their own row: <id>-vX.Y.Z. The palette keeps vX.Y.Z.
   local tag_case tag_lock

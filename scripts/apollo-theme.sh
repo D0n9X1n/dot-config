@@ -459,9 +459,11 @@ apollo_build_bundle() {
   apollo_generate_claude_theme "${stage}/palette/apollo.json" "${stage}/generated/claude/apollo.json"
   (
     cd "$stage" || exit 1
-    for file in palette/apollo.json sonicterm/apollo.toml rmux/apollo-rmux.conf tmux/apollo.tmux eza/theme.yml; do
-      printf '%s  %s\n' "$(apollo_sha256 "$file")" "$file"
-    done
+    # Every file, including generated ones the consumer links point to.
+    find . -type f ! -name SHA256SUMS ! -name .complete | sed 's#^\./##' | LC_ALL=C sort | \
+      while IFS= read -r file; do
+        printf '%s  %s\n' "$(apollo_sha256 "$file")" "$file"
+      done
   ) >"${stage}/SHA256SUMS" || return 1
   : >"${stage}/.complete"
   apollo_validate_bundle "$stage" "$lock"
@@ -629,7 +631,8 @@ apollo_prune() {
     sets/*) ;;
     *) return 0 ;;
   esac
-  [ -d "${root}/${current_set}" ] && [ -f "${root}/${current_set}/.complete" ] || return 0
+  [ -d "${root}/sets" ] && [ ! -L "${root}/sets" ] || return 0
+  [ -d "${root}/${current_set}" ] && [ ! -L "${root}/${current_set}" ] && [ -f "${root}/${current_set}/.complete" ] || return 0
 
   for entry in "${root}"/sets/* "${root}"/sets/.[!.]*; do
     [ -e "$entry" ] || [ -L "$entry" ] || continue
@@ -673,29 +676,25 @@ apollo_prune() {
 }
 
 # One install at a time: build, switch and prune share the Apollo root. The
-# lock is a directory (atomic mkdir) holding the owner's PID; a lock whose
-# owner is gone is taken over.
+# lock is a kernel flock on fd 8, taken by perl on the shell's own open file,
+# so it is held until this shell closes fd 8 or exits, even on SIGKILL. No
+# stale-lock cleanup is needed, so there is no takeover race.
 apollo_lock_acquire() {
-  local root="$1" lockdir="$1/.install.lock" waited=0 owner
-  mkdir -p "$root"
-  while ! mkdir "$lockdir" 2>/dev/null; do
-    owner="$(cat "${lockdir}/pid" 2>/dev/null || true)"
-    if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
-      rm -rf -- "$lockdir"
-      continue
-    fi
-    if [ "$waited" -ge "${APOLLO_LOCK_WAIT:-60}" ]; then
-      printf 'Error: another Apollo install is running (%s); try again later.\n' "$lockdir" >&2
-      return 1
-    fi
-    sleep 1
-    waited=$((waited + 1))
-  done
-  printf '%s\n' "$$" >"${lockdir}/pid"
+  local root="$1"
+  mkdir -p "$root" || return 1
+  exec 8>>"${root}/.install.lock" || return 1
+  if ! perl -MFcntl=:flock -e '
+      open(my $f, ">&=", 8) or exit 2;
+      for (0 .. $ARGV[0]) { exit 0 if flock($f, LOCK_EX | LOCK_NB); sleep 1 }
+      exit 1' "${APOLLO_LOCK_WAIT:-60}"; then
+    exec 8>&-
+    printf 'Error: another Apollo install is running (%s); try again later.\n' "${root}/.install.lock" >&2
+    return 1
+  fi
 }
 
 apollo_lock_release() {
-  rm -rf -- "$1/.install.lock"
+  exec 8>&-
 }
 
 install_apollo_themes() {
@@ -721,18 +720,22 @@ apollo_install_locked() {
 
   lock_hash="$(apollo_bundle_hash "$lock")" || return 1
   final="${root}/sets/${lock_hash}"
-  mkdir -p "${root}/sets" "${root}/blobs"
+  mkdir -p "${root}/sets" "${root}/blobs" || return 1
   if ! apollo_validate_bundle "$final" "$lock" >/dev/null 2>&1; then
     if [ -e "$final" ]; then
       printf 'Error: existing Apollo release set is incomplete or corrupt: %s\n' "$final" >&2
       return 1
     fi
-    stage="$(mktemp -d "${root}/sets/.${lock_hash}.XXXXXX")"
+    stage="$(mktemp -d "${root}/sets/.${lock_hash}.XXXXXX")" || return 1
     if ! apollo_build_bundle "$stage" "$lock"; then
       rm -rf "$stage"
       return 1
     fi
-    mv "$stage" "$final"
+    if ! mv "$stage" "$final"; then
+      rm -rf -- "$stage"
+      printf 'Error: could not publish Apollo set %s.\n' "$final" >&2
+      return 1
+    fi
   fi
 
   apollo_install_fsh_base16 "$root" || return 1
