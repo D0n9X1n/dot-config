@@ -630,7 +630,8 @@ apollo_set_unmodified() {
       awk -v f="$file" '$2 == f { found = 1 } END { exit !found }' SHA256SUMS || printf '%s\n' "$file"
     done)"
   [ -z "$unlisted" ] && return 0
-  printf '%s\n' "$unlisted" | grep -qv '^generated/' && return 1
+  # Only the files apollo_build_bundle generates may be unlisted.
+  printf '%s\n' "$unlisted" | grep -qvxE 'generated/(statusline-colors\.sh|zsh-colors\.zsh|claude/apollo\.json)' && return 1
   apollo_validate_generated "$set" >/dev/null 2>&1
 }
 
@@ -687,30 +688,35 @@ apollo_prune() {
 }
 
 # One install at a time: build, switch and prune share the Apollo root. The
-# lock is a kernel flock on fd 8, taken by perl on the shell's own open file,
-# so it is held until this shell closes fd 8 or exits, even on SIGKILL. No
-# stale-lock cleanup is needed, so there is no takeover race.
+# lock is a kernel flock on fd 8, taken by perl on the shell's own open file
+# `.install.flock`, so it is held until this shell closes fd 8 or exits, even
+# on SIGKILL. That file is never unlinked: two installs always contend for
+# the same inode, so there is no stale-lock takeover and no race.
 apollo_lock_acquire() {
   local root="$1" owner
   mkdir -p "$root" || return 1
-  # The previous lock was a directory holding the owner's PID. Remove one
-  # whose owner is gone; honor one whose owner still runs.
-  if [ -d "${root}/.install.lock" ] && [ ! -L "${root}/.install.lock" ]; then
-    owner="$(cat "${root}/.install.lock/pid" 2>/dev/null || true)"
-    if [ -n "$owner" ] && kill -0 "$owner" 2>/dev/null; then
-      printf 'Error: another Apollo install is running (%s); try again later.\n' "${root}/.install.lock" >&2
-      return 1
-    fi
-    rm -rf -- "${root}/.install.lock"
-  fi
-  exec 8>>"${root}/.install.lock" || return 1
+  exec 8>>"${root}/.install.flock" || return 1
   if ! perl -MFcntl=:flock -e '
       open(my $f, ">&=", 8) or exit 2;
       for (0 .. $ARGV[0]) { exit 0 if flock($f, LOCK_EX | LOCK_NB); sleep 1 }
       exit 1' "${APOLLO_LOCK_WAIT:-60}"; then
     exec 8>&-
-    printf 'Error: another Apollo install is running (%s); try again later.\n' "${root}/.install.lock" >&2
+    printf 'Error: another Apollo install is running (%s); try again later.\n' "${root}/.install.flock" >&2
     return 1
+  fi
+  # The previous lock was the directory `.install.lock` holding the owner's
+  # PID. Handle it only while holding the flock: honor a live owner, remove
+  # one whose owner is gone.
+  if [ -d "${root}/.install.lock" ] && [ ! -L "${root}/.install.lock" ]; then
+    owner="$(cat "${root}/.install.lock/pid" 2>/dev/null || true)"
+    if [ -n "$owner" ] && kill -0 "$owner" 2>/dev/null; then
+      exec 8>&-
+      printf 'Error: another Apollo install is running (%s); try again later.\n' "${root}/.install.lock" >&2
+      return 1
+    fi
+    rm -rf -- "${root}/.install.lock"
+  elif [ -f "${root}/.install.lock" ] && [ ! -L "${root}/.install.lock" ] && [ ! -s "${root}/.install.lock" ]; then
+    rm -f -- "${root}/.install.lock"
   fi
 }
 

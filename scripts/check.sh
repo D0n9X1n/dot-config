@@ -2085,9 +2085,9 @@ SH
   # Installs are serialized by a kernel lock: while a live process holds it, a
   # second install changes nothing; the lock dies with its holder.
   apollo_before="$(readlink "$apollo_root_dir/current")"
-  : >"$apollo_root_dir/.install.lock"
+  : >"$apollo_root_dir/.install.flock"
   perl -MFcntl=:flock -e 'open(my $f, ">>", $ARGV[0]) or die; flock($f, LOCK_EX) or die; sleep 300' \
-    "$apollo_root_dir/.install.lock" &
+    "$apollo_root_dir/.install.flock" &
   apollo_holder=$!
   sleep 1
   if (
@@ -2196,11 +2196,27 @@ SH
   [ ! -e "$apollo_root_dir/sets/1111111111111111111111111111111111111111111111111111111111111111" ] || { echo "Apollo kept an unedited old-format set" >&2; return 1; }
   [ -d "$apollo_root_dir/sets/2222222222222222222222222222222222222222222222222222222222222222" ] || { echo "Apollo pruned an old-format set with an edited generated file" >&2; return 1; }
   rm -rf -- "$apollo_root_dir/sets/2222222222222222222222222222222222222222222222222222222222222222"
+  # An extra file under generated/ that the build never writes is user work.
+  apollo_cur="$(readlink "$apollo_root_dir/current")"
+  cp -R "$apollo_root_dir/$apollo_cur" "$apollo_root_dir/sets/3333333333333333333333333333333333333333333333333333333333333333"
+  grep -E '  (palette|sonicterm|rmux|tmux|eza)/' "$apollo_root_dir/$apollo_cur/SHA256SUMS" \
+    >"$apollo_root_dir/sets/3333333333333333333333333333333333333333333333333333333333333333/SHA256SUMS"
+  printf 'my notes\n' >"$apollo_root_dir/sets/3333333333333333333333333333333333333333333333333333333333333333/generated/notes.txt"
+  (
+    export HOME="$test_home"
+    export APOLLO_ROOT="$apollo_root_dir"
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    apollo_prune "$apollo_root_dir" "$lock"
+  ) >/dev/null
+  [ -f "$apollo_root_dir/sets/3333333333333333333333333333333333333333333333333333333333333333/generated/notes.txt" ] || {
+    echo "Apollo pruned a set holding an extra file under generated/" >&2
+    return 1
+  }
+  rm -rf -- "$apollo_root_dir/sets/3333333333333333333333333333333333333333333333333333333333333333"
 
   # A directory lock left by the previous lock format: removed when its owner
   # is gone, honored while its owner lives.
-  mkdir "$apollo_root_dir/.install.lock.dirtest" && rmdir "$apollo_root_dir/.install.lock.dirtest"
-  rm -f -- "$apollo_root_dir/.install.lock"
+  apollo_flock_inode="$(ls -i "$apollo_root_dir/.install.flock" | awk '{print $1}')"
   mkdir "$apollo_root_dir/.install.lock"
   sleep 300 &
   apollo_holder=$!
@@ -2234,7 +2250,62 @@ SH
     DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
     install_apollo_themes
   ) >/dev/null 2>&1 || { echo "Apollo install stayed blocked by a dead old-format directory lock" >&2; return 1; }
-  [ -f "$apollo_root_dir/.install.lock" ] || { echo "Apollo did not replace the old-format directory lock" >&2; return 1; }
+  [ ! -e "$apollo_root_dir/.install.lock" ] || { echo "Apollo did not remove the old-format directory lock" >&2; return 1; }
+  # An empty file there (an interim lock format) is removed too.
+  : >"$apollo_root_dir/.install.lock"
+  (
+    export HOME="$test_home"
+    export PATH="$fake_bin:$PATH"
+    export APOLLO_ROOT="$apollo_root_dir"
+    export APOLLO_TEST_FIXTURES="$fixtures"
+    export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+    export APOLLO_SKIP_FSH=1
+    export APOLLO_RELEASES_FILE="$lock"
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    install_apollo_themes
+  ) >/dev/null
+  [ ! -e "$apollo_root_dir/.install.lock" ] || { echo "Apollo left an empty old lock file" >&2; return 1; }
+  # The kernel lock file is never unlinked, so concurrent installs always
+  # contend for the same inode (unlinking it let two installs both win).
+  [ "$(ls -i "$apollo_root_dir/.install.flock" | awk '{print $1}')" = "$apollo_flock_inode" ] || {
+    echo "Apollo replaced its lock file; concurrent installs could both acquire it" >&2
+    return 1
+  }
+
+  # Two installs that both find a dead old-format lock still run one at a time.
+  mkdir "$apollo_root_dir/.install.lock"
+  printf '999999\n' >"$apollo_root_dir/.install.lock/pid"
+  for apollo_n in 1 2; do
+    (
+      export HOME="$test_home"
+      export PATH="$fake_bin:$PATH"
+      export APOLLO_ROOT="$apollo_root_dir"
+      export APOLLO_TEST_FIXTURES="$fixtures"
+      export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+      export APOLLO_SKIP_FSH=1
+      export APOLLO_LOCK_WAIT=30
+      export APOLLO_RELEASES_FILE="$([ "$apollo_n" = 1 ] && echo "$lock" || echo "$test_root/bumped.tsv")"
+      DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+      install_apollo_themes
+    ) >"$test_root/race-$apollo_n.out" 2>&1 &
+  done
+  wait
+  apollo_now="$(readlink "$apollo_root_dir/current")"
+  [ -d "$apollo_root_dir/$apollo_now" ] && [ -f "$apollo_root_dir/$apollo_now/.complete" ] || {
+    echo "Apollo concurrent installs left current dangling" >&2
+    return 1
+  }
+  (
+    export HOME="$test_home"
+    export PATH="$fake_bin:$PATH"
+    export APOLLO_ROOT="$apollo_root_dir"
+    export APOLLO_TEST_FIXTURES="$fixtures"
+    export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+    export APOLLO_SKIP_FSH=1
+    export APOLLO_RELEASES_FILE="$lock"
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    install_apollo_themes
+  ) >/dev/null
 
   # App tags are bound to their own row: <id>-vX.Y.Z. The palette keeps vX.Y.Z.
   local tag_case tag_lock
