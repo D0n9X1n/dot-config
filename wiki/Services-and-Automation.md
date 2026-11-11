@@ -35,9 +35,9 @@ The install log is `~/Library/Logs/dot-configs-install.log`.
 
 ## Apollo release bundle
 
-`scripts/apollo-releases.tsv` pins exact upstream tags and SHA-256 values. The installer reuses verified local blobs, builds all files under one bundle hash derived from the release lock and adapter code, and changes the `current` symlink only after the complete set validates. A second install uses the existing bundle without downloading or rewriting it.
+`scripts/apollo-releases.tsv` pins exact upstream release tags. The installer caches each download by repository, tag, and artifact with the SHA-256 it had when downloaded, reuses it only while it still matches, builds all files under one bundle hash derived from the release lock and adapter code, and changes the `current` symlink only after the complete set validates. A second install uses the existing bundle without downloading or rewriting it.
 
-A first install needs network access. Later installs work offline while the pinned blobs remain under `~/.local/share/dot-configs/apollo/`. A failed download or checksum keeps the previous bundle active. See [Apollo theme](Apollo-Theme.md).
+A first install needs network access. Later installs work offline while the pinned blobs remain under `~/.local/share/dot-configs/apollo/`. A failed download, or a cached file that changed on disk and cannot be fetched again, keeps the previous bundle active. See [Apollo theme](Apollo-Theme.md).
 
 ## Multiplexer lifetime
 

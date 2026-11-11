@@ -1,9 +1,9 @@
 # dot-configs
 
-[![CI](https://github.com/D0n9X1n/dot-config/actions/workflows/ci.yml/badge.svg)](https://github.com/D0n9X1n/dot-config/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/D0n9X1n/dot-config?sort=semver&color=fe8019)](https://github.com/D0n9X1n/dot-config/releases/latest)
+[![CI](https://github.com/MOSconfig/dot-config/actions/workflows/ci.yml/badge.svg)](https://github.com/MOSconfig/dot-config/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/MOSconfig/dot-config?sort=semver&color=fe8019)](https://github.com/MOSconfig/dot-config/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-macOS-1d2021?logo=apple&logoColor=ebdbb2)](#)
-[![License](https://img.shields.io/github/license/D0n9X1n/dot-config?color=b8bb26)](./LICENSE)
+[![License](https://img.shields.io/github/license/MOSconfig/dot-config?color=b8bb26)](./LICENSE)
 
 My macOS config for native tmux with the Apollo style, plus SonicTerm, zsh, Claude Code, and GitHub Copilot CLI. RMUX config stays for Windows only.
 
@@ -21,7 +21,7 @@ local/    your own files; upstream never tracks it
 ## Install
 
 ```sh
-git clone git@github.com:D0n9X1n/dot-config.git ~/Public/dot-configs
+git clone git@github.com:MOSconfig/dot-config.git ~/Public/dot-configs
 cd ~/Public/dot-configs
 ./install.sh
 npx copilot-relay auth
@@ -57,7 +57,7 @@ scripts/check.sh all
 
 ## Full help
 
-Read the [GitHub Wiki](https://github.com/D0n9X1n/dot-config/wiki).
+Read the [GitHub Wiki](https://github.com/MOSconfig/dot-config/wiki).
 
 The reviewable source is in `wiki/`. It has English and Simplified Chinese pages.
 

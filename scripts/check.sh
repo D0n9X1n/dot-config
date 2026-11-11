@@ -595,7 +595,7 @@ run_global_instructions_smoke() {
       'scripts/check.sh' \
       '-zh-CN' \
       'root README' \
-      'D0n9X1n/dot-config'; do
+      'MOSconfig/dot-config'; do
       if grep -Fq -e "$pattern" "$file"; then
         echo "$file must not carry repo-only directive: $pattern" >&2
         return 1
@@ -1750,12 +1750,12 @@ PY
   printf 'colourful: true\n' >"$fixtures/theme.yml"
 
   {
-    printf '# id\tkind\trepository\ttag\tartifact\tsha256\n'
-    printf 'palette\traw\texample/apollo-theme\tv1.0.0\tpalette/apollo.json\t%s\n' "$(shasum -a 256 "$fixtures/palette.json" | awk '{print $1}')"
-    printf 'sonicterm\trelease\texample/sonicterm-apollo-theme\tv1.0.0\tapollo.toml\t%s\n' "$(shasum -a 256 "$fixtures/apollo.toml" | awk '{print $1}')"
-    printf 'rmux\trelease\texample/rmux-apollo-theme\tv1.0.0\tapollo-rmux.conf\t%s\n' "$(shasum -a 256 "$fixtures/apollo-rmux.conf" | awk '{print $1}')"
-    printf 'tmux\trelease\texample/tmux-apollo-theme\tv1.0.0\tapollo.tmux\t%s\n' "$(shasum -a 256 "$fixtures/apollo.tmux" | awk '{print $1}')"
-    printf 'eza\trelease\texample/eza-apollo-theme\tv1.0.0\ttheme.yml\t%s\n' "$(shasum -a 256 "$fixtures/theme.yml" | awk '{print $1}')"
+    printf '# id\tkind\trepository\ttag\tartifact\n'
+    printf 'palette\traw\texample/apollo-theme\tv1.0.0\tpalette/apollo.json\n'
+    printf 'sonicterm\trelease\texample/apollo-theme\tsonicterm-v1.0.0\tapollo.toml\n'
+    printf 'rmux\trelease\texample/apollo-theme\trmux-v1.0.0\tapollo-rmux.conf\n'
+    printf 'tmux\trelease\texample/apollo-theme\ttmux-v1.0.0\tapollo.tmux\n'
+    printf 'eza\trelease\texample/apollo-theme\teza-v1.0.0\ttheme.yml\n'
   } >"$lock"
 
   cat >"$fake_bin/curl" <<'SH'
@@ -1873,22 +1873,160 @@ SH
   [ "$first_current" = "$(readlink "$test_home/.local/share/dot-configs/apollo/current")" ]
   [ -z "$(find "$test_home" -name '*.bak.*' -print)" ]
 
+  # The lock pins tags only: a sixth (checksum) column is rejected.
   awk -F '\t' 'BEGIN { OFS="\t" } $1 == "palette" { $6 = "0000000000000000000000000000000000000000000000000000000000000000" } { print }' \
     "$lock" >"$bad_lock"
   if (
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    apollo_validate_lock "$bad_lock"
+  ) >/dev/null 2>&1; then
+    echo "Apollo lock validator accepted a checksum column" >&2
+    return 1
+  fi
+
+  # Bumping a tag downloads that release again; the cache is keyed by tag.
+  awk -F '\t' 'BEGIN { OFS="\t" } $1 == "tmux" { $4 = "tmux-v1.0.1" } { print }' "$lock" >"$test_root/bumped.tsv"
+  curl_count_before="$(wc -l <"$test_root/curl.log" | tr -d ' ')"
+  (
     export HOME="$test_home"
     export PATH="$fake_bin:$PATH"
-    export APOLLO_RELEASES_FILE="$bad_lock"
+    export APOLLO_RELEASES_FILE="$test_root/bumped.tsv"
     export APOLLO_ROOT="$test_home/.local/share/dot-configs/apollo"
     export APOLLO_TEST_FIXTURES="$fixtures"
     export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
     export APOLLO_SKIP_FSH=1
     DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
     install_apollo_themes
+  ) >/dev/null
+  [ "$(tail -n +$((curl_count_before + 1)) "$test_root/curl.log")" = "https://github.com/example/apollo-theme/releases/download/tmux-v1.0.1/apollo.tmux" ] || {
+    echo "Apollo tag bump did not download exactly the bumped release" >&2
+    return 1
+  }
+  [ "$(readlink "$test_home/.local/share/dot-configs/apollo/current")" != "$first_current" ]
+  # A cached download that no longer matches its download-time record is
+  # fetched again, and a set whose files changed is not reused.
+  apollo_blob="$(find "$test_home/.local/share/dot-configs/apollo/blobs" -path '*sonicterm-v1.0.0*' -name apollo.toml -type f | head -n 1)"
+  [ -n "$apollo_blob" ]
+  printf 'name = "Apollo\n' >"$apollo_blob"
+  apollo_set_file="$test_home/.local/share/dot-configs/apollo/$first_current/sonicterm/apollo.toml"
+  printf 'name = "Apollo\n' >"$apollo_set_file"
+  if (
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    apollo_validate_bundle "$test_home/.local/share/dot-configs/apollo/$first_current" "$lock"
   ) >/dev/null 2>&1; then
-    echo "Apollo installer accepted a checksum mismatch" >&2
+    echo "Apollo bundle validation accepted a modified file" >&2
     return 1
   fi
+  awk -F '\t' 'BEGIN { OFS="\t" } $1 == "rmux" { $4 = "rmux-v1.0.1" } { print }' "$lock" >"$test_root/bumped2.tsv"
+  curl_count_before="$(wc -l <"$test_root/curl.log" | tr -d ' ')"
+  (
+    export HOME="$test_home"
+    export PATH="$fake_bin:$PATH"
+    export APOLLO_RELEASES_FILE="$test_root/bumped2.tsv"
+    export APOLLO_ROOT="$test_home/.local/share/dot-configs/apollo"
+    export APOLLO_TEST_FIXTURES="$fixtures"
+    export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+    export APOLLO_SKIP_FSH=1
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    install_apollo_themes
+  ) >/dev/null
+  tail -n +$((curl_count_before + 1)) "$test_root/curl.log" | grep -Fxq 'https://github.com/example/apollo-theme/releases/download/sonicterm-v1.0.0/apollo.toml' || {
+    echo "Apollo reused a corrupt cached download" >&2
+    return 1
+  }
+  cmp -s "$fixtures/apollo.toml" "$test_home/.local/share/dot-configs/apollo/current/sonicterm/apollo.toml"
+
+  # Distinct artifact paths never share a cache entry.
+  (
+    export APOLLO_ROOT="$test_root/cache-key"
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    a="$(apollo_blob_path example/apollo-theme v1.0.0 palette/apollo.json)"
+    b="$(apollo_blob_path example/apollo-theme v1.0.0 palette_apollo.json)"
+    [ "$a" != "$b" ]
+  ) || { echo "Apollo cache keys collide for distinct artifacts" >&2; return 1; }
+
+  # A trailing empty column still counts as a sixth field.
+  awk 'BEGIN { OFS="" } $1 == "palette" { print $0, "\t"; next } { print }' "$lock" >"$test_root/trailing.tsv"
+  if (
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    apollo_validate_lock "$test_root/trailing.tsv"
+  ) >/dev/null 2>&1; then
+    echo "Apollo lock validator accepted an empty sixth column" >&2
+    return 1
+  fi
+
+  # A malformed earlier row cannot hide a trailing sixth column.
+  { printf '\t\n'; cat "$test_root/trailing.tsv"; } >"$test_root/trailing2.tsv"
+  if (
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    apollo_validate_lock "$test_root/trailing2.tsv"
+  ) >/dev/null 2>&1; then
+    echo "Apollo lock validator accepted a sixth column after an empty-id row" >&2
+    return 1
+  fi
+
+  # Repository names cannot walk out of the cache root.
+  for bad_repo in '../..' 'apollo-theme/..' './apollo-theme' 'apollo-theme/.'; do
+    awk -F '\t' -v repo="$bad_repo" 'BEGIN { OFS="\t" } $1 == "sonicterm" { $3 = repo } { print }' "$lock" >"$test_root/repo.tsv"
+    if (
+      DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+      apollo_validate_lock "$test_root/repo.tsv"
+    ) >/dev/null 2>&1; then
+      echo "Apollo lock validator accepted repository: $bad_repo" >&2
+      return 1
+    fi
+  done
+
+  # Restore the first set for the switch-back check below.
+  (
+    export HOME="$test_home"
+    export PATH="$fake_bin:$PATH"
+    export APOLLO_RELEASES_FILE="$lock"
+    export APOLLO_ROOT="$test_home/.local/share/dot-configs/apollo"
+    export APOLLO_TEST_FIXTURES="$fixtures"
+    export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+    export APOLLO_SKIP_FSH=1
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    rm -rf "$APOLLO_ROOT/$first_current"
+    install_apollo_themes
+  ) >/dev/null
+  first_current="$(readlink "$test_home/.local/share/dot-configs/apollo/current")"
+
+  # Switching back to the original lock reuses its cached set without downloading.
+  curl_count_before="$(wc -l <"$test_root/curl.log" | tr -d ' ')"
+  (
+    export HOME="$test_home"
+    export PATH="$fake_bin:$PATH"
+    export APOLLO_RELEASES_FILE="$lock"
+    export APOLLO_ROOT="$test_home/.local/share/dot-configs/apollo"
+    export APOLLO_TEST_FIXTURES="$fixtures"
+    export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+    export APOLLO_SKIP_FSH=1
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    install_apollo_themes
+  ) >/dev/null
+  [ "$(wc -l <"$test_root/curl.log" | tr -d ' ')" = "$curl_count_before" ]
+  [ "$(readlink "$test_home/.local/share/dot-configs/apollo/current")" = "$first_current" ]
+
+  # App tags are bound to their own row: <id>-vX.Y.Z. The palette keeps vX.Y.Z.
+  local tag_case tag_lock
+  for tag_case in 'tmux v1.0.0' 'tmux rmux-v1.0.0' 'tmux tmux-v1' 'palette palette-v1.0.0'; do
+    tag_lock="$test_root/tag-case.tsv"
+    awk -F '\t' -v id="${tag_case%% *}" -v tag="${tag_case#* }" \
+      'BEGIN { OFS="\t" } $1 == id { $4 = tag } { print }' "$lock" >"$tag_lock"
+    if (
+      DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+      apollo_validate_lock "$tag_lock"
+    ) >/dev/null 2>&1; then
+      echo "Apollo lock validator accepted tag case: $tag_case" >&2
+      return 1
+    fi
+  done
+  apollo_validate_lock_real="$(DOT_CONFIGS_INSTALL_LIB_ONLY=1 bash -c 'source install.sh; apollo_validate_lock scripts/apollo-releases.tsv && echo ok' 2>&1)"
+  [ "$apollo_validate_lock_real" = ok ] || {
+    echo "Apollo lock validator rejected scripts/apollo-releases.tsv: $apollo_validate_lock_real" >&2
+    return 1
+  }
   [ "$first_current" = "$(readlink "$test_home/.local/share/dot-configs/apollo/current")" ]
 
   out="$(printf '{}' | HOME="$test_home" bash config/claude/statusline.sh)"
@@ -3578,7 +3716,7 @@ run_herdr_smoke() {
     got="$(git config -f .gitmodules --get submodule.config/herdr.path)" || { echo "herdr: no config/herdr submodule in .gitmodules" >&2; exit 1; }
     [ "$got" = config/herdr ] || { echo "herdr: submodule path is $got" >&2; exit 1; }
     got="$(git config -f .gitmodules --get submodule.config/herdr.url)"
-    [ "$got" = https://github.com/D0n9X1n/herdr-config.git ] || { echo "herdr: submodule url is $got" >&2; exit 1; }
+    [ "$got" = https://github.com/MOSconfig/herdr-config.git ] || { echo "herdr: submodule url is $got" >&2; exit 1; }
     got="$(git config -f .gitmodules --get submodule.config/herdr.ignore || true)"
     [ "$got" = dirty ] || { echo "herdr: submodule ignore is '$got', want dirty" >&2; exit 1; }
     [ "$(git ls-files -s config/herdr | awk '{print $1}')" = 160000 ] || { echo "herdr: config/herdr is not a gitlink" >&2; exit 1; }

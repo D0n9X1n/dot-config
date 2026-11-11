@@ -2,7 +2,7 @@
 
 [English](Herdr.md) | 简体中文
 
-本页介绍终端工作区应用的 Apollo 布局。应用是 **Apollo.app**：它是 [Herdr](https://herdr.dev) 的改名副本，已取代 Herdr.app。它读取 Herdr 的设置目录 `~/.config/herdr-app`，所以下面的内容仍然安装到那里。布局放在独立的公开仓库 [herdr-config](https://github.com/D0n9X1n/herdr-config) 中。本仓库把它作为 Git 子模块固定在 `config/herdr`。
+本页介绍终端工作区应用的 Apollo 布局。应用是 **Apollo.app**：它是 [Herdr](https://herdr.dev) 的改名副本，已取代 Herdr.app。它读取 Herdr 的设置目录 `~/.config/herdr-app`，所以下面的内容仍然安装到那里。布局放在独立的公开仓库 [herdr-config](https://github.com/MOSconfig/herdr-config) 中。本仓库把它作为 Git 子模块固定在 `config/herdr`。
 
 ## 安装做什么
 

@@ -80,9 +80,9 @@ type<TAB>source<TAB>home destination
 
 ## 外部主题文件
 
-Apollo 主题文件不保存在 Git 中，也不作为 manifest source。`scripts/apollo-releases.tsv` 固定精确的上游 tag 和 SHA-256。`install.sh` 验证这些文件，在 `~/.local/share/dot-configs/apollo/` 下构建完整本机 set，再把 SonicTerm、RMUX、原生 tmux、eza 和 Claude 的生效主题路径链接到该 set。
+Apollo 主题文件不保存在 Git 中，也不作为 manifest source。`scripts/apollo-releases.tsv` 固定精确的上游 release tag。`install.sh` 下载这些文件，在 `~/.local/share/dot-configs/apollo/` 下构建完整本机 set，再把 SonicTerm、RMUX、原生 tmux、eza 和 Claude 的生效主题路径链接到该 set。
 
-状态栏、shell prompt 和 Claude 主题的生成文件，是从已验证规范 palette 派生的本机运行状态。下载失败或 checksum 不匹配时，不会替换当前 set。请看 [Apollo 主题](Apollo-Theme-zh-CN.md)。
+状态栏、shell prompt 和 Claude 主题的生成文件，是从规范 palette 派生的本机运行状态。下载失败时，不会替换当前 set。请看 [Apollo 主题](Apollo-Theme-zh-CN.md)。
 
 ## 安全链接
 
@@ -174,7 +174,7 @@ Claude 的 local scope 条目位于 `~/.claude.json` 的 `projects[].mcpServers`
 这些路径是本机状态，不是配置源：
 
 - `~/.claude.json` — Claude onboarding、允许项、选中的 Apollo 主题、项目状态和 MCP 状态
-- `~/.local/share/dot-configs/apollo/` — 已验证 Apollo releases 和生成的运行 adapters
+- `~/.local/share/dot-configs/apollo/` — 已下载的 Apollo releases 和生成的运行 adapters
 - `~/.copilot-relay/github_token` — relay 认证
 - `~/.copilot-relay/copilot_token.json` — relay token cache
 - `~/.copilot-relay/logs/` — relay 日志

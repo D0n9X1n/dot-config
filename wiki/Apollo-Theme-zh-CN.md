@@ -4,16 +4,16 @@
 
 Apollo 是当前终端、multiplexer、shell、CLI 状态栏和文件列表共享的主题。
 
-规范 palette 和应用 adapters 位于 [Apollo Theme organization](https://github.com/apollo-theme)。本仓库不保存 palette 值或生成的主题文件。
+规范 palette 和应用 adapters 位于 [Apollo Theme monorepo](https://github.com/apollo-theme/apollo-theme)。本仓库不保存 palette 值或生成的主题文件。
 
 ## 生效范围
 
 | 范围 | 来源 |
 |---|---|
-| SonicTerm | 带 tag 的 `sonicterm-apollo-theme` release asset |
-| RMUX | 带 tag 的 `rmux-apollo-theme` release asset |
-| 原生 tmux | `apollo-theme/tmux-apollo-theme` v0.1.0 release asset `apollo.tmux` |
-| eza | 带 tag 的 `eza-apollo-theme` release asset |
+| SonicTerm | `apollo-theme/apollo-theme` 的 `sonicterm-v0.2.1` release asset `apollo.toml` |
+| RMUX | `apollo-theme/apollo-theme` 的 `rmux-v0.2.1` release asset `apollo-rmux.conf` |
+| 原生 tmux | `apollo-theme/apollo-theme` 的 `tmux-v0.2.1` release asset `apollo.tmux` |
+| eza | `apollo-theme/apollo-theme` 的 `eza-v0.2.1` release asset `theme.yml` |
 | Claude Code UI | 从带 tag 的规范 palette 在本机生成 |
 | Claude 与 Copilot 状态栏 | 从规范 palette 生成一个本机共享 include |
 | Oh My Zsh prompt（可选） | 结构在本仓库；颜色在本机生成；仅通过 `.zshrc` 选择 |
@@ -26,7 +26,9 @@ Neovim 在另一个仓库中管理。本安装器不会修改 Neovim 配置、pl
 
 ## Release lock
 
-`scripts/apollo-releases.tsv` 固定每个上游仓库、tag、artifact 和 SHA-256。各子项目版本互相独立；不要根据规范 palette release 推断它们的 tag。
+`scripts/apollo-releases.tsv` 固定每个上游仓库、tag 和 artifact。它不记录 checksum：已发布的 `<id>-vX.Y.Z` release 就是版本。所有行都使用 `apollo-theme/apollo-theme` monorepo。palette 使用 `vX.Y.Z` tag；每个应用使用自己的 `<id>-vX.Y.Z` release，验证器会拒绝其他应用的 tag。各应用版本互相独立；不要根据 palette release 推断它们的 tag。
+
+更新某个应用时，在 [releases 页面](https://github.com/apollo-theme/apollo-theme/releases) 选它最新的 `<id>-vX.Y.Z` release，把该 tag 写进对应行。`scripts/check.sh apollo-online` 会下载每个固定的文件。
 
 安装器下载精确 tag 文件。它不跟踪 `main`，也不查询 `latest`。维护者可以在线检查发布文件：
 
@@ -48,7 +50,7 @@ scripts/check.sh apollo-online
   fsh/
 ```
 
-Bundle hash 包含 release lock 和 adapter code。安装器会先验证每个下载，再创建完整 set；所有 release 文件和生成 adapters 都通过检查后，才切换 `current`。有效 bundle 可以离线使用。下载失败或 checksum 不匹配时，旧 bundle 保持生效。
+Bundle hash 包含 release lock 和 adapter code。下载按仓库、tag 和 artifact 缓存：新 tag 只下载一次，未改变的 tag 不会再下载。每个缓存文件和每个构建好的 set 都记录写入时的 SHA-256；之后在本机被改动的文件会重新下载或重建，不会被复用。这些记录只用于发现本机改动；lock 固定的是 tag，不是 checksum。安装器先创建完整 set；所有 release 文件和生成 adapters 都通过检查后，才切换 `current`。有效 bundle 可以离线使用。下载失败时，旧 bundle 保持生效。
 
 使用者链接到 `current`：
 
@@ -71,12 +73,11 @@ Bundle hash 包含 release lock 和 adapter code。安装器会先验证每个�
 更新 Apollo：
 
 1. 在对应 Apollo 仓库中检查新 release。
-2. 只修改 `scripts/apollo-releases.tsv` 中对应的一行。
-3. 更新 SHA-256。
-4. 运行 `scripts/check.sh apollo-online`。
-5. 运行 `scripts/check.sh all`。
-6. 运行两次 `./install.sh`。
-7. 准备好后重载 SonicTerm，再启动新的 Claude 与 Copilot session。
+2. 只修改 `scripts/apollo-releases.tsv` 中对应一行的 tag。
+3. 运行 `scripts/check.sh apollo-online`。
+4. 运行 `scripts/check.sh all`。
+5. 运行两次 `./install.sh`。
+6. 准备好后重载 SonicTerm，再启动新的 Claude 与 Copilot session。
 
 安装不会重载或停止运行中的 tmux 或 RMUX 服务器。新服务器会读取配置。只有显式重载，才会把更改应用到已有服务器；请看 [Tmux](Tmux-zh-CN.md) 和 [RMUX](RMUX-zh-CN.md)。不要用 `ts` 或 `rs` 应用主题。
 

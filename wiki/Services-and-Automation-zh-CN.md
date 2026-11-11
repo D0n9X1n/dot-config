@@ -35,9 +35,9 @@ SKIP_OH_MY_ZSH=1 ./install.sh
 
 ## Apollo release bundle
 
-`scripts/apollo-releases.tsv` 固定精确的上游 tag 和 SHA-256。安装器会复用已验证本机 blobs，在一个由 release lock 和 adapter code 派生的 bundle hash 下构建全部文件，并且只在完整 set 通过检查后切换 `current` symlink。第二次安装会直接使用已有 bundle，不下载或重写。
+`scripts/apollo-releases.tsv` 固定精确的上游 release tag。安装器按仓库、tag 和 artifact 缓存每次下载，并记录下载时的 SHA-256；只在文件仍与记录一致时复用，在一个由 release lock 和 adapter code 派生的 bundle hash 下构建全部文件，并且只在完整 set 通过检查后切换 `current` symlink。第二次安装会直接使用已有 bundle，不下载或重写。
 
-第一次安装需要网络。只要固定 blobs 仍位于 `~/.local/share/dot-configs/apollo/`，以后就能离线安装。下载失败或 checksum 不匹配时，旧 bundle 保持生效。请看 [Apollo 主题](Apollo-Theme-zh-CN.md)。
+第一次安装需要网络。只要固定 blobs 仍位于 `~/.local/share/dot-configs/apollo/`，以后就能离线安装。下载失败，或本机缓存文件被改动且无法重新下载时，旧 bundle 保持生效。请看 [Apollo 主题](Apollo-Theme-zh-CN.md)。
 
 ## 复用器生命周期
 

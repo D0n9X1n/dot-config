@@ -49,19 +49,25 @@ apollo_bundle_hash() {
 
 apollo_validate_lock() {
   local lock="${1:-$(apollo_release_file)}"
-  local id kind repository tag artifact sha extra seen=""
+  local id kind repository tag artifact extra seen="" tag_pattern
 
   [ -f "$lock" ] || {
     printf 'Error: missing Apollo release lock: %s\n' "$lock" >&2
     return 1
   }
+  # read collapses trailing empty tab fields, so count columns with awk; its
+  # exit status, not its output, reports a bad row.
+  if ! id="$(awk -F '\t' '$0 !~ /^(#|$)/ && NF != 5 { print "line " NR; bad = 1; exit } END { exit bad }' "$lock")"; then
+    printf 'Error: Apollo lock row must have five fields (tags only, no checksums): %s\n' "$id" >&2
+    return 1
+  fi
 
-  while IFS=$'\t' read -r id kind repository tag artifact sha extra; do
+  while IFS=$'\t' read -r id kind repository tag artifact extra; do
     case "$id" in
       ''|'#'*) continue ;;
     esac
     [ -z "$extra" ] || {
-      printf 'Error: Apollo lock row has more than six fields: %s\n' "$id" >&2
+      printf 'Error: Apollo lock row has more than five fields (tags only, no checksums): %s\n' "$id" >&2
       return 1
     }
     case "$id" in
@@ -80,11 +86,20 @@ apollo_validate_lock() {
       printf 'Error: Apollo application %s must use a release asset.\n' "$id" >&2
       return 1
     fi
-    printf '%s\n' "$repository" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' || {
+    # Owner and name may not be . or .., so the cache path stays under its root.
+    printf '%s\n' "$repository" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' && \
+      ! printf '%s\n' "$repository" | grep -Eq '(^|/)\.{1,2}(/|$)' || {
       printf 'Error: unsafe Apollo repository for %s: %s\n' "$id" "$repository" >&2
       return 1
     }
-    printf '%s\n' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || {
+    # The palette uses the monorepo's vX.Y.Z tag; each app uses its own
+    # <id>-vX.Y.Z release, so a row cannot pin another app's tag.
+    if [ "$id" = "palette" ]; then
+      tag_pattern='^v[0-9]+\.[0-9]+\.[0-9]+$'
+    else
+      tag_pattern="^${id}-v[0-9]+\\.[0-9]+\\.[0-9]+\$"
+    fi
+    printf '%s\n' "$tag" | grep -Eq "$tag_pattern" || {
       printf 'Error: invalid Apollo release tag for %s: %s\n' "$id" "$tag" >&2
       return 1
     }
@@ -93,10 +108,6 @@ apollo_validate_lock() {
     esac
     printf '%s\n' "$artifact" | grep -Eq '^[A-Za-z0-9_./-]+$' || {
       printf 'Error: unsafe Apollo artifact for %s: %s\n' "$id" "$artifact" >&2
-      return 1
-    }
-    printf '%s\n' "$sha" | grep -Eq '^[0-9a-f]{64}$' || {
-      printf 'Error: invalid Apollo SHA-256 for %s.\n' "$id" >&2
       return 1
     }
     case $'\n'"$seen"$'\n' in
@@ -119,9 +130,6 @@ apollo_lock_row() {
   awk -F '\t' -v wanted="$wanted" '$1 == wanted { print; found += 1 } END { if (found != 1) exit 1 }' "$lock"
 }
 
-apollo_lock_sha() {
-  apollo_lock_row "$1" "${2:-$(apollo_release_file)}" | awk -F '\t' '{print $6}'
-}
 
 apollo_source_url() {
   local kind="$1" repository="$2" tag="$3" artifact="$4"
@@ -139,43 +147,52 @@ apollo_run_logged() {
   fi
 }
 
-apollo_fetch_blob() {
-  local id="$1" kind="$2" repository="$3" tag="$4" artifact="$5" expected="$6"
-  local root blob actual url tmp
+# Cache path for one release file. Repository and tag are validated names and
+# the artifact keeps its own directories, so distinct files never collide.
+apollo_blob_path() {
+  printf '%s/blobs/%s/%s/%s\n' "$(apollo_root)" "$1" "$2" "$3"
+}
 
-  root="$(apollo_root)"
-  blob="${root}/blobs/${expected}"
-  if [ -f "$blob" ]; then
-    actual="$(apollo_sha256 "$blob")" || return 1
-    if [ "$actual" = "$expected" ]; then
-      printf '%s\n' "$blob"
-      return 0
-    fi
+# A cached file is reused only while it still matches the SHA-256 recorded
+# when it was downloaded. Releases are pinned by tag; this only detects a
+# cache that changed on disk.
+apollo_blob_intact() {
+  local blob="$1"
+  [ -s "$blob" ] && [ -s "${blob}.sha256" ] && \
+    [ "$(apollo_sha256 "$blob")" = "$(cat "${blob}.sha256")" ]
+}
+
+apollo_fetch_blob() {
+  local id="$1" kind="$2" repository="$3" tag="$4" artifact="$5"
+  local blob url tmp
+
+  # A release is immutable once published, so the tag names the file; a new
+  # tag is a new cache entry and a fresh download.
+  blob="$(apollo_blob_path "$repository" "$tag" "$artifact")"
+  if apollo_blob_intact "$blob"; then
+    printf '%s\n' "$blob"
+    return 0
   fi
 
   command -v curl >/dev/null 2>&1 || {
     printf 'Error: curl is required to download Apollo %s.\n' "$id" >&2
     return 1
   }
-  mkdir -p "${root}/blobs"
+  mkdir -p "$(dirname "$blob")"
   url="$(apollo_source_url "$kind" "$repository" "$tag" "$artifact")"
-  tmp="$(mktemp "${root}/blobs/.${expected}.XXXXXX")"
-  if ! apollo_run_logged curl -fL --connect-timeout 10 --max-time 60 "$url" -o "$tmp"; then
+  tmp="$(mktemp "${blob}.XXXXXX")"
+  if ! apollo_run_logged curl -fL --connect-timeout 10 --max-time 60 "$url" -o "$tmp" || [ ! -s "$tmp" ]; then
     rm -f "$tmp"
     printf 'Error: failed to download Apollo %s from %s.\n' "$id" "$url" >&2
     return 1
   fi
-  actual="$(apollo_sha256 "$tmp")" || {
-    rm -f "$tmp"
+  chmod 644 "$tmp"
+  apollo_sha256 "$tmp" >"${tmp}.sha256" || {
+    rm -f "$tmp" "${tmp}.sha256"
     return 1
   }
-  if [ "$actual" != "$expected" ]; then
-    rm -f "$tmp"
-    printf 'Error: Apollo %s checksum mismatch (expected %s, got %s).\n' "$id" "$expected" "$actual" >&2
-    return 1
-  fi
-  chmod 644 "$tmp"
   mv -f "$tmp" "$blob"
+  mv -f "${tmp}.sha256" "${blob}.sha256"
   printf '%s\n' "$blob"
 }
 
@@ -397,7 +414,7 @@ apollo_validate_generated() {
 }
 
 apollo_validate_bundle() {
-  local bundle="$1" lock="$2" id file expected actual
+  local bundle="$1" lock="$2" id file
   [ -f "${bundle}/.complete" ] || return 1
   apollo_validate_palette "${bundle}/palette/apollo.json" || return 1
   for id in palette sonicterm rmux tmux eza; do
@@ -408,23 +425,22 @@ apollo_validate_bundle() {
       tmux) file="${bundle}/tmux/apollo.tmux" ;;
       eza) file="${bundle}/eza/theme.yml" ;;
     esac
-    expected="$(apollo_lock_sha "$id" "$lock")" || return 1
-    actual="$(apollo_sha256 "$file")" || return 1
-    [ "$actual" = "$expected" ] || return 1
+    [ -s "$file" ] || return 1
+    grep -Fxq "$(apollo_sha256 "$file")  ${file#"${bundle}/"}" "${bundle}/SHA256SUMS" 2>/dev/null || return 1
   done
   apollo_validate_generated "$bundle"
 }
 
 apollo_build_bundle() {
   local stage="$1" lock="$2"
-  local id kind repository tag artifact sha blob
+  local id kind repository tag artifact blob
 
   mkdir -p "${stage}/palette" "${stage}/sonicterm" "${stage}/rmux" \
     "${stage}/tmux" "${stage}/eza" "${stage}/generated/claude"
 
   for id in palette sonicterm rmux tmux eza; do
-    IFS=$'\t' read -r id kind repository tag artifact sha <<<"$(apollo_lock_row "$id" "$lock")"
-    blob="$(apollo_fetch_blob "$id" "$kind" "$repository" "$tag" "$artifact" "$sha")" || return 1
+    IFS=$'\t' read -r id kind repository tag artifact <<<"$(apollo_lock_row "$id" "$lock")"
+    blob="$(apollo_fetch_blob "$id" "$kind" "$repository" "$tag" "$artifact")" || return 1
     case "$id" in
       palette) cp "$blob" "${stage}/palette/apollo.json" ;;
       sonicterm) cp "$blob" "${stage}/sonicterm/apollo.toml" ;;
@@ -441,6 +457,12 @@ apollo_build_bundle() {
   apollo_generate_statusline_colors "${stage}/palette/apollo.json" "${stage}/generated/statusline-colors.sh"
   apollo_generate_zsh_colors "${stage}/palette/apollo.json" "${stage}/generated/zsh-colors.zsh"
   apollo_generate_claude_theme "${stage}/palette/apollo.json" "${stage}/generated/claude/apollo.json"
+  (
+    cd "$stage" || exit 1
+    for file in palette/apollo.json sonicterm/apollo.toml rmux/apollo-rmux.conf tmux/apollo.tmux eza/theme.yml; do
+      printf '%s  %s\n' "$(apollo_sha256 "$file")" "$file"
+    done
+  ) >"${stage}/SHA256SUMS" || return 1
   : >"${stage}/.complete"
   apollo_validate_bundle "$stage" "$lock"
 }
@@ -622,26 +644,21 @@ install_apollo_themes() {
 }
 
 verify_apollo_release_pins() {
-  local lock temp id kind repository tag artifact sha actual url
+  local lock temp id kind repository tag artifact url
   lock="$(apollo_release_file)"
   apollo_validate_lock "$lock" || return 1
   temp="$(mktemp -d -t dot-configs-apollo-verify.XXXXXX)"
-  while IFS=$'\t' read -r id kind repository tag artifact sha; do
+  while IFS=$'\t' read -r id kind repository tag artifact; do
     case "$id" in
       ''|'#'*) continue ;;
     esac
     url="$(apollo_source_url "$kind" "$repository" "$tag" "$artifact")"
-    if ! curl -fL --connect-timeout 10 --max-time 60 "$url" -o "${temp}/${id}"; then
+    if ! curl -fsSL --connect-timeout 10 --max-time 60 "$url" -o "${temp}/${id}" || [ ! -s "${temp}/${id}" ]; then
+      printf 'Error: cannot download Apollo %s from %s.\n' "$id" "$url" >&2
       rm -rf "$temp"
       return 1
     fi
-    actual="$(apollo_sha256 "${temp}/${id}")"
-    [ "$actual" = "$sha" ] || {
-      printf 'Error: online Apollo checksum mismatch for %s.\n' "$id" >&2
-      rm -rf "$temp"
-      return 1
-    }
   done <"$lock"
   rm -rf "$temp"
-  printf 'Apollo release pins match their published files.\n'
+  printf 'Apollo release pins download from their published releases.\n'
 }

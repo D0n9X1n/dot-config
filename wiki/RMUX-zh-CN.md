@@ -60,7 +60,7 @@ RMUX 使用 tmux 命令语法，不是 JSON、YAML 或 TOML。配置可以执行
 
 配置会清除守护进程可能继承的陈旧 `TERMINFO`、`TERMINFO_DIRS` 和 `TERMCAP`，然后设置 `COLORTERM=truecolor` 与 `FORCE_COLOR=3`。它不会清除 RMUX 自己的 `TERM_PROGRAM` 身份。
 
-`install.sh` 会验证官方 `rmux-apollo-theme` release，并把仅含主题的配置链接到 `~/.config/rmux-apollo-theme/`。本机 RMUX 文件会 source 它，用于 status、window、pane、message 和 copy-mode 样式。状态栏与本机 bufferline.nvim 配置保持一致：斜边分隔符、深蓝底加粗白字的活动标签，以及与状态栏背景一致的非活动标签。只有活动标签的颜色使用固定的 bufferline 专用覆盖值，其余颜色均来自 Apollo。可选的 `~/.rmux.local.conf` 最后加载，可覆盖任何选项，包括活动标签颜色；请看 [自定义](Customization-zh-CN.md)。不会添加 plugin manager 或 shell bootstrap。
+`install.sh` 会验证 Apollo monorepo 的官方 `rmux-v0.2.1` release，并把仅含主题的配置链接到 `~/.config/rmux-apollo-theme/`。本机 RMUX 文件会 source 它，用于 status、window、pane、message 和 copy-mode 样式。状态栏与本机 bufferline.nvim 配置保持一致：斜边分隔符、深蓝底加粗白字的活动标签，以及与状态栏背景一致的非活动标签。只有活动标签的颜色使用固定的 bufferline 专用覆盖值，其余颜色均来自 Apollo。可选的 `~/.rmux.local.conf` 最后加载，可覆盖任何选项，包括活动标签颜色；请看 [自定义](Customization-zh-CN.md)。不会添加 plugin manager 或 shell bootstrap。
 
 底部状态栏左侧显示红色斜边会话标签和带编号的斜边窗口标签，右侧只显示 `HH:MM` 时钟。会话标签与窗口标签之间、各窗口标签之间均留一个字符的间距。会话名称最多占 19 个显示单元，确保两端斜边可完整放入 24 单元的标签宽度内。活动提醒和响铃颜色仍然可见。Prefix 生效时显示 `PREFIX`，窗口缩放时显示 `ZOOM`。斜边使用与 bufferline 的 `slope` 样式相同的 Powerline 字形（`U+E0BA` 和 `U+E0BC`），终端字体或后备字体须支持它们。不显示完整日期或装饰性时钟图标。
 
@@ -193,7 +193,7 @@ Copilot CLI 尚不能识别所有 RMUX/SonicTerm 终端身份。因此仓库中�
 
 `~/.tmux.conf` 重新由 `config/tmux/tmux.conf` 管理。旧根目录受管链接会迁移；用户文件和外部链接会被直接替换，不保留备份。不添加 TPM 或 plugin bootstrap。已有 `~/.tmux/plugins/` 和 resurrect 快照保持不动。旧 tmux 配置仍在 v2.4.0 Git 历史中，见[仓库操作](Repository-Operations-zh-CN.md)。
 
-原生替代方案不修复 RMUX 尚未解决的[提示框问题 #60](https://github.com/D0n9X1n/dot-config/issues/60)。SonicTerm 仍是受管的外层终端。
+原生替代方案不修复 RMUX 尚未解决的[提示框问题 #60](https://github.com/MOSconfig/dot-config/issues/60)。SonicTerm 仍是受管的外层终端。
 
 ## 验证
 
