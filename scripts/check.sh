@@ -2049,6 +2049,78 @@ SH
   [ "$(wc -l <"$test_root/curl.log" | tr -d ' ')" = "$curl_count_before" ]
   [ "$(readlink "$test_home/.local/share/dot-configs/apollo/current")" = "$first_current" ]
 
+  # A set whose files the user edited (through the `current` links) is kept on
+  # the next switch, not pruned.
+  apollo_edited_set="$(readlink "$apollo_root_dir/current")"
+  printf '# my tweak\n' >>"$apollo_root_dir/$apollo_edited_set/tmux/apollo.tmux"
+  awk -F '\t' 'BEGIN { OFS="\t" } $1 == "eza" { $4 = "eza-v1.0.2" } { print }' "$lock" >"$test_root/bumped3.tsv"
+  (
+    export HOME="$test_home"
+    export PATH="$fake_bin:$PATH"
+    export APOLLO_RELEASES_FILE="$test_root/bumped3.tsv"
+    export APOLLO_ROOT="$apollo_root_dir"
+    export APOLLO_TEST_FIXTURES="$fixtures"
+    export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+    export APOLLO_SKIP_FSH=1
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    install_apollo_themes
+  ) >"$test_root/edited.out"
+  [ -d "$apollo_root_dir/$apollo_edited_set" ] || { echo "Apollo pruned a set with user edits" >&2; return 1; }
+  grep -q 'kept' "$test_root/edited.out" || { echo "Apollo did not report the kept edited set" >&2; return 1; }
+  rm -rf -- "$apollo_root_dir/$apollo_edited_set"
+  # Return to the original lock for the checks below.
+  (
+    export HOME="$test_home"
+    export PATH="$fake_bin:$PATH"
+    export APOLLO_RELEASES_FILE="$lock"
+    export APOLLO_ROOT="$apollo_root_dir"
+    export APOLLO_TEST_FIXTURES="$fixtures"
+    export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+    export APOLLO_SKIP_FSH=1
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    install_apollo_themes
+  ) >/dev/null
+  first_current="$(readlink "$apollo_root_dir/current")"
+
+  # Installs are serialized: while another live install holds the lock, a
+  # second one changes nothing; a lock left by a dead process is taken over.
+  apollo_before="$(readlink "$apollo_root_dir/current")"
+  mkdir "$apollo_root_dir/.install.lock"
+  sleep 300 &
+  apollo_holder=$!
+  printf '%s\n' "$apollo_holder" >"$apollo_root_dir/.install.lock/pid"
+  if (
+    export HOME="$test_home"
+    export PATH="$fake_bin:$PATH"
+    export APOLLO_RELEASES_FILE="$test_root/bumped.tsv"
+    export APOLLO_ROOT="$apollo_root_dir"
+    export APOLLO_TEST_FIXTURES="$fixtures"
+    export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+    export APOLLO_SKIP_FSH=1
+    export APOLLO_LOCK_WAIT=1
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    install_apollo_themes
+  ) >/dev/null 2>&1; then
+    kill "$apollo_holder" 2>/dev/null
+    echo "Apollo install ran while another install held the lock" >&2
+    return 1
+  fi
+  [ "$(readlink "$apollo_root_dir/current")" = "$apollo_before" ]
+  kill "$apollo_holder" 2>/dev/null; wait "$apollo_holder" 2>/dev/null || true
+  (
+    export HOME="$test_home"
+    export PATH="$fake_bin:$PATH"
+    export APOLLO_RELEASES_FILE="$lock"
+    export APOLLO_ROOT="$apollo_root_dir"
+    export APOLLO_TEST_FIXTURES="$fixtures"
+    export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+    export APOLLO_SKIP_FSH=1
+    export APOLLO_LOCK_WAIT=1
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    install_apollo_themes
+  ) >/dev/null || { echo "Apollo install did not take over a stale lock" >&2; return 1; }
+  [ ! -e "$apollo_root_dir/.install.lock" ] || { echo "Apollo install left its lock behind" >&2; return 1; }
+
   # App tags are bound to their own row: <id>-vX.Y.Z. The palette keeps vX.Y.Z.
   local tag_case tag_lock
   for tag_case in 'tmux v1.0.0' 'tmux rmux-v1.0.0' 'tmux tmux-v1' 'palette palette-v1.0.0'; do

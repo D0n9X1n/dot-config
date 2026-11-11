@@ -612,6 +612,15 @@ ZSH
 # from the old lock format, tag directories the lock no longer names, and
 # temp files left by an interrupted download. Never follows a symlink or
 # leaves the Apollo root.
+# True when every file a set recorded at build time still has its SHA-256.
+apollo_set_unmodified() {
+  local set="$1" sum file
+  while read -r sum file; do
+    [ -n "$file" ] || continue
+    [ -f "${set}/${file}" ] && [ "$(apollo_sha256 "${set}/${file}")" = "$sum" ] || return 1
+  done <"${set}/SHA256SUMS"
+}
+
 apollo_prune() {
   local root="$1" lock="$2" current_set entry rel keep id kind repository tag artifact
   [ -d "$root" ] && [ ! -L "$root" ] || return 0
@@ -625,6 +634,13 @@ apollo_prune() {
   for entry in "${root}"/sets/* "${root}"/sets/.[!.]*; do
     [ -e "$entry" ] || [ -L "$entry" ] || continue
     [ "sets/$(basename "$entry")" = "$current_set" ] && continue
+    # A complete set whose files no longer match its build record was edited
+    # (the consumer links point into it): keep it and say so.
+    if [ -d "$entry" ] && [ ! -L "$entry" ] && [ -f "${entry}/SHA256SUMS" ] && \
+        ! apollo_set_unmodified "$entry"; then
+      printf 'Apollo: kept %s (its files were edited).\n' "${entry#"${root}/"}"
+      continue
+    fi
     rm -rf -- "$entry"
   done
 
@@ -656,7 +672,42 @@ apollo_prune() {
   find "${root}/blobs" -type f -name '*.??????.sha256' -delete 2>/dev/null || true
 }
 
+# One install at a time: build, switch and prune share the Apollo root. The
+# lock is a directory (atomic mkdir) holding the owner's PID; a lock whose
+# owner is gone is taken over.
+apollo_lock_acquire() {
+  local root="$1" lockdir="$1/.install.lock" waited=0 owner
+  mkdir -p "$root"
+  while ! mkdir "$lockdir" 2>/dev/null; do
+    owner="$(cat "${lockdir}/pid" 2>/dev/null || true)"
+    if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
+      rm -rf -- "$lockdir"
+      continue
+    fi
+    if [ "$waited" -ge "${APOLLO_LOCK_WAIT:-60}" ]; then
+      printf 'Error: another Apollo install is running (%s); try again later.\n' "$lockdir" >&2
+      return 1
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  printf '%s\n' "$$" >"${lockdir}/pid"
+}
+
+apollo_lock_release() {
+  rm -rf -- "$1/.install.lock"
+}
+
 install_apollo_themes() {
+  local root rc=0
+  root="$(apollo_root)"
+  apollo_lock_acquire "$root" || return 1
+  apollo_install_locked || rc=$?
+  apollo_lock_release "$root"
+  return "$rc"
+}
+
+apollo_install_locked() {
   local lock root lock_hash final stage target
   lock="$(apollo_release_file)"
   root="$(apollo_root)"
