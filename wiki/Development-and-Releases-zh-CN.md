@@ -38,7 +38,7 @@ config/claude/statusline.sh
 config/copilot/statusline.sh
 ```
 
-保持相同五行布局、palette 和每目录 Git cache。Provider 字段保持不同：Claude 显示费用；Copilot 显示 premium 请求和自定义 live-subagent rows。
+保持相同两行布局（一行留白，然后两行内容）、palette 和每目录 Git cache。Provider 字段保持不同：Copilot 显示 premium 请求和自定义 live-subagent rows；Claude 两者都不显示。
 
 保持这些模型路由：
 

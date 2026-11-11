@@ -171,17 +171,14 @@ source ~/.oh-my-zsh/custom/cc.zsh
 
 ## 状态栏
 
-Claude 与 Copilot 状态栏共享五行布局、本机生成的 Apollo 颜色和每目录五秒 Git cache：
+Claude 与 Copilot 状态栏共享两行设计、本机生成的 Apollo 颜色和每目录五秒 Git cache。最上面是一行留白，然后是：
 
-1. 时间、运行时间、费用、WakaTime
-2. 模型、effort、context
-3. MCP、skills、agents、style
-4. 当前路径
-5. repo、branch、diff、stash、worktree
+1. 模型、effort、WakaTime、venv，最后是 context（十格进度条、百分比和容量，例如 `45% of 1.0M`）
+2. 先是 branch 及其标记（✓ 干净或 ● 有修改、领先/落后，有 stash 时显示 stash 图标和数量），然后是 Diff（本会话绿色的 `+新增` 和红色的 `-删除`，只显示非零部分，两者都为 0 时隐藏），文件夹路径在行的最右端
+
+每一项都是带强调色的 Nerd Font 图标、弱化的标签和值；项之间用细竖线分隔，没有数据的项会隐藏。已知 `COLUMNS` 时，路径右对齐，并从左侧缩短（`…/`）以适应宽度；否则路径跟在其他项后面。`CLAUDE_STATUSLINE_PAD_TOP` 设置留白行数（默认 1）。
 
 两个脚本读取同一个本机生成 Apollo 颜色 include。文件缺失或禁用颜色时，它们仍会输出可读的无色内容。Claude 自定义状态栏没有 live-subagent 数量或树，因为 Claude Code 已有原生 subagent UI。Copilot 保留自定义 rows。
-
-Skills 和 Agents 统计 user 和 project 文件，也统计每个已启用 plugin 的 skills 和 agents。脚本从 `~/.claude/plugins/installed_plugins.json` 读取 `installPath`，从 user、project 和 local settings 读取 `enabledPlugins`；后面的 scope 优先。它统计其中的 `skills/*/SKILL.md` 和 `agents/*.md`。plugin 数量按工作目录缓存，只在这些文件变化时重新计算。
 
 ## Plugins
 
