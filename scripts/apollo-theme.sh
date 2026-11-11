@@ -55,12 +55,12 @@ apollo_validate_lock() {
     printf 'Error: missing Apollo release lock: %s\n' "$lock" >&2
     return 1
   }
-  # read collapses trailing empty tab fields, so count columns with awk.
-  id="$(awk -F '\t' '$0 !~ /^(#|$)/ && NF != 5 { print $1; exit }' "$lock")"
-  [ -z "$id" ] || {
+  # read collapses trailing empty tab fields, so count columns with awk; its
+  # exit status, not its output, reports a bad row.
+  if ! id="$(awk -F '\t' '$0 !~ /^(#|$)/ && NF != 5 { print "line " NR; bad = 1; exit } END { exit bad }' "$lock")"; then
     printf 'Error: Apollo lock row must have five fields (tags only, no checksums): %s\n' "$id" >&2
     return 1
-  }
+  fi
 
   while IFS=$'\t' read -r id kind repository tag artifact extra; do
     case "$id" in
@@ -86,7 +86,9 @@ apollo_validate_lock() {
       printf 'Error: Apollo application %s must use a release asset.\n' "$id" >&2
       return 1
     fi
-    printf '%s\n' "$repository" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' || {
+    # Owner and name may not be . or .., so the cache path stays under its root.
+    printf '%s\n' "$repository" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' && \
+      ! printf '%s\n' "$repository" | grep -Eq '(^|/)\.{1,2}(/|$)' || {
       printf 'Error: unsafe Apollo repository for %s: %s\n' "$id" "$repository" >&2
       return 1
     }

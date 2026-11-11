@@ -1955,6 +1955,28 @@ SH
     return 1
   fi
 
+  # A malformed earlier row cannot hide a trailing sixth column.
+  { printf '\t\n'; cat "$test_root/trailing.tsv"; } >"$test_root/trailing2.tsv"
+  if (
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    apollo_validate_lock "$test_root/trailing2.tsv"
+  ) >/dev/null 2>&1; then
+    echo "Apollo lock validator accepted a sixth column after an empty-id row" >&2
+    return 1
+  fi
+
+  # Repository names cannot walk out of the cache root.
+  for bad_repo in '../..' 'apollo-theme/..' './apollo-theme' 'apollo-theme/.'; do
+    awk -F '\t' -v repo="$bad_repo" 'BEGIN { OFS="\t" } $1 == "sonicterm" { $3 = repo } { print }' "$lock" >"$test_root/repo.tsv"
+    if (
+      DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+      apollo_validate_lock "$test_root/repo.tsv"
+    ) >/dev/null 2>&1; then
+      echo "Apollo lock validator accepted repository: $bad_repo" >&2
+      return 1
+    fi
+  done
+
   # Restore the first set for the switch-back check below.
   (
     export HOME="$test_home"
