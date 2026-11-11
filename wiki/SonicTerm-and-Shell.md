@@ -36,7 +36,7 @@ The tracked config uses:
 | Cursor | block, no blink |
 | Backdrop | opaque |
 | Software render mode | auto |
-| Status line | left: `mode`, `font`, `scroll`, `input`, `paste`, `ime`, `zoom`; right: `alerts`, `clip`, `health`, `glyphs`, `history`, `mem`, `frame`, `tab_mem`; font scale 0.85 |
+| Status line | Off (`enabled = false`). When enabled: left `mode`, `font`, `scroll`, `input`, `paste`, `ime`, `zoom`; right `alerts`, `clip`, `mem`, `frame`; font scale 0.85 |
 | Child identity | `TERM_PROGRAM=SonicTerm` |
 
 Use **Reload Config** from the SonicTerm command palette (`Cmd+Shift+R`) after a config change. Some native window changes may need a restart.

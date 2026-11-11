@@ -36,7 +36,7 @@ config/sonicterm/keymaps/*.toml
 | 光标 | block，不闪烁 |
 | 背景 | opaque |
 | 软件渲染模式 | auto |
-| 状态栏 | 左侧：`mode`、`font`、`scroll`、`input`、`paste`、`ime`、`zoom`；右侧：`alerts`、`clip`、`health`、`glyphs`、`history`、`mem`、`frame`、`tab_mem`；字体缩放 0.85 |
+| 状态栏 | 关闭（`enabled = false`）。启用时：左侧 `mode`、`font`、`scroll`、`input`、`paste`、`ime`、`zoom`；右侧 `alerts`、`clip`、`mem`、`frame`；字体缩放 0.85 |
 | 子进程身份 | `TERM_PROGRAM=SonicTerm` |
 
 修改配置后，在 SonicTerm command palette 中使用 **Reload Config**（`Cmd+Shift+R`）。有些原生窗口修改可能需要重启。
