@@ -2,7 +2,7 @@
 
 English | [简体中文](Herdr-zh-CN.md)
 
-This page covers the Apollo layout for the terminal workspace app. The app is **Apollo.app**, a renamed copy of [Herdr](https://herdr.dev) that replaced Herdr.app. It loads Herdr's settings home, `~/.config/herdr-app`, so everything below still installs there. The layout lives in its own public repo, [herdr-config](https://github.com/D0n9X1n/herdr-config). This repo pins it as a Git submodule at `config/herdr`.
+This page covers the Apollo layout for the terminal workspace app. The app is **Apollo.app**, a renamed copy of [Herdr](https://herdr.dev) that replaced Herdr.app. It loads Herdr's settings home, `~/.config/herdr-app`, so everything below still installs there. The layout lives in its own public repo, [herdr-config](https://github.com/MOSconfig/herdr-config). This repo pins it as a Git submodule at `config/herdr`.
 
 ## What install does
 

@@ -7,7 +7,7 @@ This repo is for macOS. `install.sh` can set up a new Mac. It is safe to run aga
 ## Install
 
 ```sh
-git clone git@github.com:D0n9X1n/dot-config.git ~/Public/dot-configs
+git clone git@github.com:MOSconfig/dot-config.git ~/Public/dot-configs
 cd ~/Public/dot-configs
 ./install.sh
 ```

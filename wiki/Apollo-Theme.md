@@ -4,16 +4,16 @@ English | [简体中文](Apollo-Theme-zh-CN.md)
 
 Apollo is the shared theme for the active terminal, multiplexer, shell, CLI status lines, and file listings.
 
-The canonical palette and application adapters live in the [Apollo Theme organization](https://github.com/apollo-theme). This repository does not store palette values or generated theme artifacts.
+The canonical palette and application adapters live in the [Apollo Theme monorepo](https://github.com/apollo-theme/apollo-theme). This repository does not store palette values or generated theme artifacts.
 
 ## Active surfaces
 
 | Surface | Source |
 |---|---|
-| SonicTerm | Tagged `sonicterm-apollo-theme` release asset |
-| RMUX | Tagged `rmux-apollo-theme` release asset |
-| Native tmux | `apollo-theme/tmux-apollo-theme` v0.1.0 release asset `apollo.tmux` |
-| eza | Tagged `eza-apollo-theme` release asset |
+| SonicTerm | `apollo-theme/apollo-theme` `sonicterm-v0.1.0` release asset `apollo.toml` |
+| RMUX | `apollo-theme/apollo-theme` `rmux-v0.1.0` release asset `apollo-rmux.conf` |
+| Native tmux | `apollo-theme/apollo-theme` `tmux-v0.1.0` release asset `apollo.tmux` |
+| eza | `apollo-theme/apollo-theme` `eza-v0.1.0` release asset `theme.yml` |
 | Claude Code UI | Generated locally from the tagged canonical palette |
 | Claude and Copilot status lines | One local include generated from the tagged canonical palette |
 | Oh My Zsh prompt (optional) | Structure in this repo; colors generated locally; selected only through `.zshrc` |
@@ -26,7 +26,7 @@ Neovim is managed in a different repository. This installer does not modify Neov
 
 ## Release lock
 
-`scripts/apollo-releases.tsv` pins each upstream repository, tag, artifact, and SHA-256. Child projects have independent versions; do not infer their tags from the canonical palette release.
+`scripts/apollo-releases.tsv` pins each upstream repository, tag, artifact, and SHA-256. Every row uses the `apollo-theme/apollo-theme` monorepo. The palette uses a `vX.Y.Z` tag; each app uses its own `<id>-vX.Y.Z` release, and the validator rejects another app's tag. Apps have independent versions; do not infer their tags from the palette release.
 
 The installer downloads exact tagged files. It does not follow `main` or query `latest`. An online maintainer check verifies published bytes:
 

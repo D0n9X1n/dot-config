@@ -59,7 +59,7 @@ ts            # 确认、保存、重启并恢复当前服务器的工作区
 
 原生 tmux 的窗口名称字段存储转义后的反斜杠；受管标题显示和提示框只显示一份字面反斜杠。需要精确保留文字时优先使用受管提示框；原始 `tmux rename-window` 有自己的格式展开规则。
 
-此原生配置不会修复 [RMUX 独立的提示框问题](https://github.com/D0n9X1n/dot-config/issues/60)。
+此原生配置不会修复 [RMUX 独立的提示框问题](https://github.com/MOSconfig/dot-config/issues/60)。
 
 ## 终端输入与集成
 

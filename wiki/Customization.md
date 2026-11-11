@@ -100,7 +100,7 @@ In every setup, your files stay out of the upstream history, so `uu` can always 
 Clone upstream, and keep your files in a separate private repo:
 
 ```sh
-git clone git@github.com:D0n9X1n/dot-config.git ~/Public/dot-configs
+git clone git@github.com:MOSconfig/dot-config.git ~/Public/dot-configs
 git clone git@github.com:YOU/dot-config-local.git ~/Public/dot-configs-local
 ```
 
@@ -130,7 +130,7 @@ Keep your fork equal to upstream, and keep your files in a local folder or a pri
 ```sh
 git clone git@github.com:YOU/dot-config.git ~/Public/dot-configs
 cd ~/Public/dot-configs
-git remote add upstream https://github.com/D0n9X1n/dot-config.git
+git remote add upstream https://github.com/MOSconfig/dot-config.git
 git fetch upstream
 git branch --set-upstream-to=upstream/main main
 ```

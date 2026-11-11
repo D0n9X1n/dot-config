@@ -4,16 +4,16 @@
 
 Apollo 是当前终端、multiplexer、shell、CLI 状态栏和文件列表共享的主题。
 
-规范 palette 和应用 adapters 位于 [Apollo Theme organization](https://github.com/apollo-theme)。本仓库不保存 palette 值或生成的主题文件。
+规范 palette 和应用 adapters 位于 [Apollo Theme monorepo](https://github.com/apollo-theme/apollo-theme)。本仓库不保存 palette 值或生成的主题文件。
 
 ## 生效范围
 
 | 范围 | 来源 |
 |---|---|
-| SonicTerm | 带 tag 的 `sonicterm-apollo-theme` release asset |
-| RMUX | 带 tag 的 `rmux-apollo-theme` release asset |
-| 原生 tmux | `apollo-theme/tmux-apollo-theme` v0.1.0 release asset `apollo.tmux` |
-| eza | 带 tag 的 `eza-apollo-theme` release asset |
+| SonicTerm | `apollo-theme/apollo-theme` 的 `sonicterm-v0.1.0` release asset `apollo.toml` |
+| RMUX | `apollo-theme/apollo-theme` 的 `rmux-v0.1.0` release asset `apollo-rmux.conf` |
+| 原生 tmux | `apollo-theme/apollo-theme` 的 `tmux-v0.1.0` release asset `apollo.tmux` |
+| eza | `apollo-theme/apollo-theme` 的 `eza-v0.1.0` release asset `theme.yml` |
 | Claude Code UI | 从带 tag 的规范 palette 在本机生成 |
 | Claude 与 Copilot 状态栏 | 从规范 palette 生成一个本机共享 include |
 | Oh My Zsh prompt（可选） | 结构在本仓库；颜色在本机生成；仅通过 `.zshrc` 选择 |
@@ -26,7 +26,7 @@ Neovim 在另一个仓库中管理。本安装器不会修改 Neovim 配置、pl
 
 ## Release lock
 
-`scripts/apollo-releases.tsv` 固定每个上游仓库、tag、artifact 和 SHA-256。各子项目版本互相独立；不要根据规范 palette release 推断它们的 tag。
+`scripts/apollo-releases.tsv` 固定每个上游仓库、tag、artifact 和 SHA-256。所有行都使用 `apollo-theme/apollo-theme` monorepo。palette 使用 `vX.Y.Z` tag；每个应用使用自己的 `<id>-vX.Y.Z` release，验证器会拒绝其他应用的 tag。各应用版本互相独立；不要根据 palette release 推断它们的 tag。
 
 安装器下载精确 tag 文件。它不跟踪 `main`，也不查询 `latest`。维护者可以在线检查发布文件：
 

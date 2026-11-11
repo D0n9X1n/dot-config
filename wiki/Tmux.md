@@ -59,7 +59,7 @@ The managed prompt keeps quotes, backslashes, `#{...}`, `#(...)`, and semicolons
 
 Native tmux stores escaped backslashes in its window-name field. The managed title display and prompt show one literal copy. Prefer the managed rename prompt when exact literal text matters; raw `tmux rename-window` has tmux's own format-expansion semantics.
 
-This native profile does not fix [RMUX's separate prompt bug](https://github.com/D0n9X1n/dot-config/issues/60).
+This native profile does not fix [RMUX's separate prompt bug](https://github.com/MOSconfig/dot-config/issues/60).
 
 ## Terminal input and integration
 

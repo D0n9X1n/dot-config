@@ -595,7 +595,7 @@ run_global_instructions_smoke() {
       'scripts/check.sh' \
       '-zh-CN' \
       'root README' \
-      'D0n9X1n/dot-config'; do
+      'MOSconfig/dot-config'; do
       if grep -Fq -e "$pattern" "$file"; then
         echo "$file must not carry repo-only directive: $pattern" >&2
         return 1
@@ -1752,10 +1752,10 @@ PY
   {
     printf '# id\tkind\trepository\ttag\tartifact\tsha256\n'
     printf 'palette\traw\texample/apollo-theme\tv1.0.0\tpalette/apollo.json\t%s\n' "$(shasum -a 256 "$fixtures/palette.json" | awk '{print $1}')"
-    printf 'sonicterm\trelease\texample/sonicterm-apollo-theme\tv1.0.0\tapollo.toml\t%s\n' "$(shasum -a 256 "$fixtures/apollo.toml" | awk '{print $1}')"
-    printf 'rmux\trelease\texample/rmux-apollo-theme\tv1.0.0\tapollo-rmux.conf\t%s\n' "$(shasum -a 256 "$fixtures/apollo-rmux.conf" | awk '{print $1}')"
-    printf 'tmux\trelease\texample/tmux-apollo-theme\tv1.0.0\tapollo.tmux\t%s\n' "$(shasum -a 256 "$fixtures/apollo.tmux" | awk '{print $1}')"
-    printf 'eza\trelease\texample/eza-apollo-theme\tv1.0.0\ttheme.yml\t%s\n' "$(shasum -a 256 "$fixtures/theme.yml" | awk '{print $1}')"
+    printf 'sonicterm\trelease\texample/apollo-theme\tsonicterm-v1.0.0\tapollo.toml\t%s\n' "$(shasum -a 256 "$fixtures/apollo.toml" | awk '{print $1}')"
+    printf 'rmux\trelease\texample/apollo-theme\trmux-v1.0.0\tapollo-rmux.conf\t%s\n' "$(shasum -a 256 "$fixtures/apollo-rmux.conf" | awk '{print $1}')"
+    printf 'tmux\trelease\texample/apollo-theme\ttmux-v1.0.0\tapollo.tmux\t%s\n' "$(shasum -a 256 "$fixtures/apollo.tmux" | awk '{print $1}')"
+    printf 'eza\trelease\texample/apollo-theme\teza-v1.0.0\ttheme.yml\t%s\n' "$(shasum -a 256 "$fixtures/theme.yml" | awk '{print $1}')"
   } >"$lock"
 
   cat >"$fake_bin/curl" <<'SH'
@@ -1889,6 +1889,26 @@ SH
     echo "Apollo installer accepted a checksum mismatch" >&2
     return 1
   fi
+
+  # App tags are bound to their own row: <id>-vX.Y.Z. The palette keeps vX.Y.Z.
+  local tag_case tag_lock
+  for tag_case in 'tmux v1.0.0' 'tmux rmux-v1.0.0' 'tmux tmux-v1' 'palette palette-v1.0.0'; do
+    tag_lock="$test_root/tag-case.tsv"
+    awk -F '\t' -v id="${tag_case%% *}" -v tag="${tag_case#* }" \
+      'BEGIN { OFS="\t" } $1 == id { $4 = tag } { print }' "$lock" >"$tag_lock"
+    if (
+      DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+      apollo_validate_lock "$tag_lock"
+    ) >/dev/null 2>&1; then
+      echo "Apollo lock validator accepted tag case: $tag_case" >&2
+      return 1
+    fi
+  done
+  apollo_validate_lock_real="$(DOT_CONFIGS_INSTALL_LIB_ONLY=1 bash -c 'source install.sh; apollo_validate_lock scripts/apollo-releases.tsv && echo ok' 2>&1)"
+  [ "$apollo_validate_lock_real" = ok ] || {
+    echo "Apollo lock validator rejected scripts/apollo-releases.tsv: $apollo_validate_lock_real" >&2
+    return 1
+  }
   [ "$first_current" = "$(readlink "$test_home/.local/share/dot-configs/apollo/current")" ]
 
   out="$(printf '{}' | HOME="$test_home" bash config/claude/statusline.sh)"
@@ -3578,7 +3598,7 @@ run_herdr_smoke() {
     got="$(git config -f .gitmodules --get submodule.config/herdr.path)" || { echo "herdr: no config/herdr submodule in .gitmodules" >&2; exit 1; }
     [ "$got" = config/herdr ] || { echo "herdr: submodule path is $got" >&2; exit 1; }
     got="$(git config -f .gitmodules --get submodule.config/herdr.url)"
-    [ "$got" = https://github.com/D0n9X1n/herdr-config.git ] || { echo "herdr: submodule url is $got" >&2; exit 1; }
+    [ "$got" = https://github.com/MOSconfig/herdr-config.git ] || { echo "herdr: submodule url is $got" >&2; exit 1; }
     got="$(git config -f .gitmodules --get submodule.config/herdr.ignore || true)"
     [ "$got" = dirty ] || { echo "herdr: submodule ignore is '$got', want dirty" >&2; exit 1; }
     [ "$(git ls-files -s config/herdr | awk '{print $1}')" = 160000 ] || { echo "herdr: config/herdr is not a gitlink" >&2; exit 1; }

@@ -100,7 +100,7 @@ set -g window-status-current-style 'bg=#89b4fa,fg=#1e1e2e,bold'
 克隆上游，并把你的文件放在独立的私有仓库中：
 
 ```sh
-git clone git@github.com:D0n9X1n/dot-config.git ~/Public/dot-configs
+git clone git@github.com:MOSconfig/dot-config.git ~/Public/dot-configs
 git clone git@github.com:YOU/dot-config-local.git ~/Public/dot-configs-local
 ```
 
@@ -130,7 +130,7 @@ mkdir -p local/zsh
 ```sh
 git clone git@github.com:YOU/dot-config.git ~/Public/dot-configs
 cd ~/Public/dot-configs
-git remote add upstream https://github.com/D0n9X1n/dot-config.git
+git remote add upstream https://github.com/MOSconfig/dot-config.git
 git fetch upstream
 git branch --set-upstream-to=upstream/main main
 ```

@@ -196,7 +196,7 @@ The native path does not change `PATH` or replace the global `tmux` command. RMU
 
 `claude` and `cc` default to native `claude-opus-5-5[1m]` with `--effort high`; the relay maps that to `claude-opus-5.5`. `gg` keeps its separate Astra/`high` defaults. Open a new shell after installation or follow the reload steps in [Claude Code](Claude-Code.md).
 
-With native tmux 3.7 and `status-keys vi`, Esc changes prompt mode; `C-g` cancels. This does not fix RMUX's separate [prompt issue #60](https://github.com/D0n9X1n/dot-config/issues/60). See the [native keymap](Tmux-Keymap.md).
+With native tmux 3.7 and `status-keys vi`, Esc changes prompt mode; `C-g` cancels. This does not fix RMUX's separate [prompt issue #60](https://github.com/MOSconfig/dot-config/issues/60). See the [native keymap](Tmux-Keymap.md).
 
 ## Check
 

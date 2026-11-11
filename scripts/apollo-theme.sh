@@ -49,7 +49,7 @@ apollo_bundle_hash() {
 
 apollo_validate_lock() {
   local lock="${1:-$(apollo_release_file)}"
-  local id kind repository tag artifact sha extra seen=""
+  local id kind repository tag artifact sha extra seen="" tag_pattern
 
   [ -f "$lock" ] || {
     printf 'Error: missing Apollo release lock: %s\n' "$lock" >&2
@@ -84,7 +84,14 @@ apollo_validate_lock() {
       printf 'Error: unsafe Apollo repository for %s: %s\n' "$id" "$repository" >&2
       return 1
     }
-    printf '%s\n' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || {
+    # The palette uses the monorepo's vX.Y.Z tag; each app uses its own
+    # <id>-vX.Y.Z release, so a row cannot pin another app's tag.
+    if [ "$id" = "palette" ]; then
+      tag_pattern='^v[0-9]+\.[0-9]+\.[0-9]+$'
+    else
+      tag_pattern="^${id}-v[0-9]+\\.[0-9]+\\.[0-9]+\$"
+    fi
+    printf '%s\n' "$tag" | grep -Eq "$tag_pattern" || {
       printf 'Error: invalid Apollo release tag for %s: %s\n' "$id" "$tag" >&2
       return 1
     }
