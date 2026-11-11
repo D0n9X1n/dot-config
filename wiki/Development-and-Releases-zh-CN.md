@@ -87,7 +87,7 @@ CI 使用同一个脚本：
 
 `local` 会验证 fork 或私有 overlay，并运行它的 `local/check.sh`；上游没有 overlay，所以在上游什么也不做。上游 ShellCheck 会跳过 `local/`。请看 [自定义](Customization-zh-CN.md)。
 
-普通检查不会访问网络。`apollo-online` 是维护者专用检查，会下载所有固定的上游文件并验证 SHA-256。每次修改 `scripts/apollo-releases.tsv` 时都要运行它。
+普通检查不会访问网络。`apollo-online` 是维护者专用检查，会下载所有固定的上游 release 文件。每次修改 `scripts/apollo-releases.tsv` 时都要运行它。
 
 `scripts/check.sh` 在运行任何检查前会清除 `TMUX`、`TMUX_PANE`、`RMUX` 和 `RMUX_PANE`，并解析检出目录的物理路径。否则，继承的 `TMUX` 会使 RMUX 拒绝 RMUX 检查启动的嵌套会话；继承的 `RMUX` 会使 helper 检查加载的 zsh `exit` 包装函数执行 detach 而不是退出；经符号链接到达的路径（例如 macOS 的 `/tmp`）也与 RMUX 报告的解析后路径不一致。
 

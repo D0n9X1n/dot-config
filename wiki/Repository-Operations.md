@@ -80,9 +80,9 @@ The manifest rejects archived sources. Wiki pages are never installed.
 
 ## External theme assets
 
-Apollo theme files are not stored in Git or listed as manifest sources. `scripts/apollo-releases.tsv` pins exact upstream tags and SHA-256 values. `install.sh` verifies those files, builds a complete local set under `~/.local/share/dot-configs/apollo/`, and links the active SonicTerm, RMUX, native tmux, eza, and Claude theme paths to that set.
+Apollo theme files are not stored in Git or listed as manifest sources. `scripts/apollo-releases.tsv` pins exact upstream release tags. `install.sh` downloads those files, builds a complete local set under `~/.local/share/dot-configs/apollo/`, and links the active SonicTerm, RMUX, native tmux, eza, and Claude theme paths to that set.
 
-Generated status-line, shell-prompt, and Claude theme files are local runtime state derived from the verified canonical palette. A failed download or checksum does not replace the active set. See [Apollo theme](Apollo-Theme.md).
+Generated status-line, shell-prompt, and Claude theme files are local runtime state derived from the canonical palette. A failed download does not replace the active set. See [Apollo theme](Apollo-Theme.md).
 
 ## Safe links
 
@@ -174,7 +174,7 @@ Claude's local-scope entries live under `projects[].mcpServers` in `~/.claude.js
 These paths are local and are not config sources:
 
 - `~/.claude.json` — Claude onboarding, approvals, selected Apollo theme, project state, and MCP state
-- `~/.local/share/dot-configs/apollo/` — verified Apollo releases and generated runtime adapters
+- `~/.local/share/dot-configs/apollo/` — downloaded Apollo releases and generated runtime adapters
 - `~/.copilot-relay/github_token` — relay auth
 - `~/.copilot-relay/copilot_token.json` — relay token cache
 - `~/.copilot-relay/logs/` — relay logs

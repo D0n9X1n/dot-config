@@ -10,10 +10,10 @@ The canonical palette and application adapters live in the [Apollo Theme monorep
 
 | Surface | Source |
 |---|---|
-| SonicTerm | `apollo-theme/apollo-theme` `sonicterm-v0.1.0` release asset `apollo.toml` |
-| RMUX | `apollo-theme/apollo-theme` `rmux-v0.1.0` release asset `apollo-rmux.conf` |
-| Native tmux | `apollo-theme/apollo-theme` `tmux-v0.1.0` release asset `apollo.tmux` |
-| eza | `apollo-theme/apollo-theme` `eza-v0.1.0` release asset `theme.yml` |
+| SonicTerm | `apollo-theme/apollo-theme` `sonicterm-v0.2.1` release asset `apollo.toml` |
+| RMUX | `apollo-theme/apollo-theme` `rmux-v0.2.1` release asset `apollo-rmux.conf` |
+| Native tmux | `apollo-theme/apollo-theme` `tmux-v0.2.1` release asset `apollo.tmux` |
+| eza | `apollo-theme/apollo-theme` `eza-v0.2.1` release asset `theme.yml` |
 | Claude Code UI | Generated locally from the tagged canonical palette |
 | Claude and Copilot status lines | One local include generated from the tagged canonical palette |
 | Oh My Zsh prompt (optional) | Structure in this repo; colors generated locally; selected only through `.zshrc` |
@@ -26,7 +26,9 @@ Neovim is managed in a different repository. This installer does not modify Neov
 
 ## Release lock
 
-`scripts/apollo-releases.tsv` pins each upstream repository, tag, artifact, and SHA-256. Every row uses the `apollo-theme/apollo-theme` monorepo. The palette uses a `vX.Y.Z` tag; each app uses its own `<id>-vX.Y.Z` release, and the validator rejects another app's tag. Apps have independent versions; do not infer their tags from the palette release.
+`scripts/apollo-releases.tsv` pins each upstream repository, tag, and artifact. It records no checksums: a published `<id>-vX.Y.Z` release is the version. Every row uses the `apollo-theme/apollo-theme` monorepo. The palette uses a `vX.Y.Z` tag; each app uses its own `<id>-vX.Y.Z` release, and the validator rejects another app's tag. Apps have independent versions; do not infer their tags from the palette release.
+
+To update an app, pick its newest `<id>-vX.Y.Z` release on the [releases page](https://github.com/apollo-theme/apollo-theme/releases) and set that tag in its row. `scripts/check.sh apollo-online` downloads every pinned file.
 
 The installer downloads exact tagged files. It does not follow `main` or query `latest`. An online maintainer check verifies published bytes:
 
@@ -48,7 +50,7 @@ Verified files live under:
   fsh/
 ```
 
-The bundle hash covers the release lock and adapter code. The installer verifies every download before creating a complete set, then switches `current` only after all release files and generated adapters validate. A valid bundle works offline. A failed download or checksum leaves the previous bundle active.
+The bundle hash covers the release lock and adapter code. Downloads are cached by repository, tag, and artifact, so a new tag downloads once and an unchanged tag never downloads again. The installer builds a complete set, then switches `current` only after all release files and generated adapters validate. A valid bundle works offline. A failed download leaves the previous bundle active.
 
 Installed consumers link to `current`:
 
@@ -71,12 +73,11 @@ The shared include generates `C_FG_BRIGHT` from the canonical `foregroundBright`
 To update Apollo:
 
 1. Review the new release in its Apollo repository.
-2. Change only that row in `scripts/apollo-releases.tsv`.
-3. Update its SHA-256.
-4. Run `scripts/check.sh apollo-online`.
-5. Run `scripts/check.sh all`.
-6. Run `./install.sh` twice.
-7. Reload SonicTerm when ready, then start new Claude and Copilot sessions.
+2. Change only that row's tag in `scripts/apollo-releases.tsv`.
+3. Run `scripts/check.sh apollo-online`.
+4. Run `scripts/check.sh all`.
+5. Run `./install.sh` twice.
+6. Reload SonicTerm when ready, then start new Claude and Copilot sessions.
 
 Installation does not reload or stop live tmux or RMUX servers. A new server reads its config. Apply changes to an existing server only with an explicit reload; see [Tmux](Tmux.md) and [RMUX](RMUX.md). Do not run `ts` or `rs` to apply a theme.
 

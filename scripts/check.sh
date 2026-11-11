@@ -1750,12 +1750,12 @@ PY
   printf 'colourful: true\n' >"$fixtures/theme.yml"
 
   {
-    printf '# id\tkind\trepository\ttag\tartifact\tsha256\n'
-    printf 'palette\traw\texample/apollo-theme\tv1.0.0\tpalette/apollo.json\t%s\n' "$(shasum -a 256 "$fixtures/palette.json" | awk '{print $1}')"
-    printf 'sonicterm\trelease\texample/apollo-theme\tsonicterm-v1.0.0\tapollo.toml\t%s\n' "$(shasum -a 256 "$fixtures/apollo.toml" | awk '{print $1}')"
-    printf 'rmux\trelease\texample/apollo-theme\trmux-v1.0.0\tapollo-rmux.conf\t%s\n' "$(shasum -a 256 "$fixtures/apollo-rmux.conf" | awk '{print $1}')"
-    printf 'tmux\trelease\texample/apollo-theme\ttmux-v1.0.0\tapollo.tmux\t%s\n' "$(shasum -a 256 "$fixtures/apollo.tmux" | awk '{print $1}')"
-    printf 'eza\trelease\texample/apollo-theme\teza-v1.0.0\ttheme.yml\t%s\n' "$(shasum -a 256 "$fixtures/theme.yml" | awk '{print $1}')"
+    printf '# id\tkind\trepository\ttag\tartifact\n'
+    printf 'palette\traw\texample/apollo-theme\tv1.0.0\tpalette/apollo.json\n'
+    printf 'sonicterm\trelease\texample/apollo-theme\tsonicterm-v1.0.0\tapollo.toml\n'
+    printf 'rmux\trelease\texample/apollo-theme\trmux-v1.0.0\tapollo-rmux.conf\n'
+    printf 'tmux\trelease\texample/apollo-theme\ttmux-v1.0.0\tapollo.tmux\n'
+    printf 'eza\trelease\texample/apollo-theme\teza-v1.0.0\ttheme.yml\n'
   } >"$lock"
 
   cat >"$fake_bin/curl" <<'SH'
@@ -1873,22 +1873,51 @@ SH
   [ "$first_current" = "$(readlink "$test_home/.local/share/dot-configs/apollo/current")" ]
   [ -z "$(find "$test_home" -name '*.bak.*' -print)" ]
 
+  # The lock pins tags only: a sixth (checksum) column is rejected.
   awk -F '\t' 'BEGIN { OFS="\t" } $1 == "palette" { $6 = "0000000000000000000000000000000000000000000000000000000000000000" } { print }' \
     "$lock" >"$bad_lock"
   if (
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    apollo_validate_lock "$bad_lock"
+  ) >/dev/null 2>&1; then
+    echo "Apollo lock validator accepted a checksum column" >&2
+    return 1
+  fi
+
+  # Bumping a tag downloads that release again; the cache is keyed by tag.
+  awk -F '\t' 'BEGIN { OFS="\t" } $1 == "tmux" { $4 = "tmux-v1.0.1" } { print }' "$lock" >"$test_root/bumped.tsv"
+  curl_count_before="$(wc -l <"$test_root/curl.log" | tr -d ' ')"
+  (
     export HOME="$test_home"
     export PATH="$fake_bin:$PATH"
-    export APOLLO_RELEASES_FILE="$bad_lock"
+    export APOLLO_RELEASES_FILE="$test_root/bumped.tsv"
     export APOLLO_ROOT="$test_home/.local/share/dot-configs/apollo"
     export APOLLO_TEST_FIXTURES="$fixtures"
     export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
     export APOLLO_SKIP_FSH=1
     DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
     install_apollo_themes
-  ) >/dev/null 2>&1; then
-    echo "Apollo installer accepted a checksum mismatch" >&2
+  ) >/dev/null
+  [ "$(tail -n +$((curl_count_before + 1)) "$test_root/curl.log")" = "https://github.com/example/apollo-theme/releases/download/tmux-v1.0.1/apollo.tmux" ] || {
+    echo "Apollo tag bump did not download exactly the bumped release" >&2
     return 1
-  fi
+  }
+  [ "$(readlink "$test_home/.local/share/dot-configs/apollo/current")" != "$first_current" ]
+  # Switching back to the original lock reuses its cached set without downloading.
+  curl_count_before="$(wc -l <"$test_root/curl.log" | tr -d ' ')"
+  (
+    export HOME="$test_home"
+    export PATH="$fake_bin:$PATH"
+    export APOLLO_RELEASES_FILE="$lock"
+    export APOLLO_ROOT="$test_home/.local/share/dot-configs/apollo"
+    export APOLLO_TEST_FIXTURES="$fixtures"
+    export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+    export APOLLO_SKIP_FSH=1
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    install_apollo_themes
+  ) >/dev/null
+  [ "$(wc -l <"$test_root/curl.log" | tr -d ' ')" = "$curl_count_before" ]
+  [ "$(readlink "$test_home/.local/share/dot-configs/apollo/current")" = "$first_current" ]
 
   # App tags are bound to their own row: <id>-vX.Y.Z. The palette keeps vX.Y.Z.
   local tag_case tag_lock

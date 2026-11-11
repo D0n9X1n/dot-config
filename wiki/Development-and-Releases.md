@@ -87,7 +87,7 @@ CI uses the same script:
 
 `local` validates a fork or private overlay and runs its `local/check.sh`; upstream has none, so it does nothing there. Upstream ShellCheck skips `local/`. See [Customization](Customization.md).
 
-Ordinary checks do not access the network. `apollo-online` is a maintainer-only check that downloads every pinned upstream file and verifies its SHA-256. Run it whenever `scripts/apollo-releases.tsv` changes.
+Ordinary checks do not access the network. `apollo-online` is a maintainer-only check that downloads every pinned upstream release file. Run it whenever `scripts/apollo-releases.tsv` changes.
 
 `scripts/check.sh` clears `TMUX`, `TMUX_PANE`, `RMUX` and `RMUX_PANE` and resolves the checkout's physical path before it runs any check. Otherwise an inherited `TMUX` would make RMUX refuse the nested sessions that the RMUX checks start, an inherited `RMUX` would make the zsh `exit` wrapper that a helper check sources detach instead of exiting, and a path reached through a symlink, such as macOS `/tmp`, would not match the resolved paths that RMUX reports.
 
