@@ -1884,6 +1884,20 @@ SH
     return 1
   fi
 
+  # A set whose files changed on disk fails validation (checked on the active
+  # set, before a tag bump prunes it).
+  apollo_set_file="$test_home/.local/share/dot-configs/apollo/$first_current/sonicterm/apollo.toml"
+  cp "$apollo_set_file" "$test_root/set-file.bak"
+  printf 'name = "Apollo\n' >"$apollo_set_file"
+  if (
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    apollo_validate_bundle "$test_home/.local/share/dot-configs/apollo/$first_current" "$lock"
+  ) >/dev/null 2>&1; then
+    echo "Apollo bundle validation accepted a modified file" >&2
+    return 1
+  fi
+  cp "$test_root/set-file.bak" "$apollo_set_file"
+
   # Bumping a tag downloads that release again; the cache is keyed by tag.
   awk -F '\t' 'BEGIN { OFS="\t" } $1 == "tmux" { $4 = "tmux-v1.0.1" } { print }' "$lock" >"$test_root/bumped.tsv"
   curl_count_before="$(wc -l <"$test_root/curl.log" | tr -d ' ')"
@@ -1903,20 +1917,15 @@ SH
     return 1
   }
   [ "$(readlink "$test_home/.local/share/dot-configs/apollo/current")" != "$first_current" ]
+  [ ! -e "$test_home/.local/share/dot-configs/apollo/$first_current" ] || {
+    echo "Apollo kept the previous set after a tag bump" >&2
+    return 1
+  }
   # A cached download that no longer matches its download-time record is
   # fetched again, and a set whose files changed is not reused.
   apollo_blob="$(find "$test_home/.local/share/dot-configs/apollo/blobs" -path '*sonicterm-v1.0.0*' -name apollo.toml -type f | head -n 1)"
   [ -n "$apollo_blob" ]
   printf 'name = "Apollo\n' >"$apollo_blob"
-  apollo_set_file="$test_home/.local/share/dot-configs/apollo/$first_current/sonicterm/apollo.toml"
-  printf 'name = "Apollo\n' >"$apollo_set_file"
-  if (
-    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
-    apollo_validate_bundle "$test_home/.local/share/dot-configs/apollo/$first_current" "$lock"
-  ) >/dev/null 2>&1; then
-    echo "Apollo bundle validation accepted a modified file" >&2
-    return 1
-  fi
   awk -F '\t' 'BEGIN { OFS="\t" } $1 == "rmux" { $4 = "rmux-v1.0.1" } { print }' "$lock" >"$test_root/bumped2.tsv"
   curl_count_before="$(wc -l <"$test_root/curl.log" | tr -d ' ')"
   (
@@ -1987,12 +1996,44 @@ SH
     export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
     export APOLLO_SKIP_FSH=1
     DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
-    rm -rf "$APOLLO_ROOT/$first_current"
     install_apollo_themes
   ) >/dev/null
   first_current="$(readlink "$test_home/.local/share/dot-configs/apollo/current")"
 
-  # Switching back to the original lock reuses its cached set without downloading.
+  # Each install keeps only what current needs: other sets, legacy flat SHA
+  # blobs, tag dirs the lock no longer names, and stray temp files are pruned.
+  # Nothing outside the Apollo root is touched.
+  apollo_root_dir="$test_home/.local/share/dot-configs/apollo"
+  mkdir -p "$apollo_root_dir/sets/0000000000000000000000000000000000000000000000000000000000000000/palette"
+  printf 'old\n' >"$apollo_root_dir/blobs/1111111111111111111111111111111111111111111111111111111111111111"
+  mkdir -p "$apollo_root_dir/blobs/example/apollo-theme/tmux-v0.0.9"
+  printf 'old\n' >"$apollo_root_dir/blobs/example/apollo-theme/tmux-v0.0.9/apollo.tmux"
+  printf 'partial\n' >"$apollo_root_dir/blobs/example/apollo-theme/eza-v1.0.0/theme.yml.AbC123"
+  printf 'keep\n' >"$test_home/.local/share/dot-configs/outside-apollo"
+  (
+    export HOME="$test_home"
+    export PATH="$fake_bin:$PATH"
+    export APOLLO_RELEASES_FILE="$lock"
+    export APOLLO_ROOT="$apollo_root_dir"
+    export APOLLO_TEST_FIXTURES="$fixtures"
+    export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+    export APOLLO_SKIP_FSH=1
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    install_apollo_themes
+  ) >/dev/null
+  apollo_kept_sets="$(find "$apollo_root_dir/sets" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')"
+  [ "$apollo_kept_sets" = 1 ] || { echo "Apollo kept $apollo_kept_sets sets; want only current" >&2; return 1; }
+  [ "sets/$(basename "$(find "$apollo_root_dir/sets" -mindepth 1 -maxdepth 1)")" = "$(readlink "$apollo_root_dir/current")" ]
+  [ -z "$(find "$apollo_root_dir/blobs" -maxdepth 1 -type f)" ] || { echo "Apollo kept a legacy flat blob" >&2; return 1; }
+  [ ! -e "$apollo_root_dir/blobs/example/apollo-theme/tmux-v0.0.9" ] || { echo "Apollo kept a tag dir not in the lock" >&2; return 1; }
+  [ -z "$(find "$apollo_root_dir/blobs" -name '*.??????' ! -name '*.sha256')" ] || { echo "Apollo kept a stray temp download" >&2; return 1; }
+  [ -s "$apollo_root_dir/blobs/example/apollo-theme/eza-v1.0.0/theme.yml" ]
+  [ -f "$test_home/.local/share/dot-configs/outside-apollo" ] || { echo "Apollo prune touched a file outside its root" >&2; return 1; }
+  cmp -s "$fixtures/apollo.tmux" "$test_home/.config/tmux-apollo-theme/apollo.tmux"
+  first_current="$(readlink "$apollo_root_dir/current")"
+
+  # Switching back to the original lock rebuilds from cached downloads without
+  # downloading (the previous set itself was pruned).
   curl_count_before="$(wc -l <"$test_root/curl.log" | tr -d ' ')"
   (
     export HOME="$test_home"

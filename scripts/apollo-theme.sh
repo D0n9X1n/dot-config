@@ -607,6 +607,55 @@ ZSH
   rm -rf "$tmp"
 }
 
+# Keep only what the active install needs: the set `current` points to, the
+# lock's tag directories, and fsh/. Remove other sets, legacy flat SHA blobs
+# from the old lock format, tag directories the lock no longer names, and
+# temp files left by an interrupted download. Never follows a symlink or
+# leaves the Apollo root.
+apollo_prune() {
+  local root="$1" lock="$2" current_set entry rel keep id kind repository tag artifact
+  [ -d "$root" ] && [ ! -L "$root" ] || return 0
+  current_set="$(readlink "${root}/current")" || return 0
+  case "$current_set" in
+    sets/*) ;;
+    *) return 0 ;;
+  esac
+  [ -d "${root}/${current_set}" ] && [ -f "${root}/${current_set}/.complete" ] || return 0
+
+  for entry in "${root}"/sets/* "${root}"/sets/.[!.]*; do
+    [ -e "$entry" ] || [ -L "$entry" ] || continue
+    [ "sets/$(basename "$entry")" = "$current_set" ] && continue
+    rm -rf -- "$entry"
+  done
+
+  keep=$'\n'
+  while IFS=$'\t' read -r id kind repository tag artifact; do
+    case "$id" in
+      ''|'#'*) continue ;;
+    esac
+    keep="${keep}${repository}/${tag}"$'\n'
+  done <"$lock"
+
+  [ -d "${root}/blobs" ] && [ ! -L "${root}/blobs" ] || return 0
+  while IFS= read -r entry; do
+    rel="${entry#"${root}/blobs/"}"
+    case "$rel" in
+      */*/*)
+        case "$keep" in
+          *$'\n'"$rel"$'\n'*) ;;
+          *) rm -rf -- "$entry" ;;
+        esac
+        ;;
+      */*) [ -n "$(find "$entry" -mindepth 1 -maxdepth 1 2>/dev/null)" ] || rmdir -- "$entry" 2>/dev/null || true ;;
+      *) [ -d "$entry" ] && [ -n "$(find "$entry" -mindepth 1 -maxdepth 1 2>/dev/null)" ] || rm -rf -- "$entry" ;;
+    esac
+  done < <(find "${root}/blobs" -mindepth 1 -maxdepth 3 ! -type l | sort -r)
+
+  # A temp download is <file>.XXXXXX (and its .sha256) next to a kept file.
+  find "${root}/blobs" -type f -name '*.??????' ! -name '*.sha256' -delete 2>/dev/null || true
+  find "${root}/blobs" -type f -name '*.??????.sha256' -delete 2>/dev/null || true
+}
+
 install_apollo_themes() {
   local lock root lock_hash final stage target
   lock="$(apollo_release_file)"
@@ -640,6 +689,7 @@ install_apollo_themes() {
   apollo_set_claude_theme || return 1
   target="sets/${lock_hash}"
   apollo_switch_current "$root" "$target" || return 1
+  apollo_prune "$root" "$lock" || return 1
   printf 'Apollo themes are active from %s.\n' "$final"
 }
 
