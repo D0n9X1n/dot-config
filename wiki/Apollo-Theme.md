@@ -50,7 +50,7 @@ Verified files live under:
   fsh/
 ```
 
-The bundle hash covers the release lock and adapter code. Downloads are cached by repository, tag, and artifact, so a new tag downloads once and an unchanged tag never downloads again. Each cached file and each built set records the SHA-256 it had when written; a file that later changed on disk is downloaded again or rebuilt, not reused. These records detect local changes only; the lock pins tags, not checksums. The installer builds a complete set, then switches `current` only after all release files and generated adapters validate. A valid bundle works offline. A failed download leaves the previous bundle active.
+The bundle hash covers the release lock and adapter code. Downloads are cached by repository, tag, and artifact, so a new tag downloads once and an unchanged tag never downloads again. Each cached file and each built set records the SHA-256 it had when written; a file that later changed on disk is downloaded again or rebuilt, not reused. These records detect local changes only; the lock pins tags, not checksums. The installer builds a complete set, then switches `current` only after all release files and generated adapters validate. A valid bundle works offline. A failed download leaves the previous bundle active. After `current` switches, the installer removes what it no longer needs: every other set, cached tag directories the lock no longer names, legacy SHA-named downloads from the old lock format, and leftover partial downloads. It never leaves `~/.local/share/dot-configs/apollo/`, and `fsh/` is kept.
 
 Installed consumers link to `current`:
 

@@ -459,9 +459,11 @@ apollo_build_bundle() {
   apollo_generate_claude_theme "${stage}/palette/apollo.json" "${stage}/generated/claude/apollo.json"
   (
     cd "$stage" || exit 1
-    for file in palette/apollo.json sonicterm/apollo.toml rmux/apollo-rmux.conf tmux/apollo.tmux eza/theme.yml; do
-      printf '%s  %s\n' "$(apollo_sha256 "$file")" "$file"
-    done
+    # Every file, including generated ones the consumer links point to.
+    find . -type f ! -name SHA256SUMS ! -name .complete | sed 's#^\./##' | LC_ALL=C sort | \
+      while IFS= read -r file; do
+        printf '%s  %s\n' "$(apollo_sha256 "$file")" "$file"
+      done
   ) >"${stage}/SHA256SUMS" || return 1
   : >"${stage}/.complete"
   apollo_validate_bundle "$stage" "$lock"
@@ -607,7 +609,131 @@ ZSH
   rm -rf "$tmp"
 }
 
+# Keep only what the active install needs: the set `current` points to, the
+# lock's tag directories, and fsh/. Remove other sets, legacy flat SHA blobs
+# from the old lock format, tag directories the lock no longer names, and
+# temp files left by an interrupted download. Never follows a symlink or
+# leaves the Apollo root.
+# True when nothing in a set changed since it was built. Every recorded file
+# must still match. A file the record does not list (sets built before every
+# file was recorded list only the downloads) must be a generated file that
+# regenerating from the set's palette reproduces exactly; anything else, or
+# any doubt, means the set is treated as edited and kept.
+apollo_set_unmodified() {
+  local set="$1" sum file unlisted
+  while read -r sum file; do
+    [ -n "$file" ] || continue
+    [ -f "${set}/${file}" ] && [ "$(apollo_sha256 "${set}/${file}")" = "$sum" ] || return 1
+  done <"${set}/SHA256SUMS"
+  unlisted="$(cd "$set" && find . -type f ! -name SHA256SUMS ! -name .complete | sed 's#^\./##' | \
+    while IFS= read -r file; do
+      awk -v f="$file" '$2 == f { found = 1 } END { exit !found }' SHA256SUMS || printf '%s\n' "$file"
+    done)"
+  [ -z "$unlisted" ] && return 0
+  # Only the files apollo_build_bundle generates may be unlisted.
+  printf '%s\n' "$unlisted" | grep -qvxE 'generated/(statusline-colors\.sh|zsh-colors\.zsh|claude/apollo\.json)' && return 1
+  apollo_validate_generated "$set" >/dev/null 2>&1
+}
+
+apollo_prune() {
+  local root="$1" lock="$2" current_set entry rel keep id kind repository tag artifact
+  [ -d "$root" ] && [ ! -L "$root" ] || return 0
+  current_set="$(readlink "${root}/current")" || return 0
+  case "$current_set" in
+    sets/*) ;;
+    *) return 0 ;;
+  esac
+  [ -d "${root}/sets" ] && [ ! -L "${root}/sets" ] || return 0
+  [ -d "${root}/${current_set}" ] && [ ! -L "${root}/${current_set}" ] && [ -f "${root}/${current_set}/.complete" ] || return 0
+
+  for entry in "${root}"/sets/* "${root}"/sets/.[!.]*; do
+    [ -e "$entry" ] || [ -L "$entry" ] || continue
+    [ "sets/$(basename "$entry")" = "$current_set" ] && continue
+    # A complete set whose files no longer match its build record was edited
+    # (the consumer links point into it): keep it and say so.
+    if [ -d "$entry" ] && [ ! -L "$entry" ] && [ -f "${entry}/SHA256SUMS" ] && \
+        ! apollo_set_unmodified "$entry"; then
+      printf 'Apollo: kept %s (its files were edited).\n' "${entry#"${root}/"}"
+      continue
+    fi
+    rm -rf -- "$entry"
+  done
+
+  keep=$'\n'
+  while IFS=$'\t' read -r id kind repository tag artifact; do
+    case "$id" in
+      ''|'#'*) continue ;;
+    esac
+    keep="${keep}${repository}/${tag}"$'\n'
+  done <"$lock"
+
+  [ -d "${root}/blobs" ] && [ ! -L "${root}/blobs" ] || return 0
+  while IFS= read -r entry; do
+    rel="${entry#"${root}/blobs/"}"
+    case "$rel" in
+      */*/*)
+        case "$keep" in
+          *$'\n'"$rel"$'\n'*) ;;
+          *) rm -rf -- "$entry" ;;
+        esac
+        ;;
+      */*) [ -n "$(find "$entry" -mindepth 1 -maxdepth 1 2>/dev/null)" ] || rmdir -- "$entry" 2>/dev/null || true ;;
+      *) [ -d "$entry" ] && [ -n "$(find "$entry" -mindepth 1 -maxdepth 1 2>/dev/null)" ] || rm -rf -- "$entry" ;;
+    esac
+  done < <(find "${root}/blobs" -mindepth 1 -maxdepth 3 ! -type l | sort -r)
+
+  # A temp download is <file>.XXXXXX (and its .sha256) next to a kept file.
+  find "${root}/blobs" -type f -name '*.??????' ! -name '*.sha256' -delete 2>/dev/null || true
+  find "${root}/blobs" -type f -name '*.??????.sha256' -delete 2>/dev/null || true
+}
+
+# One install at a time: build, switch and prune share the Apollo root. The
+# lock is a kernel flock on fd 8, taken by perl on the shell's own open file
+# `.install.flock`, so it is held until this shell closes fd 8 or exits, even
+# on SIGKILL. That file is never unlinked: two installs always contend for
+# the same inode, so there is no stale-lock takeover and no race.
+apollo_lock_acquire() {
+  local root="$1" owner
+  mkdir -p "$root" || return 1
+  exec 8>>"${root}/.install.flock" || return 1
+  if ! perl -MFcntl=:flock -e '
+      open(my $f, ">&=", 8) or exit 2;
+      for (0 .. $ARGV[0]) { exit 0 if flock($f, LOCK_EX | LOCK_NB); sleep 1 }
+      exit 1' "${APOLLO_LOCK_WAIT:-60}"; then
+    exec 8>&-
+    printf 'Error: another Apollo install is running (%s); try again later.\n' "${root}/.install.flock" >&2
+    return 1
+  fi
+  # The previous lock was the directory `.install.lock` holding the owner's
+  # PID. Handle it only while holding the flock: honor a live owner, remove
+  # one whose owner is gone.
+  if [ -d "${root}/.install.lock" ] && [ ! -L "${root}/.install.lock" ]; then
+    owner="$(cat "${root}/.install.lock/pid" 2>/dev/null || true)"
+    if [ -n "$owner" ] && kill -0 "$owner" 2>/dev/null; then
+      exec 8>&-
+      printf 'Error: another Apollo install is running (%s); try again later.\n' "${root}/.install.lock" >&2
+      return 1
+    fi
+    rm -rf -- "${root}/.install.lock"
+  elif [ -f "${root}/.install.lock" ] && [ ! -L "${root}/.install.lock" ] && [ ! -s "${root}/.install.lock" ]; then
+    rm -f -- "${root}/.install.lock"
+  fi
+}
+
+apollo_lock_release() {
+  exec 8>&-
+}
+
 install_apollo_themes() {
+  local root rc=0
+  root="$(apollo_root)"
+  apollo_lock_acquire "$root" || return 1
+  apollo_install_locked || rc=$?
+  apollo_lock_release "$root"
+  return "$rc"
+}
+
+apollo_install_locked() {
   local lock root lock_hash final stage target
   lock="$(apollo_release_file)"
   root="$(apollo_root)"
@@ -621,18 +747,22 @@ install_apollo_themes() {
 
   lock_hash="$(apollo_bundle_hash "$lock")" || return 1
   final="${root}/sets/${lock_hash}"
-  mkdir -p "${root}/sets" "${root}/blobs"
+  mkdir -p "${root}/sets" "${root}/blobs" || return 1
   if ! apollo_validate_bundle "$final" "$lock" >/dev/null 2>&1; then
     if [ -e "$final" ]; then
       printf 'Error: existing Apollo release set is incomplete or corrupt: %s\n' "$final" >&2
       return 1
     fi
-    stage="$(mktemp -d "${root}/sets/.${lock_hash}.XXXXXX")"
+    stage="$(mktemp -d "${root}/sets/.${lock_hash}.XXXXXX")" || return 1
     if ! apollo_build_bundle "$stage" "$lock"; then
       rm -rf "$stage"
       return 1
     fi
-    mv "$stage" "$final"
+    if ! mv "$stage" "$final"; then
+      rm -rf -- "$stage"
+      printf 'Error: could not publish Apollo set %s.\n' "$final" >&2
+      return 1
+    fi
   fi
 
   apollo_install_fsh_base16 "$root" || return 1
@@ -640,6 +770,7 @@ install_apollo_themes() {
   apollo_set_claude_theme || return 1
   target="sets/${lock_hash}"
   apollo_switch_current "$root" "$target" || return 1
+  apollo_prune "$root" "$lock" || return 1
   printf 'Apollo themes are active from %s.\n' "$final"
 }
 
