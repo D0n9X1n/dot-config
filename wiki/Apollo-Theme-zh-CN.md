@@ -50,7 +50,7 @@ scripts/check.sh apollo-online
   fsh/
 ```
 
-Bundle hash 包含 release lock 和 adapter code。下载按仓库、tag 和 artifact 缓存：新 tag 只下载一次，未改变的 tag 不会再下载。安装器先创建完整 set；所有 release 文件和生成 adapters 都通过检查后，才切换 `current`。有效 bundle 可以离线使用。下载失败时，旧 bundle 保持生效。
+Bundle hash 包含 release lock 和 adapter code。下载按仓库、tag 和 artifact 缓存：新 tag 只下载一次，未改变的 tag 不会再下载。每个缓存文件和每个构建好的 set 都记录写入时的 SHA-256；之后在本机被改动的文件会重新下载或重建，不会被复用。这些记录只用于发现本机改动；lock 固定的是 tag，不是 checksum。安装器先创建完整 set；所有 release 文件和生成 adapters 都通过检查后，才切换 `current`。有效 bundle 可以离线使用。下载失败时，旧 bundle 保持生效。
 
 使用者链接到 `current`：
 

@@ -1903,6 +1903,73 @@ SH
     return 1
   }
   [ "$(readlink "$test_home/.local/share/dot-configs/apollo/current")" != "$first_current" ]
+  # A cached download that no longer matches its download-time record is
+  # fetched again, and a set whose files changed is not reused.
+  apollo_blob="$(find "$test_home/.local/share/dot-configs/apollo/blobs" -path '*sonicterm-v1.0.0*' -name apollo.toml -type f | head -n 1)"
+  [ -n "$apollo_blob" ]
+  printf 'name = "Apollo\n' >"$apollo_blob"
+  apollo_set_file="$test_home/.local/share/dot-configs/apollo/$first_current/sonicterm/apollo.toml"
+  printf 'name = "Apollo\n' >"$apollo_set_file"
+  if (
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    apollo_validate_bundle "$test_home/.local/share/dot-configs/apollo/$first_current" "$lock"
+  ) >/dev/null 2>&1; then
+    echo "Apollo bundle validation accepted a modified file" >&2
+    return 1
+  fi
+  awk -F '\t' 'BEGIN { OFS="\t" } $1 == "rmux" { $4 = "rmux-v1.0.1" } { print }' "$lock" >"$test_root/bumped2.tsv"
+  curl_count_before="$(wc -l <"$test_root/curl.log" | tr -d ' ')"
+  (
+    export HOME="$test_home"
+    export PATH="$fake_bin:$PATH"
+    export APOLLO_RELEASES_FILE="$test_root/bumped2.tsv"
+    export APOLLO_ROOT="$test_home/.local/share/dot-configs/apollo"
+    export APOLLO_TEST_FIXTURES="$fixtures"
+    export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+    export APOLLO_SKIP_FSH=1
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    install_apollo_themes
+  ) >/dev/null
+  tail -n +$((curl_count_before + 1)) "$test_root/curl.log" | grep -Fxq 'https://github.com/example/apollo-theme/releases/download/sonicterm-v1.0.0/apollo.toml' || {
+    echo "Apollo reused a corrupt cached download" >&2
+    return 1
+  }
+  cmp -s "$fixtures/apollo.toml" "$test_home/.local/share/dot-configs/apollo/current/sonicterm/apollo.toml"
+
+  # Distinct artifact paths never share a cache entry.
+  (
+    export APOLLO_ROOT="$test_root/cache-key"
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    a="$(apollo_blob_path example/apollo-theme v1.0.0 palette/apollo.json)"
+    b="$(apollo_blob_path example/apollo-theme v1.0.0 palette_apollo.json)"
+    [ "$a" != "$b" ]
+  ) || { echo "Apollo cache keys collide for distinct artifacts" >&2; return 1; }
+
+  # A trailing empty column still counts as a sixth field.
+  awk 'BEGIN { OFS="" } $1 == "palette" { print $0, "\t"; next } { print }' "$lock" >"$test_root/trailing.tsv"
+  if (
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    apollo_validate_lock "$test_root/trailing.tsv"
+  ) >/dev/null 2>&1; then
+    echo "Apollo lock validator accepted an empty sixth column" >&2
+    return 1
+  fi
+
+  # Restore the first set for the switch-back check below.
+  (
+    export HOME="$test_home"
+    export PATH="$fake_bin:$PATH"
+    export APOLLO_RELEASES_FILE="$lock"
+    export APOLLO_ROOT="$test_home/.local/share/dot-configs/apollo"
+    export APOLLO_TEST_FIXTURES="$fixtures"
+    export APOLLO_TEST_CURL_LOG="$test_root/curl.log"
+    export APOLLO_SKIP_FSH=1
+    DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
+    rm -rf "$APOLLO_ROOT/$first_current"
+    install_apollo_themes
+  ) >/dev/null
+  first_current="$(readlink "$test_home/.local/share/dot-configs/apollo/current")"
+
   # Switching back to the original lock reuses its cached set without downloading.
   curl_count_before="$(wc -l <"$test_root/curl.log" | tr -d ' ')"
   (

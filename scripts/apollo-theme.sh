@@ -55,6 +55,12 @@ apollo_validate_lock() {
     printf 'Error: missing Apollo release lock: %s\n' "$lock" >&2
     return 1
   }
+  # read collapses trailing empty tab fields, so count columns with awk.
+  id="$(awk -F '\t' '$0 !~ /^(#|$)/ && NF != 5 { print $1; exit }' "$lock")"
+  [ -z "$id" ] || {
+    printf 'Error: Apollo lock row must have five fields (tags only, no checksums): %s\n' "$id" >&2
+    return 1
+  }
 
   while IFS=$'\t' read -r id kind repository tag artifact extra; do
     case "$id" in
@@ -139,15 +145,29 @@ apollo_run_logged() {
   fi
 }
 
+# Cache path for one release file. Repository and tag are validated names and
+# the artifact keeps its own directories, so distinct files never collide.
+apollo_blob_path() {
+  printf '%s/blobs/%s/%s/%s\n' "$(apollo_root)" "$1" "$2" "$3"
+}
+
+# A cached file is reused only while it still matches the SHA-256 recorded
+# when it was downloaded. Releases are pinned by tag; this only detects a
+# cache that changed on disk.
+apollo_blob_intact() {
+  local blob="$1"
+  [ -s "$blob" ] && [ -s "${blob}.sha256" ] && \
+    [ "$(apollo_sha256 "$blob")" = "$(cat "${blob}.sha256")" ]
+}
+
 apollo_fetch_blob() {
   local id="$1" kind="$2" repository="$3" tag="$4" artifact="$5"
-  local root blob url tmp
+  local blob url tmp
 
   # A release is immutable once published, so the tag names the file; a new
   # tag is a new cache entry and a fresh download.
-  root="$(apollo_root)"
-  blob="${root}/blobs/${repository//\//_}/${tag}/${artifact//\//_}"
-  if [ -s "$blob" ]; then
+  blob="$(apollo_blob_path "$repository" "$tag" "$artifact")"
+  if apollo_blob_intact "$blob"; then
     printf '%s\n' "$blob"
     return 0
   fi
@@ -165,7 +185,12 @@ apollo_fetch_blob() {
     return 1
   fi
   chmod 644 "$tmp"
+  apollo_sha256 "$tmp" >"${tmp}.sha256" || {
+    rm -f "$tmp" "${tmp}.sha256"
+    return 1
+  }
   mv -f "$tmp" "$blob"
+  mv -f "${tmp}.sha256" "${blob}.sha256"
   printf '%s\n' "$blob"
 }
 
@@ -399,6 +424,7 @@ apollo_validate_bundle() {
       eza) file="${bundle}/eza/theme.yml" ;;
     esac
     [ -s "$file" ] || return 1
+    grep -Fxq "$(apollo_sha256 "$file")  ${file#"${bundle}/"}" "${bundle}/SHA256SUMS" 2>/dev/null || return 1
   done
   apollo_validate_generated "$bundle"
 }
@@ -429,6 +455,12 @@ apollo_build_bundle() {
   apollo_generate_statusline_colors "${stage}/palette/apollo.json" "${stage}/generated/statusline-colors.sh"
   apollo_generate_zsh_colors "${stage}/palette/apollo.json" "${stage}/generated/zsh-colors.zsh"
   apollo_generate_claude_theme "${stage}/palette/apollo.json" "${stage}/generated/claude/apollo.json"
+  (
+    cd "$stage" || exit 1
+    for file in palette/apollo.json sonicterm/apollo.toml rmux/apollo-rmux.conf tmux/apollo.tmux eza/theme.yml; do
+      printf '%s  %s\n' "$(apollo_sha256 "$file")" "$file"
+    done
+  ) >"${stage}/SHA256SUMS" || return 1
   : >"${stage}/.complete"
   apollo_validate_bundle "$stage" "$lock"
 }
