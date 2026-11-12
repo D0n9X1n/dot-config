@@ -1,0 +1,41 @@
+# File types Zed opens by default on macOS (install.sh -> scripts/zed-defaults.js).
+# One uniform type id per line. Find one with:
+#   osascript -l JavaScript -e 'ObjC.import("CoreServices"); ObjC.unwrap(ObjC.castRefToObject($.UTTypeCreatePreferredIdentifierForTag($.kUTTagClassFilenameExtension, $("yaml"), $())))'
+# Not here on purpose: .ts (macOS reads it as MPEG-2 video), web pages, CSV, and logs.
+
+# Text and docs
+public.plain-text
+public.text
+net.daringfireball.markdown
+# Data and config
+public.json
+public.yaml
+public.toml
+public.xml
+com.apple.property-list
+com.microsoft.ini
+org.vim.cfg-file
+# Code
+public.source-code
+public.script
+public.shell-script
+public.bash-script
+public.zsh-script
+public.python-script
+public.ruby-script
+public.perl-script
+com.netscape.javascript-source
+com.microsoft.typescript
+public.c-source
+public.c-header
+public.c-plus-plus-source
+public.c-plus-plus-header
+public.objective-c-source
+public.swift-source
+com.sun.java-source
+org.golang.go-script
+org.rust-lang.rust-script
+org.lua.lua-source
+org.iso.sql
+org.vim.vim-script
+public.css

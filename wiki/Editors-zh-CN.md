@@ -6,9 +6,21 @@
 
 ## Zed
 
-`config/zed/settings.json` 链接到 `~/.config/zed/settings.json`。它包含主题、图标主题、字体、Vim 模式和 agent servers。新窗口会打开一个空标签页。
+`config/zed/settings.json` 链接到 `~/.config/zed/settings.json`。它包含主题、图标主题、字体、Vim 模式和 agent servers。新窗口会打开一个空标签页。编辑器工具栏整行隐藏：面包屑、快捷操作、Selections 菜单和 agent review 按钮都关闭，`code_actions` 默认已关闭。文件名只在标签页显示一次。
+
+标签页标题比编辑器文字大。Zed 没有单独的标签页字号设置：标签页标题使用默认标签字号，即 `ui_font_size` 的 14/16。`ui_font_size` 为 `15`、`buffer_font_size` 为 `13` 时，标签页标题约为 13.1px。`scripts/check.sh editors` 会检查标签页标题始终大于编辑器文字。
 
 Zed 会通过链接写入设置，因此在 Zed 中修改设置后，本仓库会出现 Git 改动。请提交它，或用 `git checkout` 丢弃。
+
+### 文本文件的默认应用
+
+在 macOS 上，`install.sh` 把 Zed 设为文本和代码文件的默认应用：纯文本、Markdown、JSON、YAML、TOML、XML、property list，以及源代码和脚本文件。列表在 `scripts/zed-default-types.txt`，每行一个统一类型标识符。`scripts/zed-defaults.js`（用 `osascript` 运行，不需要 Xcode）只为 Zed 尚未处理的类型请求 Launch Services。macOS 随后为每个类型弹出一个 “Use Zed?” 对话框；点 **Use "Zed"**。已经是 Zed 的类型不会改动，所以之后的安装不会再询问。设置 `SKIP_ZED_DEFAULTS=1` 可跳过此步骤。
+
+有意不在列表中：`.ts`（macOS 把它识别为 MPEG-2 视频）、网页、CSV 和日志。查看某个类型现在用什么打开：
+
+```sh
+osascript -l JavaScript scripts/zed-defaults.js dev.zed.Zed check public.yaml
+```
 
 不同步：`~/.config/zed/themes/`（为空）和 `~/.config/zed/prompts/`（Zed 的本地 prompt 数据库）。
 

@@ -53,8 +53,6 @@ link_file	journaled	rm -f "$dest" || return 1
 link_file	journaled	rm -rf "$dest" || return 1
 link_local_overlay	journaled	rm -f "$dest" && echo "Removed old local link: $dest"
 main	journaled	[ -f "$legacy_plist" ] && rm -f "$legacy_plist" && echo "Migration: removed $legacy_plist"
-merge_harbor_client_settings	journaled	if "$@" >"$tmp" && chmod 600 "$tmp" && mv -f "$tmp" "$dest"; then
-merge_harbor_client_settings	temp-only	rm -f "$tmp"
 merge_shared_mcp	journaled	jq '{mcpServers: (.mcpServers // {})}' "$shared_mcp" >"$copilot_mcp_pre" \
 merge_shared_mcp	journaled	mv "$tmp_mcp" "$copilot_mcp_pre"
 merge_shared_mcp	temp-only	' "$copilot_mcp_pre" "$shared_mcp" >"$tmp_mcp"; then
