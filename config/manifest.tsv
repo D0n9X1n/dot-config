@@ -9,6 +9,7 @@ link	config/sonicterm/keymaps/sonicterm-windows.toml	.sonicterm/keymaps/sonicter
 link	config/claude/CLAUDE.md	.claude/CLAUDE.md
 link	config/claude/settings.json	.claude/settings.json
 link	config/claude/statusline.sh	.claude/statusline.sh
+link	config/claude/statusline.ps1	.claude/statusline.ps1
 link	config/claude/skills/update-settings/SKILL.md	.claude/skills/update-settings/SKILL.md
 link	config/copilot/copilot-instructions.md	.copilot/copilot-instructions.md
 link	config/copilot/settings.json	.copilot/settings.json

@@ -181,6 +181,8 @@ Every item is an accent-colored Nerd Font icon, a muted label, and its value; a 
 
 Both scripts source the same generated Apollo color include. If it is missing or color is disabled, they remain readable without colors. Claude's custom status line has no live-subagent count or tree because Claude Code has native subagent UI. Copilot keeps the custom rows.
 
+On Windows, `config/claude/statusline.ps1` is the PowerShell 7 port of `statusline.sh` with the same two-line layout. `config/claude/settings.json` keeps the macOS command; a Windows machine sets `statusLine.command` to `pwsh -NoProfile -File ~/.claude/statusline.ps1` with `padding` `1` in its own `~/.claude/settings.json`. The port embeds its colors instead of reading the generated Apollo include.
+
 ## Plugins
 
 The tracked settings enable:

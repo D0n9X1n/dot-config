@@ -181,6 +181,8 @@ Claude 与 Copilot 状态栏共享两行设计、本机生成的 Apollo 颜色�
 
 两个脚本读取同一个本机生成 Apollo 颜色 include。文件缺失或禁用颜色时，它们仍会输出可读的无色内容。Claude 自定义状态栏没有 live-subagent 数量或树，因为 Claude Code 已有原生 subagent UI。Copilot 保留自定义 rows。
 
+Windows 上，`config/claude/statusline.ps1` 是 `statusline.sh` 的 PowerShell 7 移植版，布局同为两行。`config/claude/settings.json` 保留 macOS 命令；Windows 机器在自己的 `~/.claude/settings.json` 中把 `statusLine.command` 设为 `pwsh -NoProfile -File ~/.claude/statusline.ps1`，`padding` 设为 `1`。移植版内嵌颜色，不读取本机生成的 Apollo include。
+
 ## Plugins
 
 受管设置启用：
