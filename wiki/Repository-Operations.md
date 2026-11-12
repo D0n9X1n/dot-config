@@ -64,7 +64,6 @@ The manifest check excludes SonicTerm `*.save.lock` runtime files and the `confi
 | `config/zed/settings.json` | `~/.config/zed/settings.json` |
 | `config/neovide/config.toml` | `~/.config/neovide/config.toml` |
 | `config/mcp/mcp-shared.json` | merge into local Copilot MCP data |
-| `config/harbor-client/settings.json` | merge model keys into `~/Library/Application Support/harbor-client/settings.json` |
 | `config/launchd/*.plist` | render into `~/Library/LaunchAgents/` |
 | `config/herdr/{layouts,themes}/*`, `config/herdr/user/{settings,keys}.json` | links under `~/.config/herdr-app/`; see [Herdr](Herdr.md) |
 | `config/herdr/mods/**` | copies under `~/.config/herdr-app/mods/` |

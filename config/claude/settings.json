@@ -95,6 +95,7 @@
   "theme": "custom:apollo",
   "autoCompactEnabled": true,
   "crossSessionInbound": "accept",
+  "cleanupPeriodDays": 7,
   "skipAutoPermissionPrompt": true,
   "hooks": {
     "SessionStart": [

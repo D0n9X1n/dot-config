@@ -2,14 +2,14 @@
 
 [English](Herdr.md) | 简体中文
 
-本页介绍终端工作区应用的 Apollo 布局。应用是 **Apollo.app**：它是 [Herdr](https://herdr.dev) 的改名副本，已取代 Herdr.app。它读取 Herdr 的设置目录 `~/.config/herdr-app`，所以下面的内容仍然安装到那里。布局放在独立的公开仓库 [herdr-config](https://github.com/MOSconfig/herdr-config) 中。本仓库把它作为 Git 子模块固定在 `config/herdr`。
+本页介绍终端工作区应用的 Apollo 布局。应用是 **Apollo.app**：它是 [Herdr](https://herdr.dev) 的改名副本，已取代 Herdr.app。它读取 Herdr 的设置目录 `~/.config/herdr-app`，所以下面的内容仍然安装到那里。布局放在独立的公开仓库 [herdr-config](https://github.com/MOSconfig/herdr-config) 中。本仓库把它作为 Git 子模块放在 `config/herdr`。子模块跟随 herdr-config 的 `main`：每次安装都会更新到最新提交。
 
 ## 安装做什么
 
 `./install.sh`（以及运行它的 `uu`）在 macOS 上执行这些步骤。它从不安装 Herdr 或 Apollo.app；请手动安装 Apollo.app。
 
-1. **更新子模块。** 运行 `git submodule update --init config/herdr`。离线时会跳过 Herdr 行，并输出一行 `Herdr config:`，其他内容照常安装。
-2. **保留你的当前值。** 读取当前的 `settings.json` 和 `keys.json`，有差异时写入 `config/herdr/user/`。如果你的 `keys.json` 仍是 Herdr 默认值，则使用 Apollo 按键表。
+1. **更新子模块。** 运行 `git submodule update --init --remote config/herdr`，拉取 herdr-config 并检出最新的 `main`。已有检出时若离线，输出一行 `Herdr config: could not update`，并用当前检出安装，绝不回退到 dot-configs 记录的旧提交。如果 herdr-config 的 `main` 不再有 `user/settings.json` 或 `user/keys.json`，检出保持不变并输出一行，所以你的 live settings 和 keys 链接不会失效。没有检出时若离线，会跳过 Herdr 行，并输出一行 `Herdr config:`。其他内容照常安装。
+2. **保留你的当前值。** 读取当前的 `settings.json` 和 `keys.json`，有差异时写入 `config/herdr/user/`。如果你的 `keys.json` 仍是 Herdr 默认值，则使用 Apollo 按键表。如果某个值写回失败，警告会给出仍保存你这些值的临时目录。
 3. **安装文件。** 布局、主题、`settings.json`、`keys.json` 和 agent 脚本是链接。mod 是副本；见下文。
 4. **恢复程序坞图标。** 重新签名或复制 `Apollo.app` 会去掉它的自定义图标。如果 `config/herdr/scripts/set-app-icon.sh --check --app <Apollo.app>` 没有发现自定义图标，安装器会重新设置 Apollo 图标。它先查找 `~/Applications`，再查找 `/Applications`。失败时输出警告并继续。
 
@@ -42,14 +42,19 @@ Claude Code 和 Copilot CLI 在会话开始时运行：
 
 ## 设置修改
 
-`config/herdr` 设置了 `ignore = dirty`，所以 Herdr 自己对 `settings.json` 和 `keys.json` 的写入不会阻止 `uu`。要让某个修改在所有机器上生效，请在 herdr-config 中提交，然后在这里更新固定版本。
+`.gitmodules` 为 `config/herdr` 设置了 `branch = main` 和 `ignore = all`。Herdr 自己对 `settings.json` 和 `keys.json` 的写入不会阻止 `uu`，移动后的检出也不会出现在 `git status` 中。要让某个修改在所有机器上生效，把它提交到 herdr-config 的 `main`；每台机器下次运行 `uu` 时都会取到。
 
-## 更新固定版本
+## 跟随 main
+
+不需要手动更新版本。dot-configs 为 `config/herdr` 记录的提交只是新克隆和 CI 的起点；之后每次安装都会更新到最新的 `main`。CI 测试的是记录的提交，而不是 `main`。
+
+`.gitmodules` 中的 `ignore = all` 让 `git add -A` 和 `git commit -a` 不会记录移动后的提交（git 2.54+）。如需有意更新记录的提交，例如让新克隆从更接近 `main` 的位置开始：
 
 ```sh
-git -C config/herdr fetch --tags
-git -C config/herdr checkout vX.Y.Z
-git add config/herdr
+git -C config/herdr fetch
+git -C config/herdr checkout origin/main
+git add --force config/herdr
 ```
 
-把 `scripts/check.sh` 中的 `HERDR_PIN` 和 `HERDR_PIN_SHA`（该标签的提交，用 `git -C config/herdr rev-parse vX.Y.Z^{commit}` 获取）改成相同版本，运行 `scripts/check.sh all`，然后提交。CI 拉取子模块时不带标签，所以检查比较的是提交。
+`scripts/check.sh` 会检查 `.gitmodules` 用 `ignore = all` 跟踪 `main`，以及 `install.sh` 用 `--remote` 更新。它还检查 manifest 行与检出中的文件一致，所以上游新增或删除文件时，检查会失败，直到更新 `config/manifest.tsv`。
+

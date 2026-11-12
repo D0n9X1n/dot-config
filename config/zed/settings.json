@@ -7,6 +7,8 @@
 // custom settings, run `zed: open default settings` from the
 // command palette (cmd-shift-p / ctrl-shift-p)
 {
+  "ui_font_weight": 400.0,
+  "proxy": "",
   "on_new_window": "empty_tab",
   "disable_ai": true,
   "buffer_font_weight": 400.0,
@@ -18,8 +20,20 @@
   "markdown_preview": {
     "font_size": 14.0
   },
-  "agent_buffer_font_size": 14.0,
+  "agent_buffer_font_size": 15.0,
+  "toolbar": {
+    "breadcrumbs": false,
+    "quick_actions": false,
+    "selections_menu": false,
+    "agent_review": false
+  },
   "project_panel": {
+    "show_diagnostics": "off",
+    "scrollbar": {
+      "show": "always"
+    },
+    "title_tooltip_delay": "disabled",
+    "dock": "left",
     "button": false
   },
   "collaboration_panel": {
@@ -47,8 +61,8 @@
     "trust_all_worktrees": true
   },
   "vim_mode": true,
-  "ui_font_size": 14.0,
-  "buffer_font_size": 12.0,
+  "ui_font_size": 15.0,
+  "buffer_font_size": 13.0,
   "theme": {
     "mode": "dark",
     "light": "Ayu Light",

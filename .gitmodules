@@ -1,4 +1,5 @@
 [submodule "config/herdr"]
 	path = config/herdr
 	url = https://github.com/MOSconfig/herdr-config.git
-	ignore = dirty
+	ignore = all
+	branch = main

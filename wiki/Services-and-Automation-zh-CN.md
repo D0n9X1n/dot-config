@@ -234,23 +234,6 @@ startup-item-names --rollback
 
 并非所有详细名称都应修改：iStat daemon 和 TeamViewer 辅助程序已经有清晰的应用分组归属。Teams agent、CleanerOne 的 `TCLoginItemHelper` 以及 Quick Look/Spotlight 扩展使用第三方内部的已签名名称。应解释这些名称的用途，而不是覆盖它们。
 
-## harbor-client
-
-`uu` 不负责把 Mac 设为 Harbor 设备；这在 Harbor 应用内完成（设置 › 一键配置本机）。`config/harbor-client/settings.json` 只让 harbor-client 桌面应用的模型键与本机 relay 保持一致。每次运行 `install.sh`（以及 `uu`）都会把这四个键合并到 `~/Library/Application Support/harbor-client/settings.json`：
-
-| 键 | 值 | 原因 |
-|---|---|---|
-| `modelBase` | `http://127.0.0.1:4142` | relay 的 `host` 和 `port`，与 Claude 的 `ANTHROPIC_BASE_URL` 相同 |
-| `model` | `claude-opus-5-5` | 含 "opus" 的名称路由到 `opusModel`；应用在这里不接受 `[1m]` |
-| `checkModel` | `gpt-6-astra` | relay 的 `gptModel`；应用要求核查模型属于另一个家族 |
-| `investigateModel` | `claude-opus-5-5[1m]` | 应用用它运行 Claude Code，因此与 Claude 的 `ANTHROPIC_MODEL` 一致 |
-
-`scripts/check.sh harbor` 会对照 relay 配置和 Claude settings 检查这些值。
-
-其他键保持应用写入的原样：`apiBase`（私有 harbor 服务器，在应用中设置）、`claudePath`、`theme`、`crewBudgetUsd`，以及新版应用增加的键。令牌和密钥保存在应用加密的 `secrets.bin` 中；安装器从不读取它。没有应用数据文件夹的 Mac 会跳过合并；不是 JSON 对象的 `settings.json` 保持不动；已一致的文件不会重写。写入时先在同一文件夹写临时文件，再 rename 覆盖旧文件。
-
-运行 `uu` 前先退出 harbor-client，或之后重启它。运行中的应用在重启前沿用旧的主机白名单；如果设置页仍显示旧值时点了保存，旧值会被写回。为其他模型地址保存的模型令牌不会发给 relay；地址改变后，请在应用设置中重新输入一次 relay 令牌。
-
 ## MCP 合并
 
 `config/mcp/mcp-shared.json` 只包含安全共享项目。

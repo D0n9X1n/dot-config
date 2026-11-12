@@ -933,22 +933,48 @@ migrate_managed_link() {
   fi
 }
 
-# Herdr: config/herdr is the herdr-config submodule. Its update never stops
-# the install; a conflict with local edits keeps the current checkout. Rows
-# whose source is missing (offline, or not checked out) are skipped and
-# reported once by herdr_install_report.
+# Herdr: config/herdr is the herdr-config submodule; every install moves it to
+# herdr-config's latest main (.gitmodules: branch = main, ignore = all). Its update
+# never stops the install. A conflict with local edits, or a failed fetch, keeps the
+# current checkout: it is never rolled back to the older recorded commit. Rows whose
+# source is missing (offline, or not checked out) are skipped and reported once by
+# herdr_install_report.
 HERDR_CONFLICT=0
 HERDR_UPDATE_ERROR=""
 herdr_submodule_update() {
   [ -f "$repo_root/.gitmodules" ] || return 0
   git config -f "$repo_root/.gitmodules" --get submodule.config/herdr.path >/dev/null 2>&1 || return 0
-  local err
-  err="$(git -C "$repo_root" submodule update --init config/herdr 2>&1)" && return 0
+  local err sub="$repo_root/config/herdr" f
+  # With a checkout, fetch first and look at the new main before moving to it.
+  if [ -e "$sub/.git" ]; then
+    if ! err="$(git -C "$sub" fetch -q origin 2>&1)"; then
+      HERDR_UPDATE_ERROR="$(printf '%s' "$err" | tail -n 1)"
+      echo "Herdr config: could not update config/herdr (${HERDR_UPDATE_ERROR}); kept the current checkout."
+      return 0
+    fi
+    # Live settings.json and keys.json link into user/: a main without them would leave both links dangling.
+    for f in user/settings.json user/keys.json; do
+      if [ -f "$sub/$f" ] && ! git -C "$sub" cat-file -e "origin/main:$f" 2>/dev/null; then
+        echo "Herdr config: herdr-config main has no user/ settings; kept the current checkout."
+        return 0
+      fi
+    done
+  fi
+  if [ -e "$sub/.git" ]; then
+    err="$(git -C "$repo_root" submodule update --remote --no-fetch config/herdr 2>&1)" && return 0
+  else
+    err="$(git -C "$repo_root" submodule update --init --remote config/herdr 2>&1)" && return 0
+  fi
   case "$err" in
     *'would be overwritten'*|*'Please commit your changes'*|*'local changes'*)
       HERDR_CONFLICT=1
       echo "Herdr config: commit or discard local edits in config/herdr, then rerun ./install.sh" ;;
-    *) HERDR_UPDATE_ERROR="$(printf '%s' "$err" | tail -n 1)" ;;
+    *)
+      HERDR_UPDATE_ERROR="$(printf '%s' "$err" | tail -n 1)"
+      # Offline with a checkout: say so once; the rows still install from the current checkout.
+      if [ -e "$repo_root/config/herdr/.git" ]; then
+        echo "Herdr config: could not update config/herdr (${HERDR_UPDATE_ERROR}); kept the current checkout."
+      fi ;;
   esac
   return 0
 }
@@ -967,7 +993,7 @@ herdr_skip() {
   echo "Warning: Herdr config: could not keep your live $1.json ($2); left it as it is and did not link it." >&2
 }
 
-# Returns 1 when any live value could not be saved; the submodule then stays at its pin this run.
+# Returns 1 when any live value could not be saved; the submodule then stays where it is this run.
 herdr_seed_capture() {
   local f live ok=0
   for f in settings keys; do
@@ -988,7 +1014,7 @@ herdr_seed_capture() {
 # Live values could not be saved first, so updating the submodule could change a live file behind
 # its link with nothing to restore it from. Keep the current checkout this run.
 herdr_hold_pin() {
-  echo "Warning: Herdr config: could not save your live settings first; left config/herdr at its current pin. Rerun ./install.sh to update it." >&2
+  echo "Warning: Herdr config: could not save your live settings first; left config/herdr at its current checkout. Rerun ./install.sh to update it." >&2
 }
 
 # herdr_seed_write <settings|keys> <file>: the value into config/herdr/user/, checked; else skip.
@@ -998,6 +1024,8 @@ herdr_seed_write() {
   if cat "$2" 2>/dev/null >"$dest" && cmp -s "$2" "$dest"; then
     echo "Herdr config: kept your live $1.json"
   else
+    # The write may have cut the file short; keep the captured copy so the value is never lost.
+    HERDR_SEED_KEEP=1
     herdr_skip "$1" "could not write config/herdr/user/$1.json"
   fi
 }
@@ -1044,6 +1072,7 @@ herdr_skip_link() {
 herdr_install_prepare() {
   local seed
   HERDR_SKIP_LINKS=""
+  HERDR_SEED_KEEP=0
   # Capture first: the submodule is updated only after every live value is safely saved.
   if ! seed="$(mktemp -d "${TMPDIR:-/tmp}/herdr-live.XXXXXX" 2>/dev/null)" || [ ! -d "$seed" ]; then
     herdr_hold_pin
@@ -1056,7 +1085,11 @@ herdr_install_prepare() {
     herdr_hold_pin
   fi
   herdr_seed_apply "$seed"
-  rm -rf -- "$seed"
+  if [ "$HERDR_SEED_KEEP" = 1 ]; then
+    echo "Warning: Herdr config: a live value could not be written back; your live values are kept in $seed." >&2
+  else
+    rm -rf -- "$seed"
+  fi
 }
 
 # True for a config/herdr row whose source is not here; such rows are skipped.
@@ -1087,6 +1120,26 @@ apollo_dock_icon() {
   [ -x "$script" ] || return 0
   "$script" --check --app "$app" >/dev/null 2>&1 && return 0
   "$script" --app "$app" || echo "Warning: could not set the Apollo Dock icon on $app; skipped." >&2
+  return 0
+}
+
+# Zed opens text and code files by default (macOS). For each type in
+# scripts/zed-default-types.txt that Zed does not handle yet, Launch Services shows
+# one "Use Zed?" dialog and the person decides. ZED_APP_ROOTS (colon-separated)
+# overrides the app search for tests; SKIP_ZED_DEFAULTS=1 skips the step.
+set_zed_defaults() {
+  is_macos || return 0
+  [ "${SKIP_ZED_DEFAULTS:-0}" = 1 ] && return 0
+  local IFS=: root found="" types="${repo_root}/scripts/zed-default-types.txt"
+  for root in ${ZED_APP_ROOTS:-${HOME}/Applications:/Applications}; do
+    [ -n "$root" ] && [ -d "$root/Zed.app" ] && { found=1; break; }
+  done
+  [ -n "$found" ] && [ -f "$types" ] || return 0
+  unset IFS
+  # shellcheck disable=SC2046 # one type id per word, by design
+  osascript -l JavaScript "${repo_root}/scripts/zed-defaults.js" dev.zed.Zed apply \
+    $(sed -e 's/#.*//' -e 's/[[:space:]]*$//' "$types" | grep -v '^$') \
+    || echo "Warning: could not set Zed as the default app for text files; skipped."
   return 0
 }
 
@@ -1775,47 +1828,6 @@ import_copilot_mcp_into_claude() {
   fi
 }
 
-# Keep the harbor-client desktop app's model keys in step with this Mac's
-# relay. Only the keys in the tracked file change; every other key the app
-# writes stays, and secrets.bin is never read. Skips when the app has no data
-# folder yet, when settings.json is not a JSON object, or when it already
-# matches. The write is atomic (temp file + rename in the same folder).
-merge_harbor_client_settings() {
-  local shared="$1"
-  local app_dir="${HOME}/Library/Application Support/harbor-client"
-  local dest="${app_dir}/settings.json"
-  local tmp
-  remove_backups_of "$dest" || return 1
-  have_cmd jq && [ -f "$shared" ] || return 0
-  if [ ! -d "$app_dir" ]; then
-    echo "harbor-client: no app data folder; skipped"
-    return 0
-  fi
-  if [ -f "$dest" ]; then
-    if ! jq -e 'type == "object"' "$dest" >/dev/null 2>&1; then
-      echo "Warning: $dest is not a JSON object; harbor-client settings left alone"
-      return 0
-    fi
-    if jq -e --slurpfile s "$shared" '. as $cur | $s[0] | to_entries | all(.value == $cur[.key])' \
-        "$dest" >/dev/null 2>&1; then
-      echo "harbor-client settings already match $shared"
-      return 0
-    fi
-  fi
-  tmp="$(mktemp "${dest}.dot-configs.XXXXXX")" || return 1
-  if [ -f "$dest" ]; then
-    set -- jq -s '.[0] + .[1]' "$dest" "$shared"
-  else
-    set -- jq '.' "$shared"
-  fi
-  if "$@" >"$tmp" && chmod 600 "$tmp" && mv -f "$tmp" "$dest"; then
-    echo "Merged harbor-client model settings into $dest (restart harbor-client to use them)"
-  else
-    rm -f "$tmp"
-    echo "Warning: could not merge harbor-client settings into $dest; skipped"
-  fi
-}
-
 if [ "${DOT_CONFIGS_INSTALL_LIB_ONLY:-0}" = "1" ]; then
   return 0 2>/dev/null || exit 0
 fi
@@ -1849,6 +1861,7 @@ link_manifest_files
 herdr_step copy_manifest_files
 herdr_step herdr_install_report
 herdr_step apollo_dock_icon
+set_zed_defaults
 link_local_overlay
 install_firefox_step
 # RMUX is Windows-only. Keep retention while an older macOS install remains.
@@ -1900,12 +1913,6 @@ update_claude_plugins
 
 # Import Copilot's merged MCP server map into Claude Code's local state file.
 import_copilot_mcp_into_claude
-
-# harbor-client: model address and names follow the local copilot-relay.
-if is_macos; then
-  merge_harbor_client_settings \
-    "$(manifest_source_for_destination merge "Library/Application Support/harbor-client/settings.json")"
-fi
 
 # launchd agent: copilot-relay on login (macOS only). Renders the
 # template (substituting absolute $HOME paths — launchd doesn't expand

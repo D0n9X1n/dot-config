@@ -3312,6 +3312,9 @@ assert zed['vim_mode'] is True
 assert zed['buffer_font_family'] == 'Rec Mono St.Helens'
 assert zed['on_new_window'] == 'empty_tab'
 assert zed['icon_theme'] == {'mode': 'dark', 'light': 'Zed (Default)', 'dark': 'Zed (Default)'}
+assert zed['toolbar'] == {'breadcrumbs': False, 'quick_actions': False, 'selections_menu': False, 'agent_review': False}, zed.get('toolbar')
+# Tab titles are Zed's default label size, 14/16 of ui_font_size: larger than the editor font.
+assert zed['ui_font_size'] * 14 / 16 > zed['buffer_font_size'], (zed['ui_font_size'], zed['buffer_font_size'])
 neovide = tomllib.loads(pathlib.Path('config/neovide/config.toml').read_text())
 assert neovide == {'fork': True}, neovide
 PY
@@ -3377,79 +3380,47 @@ ZSH
   echo "Zed, Neovide, and nv ok"
 }
 
-run_harbor_client_smoke() {
-  local shared=config/harbor-client/settings.json relay_base
-  grep -Fq $'merge\tconfig/harbor-client/settings.json\tLibrary/Application Support/harbor-client/settings.json' \
-    config/manifest.tsv
-
-  # The tracked file holds only the model keys. apiBase (a private host),
-  # claudePath, theme, crewBudgetUsd and every secret stay in the app.
-  jq -e 'keys == ["checkModel", "investigateModel", "model", "modelBase"] and all(.[]; type == "string")' \
-    "$shared" >/dev/null || {
-    echo "$shared must hold exactly modelBase, model, checkModel and investigateModel" >&2
-    return 1
-  }
-
-  # modelBase is the relay's own listen address, which Claude also uses.
-  relay_base="http://$(sed -n 's/^host:[[:space:]]*//p' config/copilot-relay/config.yaml):$(sed -n 's/^port:[[:space:]]*//p' config/copilot-relay/config.yaml)"
-  jq -e --arg b "$relay_base" '.modelBase == $b' "$shared" >/dev/null || {
-    echo "$shared modelBase must be the relay address $relay_base" >&2
-    return 1
-  }
-  jq -e --slurpfile c config/claude/settings.json '.modelBase == $c[0].env.ANTHROPIC_BASE_URL' "$shared" >/dev/null
-
-  # Models: Opus stays native and routes to opusModel; the checker is GPT-6
-  # Astra (another family, as harbor-client requires). The investigator runs
-  # Claude Code, so it matches Claude's default; the others take no [1m].
-  jq -e --slurpfile c config/claude/settings.json '
-    .model == "claude-opus-5-5" and
-    .checkModel == "gpt-6-astra" and
-    .investigateModel == $c[0].env.ANTHROPIC_MODEL
-  ' "$shared" >/dev/null
-  grep -Eq "^gptModel:[[:space:]]*$(jq -r .checkModel "$shared")\$" config/copilot-relay/config.yaml
-
+# Zed is the default app for text and code files: install.sh hands the tracked type list to
+# scripts/zed-defaults.js only on macOS with Zed.app present, and never for an unknown type.
+run_zed_defaults_smoke() (
+  set -euo pipefail
+  local t types out
+  types=scripts/zed-default-types.txt
+  [ -f "$types" ] && [ -f scripts/zed-defaults.js ] || { echo "zed defaults: missing $types or scripts/zed-defaults.js" >&2; exit 1; }
+  grep -qxF 'link	config/zed/settings.json	.config/zed/settings.json' config/manifest.tsv
+  # One uniform type id per line; comments and blanks allowed; no dynamic ids, no duplicates.
+  local ids; ids="$(sed -e 's/#.*//' -e 's/[[:space:]]*$//' "$types" | grep -v '^$')"
+  ! grep -Ev '^[A-Za-z0-9.-]+$' <<<"$ids" || { echo "zed defaults: a line is not a type id" >&2; exit 1; }
+  ! grep -q '^dyn\.' <<<"$ids" || { echo "zed defaults: dynamic ids change per Mac" >&2; exit 1; }
+  [ -z "$(sort <<<"$ids" | uniq -d)" ] || { echo "zed defaults: duplicate type ids" >&2; exit 1; }
+  for want in public.plain-text net.daringfireball.markdown public.yaml public.json public.source-code public.script public.xml; do
+    grep -qxF "$want" <<<"$ids" || { echo "zed defaults: $want is missing" >&2; exit 1; }
+  done
+  # .ts is MPEG-2 video to macOS, and web pages, CSV and logs keep their own apps.
+  for not in public.mpeg-2-transport-stream public.html public.comma-separated-values-text com.apple.log; do
+    ! grep -qxF "$not" <<<"$ids" || { echo "zed defaults: $not must not open in Zed" >&2; exit 1; }
+  done
+  t="$(mktemp -d)"; trap 'rm -rf "$t"' EXIT
+  mkdir -p "$t/bin" "$t/apps/Zed.app"
+  printf '#!/bin/sh\nprintf "%%s\\n" "$@" >"$ZED_TEST_LOG"\n' >"$t/bin/osascript"; chmod +x "$t/bin/osascript"
   (
-    local test_root app dest
-    test_root="$(mktemp -d)"
-    trap 'rm -rf "$test_root"' EXIT
-    export HOME="$test_root/home"
-    mkdir -p "$HOME"
+    export PATH="$t/bin:$PATH" ZED_TEST_LOG="$t/log"
     DOT_CONFIGS_INSTALL_LIB_ONLY=1 source install.sh
-    app="$HOME/Library/Application Support/harbor-client"
-    dest="$app/settings.json"
-
-    # No app data folder: nothing is created.
-    merge_harbor_client_settings "$repo_root/$shared" >/dev/null
-    [ ! -e "$app" ]
-
-    # Merge: managed keys change, every other key stays, no temp file is left.
-    mkdir -p "$app"
-    printf '{"apiBase":"https://api.example.test","modelBase":"https://api.anthropic.com","model":"x","theme":"dark","crewBudgetUsd":"20","claudePath":"/opt/claude"}' >"$dest"
-    : >"$dest.bak.1"
-    merge_harbor_client_settings "$repo_root/$shared" >/dev/null
-    jq -e --slurpfile s "$repo_root/$shared" '
-      . == ({"apiBase":"https://api.example.test","theme":"dark","crewBudgetUsd":"20","claudePath":"/opt/claude"} + $s[0])
-    ' "$dest" >/dev/null
-    [ "$(stat -f '%Lp' "$dest" 2>/dev/null || stat -c '%a' "$dest")" = 600 ]
-    [ "$(find "$app" -type f | wc -l | tr -d ' ')" = 1 ]
-
-    # A matching file is left untouched.
-    touch -t 200001010000 "$dest"
-    merge_harbor_client_settings "$repo_root/$shared" | grep -Fq 'already match'
-    [ -z "$(find "$dest" -newermt '2000-01-02' -print)" ]
-
-    # A broken file is never replaced.
-    printf 'not json' >"$dest"
-    merge_harbor_client_settings "$repo_root/$shared" >/dev/null
-    [ "$(cat "$dest")" = 'not json' ]
-
-    # A data folder without settings.json gets just the managed keys.
-    rm -f "$dest"
-    merge_harbor_client_settings "$repo_root/$shared" >/dev/null
-    jq -e --slurpfile s "$repo_root/$shared" '. == $s[0]' "$dest" >/dev/null
+    repo_root="$(pwd -P)"
+    is_macos() { return 0; }
+    ZED_APP_ROOTS="$t/apps" set_zed_defaults >/dev/null
+    [ "$(sed -n 1,5p "$t/log" | tr '\n' ' ')" = "-l JavaScript $repo_root/scripts/zed-defaults.js dev.zed.Zed apply " ] \
+      || { echo "zed defaults: wrong osascript call: $(head -5 "$t/log" | tr '\n' ' ')" >&2; exit 1; }
+    [ "$(tail -n +6 "$t/log")" = "$ids" ] || { echo "zed defaults: the type list was not passed as is" >&2; exit 1; }
+    rm -f "$t/log"
+    ZED_APP_ROOTS="$t/none" set_zed_defaults >/dev/null; [ ! -e "$t/log" ] || { echo "zed defaults: ran without Zed.app" >&2; exit 1; }
+    SKIP_ZED_DEFAULTS=1 ZED_APP_ROOTS="$t/apps" set_zed_defaults >/dev/null; [ ! -e "$t/log" ] || { echo "zed defaults: ran with SKIP_ZED_DEFAULTS=1" >&2; exit 1; }
+    is_macos() { return 1; }
+    ZED_APP_ROOTS="$t/apps" set_zed_defaults >/dev/null; [ ! -e "$t/log" ] || { echo "zed defaults: ran off macOS" >&2; exit 1; }
   )
-  echo "harbor-client settings follow the relay"
-}
+  grep -qx 'set_zed_defaults' install.sh || { echo "zed defaults: install.sh does not run set_zed_defaults" >&2; exit 1; }
+  echo "zed defaults: ok"
+)
 
 # copy rows: installed as files (Herdr does not load mod glyphs through links), never backed up,
 # removed with their row only while their bytes are still what was installed.
@@ -3525,8 +3496,9 @@ run_herdr_copy_smoke() {
   )
 }
 
-# Fixture for install.sh's Herdr steps: a bare herdr-config remote with pins p1, p2 (themes only)
-# and p3 (user/settings.json), a bare superproject pinned at p1, and a temp HOME. Prints the dir.
+# Fixture for install.sh's Herdr steps: a bare herdr-config remote with commits p1, p2 (themes only)
+# and p3 (user/settings.json) whose main starts at p1, a bare superproject whose submodule follows
+# main (gitlink p1), and a temp HOME. Tests advance main with herdr_advance. Prints the dir.
 herdr_fixture() {
   local t="$1" h s
   h="$t/herdr-src"; s="$t/super-src"
@@ -3539,8 +3511,10 @@ herdr_fixture() {
   jq -S -s '.[0] * .[1] | walk(if type == "object" then with_entries(select(.value != null)) else . end)' \
     "$h/data/herdr-default-keys.json" "$h/user/keys.overrides.json" >"$h/user/keys.json"
   git -C "$h" add -A && git -C "$h" commit -qm p1 && git -C "$h" tag p1
-  printf 't2\n' >"$h/themes/x.json"; git -C "$h" commit -qam p2 && git -C "$h" tag p2
+  printf 't2\n' >"$h/themes/x.json"; printf 'm2\n' >"$h/mods/m/a.js"; git -C "$h" commit -qam p2 && git -C "$h" tag p2
   printf '{"zoom":2}\n' >"$h/user/settings.json"; git -C "$h" commit -qam p3 && git -C "$h" tag p3
+  git -C "$h" rm -rq user && git -C "$h" commit -qm p4 && git -C "$h" tag p4
+  git -C "$h" reset -q --hard p1
   git clone -q --bare "$h" "$t/herdr.git"
   git init -q -b main "$s"
   mkdir -p "$s/config"; printf 'readme\n' >"$s/README.md"; printf 'cfg\n' >"$s/config/plain.txt"
@@ -3550,11 +3524,13 @@ herdr_fixture() {
     config/herdr/user/settings.json .config/herdr-app/settings.json \
     config/herdr/user/keys.json .config/herdr-app/keys.json >"$s/config/manifest.tsv"
   printf 'copy\tconfig/herdr/mods/m/a.js\t.config/herdr-app/mods/m/a.js\n' >>"$s/config/manifest.tsv"
-  git -C "$s" submodule add -q "file://$t/herdr.git" config/herdr
-  git -C "$s/config/herdr" checkout -q p1
+  git -C "$s" submodule add -q -b main "file://$t/herdr.git" config/herdr
+  git -C "$s" config -f .gitmodules submodule.config/herdr.ignore all
   git -C "$s" add -A && git -C "$s" commit -qm super
   git clone -q --bare "$s" "$t/super.git"
 }
+# herdr_advance <dir> <tag>: herdr-config's main moves to <tag>, as an upstream push would.
+herdr_advance() { git -C "$1/herdr.git" update-ref refs/heads/main "$(git -C "$1/herdr.git" rev-parse "$2^{commit}")"; }
 
 # install.sh's Herdr steps on fixtures: offline skip, repeat, dirty edit carried, conflict, uu.
 run_herdr_install_smoke() {
@@ -3599,18 +3575,20 @@ run_herdr_install_smoke() {
     [ "$before" = "$after" ] || { diff <(printf '%s\n' "$before") <(printf '%s\n' "$after") >&2 || true; fail "repeat: the second install changed HOME"; }
     ! grep -q '^Herdr config:' <<<"$out" || fail "repeat: unexpected warning: $out"
 
-    # (c) A dirty, non-conflicting edit survives a pin advance to p2.
+    # (c) main advances to p2: the install follows it with no superproject commit, and a dirty,
+    #     non-conflicting edit survives.
     git clone -q "$t/super.git" "$t/r3"
     run "$t/r3" "$t/h3" >/dev/null 2>&1
     printf '{"zoom":1.2}\n' >"$t/r3/config/herdr/user/settings.json"
-    git -C "$t/r3" update-index --cacheinfo "160000,$p2,config/herdr" && git -C "$t/r3" commit -qm p2
+    herdr_advance "$t" p2
     out="$(run "$t/r3" "$t/h3" 2>&1)"
     [ "$(git -C "$t/r3/config/herdr" rev-parse HEAD)" = "$p2" ] || fail "dirty: HEAD is not p2: $out"
     [ "$(cat "$t/h3/.config/herdr-app/settings.json")" = '{"zoom":1.2}' ] || fail "dirty: the edit was lost"
     [ "$(cat "$t/h3/.config/herdr-app/themes/x.json")" = t2 ] || fail "dirty: p2's theme is not linked"
+    [ "$(cat "$t/h3/.config/herdr-app/mods/m/a.js")" = m2 ] || fail "dirty: p2's mod was not copied"
 
-    # (d) A conflicting edit: the message, the old pin kept, the links still resolve.
-    git -C "$t/r3" update-index --cacheinfo "160000,$p3,config/herdr" && git -C "$t/r3" commit -qm p3
+    # (d) main advances to p3 against a conflicting edit: the message, the checkout kept, the links resolve.
+    herdr_advance "$t" p3
     out="$(run "$t/r3" "$t/h3" 2>&1)"
     grep -qxF 'Herdr config: commit or discard local edits in config/herdr, then rerun ./install.sh' <<<"$out" \
       || fail "conflict: no message: $out"
@@ -3619,6 +3597,28 @@ run_herdr_install_smoke() {
       [ -e "$t/h3/.config/herdr-app/$l" ] || fail "conflict: $l does not resolve"
     done
     [ "$(cat "$t/h3/.config/herdr-app/settings.json")" = '{"zoom":1.2}' ] || fail "conflict: the edit was lost"
+
+    # (f) Offline with a checkout ahead of the gitlink (r3 is at p2, the gitlink is p1): one notice, the
+    #     checkout and the live edit kept (never rolled back to the gitlink), Herdr and other rows installed.
+    git -C "$t/r3/config/herdr" checkout -q -- user/settings.json 2>/dev/null || true
+    git -C "$t/r3/config/herdr" checkout -q "$p2"
+    printf '{"zoom":1.2}\n' >"$t/r3/config/herdr/user/settings.json"
+    git -C "$t/r3/config/herdr" remote set-url origin file:///nonexistent
+    out="$(run "$t/r3" "$t/h3" 2>&1)"
+    [ "$(grep -c '^Herdr config:' <<<"$out")" = 1 ] && grep -q '^Herdr config: could not update config/herdr (.*); kept the current checkout\.$' <<<"$out" \
+      || fail "offline ahead: want one could-not-update notice, got: $out"
+    [ "$(git -C "$t/r3/config/herdr" rev-parse HEAD)" = "$p2" ] || fail "offline ahead: HEAD moved"
+    [ "$(cat "$t/h3/.config/herdr-app/settings.json")" = '{"zoom":1.2}' ] || fail "offline ahead: the live value changed"
+    [ "$(cat "$t/h3/.config/herdr-app/mods/m/a.js")" = m2 ] || fail "offline ahead: the mod copy changed"
+    [ "$(readlink "$t/h3/.plain")" = "$t/r3/config/plain.txt" ] || fail "offline ahead: other rows not installed"
+    git -C "$t/r3/config/herdr" remote set-url origin "file://$t/herdr.git"
+
+    # (g) The moved checkout is not a superproject change: git status is clean and add -A stages nothing.
+    [ -z "$(git -C "$t/r3" status --porcelain)" ] || fail "status: the moved submodule shows: $(git -C "$t/r3" status --porcelain)"
+    git -C "$t/r3" add -A
+    [ "$(git -C "$t/r3" ls-files -s config/herdr | awk '{print $2}')" = "$p1" ] || fail "add -A staged the moved gitlink"
+    git -C "$t/r3" commit -qam probe >/dev/null 2>&1 || true
+    [ "$(git -C "$t/r3" rev-parse HEAD:config/herdr)" = "$p1" ] || fail "commit -a recorded the moved gitlink"
 
     # (e) uu's ready check ignores the submodule, and still refuses another tracked edit.
     zsh -c 'source "$1/config/zsh/uu.zsh"; _dot_configs_uu_ready "$2"' _ "$wt" "$t/r3" 2>/dev/null \
@@ -3852,28 +3852,46 @@ run_herdr_adopt_smoke() (
   cmp -s "$t/r4/config/herdr/user/keys.json" "$t/herdr-src/user/keys.json" || fail "bad linked keys: bad JSON was adopted"
   rest "$t/r4" "$t/h4" || fail "bad linked keys: the rest of the install did not run"
 
-  # 5. Capture fails while live settings.json links into the submodule and the pin advances:
+  # 5. Capture fails while live settings.json links into the submodule and main advances:
   #    the submodule must stay put, so the live bytes do not change behind the link.
   new 5; ln -s "$t/r5/config/herdr/user/settings.json" "$(live "$t/h5" settings.json)"
-  git -C "$t/r5" update-index --cacheinfo "160000,$(git -C "$t/herdr.git" rev-parse p3),config/herdr" && git -C "$t/r5" commit -qm p3
+  herdr_advance "$t" p3
   out="$(TMPDIR="$t/no/such/dir" run "$t/r5" "$t/h5" 2>&1)" || fail "capture failed: the install stopped: $out"
   [ "$(cat "$(live "$t/h5" settings.json)")" = '{"zoom":1}' ] || fail "capture failed: the live settings changed to $(cat "$(live "$t/h5" settings.json)")"
   [ "$(git -C "$t/r5/config/herdr" rev-parse HEAD)" = "$(git -C "$t/herdr.git" rev-parse p1)" ] || fail "capture failed: the submodule advanced"
-  [ "$(grep -c 'left config/herdr at its current pin' <<<"$out" || true)" = 1 ] || fail "capture failed: want one pin warning, got: $out"
+  [ "$(grep -c 'left config/herdr at its current checkout' <<<"$out" || true)" = 1 ] || fail "capture failed: want one hold warning, got: $out"
   rest "$t/r5" "$t/h5" || fail "capture failed: the rest of the install did not run"
 
   # 6. One live file cannot be read (keys.json) while settings.json links into the submodule and the
-  #    pin advances: the submodule stays put, and the unreadable file is left alone.
+  #    main advances: the submodule stays put, and the unreadable file is left alone.
   new 6; ln -s "$t/r6/config/herdr/user/settings.json" "$(live "$t/h6" settings.json)"
   printf '{"global":{}}\n' >"$(live "$t/h6" keys.json)"; chmod 000 "$(live "$t/h6" keys.json)"
-  git -C "$t/r6" update-index --cacheinfo "160000,$(git -C "$t/herdr.git" rev-parse p3),config/herdr" && git -C "$t/r6" commit -qm p3
+  herdr_advance "$t" p3
   out="$(run "$t/r6" "$t/h6" 2>&1)" || fail "unreadable keys: the install stopped: $out"
   chmod 644 "$(live "$t/h6" keys.json)"
   [ "$(cat "$(live "$t/h6" settings.json)")" = '{"zoom":1}' ] || fail "unreadable keys: the live settings changed to $(cat "$(live "$t/h6" settings.json)")"
   [ "$(git -C "$t/r6/config/herdr" rev-parse HEAD)" = "$(git -C "$t/herdr.git" rev-parse p1)" ] || fail "unreadable keys: the submodule advanced"
   kept "$t/h6" keys.json '{"global":{}}' || fail "unreadable keys: the live keys.json was replaced"
-  [ "$(grep -c 'left config/herdr at its current pin' <<<"$out" || true)" = 1 ] || fail "unreadable keys: want one pin warning, got: $out"
+  [ "$(grep -c 'left config/herdr at its current checkout' <<<"$out" || true)" = 1 ] || fail "unreadable keys: want one hold warning, got: $out"
   rest "$t/r6" "$t/h6" || fail "unreadable keys: the rest of the install did not run"
+  # 7. main drops user/: live settings.json and keys.json link into the submodule. The checkout must not
+  #    move, or both live links would dangle; one hold line, and the live bytes stay.
+  herdr_advance "$t" p4
+  new 7; run "$t/r7" "$t/h7" >/dev/null 2>&1 || true
+  git -C "$t/r7/config/herdr" checkout -q p1 2>/dev/null || true
+  out="$(run "$t/r7" "$t/h7" 2>&1)" || fail "no user/: the install stopped: $out"
+  [ "$(git -C "$t/r7/config/herdr" rev-parse HEAD)" = "$(git -C "$t/herdr.git" rev-parse p1)" ] || fail "no user/: the checkout moved to a main without user/"
+  [ "$(cat "$(live "$t/h7" settings.json)")" = '{"zoom":1}' ] && [ -s "$(live "$t/h7" keys.json)" ] || fail "no user/: a live file was lost"
+  [ "$(grep -c "main has no user/" <<<"$out" || true)" = 1 ] || fail "no user/: want one hold line, got: $out"
+  herdr_advance "$t" p1
+
+  # 8. Writing a live value back fails part-way: the captured value is kept in a folder the warning names.
+  new 8; printf '{"zoom":8}\n' >"$(live "$t/h8" settings.json)"
+  out="$(cat() { if [ "${2:-}" = "" ] && [ "${1:-}" != "" ] && [ "${1#*herdr-live}" != "$1" ]; then printf 'partial'; return 1; fi; command cat "$@"; }
+         run "$t/r8" "$t/h8" 2>&1)" || fail "write fails: the install stopped: $out"
+  local kept; kept="$(sed -n 's/.*your live values are kept in \(.*\)\.$/\1/p' <<<"$out" | head -1)"
+  [ -n "$kept" ] && [ "$(command cat "$kept/settings.json" 2>/dev/null)" = '{"zoom":8}' ] || fail "write fails: the captured value was not kept: $out"
+  rm -rf -- "$kept"
   echo "herdr adopt: ok"
 )
 
@@ -3997,10 +4015,7 @@ run_herdr_preflight_smoke() (
   echo "herdr preflight: ok"
 )
 
-# Herdr: the herdr-config submodule (config/herdr) and how install.sh uses it.
-HERDR_PIN=v0.0.8
-# The commit HERDR_PIN points to. CI clones the submodule without tags, so the gitlink is checked by SHA.
-HERDR_PIN_SHA=1710d471aade9062a3dabe2031641eb83f21cb82
+# Herdr: the herdr-config submodule (config/herdr) follows herdr-config's main on every install.
 herdr_expected_rows() {
   git -C config/herdr ls-files -- layouts themes mods user/settings.json user/keys.json agent/herdr-context.sh |
     awk -v OFS='\t' '
@@ -4017,17 +4032,14 @@ run_herdr_smoke() {
     got="$(git config -f .gitmodules --get submodule.config/herdr.url)"
     [ "$got" = https://github.com/MOSconfig/herdr-config.git ] || { echo "herdr: submodule url is $got" >&2; exit 1; }
     got="$(git config -f .gitmodules --get submodule.config/herdr.ignore || true)"
-    [ "$got" = dirty ] || { echo "herdr: submodule ignore is '$got', want dirty" >&2; exit 1; }
+    [ "$got" = all ] || { echo "herdr: submodule ignore is '$got', want all (in .gitmodules, so git add never stages the moving gitlink)" >&2; exit 1; }
+    got="$(git config -f .gitmodules --get submodule.config/herdr.branch || true)"
+    [ "$got" = main ] || { echo "herdr: submodule branch is '$got', want main" >&2; exit 1; }
+    grep -qF 'submodule update --init --remote config/herdr' install.sh && grep -qF 'submodule update --remote --no-fetch config/herdr' install.sh \
+      || { echo "herdr: install.sh does not update config/herdr with --remote" >&2; exit 1; }
     [ "$(git ls-files -s config/herdr | awk '{print $1}')" = 160000 ] || { echo "herdr: config/herdr is not a gitlink" >&2; exit 1; }
-    got="$(git ls-files -s config/herdr | awk '{print $2}')"
-    [ "$got" = "$HERDR_PIN_SHA" ] || { echo "herdr: config/herdr gitlink is '$got', want $HERDR_PIN_SHA ($HERDR_PIN)" >&2; exit 1; }
-    if [ -e config/herdr/.git ]; then
-      got="$(git -C config/herdr rev-parse HEAD 2>/dev/null || true)"
-      [ "$got" = "$HERDR_PIN_SHA" ] || { echo "herdr: config/herdr is checked out at '$got', want $HERDR_PIN_SHA ($HERDR_PIN)" >&2; exit 1; }
-      if got="$(git -C config/herdr rev-parse -q --verify "refs/tags/$HERDR_PIN^{commit}" 2>/dev/null)"; then
-        [ "$got" = "$HERDR_PIN_SHA" ] || { echo "herdr: tag $HERDR_PIN is $got, not $HERDR_PIN_SHA" >&2; exit 1; }
-      fi
-    fi
+    # The gitlink is only where fresh clones and CI start. A checkout may be anywhere on main: ahead of it
+    # after an install, or behind it when an install held the checkout (offline, a conflict, a capture failure).
     grep -q -- '--ignore-submodules=all' config/zsh/uu.zsh || { echo "herdr: uu's dirty check does not ignore submodules" >&2; exit 1; }
     # Manifest rows: one per installable tracked file. Mods are copy rows (Herdr does not load
     # their glyphs through links); layouts, themes, user settings/keys and the agent script are links.
@@ -4107,7 +4119,7 @@ run_smoke() {
   run_relay_completion_smoke
   run_firefox_smoke
   run_editors_smoke
-  run_harbor_client_smoke
+  run_zed_defaults_smoke
   run_herdr_smoke
   run_herdr_copy_smoke
   run_herdr_install_smoke
@@ -4133,14 +4145,13 @@ case "${1:-all}" in
   shell) run_shell_update_smoke; run_local_overlay_smoke; run_relay_completion_smoke ;;
   local) run_local_checks ;;
   firefox) run_firefox_smoke ;;
-  editors) run_editors_smoke ;;
-  harbor) run_harbor_client_smoke ;;
+  editors) run_editors_smoke; run_zed_defaults_smoke ;;
   herdr) run_herdr_smoke; run_herdr_copy_smoke; run_herdr_install_smoke; run_herdr_seed_smoke; run_herdr_adopt_smoke; run_herdr_copy_boundary_smoke; run_herdr_link_fail_smoke; run_herdr_app_smoke; run_herdr_preflight_smoke ;;
   backups) run_install_backup_smoke ;;
   shellcheck) run_shellcheck ;;
   all) run_smoke; run_shellcheck ;;
   *)
-    echo "usage: $0 [smoke|apollo|apollo-online|instructions|models|mcp|wiki|rmux|tmux|shell|local|firefox|editors|harbor|herdr|backups|shellcheck|all]" >&2
+    echo "usage: $0 [smoke|apollo|apollo-online|instructions|models|mcp|wiki|rmux|tmux|shell|local|firefox|editors|herdr|backups|shellcheck|all]" >&2
     exit 2
     ;;
 esac

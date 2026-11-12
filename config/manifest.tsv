@@ -43,7 +43,6 @@ link	scripts/launchd/vendor_names.py	.local/bin/startup-item-names
 link	config/zed/settings.json	.config/zed/settings.json
 link	config/neovide/config.toml	.config/neovide/config.toml
 firefox	config/firefox/user.js	user.js
-merge	config/harbor-client/settings.json	Library/Application Support/harbor-client/settings.json
 
 # Herdr (config/herdr submodule). Mods are copies: Herdr does not load their glyphs through links.
 link	config/herdr/agent/herdr-context.sh	.local/bin/herdr-agent-context
