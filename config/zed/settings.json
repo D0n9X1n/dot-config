@@ -45,9 +45,6 @@
     "dark": "Zed (Default)"
   },
   "agent_servers": {
-    "codex-acp": {
-      "type": "registry"
-    },
     "claude-acp": {
       "type": "registry"
     },

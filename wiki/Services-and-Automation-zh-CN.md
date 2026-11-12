@@ -70,7 +70,7 @@ upstreamTimeoutSeconds: 900
 gptModel: gpt-6-astra
 opusModel: claude-opus-5.5
 claudeUpstreamApi: chat-completions
-codexSetup: true
+codexSetup: false
 ```
 
 `opusModel` 使用规范上游 ID，不加 `[1m]`。Claude 以原生 `claude-opus-5-5[1m]` 启动，路由到 Opus 5.5。Sonnet、Haiku 和 small-fast 直接调用 `gpt-6-astra[1m]`，空白 WebSearch 后端使用 Astra。Opus 工具选择限制见 [Claude Code](Claude-Code-zh-CN.md)。
@@ -79,7 +79,7 @@ codexSetup: true
 
 在 zsh 中，Tab 可补全 copilot-relay 的命令、参数和已配置模型；请看 [SonicTerm 与 Shell](SonicTerm-and-Shell-zh-CN.md)。`install.sh`（以及 `uu`）会把 relay 保持在 npm 最新版本。
 
-`codexSetup: true` 让 relay 在启动时更新 Codex 的 `config.toml` 和模型列表（已安装 Codex 时）。`claudeSetup: false` 会阻止 relay 重写链接的 Claude settings。Relay 的 `thinkEffort` 回退值与 Claude 保存的 Opus 偏好、启动器和状态栏回退值都使用 `high`；客户端显式指定的 effort 仍优先。Copilot CLI 和 `gg` 保留独立的 Astra/`high` 默认值。模型路由和 relay effort 会热重载，无需重启；已有 shell 需要重新加载 Claude 启动器或打开新 shell。`upstreamTimeoutSeconds: 900` 允许单个 Claude 请求的上游 Copilot 调用最多等待十五分钟。
+不再使用 Codex。`codexSetup: false` 阻止 relay 修改 `~/.codex`。请保留这个键：relay 会把缺失的键按默认值 `true` 写回。`claudeSetup: false` 会阻止 relay 重写链接的 Claude settings。Relay 的 `thinkEffort` 回退值与 Claude 保存的 Opus 偏好、启动器和状态栏回退值都使用 `high`；客户端显式指定的 effort 仍优先。Copilot CLI 和 `gg` 保留独立的 Astra/`high` 默认值。模型路由和 relay effort 会热重载，无需重启；已有 shell 需要重新加载 Claude 启动器或打开新 shell。`upstreamTimeoutSeconds: 900` 允许单个 Claude 请求的上游 Copilot 调用最多等待十五分钟。
 
 登录一次：
 

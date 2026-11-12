@@ -70,7 +70,7 @@ upstreamTimeoutSeconds: 900
 gptModel: gpt-6-astra
 opusModel: claude-opus-5.5
 claudeUpstreamApi: chat-completions
-codexSetup: true
+codexSetup: false
 ```
 
 `opusModel` uses the canonical upstream ID without `[1m]`. Claude starts with native `claude-opus-5-5[1m]` and routes to Opus 5.5. Sonnet, Haiku, and small-fast call `gpt-6-astra[1m]` directly, and the blank WebSearch backend uses Astra. See [Claude Code](Claude-Code.md) for the Opus tool-selection limit.
@@ -79,7 +79,7 @@ codexSetup: true
 
 Tab completes copilot-relay commands, flags, and configured models in zsh; see [SonicTerm and shell](SonicTerm-and-Shell.md). `install.sh`, and so `uu`, keeps the relay at the latest npm version.
 
-`codexSetup: true` lets the relay update Codex's `config.toml` and model list on start, when Codex is installed. `claudeSetup: false` stops the relay from rewriting the linked Claude settings. The relay's `thinkEffort` fallback and Claude's saved Opus preference, launchers, and status-line fallback use `high`. Explicit client effort still takes precedence. Copilot CLI and `gg` retain their separate Astra/`high` defaults. Model routes and relay effort hot-reload without a restart; existing shells need their Claude launchers reloaded or a new shell. `upstreamTimeoutSeconds: 900` allows up to fifteen minutes for a single Claude request's upstream Copilot calls.
+Codex is not used. `codexSetup: false` stops the relay from editing `~/.codex`. Keep the key: the relay writes a missing key back with its default, `true`. `claudeSetup: false` stops the relay from rewriting the linked Claude settings. The relay's `thinkEffort` fallback and Claude's saved Opus preference, launchers, and status-line fallback use `high`. Explicit client effort still takes precedence. Copilot CLI and `gg` retain their separate Astra/`high` defaults. Model routes and relay effort hot-reload without a restart; existing shells need their Claude launchers reloaded or a new shell. `upstreamTimeoutSeconds: 900` allows up to fifteen minutes for a single Claude request's upstream Copilot calls.
 
 Login once:
 
