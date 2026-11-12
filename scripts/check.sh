@@ -307,7 +307,7 @@ run_model_default_smoke() {
   grep -Eq '^claudeUpstreamApi:[[:space:]]*chat-completions$' config/copilot-relay/config.yaml
 
   grep -Fq $'link\tconfig/copilot-relay/config.yaml\t.copilot-relay/config.yaml' config/manifest.tsv
-  grep -Eq '^codexSetup: true$' config/copilot-relay/config.yaml
+  grep -Eq '^codexSetup: false$' config/copilot-relay/config.yaml
 
   # Launcher wrappers inject the same defaults (settings.json can be rewritten
   # at runtime, so the flags are the authoritative per-launch pin).
