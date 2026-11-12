@@ -317,14 +317,12 @@ seg_model() {
 }
 
 seg_effort() {
-  # Claude Code's statusline JSON doesn't expose reasoning effort (no
-  # `.effort.level` in the documented schema as of v2.1.x), so $effort_level
-  # parsed from the payload is virtually always empty. Fall back to the
-  # MODEL_REASONING_EFFORT env var — Claude Code exports settings.json's
-  # `env` block to the statusline subprocess, so a user who set
-  # MODEL_REASONING_EFFORT=high in settings.json gets it surfaced here.
-  # Mirrors how the copilot statusline derives effort from the "(xhigh)"
-  # suffix in the model name; Claude's model names don't carry one.
+  # Claude Code's payload carries `.effort.level`, the session's level,
+  # including a /effort change made for this session only. The payload omits
+  # it when the model does not support effort. Then fall back to the
+  # MODEL_REASONING_EFFORT env var: Claude Code exports settings.json's
+  # `env` block to the statusline subprocess. The copilot statusline instead
+  # derives effort from the "(xhigh)" suffix in the model name.
   local lvl="${effort_level:-${MODEL_REASONING_EFFORT:-}}"
   [ -n "$lvl" ] || return 0
   label "$C_PURPLE" "$ICON_EFFORT" 'Effort'
