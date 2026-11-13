@@ -10,7 +10,7 @@ Apollo 是当前终端、multiplexer、shell、CLI 状态栏和文件列表共�
 
 | 范围 | 来源 |
 |---|---|
-| SonicTerm | `apollo-theme/apollo-theme` 的 `sonicterm-v0.2.1` release asset `apollo.toml` |
+| SonicTerm | `apollo-theme/apollo-theme` 的 `sonicterm-v0.2.2` release asset `apollo.toml` |
 | RMUX | `apollo-theme/apollo-theme` 的 `rmux-v0.2.1` release asset `apollo-rmux.conf` |
 | 原生 tmux | `apollo-theme/apollo-theme` 的 `tmux-v0.2.1` release asset `apollo.tmux` |
 | eza | `apollo-theme/apollo-theme` 的 `eza-v0.2.1` release asset `theme.yml` |
