@@ -10,7 +10,7 @@ The canonical palette and application adapters live in the [Apollo Theme monorep
 
 | Surface | Source |
 |---|---|
-| SonicTerm | `apollo-theme/apollo-theme` `sonicterm-v0.2.1` release asset `apollo.toml` |
+| SonicTerm | `apollo-theme/apollo-theme` `sonicterm-v0.2.2` release asset `apollo.toml` |
 | RMUX | `apollo-theme/apollo-theme` `rmux-v0.2.1` release asset `apollo-rmux.conf` |
 | Native tmux | `apollo-theme/apollo-theme` `tmux-v0.2.1` release asset `apollo.tmux` |
 | eza | `apollo-theme/apollo-theme` `eza-v0.2.1` release asset `theme.yml` |

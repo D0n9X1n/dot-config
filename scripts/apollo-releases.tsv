@@ -1,6 +1,6 @@
 # id	kind	repository	tag	artifact
 palette	raw	apollo-theme/apollo-theme	v0.2.0	palette/apollo.json
-sonicterm	release	apollo-theme/apollo-theme	sonicterm-v0.2.1	apollo.toml
+sonicterm	release	apollo-theme/apollo-theme	sonicterm-v0.2.2	apollo.toml
 rmux	release	apollo-theme/apollo-theme	rmux-v0.2.1	apollo-rmux.conf
 tmux	release	apollo-theme/apollo-theme	tmux-v0.2.1	apollo.tmux
 eza	release	apollo-theme/apollo-theme	eza-v0.2.1	theme.yml
